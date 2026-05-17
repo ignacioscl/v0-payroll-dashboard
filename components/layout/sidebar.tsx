@@ -220,7 +220,7 @@ export function Sidebar() {
                         <span className="text-sidebar-foreground font-medium text-sm truncate w-full">
                           John Doe
                         </span>
-                        <span className="text-muted-foreground text-xs truncate w-full">
+                        <span className="text-sky-100 text-xs truncate w-full">
                           Administrator
                         </span>
                       </div>
