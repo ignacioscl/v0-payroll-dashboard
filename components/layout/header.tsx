@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Calendar } from 'lucide-react'
+import { Bell, MagnifyingGlass, CalendarBlank } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,10 +21,8 @@ import { format } from 'date-fns'
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { agencies } from '@/lib/mock-data'
-
-interface HeaderProps {
-  sidebarCollapsed?: boolean
-}
+import { useSidebar } from '@/lib/sidebar-context'
+import { cn } from '@/lib/utils'
 
 // Issue types based on current page
 const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
@@ -42,9 +40,10 @@ const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
   ],
 }
 
-export function Header({ sidebarCollapsed }: HeaderProps) {
+export function Header() {
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+  const { collapsed } = useSidebar()
   const {
     search,
     setSearch,
@@ -55,7 +54,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
     selectedStatus,
     setSelectedStatus,
     dateRange,
-    setDateRange
+    setDateRange,
   } = useFilters()
 
   useEffect(() => {
@@ -69,15 +68,20 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
 
   return (
     <header
-      className={`fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6 transition-all duration-300 ${
-        sidebarCollapsed ? 'left-16' : 'left-64'
-      }`}
+      className={cn(
+        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6 transition-all duration-200 ease-in-out',
+        collapsed ? 'left-[72px]' : 'left-[260px]'
+      )}
     >
       {/* Filters */}
       <div className="flex items-center gap-3 flex-1">
         {/* Search */}
         <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlass
+            size={18}
+            weight="regular"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             placeholder="Search employee, dealer..."
             value={search}
@@ -93,8 +97,10 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Dealers</SelectItem>
-            {agencies.map(agency => (
-              <SelectItem key={agency.id} value={agency.id}>{agency.name}</SelectItem>
+            {agencies.map((agency) => (
+              <SelectItem key={agency.id} value={agency.id}>
+                {agency.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -107,8 +113,10 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              {currentIssueTypes.map(type => (
-                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+              {currentIssueTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -132,8 +140,11 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
         {/* Date Range Picker */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-2 border-border bg-background min-w-[160px]">
-              <Calendar className="h-4 w-4" />
+            <Button
+              variant="outline"
+              className="gap-2 border-border bg-background min-w-[160px]"
+            >
+              <CalendarBlank size={18} weight="regular" />
               {mounted && dateRange?.from ? (
                 dateRange.to ? (
                   <>
@@ -162,7 +173,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
       {/* Right side - Notifications */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+          <Bell size={22} weight="regular" />
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-white">
             12
           </span>
