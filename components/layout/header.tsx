@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, MagnifyingGlass, CalendarBlank } from '@phosphor-icons/react'
+import { Bell, Search, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -69,30 +69,28 @@ export function Header() {
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6 transition-all duration-200 ease-in-out',
+        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-xl px-6 transition-all duration-200 ease-in-out',
         collapsed ? 'left-[72px]' : 'left-[260px]'
       )}
     >
       {/* Filters */}
       <div className="flex items-center gap-3 flex-1">
         {/* Search */}
-        <div className="relative w-64">
-          <MagnifyingGlass
-            size={18}
-            weight="regular"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        <div className="relative w-72">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4"
           />
           <Input
             placeholder="Search employee, dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-background border-border"
+            className="pl-10 bg-background/50 border-border focus:bg-background transition-colors"
           />
         </div>
 
         {/* Dealer Filter */}
         <Select value={selectedDealer} onValueChange={setSelectedDealer}>
-          <SelectTrigger className="w-[160px] border-border bg-background">
+          <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
             <SelectValue placeholder="All Dealers" />
           </SelectTrigger>
           <SelectContent>
@@ -108,7 +106,7 @@ export function Header() {
         {/* Type Filter - only show on relevant pages */}
         {showTypeFilter && (
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[160px] border-border bg-background">
+            <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
@@ -125,7 +123,7 @@ export function Header() {
         {/* Status Filter - only show on relevant pages */}
         {showStatusFilter && (
           <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[140px] border-border bg-background">
+            <SelectTrigger className="w-[140px] border-border bg-background/50 focus:bg-background transition-colors">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -142,20 +140,19 @@ export function Header() {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="gap-2 border-border bg-background min-w-[160px]"
+              className="gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors"
             >
-              <CalendarBlank size={18} weight="regular" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               {mounted && dateRange?.from ? (
                 dateRange.to ? (
-                  <>
-                    {format(dateRange.from, 'MMM dd')} -{' '}
-                    {format(dateRange.to, 'MMM dd')}
-                  </>
+                  <span className="text-foreground">
+                    {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd')}
+                  </span>
                 ) : (
-                  format(dateRange.from, 'MMM dd, yyyy')
+                  <span className="text-foreground">{format(dateRange.from, 'MMM dd, yyyy')}</span>
                 )
               ) : (
-                'Select dates'
+                <span className="text-muted-foreground">Select dates</span>
               )}
             </Button>
           </PopoverTrigger>
@@ -172,9 +169,13 @@ export function Header() {
 
       {/* Right side - Notifications */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell size={22} weight="regular" />
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-white">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="relative hover:bg-muted transition-colors"
+        >
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-lg shadow-destructive/30">
             12
           </span>
         </Button>
