@@ -144,8 +144,8 @@ export function Sidebar() {
                     className={cn(
                       'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-sidebar-accent text-sidebar-foreground'
-                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                        ? 'bg-primary/15 text-sidebar-foreground shadow-sm'
+                        : 'text-sidebar-foreground hover:bg-white/10 hover:text-sidebar-foreground',
                       collapsed && 'justify-center px-0'
                     )}
                   >
@@ -161,7 +161,7 @@ export function Sidebar() {
                       <Icon
                       className={cn(
                         'h-5 w-5 shrink-0 transition-all duration-200',
-                        isActive ? 'text-primary' : 'text-sidebar-foreground/70 group-hover:text-primary group-hover:scale-110'
+                        isActive ? 'text-primary' : 'text-sidebar-foreground group-hover:text-primary group-hover:scale-110'
                       )}
                     />
                     <AnimatePresence>
@@ -202,7 +202,7 @@ export function Sidebar() {
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200',
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-white/10 transition-all duration-200',
                     collapsed && 'justify-center px-0'
                   )}
                 >
