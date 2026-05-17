@@ -103,7 +103,7 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setCollapsed(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/15 hover:text-white transition-all duration-200"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -120,7 +120,7 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setCollapsed(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/15 hover:text-white transition-all duration-200"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -144,8 +144,8 @@ export function Sidebar() {
                     className={cn(
                       'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-primary/15 text-sidebar-foreground shadow-sm'
-                        : 'text-sidebar-foreground hover:bg-white/10 hover:text-sidebar-foreground',
+                        ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
+                        : 'text-white/80 hover:bg-white/15 hover:text-white',
                       collapsed && 'justify-center px-0'
                     )}
                   >
@@ -153,7 +153,7 @@ export function Sidebar() {
                     {isActive && (
                       <motion.div
                         layoutId="activeIndicator"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-sm shadow-white/40"
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                       />
                     )}
@@ -161,7 +161,9 @@ export function Sidebar() {
                       <Icon
                       className={cn(
                         'h-5 w-5 shrink-0 transition-all duration-200',
-                        isActive ? 'text-primary' : 'text-sidebar-foreground group-hover:text-primary group-hover:scale-110'
+                        isActive
+                          ? 'text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.45)]'
+                          : 'text-white/70 group-hover:text-white group-hover:drop-shadow-[0_0_4px_rgba(255,255,255,0.35)] group-hover:scale-110'
                       )}
                     />
                     <AnimatePresence>
@@ -202,7 +204,7 @@ export function Sidebar() {
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-white/10 transition-all duration-200',
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all duration-200',
                     collapsed && 'justify-center px-0'
                   )}
                 >
@@ -222,7 +224,7 @@ export function Sidebar() {
                           Administrator
                         </span>
                       </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      <ChevronDown className="h-4 w-4 text-white/60" />
                     </>
                   )}
                 </button>
