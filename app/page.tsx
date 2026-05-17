@@ -154,7 +154,7 @@ export default function DashboardPage() {
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
       >
         {/* Trend Chart */}
-        <Card className="bg-card border-border overflow-hidden">
+        <Card className="bg-gradient-to-br from-white to-blue-50/50 border-blue-100 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -235,7 +235,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Distribution Pie Chart */}
-        <Card className="bg-card border-border overflow-hidden">
+        <Card className="bg-gradient-to-br from-white to-cyan-50/50 border-cyan-100 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
@@ -296,7 +296,7 @@ export default function DashboardPage() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
         {/* Top Agencies with Issues */}
-        <Card className="bg-card border-border overflow-hidden">
+        <Card className="bg-gradient-to-br from-white to-red-50/50 border-red-100 overflow-hidden">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
@@ -339,7 +339,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Recent Issues Table */}
-        <Card className="bg-card border-border lg:col-span-2 overflow-hidden">
+        <Card className="bg-gradient-to-br from-white to-slate-50/80 border-slate-100 lg:col-span-2 overflow-hidden">
           <CardHeader className="pb-4 flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">

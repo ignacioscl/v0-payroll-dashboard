@@ -28,39 +28,44 @@ export function KPICard({
 }: KPICardProps) {
   const variantConfig = {
     default: {
-      bg: 'bg-card',
-      border: 'border-border',
-      iconBg: 'bg-primary/10',
-      iconColor: 'text-primary',
-      glow: 'shadow-primary/5'
+      bg: 'bg-gradient-to-br from-white to-blue-50/60',
+      border: 'border-blue-100',
+      iconBg: 'bg-gradient-to-br from-blue-500 to-blue-700',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-blue-500/30',
+      glow: 'shadow-primary/10'
     },
     warning: {
-      bg: 'bg-card',
-      border: 'border-warning/20',
-      iconBg: 'bg-warning/10',
-      iconColor: 'text-warning',
-      glow: 'shadow-warning/10'
+      bg: 'bg-gradient-to-br from-white to-amber-50/70',
+      border: 'border-warning/25',
+      iconBg: 'bg-gradient-to-br from-amber-400 to-orange-600',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-amber-400/30',
+      glow: 'shadow-warning/15'
     },
     danger: {
-      bg: 'bg-card',
-      border: 'border-destructive/20',
-      iconBg: 'bg-destructive/10',
-      iconColor: 'text-destructive',
-      glow: 'shadow-destructive/10'
+      bg: 'bg-gradient-to-br from-white to-red-50/70',
+      border: 'border-destructive/25',
+      iconBg: 'bg-gradient-to-br from-red-500 to-rose-700',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-red-500/30',
+      glow: 'shadow-destructive/15'
     },
     success: {
-      bg: 'bg-card',
-      border: 'border-success/20',
-      iconBg: 'bg-success/10',
-      iconColor: 'text-success',
-      glow: 'shadow-success/10'
+      bg: 'bg-gradient-to-br from-white to-emerald-50/70',
+      border: 'border-success/25',
+      iconBg: 'bg-gradient-to-br from-emerald-400 to-green-700',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-emerald-500/30',
+      glow: 'shadow-success/15'
     },
     info: {
-      bg: 'bg-card',
-      border: 'border-accent/20',
-      iconBg: 'bg-accent/10',
-      iconColor: 'text-accent',
-      glow: 'shadow-accent/10'
+      bg: 'bg-gradient-to-br from-white to-cyan-50/70',
+      border: 'border-accent/25',
+      iconBg: 'bg-gradient-to-br from-cyan-400 to-sky-700',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-cyan-400/30',
+      glow: 'shadow-accent/15'
     }
   }
 
@@ -95,8 +100,6 @@ export function KPICard({
         config.glow
       )}
     >
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
       
       <div className="relative flex items-start justify-between">
         <div className="space-y-3 flex-1">
@@ -145,11 +148,12 @@ export function KPICard({
         </div>
 
         <div className={cn(
-          'flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-300',
-          'group-hover:scale-110',
-          config.iconBg
+          'flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300',
+          'group-hover:scale-110 group-hover:-translate-y-0.5',
+          config.iconBg,
+          config.iconShadow
         )}>
-          <span className={cn('transition-colors', config.iconColor)}>
+          <span className={cn('transition-colors drop-shadow-sm', config.iconColor)}>
             {icon}
           </span>
         </div>
