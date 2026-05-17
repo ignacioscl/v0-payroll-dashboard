@@ -21,10 +21,8 @@ import { format } from 'date-fns'
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { agencies } from '@/lib/mock-data'
-
-interface HeaderProps {
-  sidebarCollapsed?: boolean
-}
+import { useSidebar } from '@/lib/sidebar-context'
+import { cn } from '@/lib/utils'
 
 // Issue types based on current page
 const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
@@ -42,9 +40,10 @@ const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
   ],
 }
 
-export function Header({ sidebarCollapsed }: HeaderProps) {
+export function Header() {
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+  const { collapsed } = useSidebar()
   const {
     search,
     setSearch,
@@ -55,7 +54,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
     selectedStatus,
     setSelectedStatus,
     dateRange,
-    setDateRange
+    setDateRange,
   } = useFilters()
 
   useEffect(() => {
@@ -69,32 +68,37 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
 
   return (
     <header
-      className={`fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6 transition-all duration-300 ${
-        sidebarCollapsed ? 'left-16' : 'left-64'
-      }`}
+      className={cn(
+        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-xl px-6 transition-all duration-200 ease-in-out',
+        collapsed ? 'left-[72px]' : 'left-[260px]'
+      )}
     >
       {/* Filters */}
       <div className="flex items-center gap-3 flex-1">
         {/* Search */}
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative w-72">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4"
+          />
           <Input
             placeholder="Search employee, dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-background border-border"
+            className="pl-10 bg-background/50 border-border focus:bg-background transition-colors"
           />
         </div>
 
         {/* Dealer Filter */}
         <Select value={selectedDealer} onValueChange={setSelectedDealer}>
-          <SelectTrigger className="w-[160px] border-border bg-background">
+          <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
             <SelectValue placeholder="All Dealers" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Dealers</SelectItem>
-            {agencies.map(agency => (
-              <SelectItem key={agency.id} value={agency.id}>{agency.name}</SelectItem>
+            {agencies.map((agency) => (
+              <SelectItem key={agency.id} value={agency.id}>
+                {agency.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -102,13 +106,15 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
         {/* Type Filter - only show on relevant pages */}
         {showTypeFilter && (
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[160px] border-border bg-background">
+            <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              {currentIssueTypes.map(type => (
-                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+              {currentIssueTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -117,7 +123,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
         {/* Status Filter - only show on relevant pages */}
         {showStatusFilter && (
           <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[140px] border-border bg-background">
+            <SelectTrigger className="w-[140px] border-border bg-background/50 focus:bg-background transition-colors">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -132,19 +138,21 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
         {/* Date Range Picker */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-2 border-border bg-background min-w-[160px]">
-              <Calendar className="h-4 w-4" />
+            <Button
+              variant="outline"
+              className="gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors"
+            >
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               {mounted && dateRange?.from ? (
                 dateRange.to ? (
-                  <>
-                    {format(dateRange.from, 'MMM dd')} -{' '}
-                    {format(dateRange.to, 'MMM dd')}
-                  </>
+                  <span className="text-foreground">
+                    {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd')}
+                  </span>
                 ) : (
-                  format(dateRange.from, 'MMM dd, yyyy')
+                  <span className="text-foreground">{format(dateRange.from, 'MMM dd, yyyy')}</span>
                 )
               ) : (
-                'Select dates'
+                <span className="text-muted-foreground">Select dates</span>
               )}
             </Button>
           </PopoverTrigger>
@@ -161,9 +169,13 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
 
       {/* Right side - Notifications */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-white">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="relative hover:bg-muted transition-colors"
+        >
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-lg shadow-destructive/30">
             12
           </span>
         </Button>

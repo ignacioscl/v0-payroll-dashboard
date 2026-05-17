@@ -1,23 +1,36 @@
 import { cn } from '@/lib/utils'
 import type { IssueStatus, IssueType } from '@/lib/types'
 import { issueStatusLabels, issueTypeLabels } from '@/lib/types'
+import { Clock, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface StatusBadgeProps {
   status: IssueStatus
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const styles = {
-    pending: 'bg-amber-500/20 text-amber-500 border-amber-500/30',
-    reviewed: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
-    justified: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30'
+  const config = {
+    pending: {
+      styles: 'bg-warning/10 text-warning border-warning/20',
+      icon: Clock
+    },
+    reviewed: {
+      styles: 'bg-primary/10 text-primary border-primary/20',
+      icon: CheckCircle
+    },
+    justified: {
+      styles: 'bg-success/10 text-success border-success/20',
+      icon: CheckCircle
+    }
   }
+
+  const { styles, icon: Icon } = config[status]
 
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-      styles[status]
+      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold',
+      styles
     )}>
+      <Icon className="h-3 w-3" />
       {issueStatusLabels[status]}
     </span>
   )
@@ -29,26 +42,27 @@ interface IssueTypeBadgeProps {
 
 export function IssueTypeBadge({ type }: IssueTypeBadgeProps) {
   const styles: Record<IssueType, string> = {
-    late_arrival: 'bg-amber-500/20 text-amber-600 border-amber-500/30',
-    late_departure: 'bg-cyan-500/20 text-cyan-600 border-cyan-500/30',
-    early_departure: 'bg-orange-500/20 text-orange-600 border-orange-500/30',
-    missing_entry: 'bg-red-500/20 text-red-600 border-red-500/30',
-    missing_exit: 'bg-red-500/20 text-red-600 border-red-500/30',
-    missing_clock_out: 'bg-red-500/20 text-red-600 border-red-500/30',
-    missing_lunch_out: 'bg-orange-500/20 text-orange-600 border-orange-500/30',
-    missing_lunch_in: 'bg-orange-500/20 text-orange-600 border-orange-500/30',
-    extended_lunch: 'bg-purple-500/20 text-purple-600 border-purple-500/30',
-    no_punches: 'bg-red-600/20 text-red-600 border-red-600/30',
-    manual_punch: 'bg-blue-500/20 text-blue-600 border-blue-500/30',
-    deleted_punch: 'bg-purple-500/20 text-purple-600 border-purple-500/30',
-    modified_payment: 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
+    late_arrival: 'bg-warning/10 text-warning border-warning/20',
+    late_departure: 'bg-accent/10 text-accent border-accent/20',
+    early_departure: 'bg-warning/10 text-warning border-warning/20',
+    missing_entry: 'bg-destructive/10 text-destructive border-destructive/20',
+    missing_exit: 'bg-destructive/10 text-destructive border-destructive/20',
+    missing_clock_out: 'bg-destructive/10 text-destructive border-destructive/20',
+    missing_lunch_out: 'bg-warning/10 text-warning border-warning/20',
+    missing_lunch_in: 'bg-warning/10 text-warning border-warning/20',
+    extended_lunch: 'bg-chart-5/10 text-chart-5 border-chart-5/20',
+    no_punches: 'bg-destructive/10 text-destructive border-destructive/20',
+    manual_punch: 'bg-primary/10 text-primary border-primary/20',
+    deleted_punch: 'bg-chart-5/10 text-chart-5 border-chart-5/20',
+    modified_payment: 'bg-success/10 text-success border-success/20'
   }
 
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold',
       styles[type]
     )}>
+      <AlertCircle className="h-3 w-3" />
       {issueTypeLabels[type]}
     </span>
   )
