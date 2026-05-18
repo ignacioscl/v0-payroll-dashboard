@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Calendar } from 'lucide-react'
+import { Bell, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,17 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { Calendar as CalendarComponent } from '@/components/ui/calendar'
-import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
-import { agencies } from '@/lib/mock-data'
+import { dealerOptions } from '@/lib/dealers'
+import { DateRangePicker } from '@/components/filters/date-range-picker'
+import { DealerSelect } from '@/components/filters/dealer-select'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 
@@ -41,7 +35,6 @@ const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
 }
 
 export function Header() {
-  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
   const { collapsed } = useSidebar()
   const {
@@ -56,10 +49,6 @@ export function Header() {
     dateRange,
     setDateRange,
   } = useFilters()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Get issue types for current page
   const currentIssueTypes = issueTypesByPage[pathname] || []
@@ -89,19 +78,11 @@ export function Header() {
         </div>
 
         {/* Dealer Filter */}
-        <Select value={selectedDealer} onValueChange={setSelectedDealer}>
-          <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
-            <SelectValue placeholder="All Dealers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Dealers</SelectItem>
-            {agencies.map((agency) => (
-              <SelectItem key={agency.id} value={agency.id}>
-                {agency.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <DealerSelect
+          dealers={dealerOptions}
+          value={selectedDealer}
+          onValueChange={setSelectedDealer}
+        />
 
         {/* Type Filter - only show on relevant pages */}
         {showTypeFilter && (
@@ -136,35 +117,7 @@ export function Header() {
         )}
 
         {/* Date Range Picker */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors"
-            >
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              {mounted && dateRange?.from ? (
-                dateRange.to ? (
-                  <span className="text-foreground">
-                    {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd')}
-                  </span>
-                ) : (
-                  <span className="text-foreground">{format(dateRange.from, 'MMM dd, yyyy')}</span>
-                )
-              ) : (
-                <span className="text-muted-foreground">Select dates</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              numberOfMonths={2}
-            />
-          </PopoverContent>
-        </Popover>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
       {/* Right side - Notifications */}

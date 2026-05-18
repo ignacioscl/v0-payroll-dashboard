@@ -20,6 +20,7 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
+  Blocks,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -35,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useSrsUser } from '@/lib/auth/use-srs-user'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -44,11 +46,24 @@ const navigation = [
   { name: 'Trends', href: '/trends', icon: TrendingUp },
   { name: 'Employee Ranking', href: '/ranking', icon: Trophy },
   { name: 'Costs by Dealer', href: '/costs', icon: DollarSign },
+  { name: 'Components', href: '/components', icon: Blocks },
 ]
+
+function userInitials(nombre: string) {
+  const parts = nombre.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useSidebar()
+  const { user } = useSrsUser()
+
+  const displayName = user?.nombre ?? 'User'
+  const displayRole = user?.dealerName ?? user?.email ?? 'SRS'
+  const initials = userInitials(displayName)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -211,17 +226,17 @@ export function Sidebar() {
                   <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-lg shadow-primary/10">
                     <AvatarImage src="/avatars/user.jpg" alt="User" />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs font-semibold">
-                      JD
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                   {!collapsed && (
                     <>
                       <div className="flex flex-col items-start flex-1 min-w-0">
                         <span className="text-sidebar-foreground font-medium text-sm truncate w-full">
-                          John Doe
+                          {displayName}
                         </span>
                         <span className="text-sky-100 text-xs truncate w-full">
-                          Administrator
+                          {displayRole}
                         </span>
                       </div>
                       <ChevronDown className="h-4 w-4 text-white/60" />
@@ -235,8 +250,8 @@ export function Sidebar() {
                 className="w-56"
               >
                 <div className="px-3 py-2">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-muted-foreground">john@autowax.com</p>
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email || displayRole}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2 cursor-pointer">
