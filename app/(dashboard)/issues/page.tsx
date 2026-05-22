@@ -11,7 +11,7 @@ import { useFilters } from '@/lib/filter-context'
 import { EmployeeAvatar } from '@/components/employees/employee-avatar'
 import { IssueTypeBadge, StatusBadge } from '@/components/shared/status-badge'
 import { TimeDiffBadge } from '@/components/shared/time-diff-badge'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -401,131 +401,126 @@ export default function IssuesPage() {
       </div>
 
       {/* ── Table Card ──────────────────────────────────── */}
-      <Card className="border-border shadow-sm">
+      <Card className="gap-0 overflow-hidden border-border py-0 shadow-sm">
 
-        {/* Toolbar */}
-        <CardHeader className="px-4 py-3 border-b border-border">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{filteredIssues.length}</span>
-              <span>records found</span>
-              {filteredIssues.length !== issues.length && (
-                <Badge variant="secondary" className="text-[11px] px-1.5 py-0">filtered</Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Rows per page */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(value) => { setPageSize(Number(value)); setPageIndex(0) }}
-                >
-                  <SelectTrigger className="h-8 w-[70px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator orientation="vertical" className="h-6" />
-
-              {/* Column visibility */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    Columns
-                    <Badge variant="secondary" className="text-[11px] px-1.5 py-0 ml-0.5">
-                      {visibleColumns.size}
-                    </Badge>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel className="text-xs">Toggle columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {ALL_COLUMNS.map(col => (
-                    <DropdownMenuCheckboxItem
-                      key={col.key}
-                      className="text-sm"
-                      checked={visibleColumns.has(col.key)}
-                      onCheckedChange={() => toggleColumn(col.key)}
-                    >
-                      {col.label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Export */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={handleExportCSV}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />
-                Export Excel
-              </Button>
-            </div>
+        {/* Toolbar — flex row (CardHeader grid reserves an empty second row) */}
+        <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border bg-muted/25 px-3 py-1.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">{filteredIssues.length}</span>
+            <span>records</span>
+            {filteredIssues.length !== issues.length && (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">filtered</Badge>
+            )}
           </div>
-        </CardHeader>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">Rows</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) => { setPageSize(Number(value)); setPageIndex(0) }}
+              >
+                <SelectTrigger className="h-7 w-[58px] px-2 text-[11px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 h-4" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]">
+                  <SlidersHorizontal className="h-3 w-3" />
+                  Columns
+                  <Badge variant="secondary" className="ml-0 px-1 py-0 text-[10px]">
+                    {visibleColumns.size}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-xs">Toggle columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {ALL_COLUMNS.map(col => (
+                  <DropdownMenuCheckboxItem
+                    key={col.key}
+                    className="text-sm"
+                    checked={visibleColumns.has(col.key)}
+                    onCheckedChange={() => toggleColumn(col.key)}
+                  >
+                    {col.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={handleExportCSV}
+            >
+              <FileSpreadsheet className="h-3 w-3 text-green-600" />
+              Export
+            </Button>
+          </div>
+        </div>
 
         {/* Table */}
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-[#1565C0] hover:bg-[#1565C0] border-none">
+            <TableHeader className="[&_tr]:border-0">
+              <TableRow className="border-0 bg-[#1565C0] hover:bg-[#1565C0]">
                 {visibleColumns.has('employee') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('employee')}>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('employee')}>
                       Employee <SortIcon field="employee" />
                     </button>
                   </TableHead>
                 )}
                 {visibleColumns.has('dealer') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('agency')}>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('agency')}>
                       Dealer <SortIcon field="agency" />
                     </button>
                   </TableHead>
                 )}
                 {visibleColumns.has('date') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('date')}>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('date')}>
                       Date <SortIcon field="date" />
                     </button>
                   </TableHead>
                 )}
                 {visibleColumns.has('issue') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('type')}>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('type')}>
                       Issue <SortIcon field="type" />
                     </button>
                   </TableHead>
                 )}
                 {visibleColumns.has('expected') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">Expected</TableHead>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Expected</TableHead>
                 )}
                 {visibleColumns.has('actual') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">Actual</TableHead>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Actual</TableHead>
                 )}
                 {visibleColumns.has('difference') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('minutesDiff')}>
-                      Difference <SortIcon field="minutesDiff" />
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('minutesDiff')}>
+                      Diff <SortIcon field="minutesDiff" />
                     </button>
                   </TableHead>
                 )}
                 {visibleColumns.has('status') && (
-                  <TableHead className="text-white font-medium px-4 py-3 h-auto">
-                    <button className="flex items-center hover:text-white/80 transition-colors" onClick={() => handleSort('status')}>
+                  <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
+                    <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('status')}>
                       Status <SortIcon field="status" />
                     </button>
                   </TableHead>
@@ -555,47 +550,47 @@ export default function IssuesPage() {
                   return (
                     <TableRow
                       key={issue.id}
-                      className={`border-b border-border/60 transition-colors ${index % 2 === 0 ? '' : 'bg-muted/30'}`}
+                      className={`border-b border-border/50 transition-colors ${index % 2 === 0 ? '' : 'bg-muted/25'}`}
                     >
                       {visibleColumns.has('employee') && (
-                        <TableCell className="px-4 py-2.5">
-                          <EmployeeAvatar employee={employee} size="sm" showName showPosition />
+                        <TableCell className="px-3 py-1.5">
+                          <EmployeeAvatar employee={employee} size="xs" showName showPosition />
                         </TableCell>
                       )}
                       {visibleColumns.has('dealer') && (
-                        <TableCell className="px-4 py-2.5">
-                          <p className="text-sm font-medium text-foreground">{agency.name}</p>
-                          <p className="text-xs text-muted-foreground">ID: {employee.id}</p>
+                        <TableCell className="px-3 py-1.5">
+                          <p className="text-xs font-medium leading-tight text-foreground">{agency.name}</p>
+                          <p className="text-[11px] leading-tight text-muted-foreground">{employee.id}</p>
                         </TableCell>
                       )}
                       {visibleColumns.has('date') && (
-                        <TableCell className="px-4 py-2.5">
-                          <p className="text-sm text-foreground">{format(new Date(issue.date), 'MMM dd, yyyy')}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(issue.date), 'EEEE')}</p>
+                        <TableCell className="px-3 py-1.5">
+                          <p className="text-xs leading-tight text-foreground">{format(new Date(issue.date), 'MMM dd, yyyy')}</p>
+                          <p className="text-[11px] leading-tight text-muted-foreground">{format(new Date(issue.date), 'EEE')}</p>
                         </TableCell>
                       )}
                       {visibleColumns.has('issue') && (
-                        <TableCell className="px-4 py-2.5">
+                        <TableCell className="px-3 py-1.5">
                           <IssueTypeBadge type={issue.type} />
                         </TableCell>
                       )}
                       {visibleColumns.has('expected') && (
-                        <TableCell className="px-4 py-2.5">
-                          <span className="text-sm font-mono text-foreground">{issue.expectedTime || '—'}</span>
+                        <TableCell className="px-3 py-1.5">
+                          <span className="text-xs font-mono text-foreground">{issue.expectedTime || '—'}</span>
                         </TableCell>
                       )}
                       {visibleColumns.has('actual') && (
-                        <TableCell className="px-4 py-2.5">
-                          <span className="text-sm font-mono text-foreground">{issue.actualTime || '—'}</span>
+                        <TableCell className="px-3 py-1.5">
+                          <span className="text-xs font-mono text-foreground">{issue.actualTime || '—'}</span>
                         </TableCell>
                       )}
                       {visibleColumns.has('difference') && (
-                        <TableCell className="px-4 py-2.5">
+                        <TableCell className="px-3 py-1.5">
                           <TimeDiffBadge minutes={issue.minutesDiff} />
                         </TableCell>
                       )}
                       {visibleColumns.has('status') && (
-                        <TableCell className="px-4 py-2.5">
+                        <TableCell className="px-3 py-1.5">
                           <StatusBadge status={issue.status} />
                         </TableCell>
                       )}
@@ -608,32 +603,36 @@ export default function IssuesPage() {
         </CardContent>
 
         {/* ── Pagination ──────────────────────────────────── */}
-        {totalPages > 1 && (
-          <div className="border-t border-border px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-xs text-muted-foreground shrink-0">
-              Showing{' '}
-              <span className="font-medium text-foreground">
-                {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, filteredIssues.length)}
-              </span>{' '}
-              of{' '}
-              <span className="font-medium text-foreground">{filteredIssues.length}</span>{' '}
-              records
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5">
+          <p className="shrink-0 text-[11px] text-muted-foreground">
+            {filteredIssues.length === 0 ? (
+              'No records'
+            ) : (
+              <>
+                <span className="font-medium text-foreground tabular-nums">
+                  {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, filteredIssues.length)}
+                </span>
+                {' '}of{' '}
+                <span className="font-medium text-foreground tabular-nums">{filteredIssues.length}</span>
+              </>
+            )}
+          </p>
 
-            <Pagination className="w-auto mx-0">
+          {totalPages > 1 && (
+            <Pagination className="mx-0 w-auto">
               <PaginationContent className="gap-0.5">
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
                     onClick={(e) => { e.preventDefault(); if (pageIndex > 0) setPageIndex(p => p - 1) }}
-                    className={pageIndex === 0 ? 'pointer-events-none opacity-40' : 'cursor-pointer'}
+                    className={`h-7 px-2 text-xs ${pageIndex === 0 ? 'pointer-events-none opacity-40' : 'cursor-pointer'}`}
                   />
                 </PaginationItem>
 
                 {pageNumbers.map((page, i) =>
                   page === 'ellipsis' ? (
                     <PaginationItem key={`ellipsis-${i}`}>
-                      <PaginationEllipsis />
+                      <PaginationEllipsis className="h-7 w-7" />
                     </PaginationItem>
                   ) : (
                     <PaginationItem key={page}>
@@ -641,7 +640,7 @@ export default function IssuesPage() {
                         href="#"
                         isActive={page === pageIndex + 1}
                         onClick={(e) => { e.preventDefault(); setPageIndex(page - 1) }}
-                        className="cursor-pointer"
+                        className="h-7 w-7 cursor-pointer text-xs"
                       >
                         {page}
                       </PaginationLink>
@@ -653,13 +652,13 @@ export default function IssuesPage() {
                   <PaginationNext
                     href="#"
                     onClick={(e) => { e.preventDefault(); if (pageIndex < totalPages - 1) setPageIndex(p => p + 1) }}
-                    className={pageIndex >= totalPages - 1 ? 'pointer-events-none opacity-40' : 'cursor-pointer'}
+                    className={`h-7 px-2 text-xs ${pageIndex >= totalPages - 1 ? 'pointer-events-none opacity-40' : 'cursor-pointer'}`}
                   />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
     </div>
   )

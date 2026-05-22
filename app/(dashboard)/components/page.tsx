@@ -9,6 +9,7 @@ import { DealerSelect } from '@/components/filters/dealer-select'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ParallelRequestTest } from '@/components/dev/parallel-request-test'
 
 function defaultDateRange(): DateRange {
   const to = BASE_DATE
@@ -114,6 +115,14 @@ export default function ComponentsPage() {
               </div>
             )}
           </Preview>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Parallel request test (temp)"
+          description="10 calls to compare parallel vs serial — remove after testing."
+          className="lg:col-span-2"
+        >
+          <ParallelRequestTest />
         </ComponentCard>
       </div>
     </div>
