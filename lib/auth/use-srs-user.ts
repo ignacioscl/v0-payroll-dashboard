@@ -1,38 +1,41 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useApiRequest } from '@/lib/hooks/use-api-request'
+import { UrlEnum } from '@/types/enum-url'
 import type { SrsSessionUser } from './types'
 
+type SessionResponse = {
+  authenticated?: boolean
+  user?: SrsSessionUser
+  error?: string
+}
+
+export const sessionQueryKey = ['auth', 'session'] as const
+
 export function useSrsUser() {
-  const [user, setUser] = useState<SrsSessionUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const apiRequest = useApiRequest<SrsSessionUser, undefined, SessionResponse>(
+    UrlEnum.AUTH_SESSION,
+  )
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
+  const query = useQuery({
+    queryKey: sessionQueryKey,
+    queryFn: async () => {
       try {
-        const res = await fetch('/api/auth/session', { credentials: 'include' })
-        if (!res.ok) {
-          if (!cancelled) setUser(null)
-          return
+        const json = await apiRequest.getRaw()
+        if (!json.authenticated || !json.user) {
+          return null
         }
-        const json = await res.json()
-        if (!cancelled && json.authenticated && json.user) {
-          setUser(json.user as SrsSessionUser)
-        }
+        return json.user
       } catch {
-        if (!cancelled) setUser(null)
-      } finally {
-        if (!cancelled) setLoading(false)
+        return null
       }
-    }
+    },
+    retry: false,
+  })
 
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return { user, loading }
+  return {
+    user: query.data ?? null,
+    loading: query.isLoading,
+  }
 }

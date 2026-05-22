@@ -1,0 +1,56 @@
+---
+description: Payroll dashboard — proxy SRS genérico vs BFF dedicado
+globs: v0-payroll-dashboard/**/*
+alwaysApply: false
+---
+
+# API: proxy SRS híbrido
+
+## Default (~80%): proxy genérico
+
+- Cliente (`useApiRequest`, hooks): llamar a `/api/srs/{path}` vía `srsProxyUrl()` o `UrlEnum` con prefijo `/api/srs/`.
+- Path upstream: paths reales de SRS (ej. `php/api/...`). No duplicar lógica PHP en Next.
+- Auth: cookies httpOnly; el proxy inyecta JWT con `forwardToSrs` / `getSrsSession`. El browser no ve el token SRS.
+- No crear `app/api/{recurso}/route.ts` por cada endpoint PHP.
+
+Ejemplo cliente:
+
+```ts
+// UrlEnum o srsProxyUrl
+EMPLOYEES = '/api/srs/php/api/payroll/employees.php'
+```
+
+## BFF dedicado (excepciones)
+
+Crear `app/api/{recurso}/route.ts` solo cuando:
+
+- Hay que **normalizar** respuesta legacy PHP (ej. dealers → `{ dealers: [{ id, label }] }`).
+- **Exports** (XLSX, CSV, blobs) o respuestas no-JSON.
+- **Reportes** con agregación, filtros complejos o contrato estable para el UI.
+- Errores PHP/HTML deben convertirse a JSON claro (`readSrsJson`, mensajes útiles).
+- Restricción de seguridad: no exponer un path PHP amplio al browser.
+
+BFF existentes (mantener):
+
+- `/api/auth/session` — lee sesión local; no llama SRS.
+- `/api/dealers` — normaliza contratistas/dealers.
+
+Futuros candidatos BFF: `/api/reports/*`, `/api/exports/*`.
+
+## Cliente
+
+- Usar `useApiRequest` + `@tanstack/react-query` (no `fetch` directo en hooks).
+- `UrlEnum` en `types/enum-url.ts`: rutas same-origin; genéricas bajo `/api/srs/...`, BFF bajo `/api/...`.
+- Misma `queryKey` si varios componentes consumen el mismo recurso.
+
+## Servidor
+
+- Route Handlers BFF: usar `srsFetch()` (llama `forwardToSrs` en proceso, sin hop HTTP a `/api/srs`).
+- Proxy genérico: `app/api/srs/[...path]/route.ts` + `lib/srs-proxy.ts`.
+- SSO exchange: `lib/srs-api.ts` directo a SRS (server-only, secret).
+- No llamar `SRS_API_URL` desde el browser.
+
+## PHP (SRS)
+
+- Endpoints nuevos de payroll bajo `public/php/api/payroll/` cuando el contrato sea para este dashboard.
+- Reutilizar filtros/sesión JWT como `dealers.php` cuando aplique.
