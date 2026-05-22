@@ -7,6 +7,8 @@ export interface SrsSessionUser {
   idDealer: number | null
   dealerName: string | null
   idDealerProvider: number | null
+  rolesRelCount?: number
+  isCompanyTypeCompany?: boolean
 }
 
 export interface SrsSession {

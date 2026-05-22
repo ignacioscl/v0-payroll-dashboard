@@ -1,9 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Command,
   CommandEmpty,
@@ -21,6 +20,22 @@ import {
 import { cn } from '@/lib/utils'
 import type { DealerOption } from './types'
 
+function RowCheckbox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        'mr-2 flex size-4 shrink-0 items-center justify-center rounded-[4px] border shadow-xs',
+        checked
+          ? 'border-primary bg-primary text-white'
+          : 'border-muted-foreground/60 bg-background'
+      )}
+      aria-hidden
+    >
+      {checked ? <Check className="size-3 stroke-[3] text-white" /> : null}
+    </span>
+  )
+}
+
 interface DealerMultiSelectProps {
   dealers: DealerOption[]
   value: string[]
@@ -30,6 +45,8 @@ interface DealerMultiSelectProps {
   emptyLabel?: string
   className?: string
   maxHeight?: string
+  loading?: boolean
+  disabled?: boolean
 }
 
 export function DealerMultiSelect({
@@ -41,11 +58,14 @@ export function DealerMultiSelect({
   emptyLabel = 'No dealers found.',
   className,
   maxHeight = 'max-h-[280px]',
+  loading = false,
+  disabled = false,
 }: DealerMultiSelectProps) {
   const [open, setOpen] = useState(false)
 
   const allIds = useMemo(() => dealers.map((d) => d.id), [dealers])
-  const allSelected = dealers.length > 0 && value.length === dealers.length
+  const allSelected =
+    dealers.length > 0 && allIds.every((id) => value.includes(id))
   const noneSelected = value.length === 0
 
   const label = useMemo(() => {
@@ -66,8 +86,16 @@ export function DealerMultiSelect({
     }
   }
 
-  const selectAll = () => onChange([...allIds])
-  const clearAll = () => onChange([])
+  const toggleAll = () => {
+    onChange(allSelected ? [] : [...allIds])
+  }
+
+  /** cmdk: use mousedown so every click toggles (onSelect only fires once per item). */
+  const handleRowMouseDown = (action: () => void) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    action()
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -76,13 +104,20 @@ export function DealerMultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled || loading}
           className={cn(
             'min-w-[200px] justify-between border-border bg-background/50 font-normal text-foreground hover:bg-background hover:text-foreground',
             className
           )}
         >
-          <span className="truncate text-foreground">{label}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate text-foreground">
+            {loading ? 'Loading dealers...' : label}
+          </span>
+          {loading ? (
+            <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
+          ) : (
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] p-0" align="start">
@@ -92,16 +127,13 @@ export function DealerMultiSelect({
             <CommandEmpty>{emptyLabel}</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                onSelect={() => (allSelected ? clearAll() : selectAll())}
+                value="__select_all__"
+                onSelect={() => {}}
+                onMouseDown={handleRowMouseDown(toggleAll)}
                 className="cursor-pointer data-[selected=true]:text-foreground"
               >
-                <Checkbox
-                  checked={allSelected}
-                  className="pointer-events-none mr-2"
-                  aria-hidden
-                />
+                <RowCheckbox checked={allSelected} />
                 <span className="font-medium">{allSelectedLabel}</span>
-                {allSelected && <Check className="ml-auto h-4 w-4 text-primary" />}
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -112,16 +144,12 @@ export function DealerMultiSelect({
                   <CommandItem
                     key={dealer.id}
                     value={dealer.label}
-                    onSelect={() => toggleDealer(dealer.id)}
+                    onSelect={() => {}}
+                    onMouseDown={handleRowMouseDown(() => toggleDealer(dealer.id))}
                     className="cursor-pointer data-[selected=true]:text-foreground"
                   >
-                    <Checkbox
-                      checked={checked}
-                      className="pointer-events-none mr-2"
-                      aria-hidden
-                    />
+                    <RowCheckbox checked={checked} />
                     <span className="truncate">{dealer.label}</span>
-                    {checked && <Check className="ml-auto h-4 w-4 text-primary" />}
                   </CommandItem>
                 )
               })}

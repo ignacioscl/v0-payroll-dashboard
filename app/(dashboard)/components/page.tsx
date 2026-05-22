@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { BASE_DATE } from '@/lib/mock-data'
-import { dealerOptions } from '@/lib/dealers'
+import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerSelect } from '@/components/filters/dealer-select'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
@@ -18,14 +18,23 @@ function defaultDateRange(): DateRange {
 }
 
 export default function ComponentsPage() {
+  const { dealers: dealerOptions, loading, error } = useSrsDealers()
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
   const [dealer, setDealer] = useState('all')
   const [dealers, setDealers] = useState<string[]>([])
+  const didInitDealers = useRef(false)
 
   useEffect(() => {
     setDateRange(defaultDateRange())
-    setDealers(dealerOptions.map((d) => d.id))
   }, [])
+
+  // Only pre-select all once when SRS dealers first load — not when user clears selection
+  useEffect(() => {
+    if (!didInitDealers.current && dealerOptions.length > 0) {
+      setDealers(dealerOptions.map((d) => d.id))
+      didInitDealers.current = true
+    }
+  }, [dealerOptions])
 
   const selectedDealerLabels = dealerOptions
     .filter((d) => dealers.includes(d.id))
@@ -38,6 +47,9 @@ export default function ComponentsPage() {
         <p className="mt-1 text-muted-foreground">
           Shared filters and controls used across the payroll dashboard (shadcn / site style).
         </p>
+        {error && (
+          <p className="mt-2 text-sm text-destructive">Could not load dealers from SRS: {error}</p>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -57,12 +69,14 @@ export default function ComponentsPage() {
 
         <ComponentCard
           title="Dealer select"
-          description="Single dealer dropdown with an “All Dealers” option."
+          description="Single dealer from SRS (json.contratistas.php), same source as invoice_main."
         >
           <DealerSelect
             dealers={dealerOptions}
             value={dealer}
             onValueChange={setDealer}
+            loading={loading}
+            disabled={!!error}
           />
           <Preview label="Value">
             {dealer === 'all'
@@ -73,16 +87,20 @@ export default function ComponentsPage() {
 
         <ComponentCard
           title="Dealer multi-select"
-          description="Multi-check dealers with search and select-all — same behavior as SRS invoices (#id_dealer_multi)."
+          description="Multi-check dealers from SRS — same list as #id_dealer_multi on invoice_main."
           className="lg:col-span-2"
         >
           <DealerMultiSelect
             dealers={dealerOptions}
             value={dealers}
             onChange={setDealers}
+            loading={loading}
+            disabled={!!error}
           />
           <Preview label={`Selected (${dealers.length})`}>
-            {dealers.length === dealerOptions.length ? (
+            {loading ? (
+              <span className="text-muted-foreground">Loading...</span>
+            ) : dealers.length === dealerOptions.length && dealerOptions.length > 0 ? (
               <Badge variant="secondary">All Dealers</Badge>
             ) : dealers.length === 0 ? (
               <span className="text-muted-foreground">None</span>

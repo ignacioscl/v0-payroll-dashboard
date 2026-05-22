@@ -12,9 +12,9 @@ import {
 } from '@/components/ui/select'
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
-import { dealerOptions } from '@/lib/dealers'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerSelect } from '@/components/filters/dealer-select'
+import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,7 @@ const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
 export function Header() {
   const pathname = usePathname()
   const { collapsed } = useSidebar()
+  const { dealers: dealerOptions, loading: dealersLoading } = useSrsDealers()
   const {
     search,
     setSearch,
@@ -82,6 +83,7 @@ export function Header() {
           dealers={dealerOptions}
           value={selectedDealer}
           onValueChange={setSelectedDealer}
+          loading={dealersLoading}
         />
 
         {/* Type Filter - only show on relevant pages */}

@@ -20,6 +20,8 @@ interface DealerSelectProps {
   placeholder?: string
   className?: string
   triggerClassName?: string
+  loading?: boolean
+  disabled?: boolean
 }
 
 export function DealerSelect({
@@ -32,9 +34,11 @@ export function DealerSelect({
   placeholder = 'Dealer',
   className,
   triggerClassName,
+  loading = false,
+  disabled = false,
 }: DealerSelectProps) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled || loading}>
       <SelectTrigger
         className={cn(
           'w-[160px] border-border bg-background/50 focus:bg-background transition-colors',
