@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Bell, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,19 +14,18 @@ import {
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
-import { DealerSelect } from '@/components/filters/dealer-select'
+import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 
-// Issue types based on current page
 const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
   '/issues': [
-    { value: 'missing_lunch_out', label: 'Missing Lunch' },
-    { value: 'missing_clock_out', label: 'Missing Clock Out' },
-    { value: 'manual_punch', label: 'Manual Punch' },
-    { value: 'deleted_punch', label: 'Deleted Punch' },
-    { value: 'modified_payment', label: 'Modified Payment' },
+    { value: 'only_error', label: 'Only with errors' },
+    { value: 'only_error_clockout', label: 'Only without clock out' },
+    { value: 'manual_punch', label: 'Manual punch' },
+    { value: 'only_deletes', label: 'Deleted punches' },
+    { value: 'without_salary', label: 'Without salary' },
   ],
   '/schedule': [
     { value: 'late_arrival', label: 'Late Arrival' },
@@ -41,8 +41,8 @@ export function Header() {
   const {
     search,
     setSearch,
-    selectedDealer,
-    setSelectedDealer,
+    selectedDealers,
+    setSelectedDealers,
     selectedType,
     setSelectedType,
     selectedStatus,
@@ -50,46 +50,52 @@ export function Header() {
     dateRange,
     setDateRange,
   } = useFilters()
+  const didSanitizeDealers = useRef(false)
 
-  // Get issue types for current page
+  useEffect(() => {
+    if (didSanitizeDealers.current || dealerOptions.length === 0) return
+    didSanitizeDealers.current = true
+
+    setSelectedDealers((prev) => {
+      if (prev.length === 0) return prev
+      const valid = new Set(dealerOptions.map((d) => d.id))
+      return prev.filter((id) => valid.has(id))
+    })
+  }, [dealerOptions, setSelectedDealers])
+
   const currentIssueTypes = issueTypesByPage[pathname] || []
   const showTypeFilter = currentIssueTypes.length > 0
-  const showStatusFilter = pathname === '/issues' || pathname === '/schedule'
+  const showStatusFilter = pathname === '/schedule'
 
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-xl px-6 transition-all duration-200 ease-in-out',
+        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur-xl transition-all duration-200 ease-in-out sm:px-6',
         collapsed ? 'left-[72px]' : 'left-[260px]'
       )}
     >
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-1">
-        {/* Search */}
-        <div className="relative w-72">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4"
-          />
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+        <div className="relative w-56 shrink-0 sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search employee, dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-background/50 border-border focus:bg-background transition-colors"
+            className="h-9 border-border bg-background/50 pl-10 focus:bg-background"
           />
         </div>
 
-        {/* Dealer Filter */}
-        <DealerSelect
+        <DealerMultiSelect
           dealers={dealerOptions}
-          value={selectedDealer}
-          onValueChange={setSelectedDealer}
+          value={selectedDealers}
+          onChange={setSelectedDealers}
           loading={dealersLoading}
+          className="w-[200px] shrink-0"
         />
 
-        {/* Type Filter - only show on relevant pages */}
         {showTypeFilter && (
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[160px] border-border bg-background/50 focus:bg-background transition-colors">
+            <SelectTrigger className="h-9 w-[150px] shrink-0 border-border bg-background/50">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
@@ -103,10 +109,9 @@ export function Header() {
           </Select>
         )}
 
-        {/* Status Filter - only show on relevant pages */}
         {showStatusFilter && (
           <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[140px] border-border bg-background/50 focus:bg-background transition-colors">
+            <SelectTrigger className="h-9 w-[130px] shrink-0 border-border bg-background/50">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -118,17 +123,11 @@ export function Header() {
           </Select>
         )}
 
-        {/* Date Range Picker */}
         <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
-      {/* Right side - Notifications */}
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="relative hover:bg-muted transition-colors"
-        >
+      <div className="flex shrink-0 items-center gap-4">
+        <Button variant="ghost" size="icon" className="relative hover:bg-muted">
           <Bell className="h-5 w-5 text-muted-foreground" />
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-lg shadow-destructive/30">
             12

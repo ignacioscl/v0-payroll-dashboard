@@ -41,7 +41,7 @@ type SortDirection = 'asc' | 'desc'
 
 export default function SchedulePage() {
   // Get filters from global context
-  const { search, selectedDealer, selectedType, selectedStatus, dateRange } = useFilters()
+  const { search, selectedDealers, selectedType, selectedStatus, dateRange } = useFilters()
   
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(25)
@@ -69,8 +69,8 @@ export default function SchedulePage() {
       })
     }
 
-    if (selectedDealer !== 'all') {
-      result = result.filter(issue => issue.agencyId === selectedDealer)
+    if (selectedDealers.length > 0) {
+      result = result.filter(issue => selectedDealers.includes(issue.agencyId))
     }
 
     if (selectedType !== 'all') {
@@ -121,7 +121,7 @@ export default function SchedulePage() {
     })
 
     return result
-  }, [scheduleIssues, search, selectedDealer, selectedType, selectedStatus, dateRange, sortField, sortDirection])
+  }, [scheduleIssues, search, selectedDealers, selectedType, selectedStatus, dateRange, sortField, sortDirection])
 
   const totalPages = Math.ceil(filteredIssues.length / pageSize)
   const paginatedIssues = filteredIssues.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
