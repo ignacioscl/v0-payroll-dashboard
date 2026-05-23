@@ -24,6 +24,8 @@ interface FilterContextType {
   setSelectedStatus: (value: string) => void
   dateRange: DateRange | undefined
   setDateRange: (value: DateRange | undefined) => void
+  /** True after client mount + cookie restore (safe for dealer-dependent UI). */
+  filtersHydrated: boolean
   clearFilters: () => void
 }
 
@@ -36,6 +38,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedType, setSelectedType] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
+  const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const setSelectedDealers = useCallback((value: string[] | ((prev: string[]) => string[])) => {
     setSelectedDealersState((prev) => {
@@ -51,6 +54,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     if (saved.length > 0) {
       setSelectedDealersState(saved)
     }
+    setFiltersHydrated(true)
   }, [])
 
   useEffect(() => {
@@ -87,6 +91,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setSelectedStatus,
       dateRange,
       setDateRange,
+      filtersHydrated,
       clearFilters
     }}>
       {children}

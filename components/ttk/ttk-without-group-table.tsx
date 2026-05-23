@@ -117,6 +117,7 @@ export function TtkWithoutGroupTable() {
     selectedDealers,
     selectedType,
     dateRange,
+    filtersHydrated,
   } = useFilters()
 
   const [pageIndex, setPageIndex] = useState(0)
@@ -144,6 +145,7 @@ export function TtkWithoutGroupTable() {
     pageIndex,
     pageSize,
     orderBy,
+    filtersHydrated,
   })
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -213,7 +215,7 @@ export function TtkWithoutGroupTable() {
             <span className="font-semibold tabular-nums text-foreground">{total}</span>
           )}
           <span>records</span>
-          {selectedDealers.length === 0 && (
+          {filtersHydrated && selectedDealers.length === 0 && (
             <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">select dealers</Badge>
           )}
         </div>
@@ -342,9 +344,11 @@ export function TtkWithoutGroupTable() {
                   <div className="flex flex-col items-center gap-2">
                     <AlertTriangle className="h-8 w-8 opacity-20" />
                     <span>
-                      {selectedDealers.length === 0
-                        ? 'Select at least one dealer in the header.'
-                        : 'No records for the current filters.'}
+                      {!filtersHydrated
+                        ? 'Loading filters...'
+                        : selectedDealers.length === 0
+                          ? 'Select at least one dealer in the header.'
+                          : 'No records for the current filters.'}
                     </span>
                   </div>
                 </TableCell>

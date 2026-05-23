@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { useApiRequest } from '@/lib/hooks/use-api-request'
 import { buildTtkListParams } from '@/lib/ttk/map-header-filters'
 import type { TtkListResponse } from '@/lib/ttk/ttk-list-types'
@@ -16,9 +17,10 @@ export type UseTtkListArgs = {
   pageSize: number
   orderBy: string
   enabled?: boolean
+  filtersHydrated?: boolean
 }
 
-export function ttkListQueryKey(args: UseTtkListArgs) {
+export function ttkListQueryKey(args: UseTtkListArgs & { selectedDealers: string[] }) {
   return [
     'ttk-list',
     args.search,
@@ -33,21 +35,31 @@ export function ttkListQueryKey(args: UseTtkListArgs) {
 }
 
 export function useTtkList(args: UseTtkListArgs) {
+  const debouncedDealers = useDebouncedValue(args.selectedDealers, 450)
+  const debouncedSearch = useDebouncedValue(args.search, 300)
+
   const apiRequest = useApiRequest<unknown, Record<string, string | number>, TtkListResponse>(
     SrsProxyPath.TTK_LIST,
   )
 
-  const params = buildTtkListParams(args)
+  const queryArgs = {
+    ...args,
+    search: debouncedSearch,
+    selectedDealers: debouncedDealers,
+  }
+
+  const params = buildTtkListParams(queryArgs)
   const enabled =
+    (args.filtersHydrated ?? true) &&
     (args.enabled ?? true) &&
-    args.selectedDealers.length > 0 &&
+    debouncedDealers.length > 0 &&
     Boolean(params.fecha_desde) &&
     Boolean(params.fecha_hasta)
 
   const query = useQuery({
-    queryKey: ttkListQueryKey(args),
+    queryKey: ttkListQueryKey(queryArgs),
     enabled,
-    placeholderData: (previous) => previous,
+    gcTime: 2 * 60 * 1000,
     queryFn: async () => {
       const json = await apiRequest.getCustom('', undefined, params)
       if (json.status === 'fail' || json.error) {
@@ -58,11 +70,13 @@ export function useTtkList(args: UseTtkListArgs) {
   })
 
   const total = Number(query.data?.recordsFiltered ?? query.data?.recordsTotal ?? 0)
+  const dealersPending =
+    args.selectedDealers.slice().sort().join(',') !== debouncedDealers.slice().sort().join(',')
 
   return {
     rows: query.data?.data ?? [],
     total,
-    loading: query.isLoading || query.isFetching,
+    loading: query.isLoading || query.isFetching || dealersPending,
     error: query.error instanceof Error ? query.error.message : null,
     refetch: query.refetch,
   }
