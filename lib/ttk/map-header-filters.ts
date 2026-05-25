@@ -52,6 +52,25 @@ export function buildTtkListParams(input: {
   return params
 }
 
+/** Shared scope params for TTK list + issue KPI counts (dealers, dates, search). */
+export function buildTtkScopeParams(input: {
+  search: string
+  selectedDealers: string[]
+  dateRange: DateRange | undefined
+}): Record<string, string | number> {
+  const params: Record<string, string | number> = {
+    'search[value]': input.search.trim(),
+    fecha_desde: formatDateParam(input.dateRange?.from),
+    fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
+  }
+
+  if (input.selectedDealers.length > 0) {
+    params.id_dealer = input.selectedDealers.join(',')
+  }
+
+  return params
+}
+
 export function formatGmtDate(gmt0?: string | null): string {
   if (!gmt0) return ''
   const d = new Date(gmt0)

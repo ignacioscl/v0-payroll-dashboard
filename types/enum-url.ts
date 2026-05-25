@@ -7,6 +7,7 @@ export enum UrlEnum {
 /** SRS paths proxied via `/api/srs/[...path]`. */
 export const SrsProxyPath = {
   TTK_LIST: '/api/srs/php/api/payroll/ttk-list.php',
+  TTK_ISSUE_COUNTS: '/api/srs/php/api/payroll/ttk-issue-counts.php',
 } as const
 
 /** Face recognition paths proxied via `/api/face/[...path]`. */

@@ -17,6 +17,7 @@ export type TtkListRow = {
   rolDpto?: { role?: string; department?: string } | null
   dealer?: { id?: number; razonSocial?: string }
   dealerProvider?: { id?: number }
+  badPunch?: { res?: string } | null
 }
 
 export type TtkListResponse = {

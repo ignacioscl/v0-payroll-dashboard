@@ -112,6 +112,11 @@ function roleLabel(row: TtkListRow): string {
   return parts.join(' / ')
 }
 
+function punchErrorLabel(row: TtkListRow): string | null {
+  const res = row.badPunch?.res?.trim()
+  return res ? res : null
+}
+
 export function TtkWithoutGroupTable() {
   const {
     search,
@@ -389,6 +394,13 @@ export function TtkWithoutGroupTable() {
                           size="sm"
                         />
                         <span>{employeeLabel(row, multiDealer)}</span>
+                        {punchErrorLabel(row) ? (
+                          <AlertTriangle
+                            className="h-3.5 w-3.5 shrink-0 text-destructive"
+                            title={punchErrorLabel(row) ?? 'Punch errors found'}
+                            aria-label={punchErrorLabel(row) ?? 'Punch errors found'}
+                          />
+                        ) : null}
                       </div>
                     </TableCell>
                   )}
