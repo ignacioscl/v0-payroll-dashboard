@@ -12,6 +12,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import {
+  DATE_RANGE_PRESETS,
+  getPresetRange,
+  matchPreset,
+  type DateRangePreset,
+} from '@/lib/filters/date-range-presets'
 
 interface DateRangePickerProps {
   value?: DateRange
@@ -19,6 +25,8 @@ interface DateRangePickerProps {
   placeholder?: string
   className?: string
   numberOfMonths?: number
+  /** Presets que se muestran en el panel lateral. Pasar [] para ocultarlos. */
+  presets?: DateRangePreset[]
 }
 
 export function DateRangePicker({
@@ -27,12 +35,20 @@ export function DateRangePicker({
   placeholder = 'Select dates',
   className,
   numberOfMonths = 2,
+  presets = DATE_RANGE_PRESETS,
 }: DateRangePickerProps) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const activePresetKey = mounted ? matchPreset(value) : null
+  const showPresets = presets.length > 0
+
+  const handlePreset = (preset: DateRangePreset) => {
+    onChange?.(getPresetRange(preset.days))
+  }
 
   return (
     <Popover>
@@ -59,12 +75,35 @@ export function DateRangePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <CalendarComponent
-          mode="range"
-          selected={value}
-          onSelect={onChange}
-          numberOfMonths={numberOfMonths}
-        />
+        <div className="flex flex-col sm:flex-row">
+          {showPresets && (
+            <div className="flex shrink-0 flex-row gap-1 border-b border-border p-2 sm:flex-col sm:border-b-0 sm:border-r sm:p-3">
+              {presets.map((preset) => {
+                const isActive = activePresetKey === preset.key
+                return (
+                  <Button
+                    key={preset.key}
+                    variant={isActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className={cn(
+                      'justify-start whitespace-nowrap text-sm font-normal',
+                      !isActive && 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => handlePreset(preset)}
+                  >
+                    {preset.label}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+          <CalendarComponent
+            mode="range"
+            selected={value}
+            onSelect={onChange}
+            numberOfMonths={numberOfMonths}
+          />
+        </div>
       </PopoverContent>
     </Popover>
   )

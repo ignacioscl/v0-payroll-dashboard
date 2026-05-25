@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { BASE_DATE } from '@/lib/mock-data'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerSelect } from '@/components/filters/dealer-select'
@@ -10,13 +9,7 @@ import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ParallelRequestTest } from '@/components/dev/parallel-request-test'
-
-function defaultDateRange(): DateRange {
-  const to = BASE_DATE
-  const from = new Date(BASE_DATE)
-  from.setDate(from.getDate() - 7)
-  return { from, to }
-}
+import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 
 export default function ComponentsPage() {
   const { dealers: dealerOptions, loading, error } = useSrsDealers()
@@ -26,7 +19,7 @@ export default function ComponentsPage() {
   const didInitDealers = useRef(false)
 
   useEffect(() => {
-    setDateRange(defaultDateRange())
+    setDateRange(getDefaultDateRange())
   }, [])
 
   // Only pre-select all once when SRS dealers first load — not when user clears selection
@@ -56,7 +49,7 @@ export default function ComponentsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ComponentCard
           title="Date range picker"
-          description="Two-month calendar in a popover — same control as the header date filter."
+          description="Two-month calendar with quick presets (última semana, 15 días, 1 mes) — mismo control que el filtro de fechas del header."
         >
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Preview label="Selection">

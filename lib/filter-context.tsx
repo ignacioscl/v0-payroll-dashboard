@@ -6,9 +6,7 @@ import {
   readSelectedDealersCookie,
   writeSelectedDealersCookie,
 } from '@/lib/filters/dealer-selection-cookie'
-
-// Fixed base date to match mock data
-const BASE_DATE = new Date('2026-05-12T12:00:00.000Z')
+import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 
 interface FilterContextType {
   search: string
@@ -58,10 +56,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const to = BASE_DATE
-    const from = new Date(BASE_DATE)
-    from.setDate(from.getDate() - 7)
-    setDateRange({ from, to })
+    setDateRange(getDefaultDateRange())
   }, [])
 
   const clearFilters = () => {
@@ -71,10 +66,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSelectedDealer('all')
     setSelectedType('all')
     setSelectedStatus('all')
-    const to = BASE_DATE
-    const from = new Date(BASE_DATE)
-    from.setDate(from.getDate() - 7)
-    setDateRange({ from, to })
+    setDateRange(getDefaultDateRange())
   }
 
   return (

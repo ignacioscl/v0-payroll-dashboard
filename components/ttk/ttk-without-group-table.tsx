@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkList } from '@/hooks/use-ttk-list'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
+import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -127,6 +128,24 @@ export function TtkWithoutGroupTable() {
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
     new Set(ALL_COLUMNS.map((c) => c.key)),
   )
+  const [thumbnailOverrides, setThumbnailOverrides] = useState<Record<string, string>>({})
+
+  const getEmployeeId = useCallback((row: TtkListRow) => Number(row.usuario?.id ?? 0), [])
+
+  const getThumbnailUuid = useCallback(
+    (row: TtkListRow) => {
+      const id = String(row.usuario?.id ?? '')
+      if (id && thumbnailOverrides[id]) {
+        return thumbnailOverrides[id]
+      }
+      return row.usuario?.thumbnailUuid ?? null
+    },
+    [thumbnailOverrides],
+  )
+
+  const handleThumbnailSaved = useCallback((employeeId: number, uuid: string) => {
+    setThumbnailOverrides((prev) => ({ ...prev, [String(employeeId)]: uuid }))
+  }, [])
 
   const orderBy = useMemo(
     () => sortToOrderBy(sortField, sortDirection),
@@ -361,7 +380,16 @@ export function TtkWithoutGroupTable() {
                 >
                   {visibleColumns.has('employee') && (
                     <TableCell className="px-3 py-1.5 text-xs font-medium">
-                      {employeeLabel(row, multiDealer)}
+                      <div className="flex items-center gap-2">
+                        <EmployeeThumbnail
+                          employeeId={getEmployeeId(row)}
+                          employeeName={row.usuario?.nombre ?? '—'}
+                          thumbnailUuid={getThumbnailUuid(row)}
+                          onSaved={(uuid) => handleThumbnailSaved(getEmployeeId(row), uuid)}
+                          size="sm"
+                        />
+                        <span>{employeeLabel(row, multiDealer)}</span>
+                      </div>
                     </TableCell>
                   )}
                   {visibleColumns.has('role') && (

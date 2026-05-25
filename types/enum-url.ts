@@ -8,3 +8,10 @@ export enum UrlEnum {
 export const SrsProxyPath = {
   TTK_LIST: '/api/srs/php/api/payroll/ttk-list.php',
 } as const
+
+/** Face recognition paths proxied via `/api/face/[...path]`. */
+export const FaceProxyPath = {
+  EMPLOYEE_THUMBNAIL: (uuid: string) => `/api/face/api/employeeThumbnail/${encodeURIComponent(uuid)}`,
+  EMPLOYEE_PUNCH_PHOTOS: (id: number | string) =>
+    `/api/face/api/employeePunchPhotos/${encodeURIComponent(String(id))}`,
+} as const

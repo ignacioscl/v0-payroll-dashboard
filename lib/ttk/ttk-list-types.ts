@@ -13,7 +13,7 @@ export type TtkListRow = {
   numberWork?: number | null
   numberBrake?: number | null
   estado?: number
-  usuario?: { nombre?: string }
+  usuario?: { id?: number | string; nombre?: string; thumbnailUuid?: string | null }
   rolDpto?: { role?: string; department?: string } | null
   dealer?: { id?: number; razonSocial?: string }
   dealerProvider?: { id?: number }
