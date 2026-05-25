@@ -2,19 +2,35 @@
 
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+
+export type KPICardVariant =
+  | 'default'
+  | 'warning'
+  | 'danger'
+  | 'success'
+  | 'info'
+  | 'violet'
 
 interface KPICardProps {
   title: string
   value: string | number
-  subtitle?: string
+  subtitle?: ReactNode
   icon: ReactNode
   trend?: {
     value: number
     label: string
   }
-  variant?: 'default' | 'warning' | 'danger' | 'success' | 'info'
+  variant?: KPICardVariant
   sparkline?: number[]
+  /** Si está presente, la tarjeta es clickeable y se comporta como botón. */
+  onClick?: () => void
+  /** Marca la tarjeta como seleccionada (ring + borde primary). */
+  active?: boolean
+  /** Reemplaza el value por un spinner. */
+  loading?: boolean
+  className?: string
 }
 
 export function KPICard({
@@ -24,7 +40,11 @@ export function KPICard({
   icon,
   trend,
   variant = 'default',
-  sparkline
+  sparkline,
+  onClick,
+  active = false,
+  loading = false,
+  className,
 }: KPICardProps) {
   const variantConfig = {
     default: {
@@ -66,6 +86,14 @@ export function KPICard({
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-cyan-400/30',
       glow: 'shadow-accent/15'
+    },
+    violet: {
+      bg: 'bg-gradient-to-br from-white to-violet-50/70',
+      border: 'border-violet-200/60',
+      iconBg: 'bg-gradient-to-br from-violet-500 to-purple-700',
+      iconColor: 'text-white',
+      iconShadow: 'shadow-lg shadow-violet-500/30',
+      glow: 'shadow-violet-500/15'
     }
   }
 
@@ -87,68 +115,93 @@ export function KPICard({
     return `M ${points.join(' L ')}`
   }
 
+  const isInteractive = typeof onClick === 'function'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      onClick={onClick}
+      onKeyDown={
+        isInteractive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-pressed={isInteractive ? active : undefined}
       className={cn(
         'group relative overflow-hidden rounded-xl border p-5 transition-all duration-300',
         'hover:shadow-xl hover:scale-[1.02] hover:border-border/80',
         config.bg,
         config.border,
-        config.glow
+        config.glow,
+        isInteractive && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        active && 'ring-2 ring-primary/60 border-primary shadow-lg',
+        className,
       )}
     >
-      
-      <div className="relative flex items-start justify-between">
-        <div className="space-y-3 flex-1">
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="space-y-3 flex-1 min-w-0">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
             {title}
           </p>
-          
+
           <div className="flex items-baseline gap-2">
-            <motion.span 
-              key={value}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-4xl font-bold text-foreground tracking-tight"
-            >
-              {value}
-            </motion.span>
+            {loading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            ) : (
+              <motion.span
+                key={String(value)}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-4xl font-bold text-foreground tracking-tight tabular-nums"
+              >
+                {value}
+              </motion.span>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {trend && (
-              <span className={cn(
-                'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
-                trend.value >= 0 
-                  ? 'bg-success/10 text-success' 
-                  : 'bg-destructive/10 text-destructive'
-              )}>
-                <svg 
-                  className={cn('w-3 h-3', trend.value < 0 && 'rotate-180')} 
-                  viewBox="0 0 12 12" 
-                  fill="none"
-                >
-                  <path 
-                    d="M6 2L10 7H2L6 2Z" 
-                    fill="currentColor"
-                  />
-                </svg>
-                {Math.abs(trend.value)}%
-              </span>
-            )}
-            {subtitle && (
-              <p className="text-xs text-muted-foreground">
-                {subtitle}
-              </p>
-            )}
-          </div>
+          {(trend || subtitle) && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {trend && (
+                <span className={cn(
+                  'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
+                  trend.value >= 0
+                    ? 'bg-success/10 text-success'
+                    : 'bg-destructive/10 text-destructive'
+                )}>
+                  <svg
+                    className={cn('w-3 h-3', trend.value < 0 && 'rotate-180')}
+                    viewBox="0 0 12 12"
+                    fill="none"
+                  >
+                    <path
+                      d="M6 2L10 7H2L6 2Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {Math.abs(trend.value)}%
+                </span>
+              )}
+              {subtitle && (
+                <div className="text-xs text-muted-foreground">
+                  {subtitle}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={cn(
-          'flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300',
+          'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300',
           'group-hover:scale-110 group-hover:-translate-y-0.5',
           config.iconBg,
           config.iconShadow
