@@ -50,7 +50,9 @@ import {
   SlidersHorizontal,
   FileSpreadsheet,
   Loader2,
+  Pencil,
 } from 'lucide-react'
+import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 
 type SortField = 'date' | 'employee'
 type SortDirection = 'asc' | 'desc'
@@ -134,6 +136,14 @@ export function TtkWithoutGroupTable() {
     new Set(ALL_COLUMNS.map((c) => c.key)),
   )
   const [thumbnailOverrides, setThumbnailOverrides] = useState<Record<string, string>>({})
+  const [editingPunch, setEditingPunch] = useState<{
+    id: number | string
+    employeeName: string
+    punchIn?: string | null
+    breakStart?: string | null
+    breakEnd?: string | null
+    punchOut?: string | null
+  } | null>(null)
 
   const getEmployeeId = useCallback((row: TtkListRow) => Number(row.usuario?.id ?? 0), [])
 
@@ -352,19 +362,20 @@ export function TtkWithoutGroupTable() {
               {visibleColumns.has('timeBreak') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Time Break</TableHead>
               )}
+              <TableHead className="h-8 w-12 px-3 py-1.5 text-right text-xs font-semibold text-white">Edit</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {loading && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={visibleColumns.size + 1} className="h-24 text-center text-muted-foreground">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={visibleColumns.size + 1} className="h-24 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <AlertTriangle className="h-8 w-8 opacity-20" />
                     <span>
@@ -444,6 +455,26 @@ export function TtkWithoutGroupTable() {
                       {row.timeBreak || '—'}
                     </TableCell>
                   )}
+                  <TableCell className="px-3 py-1.5 text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                      onClick={() =>
+                        setEditingPunch({
+                          id: row.id,
+                          employeeName: row.usuario?.nombre ?? '',
+                          punchIn: row.punchInGmt0,
+                          breakStart: row.breakStartGmt0,
+                          breakEnd: row.breakEndGmt0,
+                          punchOut: row.punchOutGmt0,
+                        })
+                      }
+                      aria-label={`Edit punch for ${row.usuario?.nombre ?? 'employee'}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -516,6 +547,25 @@ export function TtkWithoutGroupTable() {
           </Pagination>
         )}
       </div>
+
+      <EditPunchDialog
+        open={editingPunch !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingPunch(null)
+        }}
+        punchId={editingPunch?.id ?? null}
+        employeeName={editingPunch?.employeeName}
+        initial={
+          editingPunch
+            ? {
+                punchIn: editingPunch.punchIn,
+                breakStart: editingPunch.breakStart,
+                breakEnd: editingPunch.breakEnd,
+                punchOut: editingPunch.punchOut,
+              }
+            : undefined
+        }
+      />
     </Card>
   )
 }

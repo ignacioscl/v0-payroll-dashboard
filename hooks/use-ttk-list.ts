@@ -2,10 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
-import { useApiRequest } from '@/lib/hooks/use-api-request'
+import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
+import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
 import { buildTtkListParams } from '@/lib/ttk/map-header-filters'
-import type { TtkListResponse } from '@/lib/ttk/ttk-list-types'
-import { SrsProxyPath } from '@/types/enum-url'
+import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
+import { SrsPhpPath } from '@/types/enum-url'
 import type { DateRange } from 'react-day-picker'
 
 export type UseTtkListArgs = {
@@ -37,9 +38,8 @@ export function ttkListQueryKey(args: UseTtkListArgs & { selectedDealers: string
 export function useTtkList(args: UseTtkListArgs) {
   const debouncedDealers = useDebouncedValue(args.selectedDealers, 450)
   const debouncedSearch = useDebouncedValue(args.search, 300)
-
-  const apiRequest = useApiRequest<unknown, Record<string, string | number>, TtkListResponse>(
-    SrsProxyPath.TTK_LIST,
+  const apiRequest = useSrsApiRequest<unknown, Record<string, string | number>, TtkListResponse>(
+    SrsPhpPath.TTK_LIST,
   )
 
   const queryArgs = {
@@ -56,16 +56,14 @@ export function useTtkList(args: UseTtkListArgs) {
     Boolean(params.fecha_desde) &&
     Boolean(params.fecha_hasta)
 
-  const query = useQuery({
+  const query = useQuery<TtkListResponse>({
     queryKey: ttkListQueryKey(queryArgs),
     enabled,
     gcTime: 2 * 60 * 1000,
     queryFn: async () => {
-      const json = await apiRequest.getCustom('', undefined, params)
-      if (json.status === 'fail' || json.error) {
-        throw new Error(json.error?.message ?? 'Failed to load TTK list')
-      }
-      return json
+      const data = await apiRequest.getCustom('', undefined, params)
+      throwIfSrsFail(data, 'Failed to load TTK list')
+      return data as TtkListResponse
     },
   })
 
@@ -74,7 +72,7 @@ export function useTtkList(args: UseTtkListArgs) {
     args.selectedDealers.slice().sort().join(',') !== debouncedDealers.slice().sort().join(',')
 
   return {
-    rows: query.data?.data ?? [],
+    rows: (query.data?.data ?? []) as TtkListRow[],
     total,
     loading: query.isLoading || query.isFetching || dealersPending,
     error: query.error instanceof Error ? query.error.message : null,

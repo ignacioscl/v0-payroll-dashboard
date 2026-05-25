@@ -4,10 +4,16 @@ export enum UrlEnum {
   DEALERS = '/api/dealers',
 }
 
-/** SRS paths proxied via `/api/srs/[...path]`. */
-export const SrsProxyPath = {
-  TTK_LIST: '/api/srs/php/api/payroll/ttk-list.php',
-  TTK_ISSUE_COUNTS: '/api/srs/php/api/payroll/ttk-issue-counts.php',
+/**
+ * Relative paths on the SRS PHP server.
+ * All are proxied client-side via `/api/srs/[...path]` (see `srsProxyUrl`).
+ */
+export const SrsPhpPath = {
+  TTK_LIST: 'php/api/payroll/ttk-list.php',
+  TTK_ISSUE_COUNTS: 'php/api/payroll/ttk-issue-counts.php',
+  TTK_EDIT: 'php/api/payroll/ttk-edit.php',
+  TTK_GET_BY_ID: 'php/api/payroll/ttk-get-by-id.php',
+  DEALERS: 'php/api/payroll/dealers.php',
 } as const
 
 /** Face recognition paths proxied via `/api/face/[...path]`. */
