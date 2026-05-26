@@ -6,6 +6,7 @@ import { useTtkList } from '@/hooks/use-ttk-list'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
+import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -396,7 +397,7 @@ export function TtkWithoutGroupTable() {
                 >
                   {visibleColumns.has('employee') && (
                     <TableCell className="px-3 py-1.5 text-xs font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <EmployeeThumbnail
                           employeeId={getEmployeeId(row)}
                           employeeName={row.usuario?.nombre ?? '—'}
@@ -404,14 +405,19 @@ export function TtkWithoutGroupTable() {
                           onSaved={(uuid) => handleThumbnailSaved(getEmployeeId(row), uuid)}
                           size="sm"
                         />
-                        <span>{employeeLabel(row, multiDealer)}</span>
-                        {punchErrorLabel(row) ? (
-                          <AlertTriangle
-                            className="h-3.5 w-3.5 shrink-0 text-destructive"
-                            title={punchErrorLabel(row) ?? 'Punch errors found'}
-                            aria-label={punchErrorLabel(row) ?? 'Punch errors found'}
-                          />
-                        ) : null}
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate">{row.usuario?.nombre ?? '—'}</span>
+                            {punchErrorLabel(row) ? (
+                              <PunchErrorIndicator errorText={punchErrorLabel(row)!} />
+                            ) : null}
+                          </div>
+                          {row.dealer?.razonSocial ? (
+                            <span className="truncate text-[10px] font-normal text-muted-foreground">
+                              {row.dealer.razonSocial}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </TableCell>
                   )}
