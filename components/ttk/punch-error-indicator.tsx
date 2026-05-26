@@ -61,7 +61,7 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex shrink-0 rounded-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex shrink-0 cursor-pointer rounded-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`Punch errors: ${errorText}`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
