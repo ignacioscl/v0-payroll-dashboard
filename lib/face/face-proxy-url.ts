@@ -7,6 +7,26 @@ export function faceProxyUrl(path: string) {
 /** SRS default employee avatar (muñequito gris). */
 export const DEFAULT_EMPLOYEE_AVATAR_URL = '/api/srs/img/foto-perfil.jpg'
 
+export function legacyLogoUrl(logoImg: string | null | undefined): string | null {
+  if (!logoImg || !logoImg.trim()) {
+    return null
+  }
+  return `/api/srs/uploads/${encodeURIComponent(logoImg.trim())}`
+}
+
+export function userAvatarUrl(user: {
+  thumbnailUuid?: string | null
+  logoImg?: string | null
+} | null | undefined): string {
+  if (!user) {
+    return DEFAULT_EMPLOYEE_AVATAR_URL
+  }
+  if (user.thumbnailUuid) {
+    return employeeThumbnailUrl(user.thumbnailUuid)
+  }
+  return legacyLogoUrl(user.logoImg) ?? DEFAULT_EMPLOYEE_AVATAR_URL
+}
+
 export function employeeThumbnailUrl(thumbnailUuid: string | null | undefined): string {
   if (!thumbnailUuid) {
     return DEFAULT_EMPLOYEE_AVATAR_URL

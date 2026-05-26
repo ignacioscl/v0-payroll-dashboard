@@ -30,13 +30,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { userAvatarUrl } from '@/lib/face/face-proxy-url'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useSrsUser } from '@/lib/auth/use-srs-user'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -59,11 +60,13 @@ function userInitials(nombre: string) {
 export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useSidebar()
-  const { user } = useSrsUser()
+  const { user } = useSrsMe()
 
   const displayName = user?.nombre ?? 'User'
-  const displayRole = user?.dealerName ?? user?.email ?? 'SRS'
+  const displayRole =
+    user?.rolSystemV2Name ?? user?.dealerName ?? user?.email ?? 'SRS'
   const initials = userInitials(displayName)
+  const photoSrc = userAvatarUrl(user)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -224,7 +227,7 @@ export function Sidebar() {
                   )}
                 >
                   <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-lg shadow-primary/10">
-                    <AvatarImage src="/avatars/user.jpg" alt="User" />
+                    <AvatarImage src={photoSrc} alt={displayName} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs font-semibold">
                       {initials}
                     </AvatarFallback>

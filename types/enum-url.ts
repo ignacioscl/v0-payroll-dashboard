@@ -1,6 +1,7 @@
 /** BFF routes served by this Next app (not SRS upstream). */
 export enum UrlEnum {
   AUTH_SESSION = '/api/auth/session',
+  AUTH_ME = '/api/auth/me',
   DEALERS = '/api/dealers',
 }
 
@@ -14,6 +15,7 @@ export const SrsPhpPath = {
   TTK_EDIT: 'php/api/payroll/ttk-edit.php',
   TTK_GET_BY_ID: 'php/api/payroll/ttk-get-by-id.php',
   DEALERS: 'php/api/payroll/dealers.php',
+  ME: 'php/api/payroll/me.php',
 } as const
 
 /** Face recognition paths proxied via `/api/face/[...path]`. */
