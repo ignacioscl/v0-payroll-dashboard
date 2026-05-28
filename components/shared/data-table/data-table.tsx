@@ -10,6 +10,7 @@ import {
   useReactTable,
   type Column,
   type ColumnDef,
+  type Table as TanStackTable,
   type ColumnFiltersState,
   type ColumnPinningState,
   type ColumnSizingState,
@@ -178,21 +179,73 @@ function buildInitialPinning<TData, TValue>(
   return { left, right }
 }
 
-/** Sticky CSS for a pinned column. Falls back to `{}` for unpinned ones. */
-function getPinningStyles<TData>(column: Column<TData>): React.CSSProperties {
+type PinningLayer = 'header' | 'body'
+
+/**
+ * Sticky CSS for a pinned column.
+ * Header and body use different z-index bands so horizontally-scrolling
+ * header cells stay *below* pinned header cells (body already worked because
+ * pinned cells are opaque; header unpinned cells had no stacking context).
+ */
+function getPinningStyles<TData>(
+  column: Column<TData>,
+  layer: PinningLayer,
+): React.CSSProperties {
   const pin = column.getIsPinned()
-  if (!pin) return {}
+  if (!pin) {
+    // Unpinned header cells need `position: relative` + `zIndex: 0` or their
+    // z-index is ignored (static) and they paint on top of sticky pinned headers
+    // while scrolling horizontally.
+    return layer === 'header' ? { position: 'relative', zIndex: 0 } : {}
+  }
+  const zIndex = layer === 'header' ? 3 : 1
   if (pin === 'left') {
     return {
       position: 'sticky',
-      left: `${column.getStart('left')}px`,
-      zIndex: 1,
+      // Round to whole pixels — sub-pixel `left` + horizontal scroll causes
+      // the 2nd+ pinned column (e.g. Employee) to jitter and drift from the header.
+      left: `${Math.round(column.getStart('left'))}px`,
+      zIndex,
     }
   }
   return {
     position: 'sticky',
-    right: `${column.getAfter('right')}px`,
-    zIndex: 1,
+    right: `${Math.round(column.getAfter('right'))}px`,
+    zIndex,
+  }
+}
+
+/** Leaf columns in the same order as header/body rows (left → center → right). */
+function getDisplayLeafColumns<TData>(table: TanStackTable<TData>) {
+  return [
+    ...table.getLeftVisibleLeafColumns(),
+    ...table.getCenterVisibleLeafColumns(),
+    ...table.getRightVisibleLeafColumns(),
+  ]
+}
+
+/** Solid header background for every `<th>` so scrolled columns don't show through. */
+function getHeaderCellBackground(
+  headerIsColored: boolean,
+  headerColor: string,
+): string {
+  return headerIsColored ? headerColor : 'var(--card)'
+}
+
+/** Width for `<col>` — sole layout authority (see table `width` note below). */
+function getColWidthStyle(size: number): React.CSSProperties {
+  return { width: size }
+}
+
+/**
+ * Pinned `<th>` / `<td>` also set width so sticky offsets match rendered
+ * columns when the table is scrolled horizontally.
+ */
+function getPinnedCellWidthStyle(size: number): React.CSSProperties {
+  return {
+    width: size,
+    minWidth: size,
+    maxWidth: size,
   }
 }
 
@@ -563,10 +616,19 @@ export function DataTable<TData, TValue = unknown>({
           className="w-full caption-bottom text-sm"
           style={{
             tableLayout: 'fixed',
+            // Exact sum of column sizes — do NOT add `minWidth: '100%'` or the
+            // browser stretches columns beyond `getSize()` while sticky `left`
+            // still uses the logical sizes (2nd pinned column jitters / drifts).
             width: totalTableWidth,
-            minWidth: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
           }}
         >
+          <colgroup>
+            {getDisplayLeafColumns(table).map((column) => (
+              <col key={column.id} style={getColWidthStyle(column.getSize())} />
+            ))}
+          </colgroup>
           <TableHeader
             className={cn(
               '[&_tr]:border-0',
@@ -591,16 +653,14 @@ export function DataTable<TData, TValue = unknown>({
                   const isLastLeftPinned = pin === 'left' && header.column.getIsLastColumn('left')
                   const isFirstRightPinned =
                     pin === 'right' && header.column.getIsFirstColumn('right')
-                  const pinStyles = getPinningStyles(header.column)
+                  const pinStyles = getPinningStyles(header.column, 'header')
                   const size = header.getSize()
                   // For pinned columns we MUST enforce the width so the
                   // sticky offset (which TanStack derives from
                   // `column.getSize()`) matches the actual rendered width.
                   // For non-pinned columns we still set width explicitly so
                   // `table-layout: fixed` honors per-column sizing (and resizing).
-                  const sizingStyle: React.CSSProperties = pin
-                    ? { width: size, minWidth: size, maxWidth: size }
-                    : { width: size }
+                  const sizingStyle = pin ? getPinnedCellWidthStyle(size) : undefined
                   const canResize = header.column.getCanResize()
                   const isResizing = header.column.getIsResizing()
                   return (
@@ -608,23 +668,23 @@ export function DataTable<TData, TValue = unknown>({
                       key={header.id}
                       colSpan={header.colSpan}
                       style={{
-                        ...sizingStyle,
                         ...pinStyles,
-                        backgroundColor: pin
-                          ? headerIsColored
-                            ? headerColor
-                            : 'var(--card)'
-                          : pinStyles.backgroundColor,
-                        zIndex: pin ? 3 : pinStyles.zIndex,
+                        ...(sizingStyle ?? {}),
+                        backgroundColor: getHeaderCellBackground(
+                          headerIsColored,
+                          headerColor,
+                        ),
+                        ...(isLastLeftPinned
+                          ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
+                          : {}),
+                        ...(isFirstRightPinned
+                          ? { boxShadow: 'inset 4px 0 8px -4px rgba(0,0,0,0.14)' }
+                          : {}),
                       }}
                       className={cn(
-                        'relative h-8 overflow-hidden px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
+                        'relative box-border h-8 overflow-hidden px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
                         headerIsColored ? 'text-white' : 'text-foreground',
                         meta?.numeric && 'text-right',
-                        isLastLeftPinned &&
-                          'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)]',
-                        isFirstRightPinned &&
-                          'shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.18)]',
                         meta?.headerClassName,
                       )}
                     >
@@ -650,22 +710,20 @@ export function DataTable<TData, TValue = unknown>({
                             header.column.resetSize()
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="group absolute top-0 right-0 z-10 flex h-full w-2 cursor-col-resize touch-none select-none items-center justify-end"
+                          className="group absolute top-0 -right-px z-10 h-full w-2 cursor-col-resize touch-none select-none"
                         >
-                          {/* Always-visible thin separator. Grows + brightens on
-                              hover and during active resize so users can see
-                              exactly where to grab. */}
+                          {/* On the real column edge — no transform (transform on
+                              sticky ancestors causes scroll jitter). */}
                           <span
                             aria-hidden="true"
                             className={cn(
-                              'block w-px transition-all',
+                              'pointer-events-none absolute top-[20%] bottom-[20%] right-0 block w-px transition-all group-hover:top-0 group-hover:bottom-0',
                               headerIsColored
                                 ? 'bg-white/40 group-hover:bg-white'
                                 : 'bg-foreground/30 group-hover:bg-foreground/80',
-                              'h-[60%] group-hover:h-full group-hover:w-0.5',
                               isResizing &&
                                 cn(
-                                  'h-full w-0.5',
+                                  'inset-y-0 w-0.5',
                                   headerIsColored
                                     ? 'bg-white'
                                     : 'bg-foreground/80',
@@ -733,37 +791,29 @@ export function DataTable<TData, TValue = unknown>({
                       // Mirror the header sizing so sticky offsets match the
                       // visual column widths. With `table-layout: fixed` every
                       // cell needs an explicit width so resizing is honoured.
-                      const sizingStyle: React.CSSProperties = pin
-                        ? { width: size, minWidth: size, maxWidth: size }
-                        : { width: size }
-                      const cellPinStyles = getPinningStyles(cell.column)
+                      const sizingStyle = pin ? getPinnedCellWidthStyle(size) : undefined
+                      const cellPinStyles = getPinningStyles(cell.column, 'body')
                       return (
                         <TableCell
                           key={cell.id}
                           style={{
-                            ...sizingStyle,
                             ...cellPinStyles,
-                            // Pinned cells MUST be opaque so the rest of the
-                            // row (zebra-striped via `bg-muted/25`) doesn't
-                            // bleed through behind them during horizontal
-                            // scroll. Solid `var(--card)` regardless of zebra.
+                            ...(sizingStyle ?? {}),
                             backgroundColor: pin
                               ? 'var(--card)'
                               : cellPinStyles.backgroundColor,
+                            ...(isLastLeftPinned
+                              ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
+                              : {}),
+                            ...(isFirstRightPinned
+                              ? { boxShadow: 'inset 4px 0 8px -4px rgba(0,0,0,0.14)' }
+                              : {}),
                           }}
                           className={cn(
-                            'overflow-hidden px-3 text-xs whitespace-nowrap',
+                            'box-border overflow-hidden px-3 text-xs whitespace-nowrap',
                             rowPadding,
                             meta?.mono && 'font-mono',
                             meta?.numeric && 'text-right tabular-nums',
-                            // Non-pinned cells inherit the row's zebra
-                            // background via the `<tr>`'s `baseBg` class —
-                            // no per-cell bg needed. Pinned cells use the
-                            // inline `var(--card)` override above.
-                            isLastLeftPinned &&
-                              'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)]',
-                            isFirstRightPinned &&
-                              'shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.18)]',
                             meta?.cellClassName,
                           )}
                         >
