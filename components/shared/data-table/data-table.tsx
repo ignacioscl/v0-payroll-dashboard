@@ -8,7 +8,6 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type Column,
   type ColumnDef,
   type Table as TanStackTable,
   type ColumnFiltersState,
@@ -179,49 +178,115 @@ function buildInitialPinning<TData, TValue>(
   return { left, right }
 }
 
-type PinningLayer = 'header' | 'body'
+type PinSide = false | 'left' | 'right'
 
 /**
- * Sticky CSS for a pinned column.
- * Header and body use different z-index bands so horizontally-scrolling
- * header cells stay *below* pinned header cells (body already worked because
- * pinned cells are opaque; header unpinned cells had no stacking context).
+ * Single source of truth for column geometry, computed once per render from
+ * `column.getSize()`. Avoids TanStack's separately-memoized `header.getSize()`,
+ * `column.getStart()` and `column.getAfter()` — those caches can desync after a
+ * resize, making the header read 80/240 while the body reads 60/243 and the
+ * pinned columns drift on horizontal scroll.
  */
-function getPinningStyles<TData>(
-  column: Column<TData>,
-  layer: PinningLayer,
-): React.CSSProperties {
-  const pin = column.getIsPinned()
-  if (!pin) {
-    // Unpinned header cells need `position: relative` + `zIndex: 0` or their
-    // z-index is ignored (static) and they paint on top of sticky pinned headers
-    // while scrolling horizontally.
-    return layer === 'header' ? { position: 'relative', zIndex: 0 } : {}
-  }
-  const zIndex = layer === 'header' ? 3 : 1
-  if (pin === 'left') {
-    return {
-      position: 'sticky',
-      // Round to whole pixels — sub-pixel `left` + horizontal scroll causes
-      // the 2nd+ pinned column (e.g. Employee) to jitter and drift from the header.
-      left: `${Math.round(column.getStart('left'))}px`,
-      zIndex,
-    }
-  }
-  return {
-    position: 'sticky',
-    right: `${Math.round(column.getAfter('right'))}px`,
-    zIndex,
-  }
+interface ColumnGeometry {
+  /** Display-ordered leaf columns (left → center → right). */
+  ordered: { id: string; size: number; pin: PinSide }[]
+  size: Map<string, number>
+  /** Rounded sticky `left` offset for each left-pinned column. */
+  left: Map<string, number>
+  /** Rounded sticky `right` offset for each right-pinned column. */
+  right: Map<string, number>
+  total: number
 }
 
-/** Leaf columns in the same order as header/body rows (left → center → right). */
-function getDisplayLeafColumns<TData>(table: TanStackTable<TData>) {
-  return [
-    ...table.getLeftVisibleLeafColumns(),
-    ...table.getCenterVisibleLeafColumns(),
-    ...table.getRightVisibleLeafColumns(),
-  ]
+function buildColumnGeometry<TData>(table: TanStackTable<TData>): ColumnGeometry {
+  const leftCols = table.getLeftVisibleLeafColumns()
+  const centerCols = table.getCenterVisibleLeafColumns()
+  const rightCols = table.getRightVisibleLeafColumns()
+
+  const size = new Map<string, number>()
+  const left = new Map<string, number>()
+  const right = new Map<string, number>()
+  const ordered: ColumnGeometry['ordered'] = []
+  let total = 0
+
+  const push = (id: string, s: number, pin: PinSide) => {
+    size.set(id, s)
+    ordered.push({ id, size: s, pin })
+    total += s
+  }
+
+  // Left offsets accumulate left → right.
+  let leftAcc = 0
+  for (const c of leftCols) {
+    const s = c.getSize()
+    left.set(c.id, Math.round(leftAcc))
+    leftAcc += s
+    push(c.id, s, 'left')
+  }
+  for (const c of centerCols) push(c.id, c.getSize(), false)
+  // Right offsets accumulate right → left.
+  let rightAcc = 0
+  for (let i = rightCols.length - 1; i >= 0; i--) {
+    const c = rightCols[i]!
+    const s = c.getSize()
+    right.set(c.id, Math.round(rightAcc))
+    rightAcc += s
+  }
+  for (const c of rightCols) push(c.id, c.getSize(), 'right')
+
+  return { ordered, size, left, right, total }
+}
+
+/**
+ * Sticky CSS for a BODY cell (`<td>`).
+ * Only pinned cells stick (horizontally). Non-pinned cells are static.
+ * z-index band (body): pinned = 1, non-pinned = auto(0).
+ */
+function getBodyCellStyle(
+  pin: PinSide,
+  geo: ColumnGeometry,
+  columnId: string,
+): React.CSSProperties {
+  if (!pin) return {}
+  if (pin === 'left') {
+    return { position: 'sticky', left: `${geo.left.get(columnId) ?? 0}px`, zIndex: 1 }
+  }
+  return { position: 'sticky', right: `${geo.right.get(columnId) ?? 0}px`, zIndex: 1 }
+}
+
+/**
+ * Sticky CSS for a HEADER cell (`<th>`).
+ *
+ * CRITICAL: every header cell handles BOTH axes itself (`top` for the sticky
+ * header + `left`/`right` for pinned columns). The `<thead>`/`<tr>` must NOT be
+ * `position: sticky` — a sticky `<th>` nested inside a sticky `<tr>` makes the
+ * browser miscompute the horizontal offset, so pinned header cells drift away
+ * from the body cells during horizontal scroll.
+ *
+ * z-index band (header, always above body): pinned = 4, non-pinned = 2.
+ */
+function getHeaderCellStyle(
+  pin: PinSide,
+  geo: ColumnGeometry,
+  columnId: string,
+  stickyHeader: boolean,
+): React.CSSProperties {
+  const style: React.CSSProperties = {}
+  if (stickyHeader) {
+    style.position = 'sticky'
+    style.top = 0
+    style.zIndex = 2
+  }
+  if (pin === 'left') {
+    style.position = 'sticky'
+    style.left = `${geo.left.get(columnId) ?? 0}px`
+    style.zIndex = 4
+  } else if (pin === 'right') {
+    style.position = 'sticky'
+    style.right = `${geo.right.get(columnId) ?? 0}px`
+    style.zIndex = 4
+  }
+  return style
 }
 
 /** Solid header background for every `<th>` so scrolled columns don't show through. */
@@ -230,23 +295,6 @@ function getHeaderCellBackground(
   headerColor: string,
 ): string {
   return headerIsColored ? headerColor : 'var(--card)'
-}
-
-/** Width for `<col>` — sole layout authority (see table `width` note below). */
-function getColWidthStyle(size: number): React.CSSProperties {
-  return { width: size }
-}
-
-/**
- * Pinned `<th>` / `<td>` also set width so sticky offsets match rendered
- * columns when the table is scrolled horizontally.
- */
-function getPinnedCellWidthStyle(size: number): React.CSSProperties {
-  return {
-    width: size,
-    minWidth: size,
-    maxWidth: size,
-  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -364,11 +412,19 @@ export function DataTable<TData, TValue = unknown>({
   stickyHeader = true,
   zebraRows = true,
 }: DataTableProps<TData, TValue>) {
-  /* ---------- Persisted visibility ---------- */
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(() =>
-    readPersistedVisibility(tableId),
-  )
+  /* ---------- Persisted visibility ----------
+   * Same SSR/hydration rule as column sizing below: start empty so the server
+   * and first client render agree on the column set, then load the persisted
+   * visibility after mount so colgroup + header + body update together. */
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const visibilityHydrated = React.useRef(false)
   React.useEffect(() => {
+    const persisted = readPersistedVisibility(tableId)
+    visibilityHydrated.current = true
+    if (Object.keys(persisted).length) setColumnVisibility(persisted)
+  }, [tableId])
+  React.useEffect(() => {
+    if (!visibilityHydrated.current) return
     persistVisibility(tableId, columnVisibility)
   }, [tableId, columnVisibility])
 
@@ -382,11 +438,32 @@ export function DataTable<TData, TValue = unknown>({
     if (columnPinning) setInternalPinning(columnPinning)
   }, [columnPinning])
 
-  /* ---------- Persisted column sizing ---------- */
-  const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>(() =>
-    readPersistedSizing(tableId),
-  )
+  /* ---------- Persisted column sizing ----------
+   * IMPORTANT: do NOT read localStorage in the initializer. During SSR
+   * `columnSizing` is `{}` (server can't see localStorage), so the server
+   * renders the `<colgroup>`/`<thead>` at the default sizes. If we then seeded
+   * the client's first render with persisted sizes, React would hydrate the
+   * server's colgroup/header markup (default widths) but render the body with
+   * the persisted widths — and since the initializer is not a state *change*,
+   * nothing forces the colgroup/header to re-render. The result is a column
+   * whose layout width (colgroup) differs from its sticky `left` offset (body),
+   * so pinned columns "snap"/drift on horizontal scroll.
+   *
+   * Instead we start at `{}` (matching the server) and load the persisted sizes
+   * in an effect after mount. That setState re-renders colgroup + header + body
+   * together with identical numbers — the single-source-of-truth approach the
+   * elescorial grid relies on. */
+  const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>({})
+  const sizingHydrated = React.useRef(false)
   React.useEffect(() => {
+    const persisted = readPersistedSizing(tableId)
+    sizingHydrated.current = true
+    if (Object.keys(persisted).length) setColumnSizing(persisted)
+  }, [tableId])
+  React.useEffect(() => {
+    // Skip the initial `{}` so we don't clobber stored sizes before the load
+    // effect above has had a chance to run.
+    if (!sizingHydrated.current) return
     persistSizing(tableId, columnSizing)
   }, [tableId, columnSizing])
 
@@ -549,7 +626,10 @@ export function DataTable<TData, TValue = unknown>({
     return () => ro.disconnect()
   }, [data, columnVisibility, columnSizing, internalPinning])
 
-  const totalTableWidth = table.getTotalSize()
+  // Single geometry source — colgroup, header and body all read from this so
+  // their widths and sticky offsets can never desync.
+  const geo = buildColumnGeometry(table)
+  const totalTableWidth = geo.total
 
   return (
     <Card
@@ -625,16 +705,14 @@ export function DataTable<TData, TValue = unknown>({
           }}
         >
           <colgroup>
-            {getDisplayLeafColumns(table).map((column) => (
-              <col key={column.id} style={getColWidthStyle(column.getSize())} />
+            {geo.ordered.map((c) => (
+              <col key={c.id} style={{ width: c.size }} />
             ))}
           </colgroup>
+          {/* NOTE: no `sticky` here — each `<th>` sticks on both axes itself
+              (see getHeaderCellStyle). A sticky thead + sticky th drifts. */}
           <TableHeader
-            className={cn(
-              '[&_tr]:border-0',
-              stickyHeader && 'sticky top-0 z-20',
-              headerClassName,
-            )}
+            className={cn('[&_tr]:border-0', headerClassName)}
           >
             {table.getHeaderGroups().map((group) => (
               <TableRow
@@ -653,14 +731,18 @@ export function DataTable<TData, TValue = unknown>({
                   const isLastLeftPinned = pin === 'left' && header.column.getIsLastColumn('left')
                   const isFirstRightPinned =
                     pin === 'right' && header.column.getIsFirstColumn('right')
-                  const pinStyles = getPinningStyles(header.column, 'header')
-                  const size = header.getSize()
-                  // For pinned columns we MUST enforce the width so the
-                  // sticky offset (which TanStack derives from
-                  // `column.getSize()`) matches the actual rendered width.
-                  // For non-pinned columns we still set width explicitly so
-                  // `table-layout: fixed` honors per-column sizing (and resizing).
-                  const sizingStyle = pin ? getPinnedCellWidthStyle(size) : undefined
+                  const stickyStyle = getHeaderCellStyle(
+                    pin,
+                    geo,
+                    header.column.id,
+                    stickyHeader,
+                  )
+                  // Pinned cells lock width (from the shared geometry) so the
+                  // sticky offset matches the rendered column exactly.
+                  const size = geo.size.get(header.column.id) ?? header.getSize()
+                  const sizingStyle = pin
+                    ? { width: size, minWidth: size, maxWidth: size }
+                    : undefined
                   const canResize = header.column.getCanResize()
                   const isResizing = header.column.getIsResizing()
                   return (
@@ -668,7 +750,7 @@ export function DataTable<TData, TValue = unknown>({
                       key={header.id}
                       colSpan={header.colSpan}
                       style={{
-                        ...pinStyles,
+                        ...stickyStyle,
                         ...(sizingStyle ?? {}),
                         backgroundColor: getHeaderCellBackground(
                           headerIsColored,
@@ -787,12 +869,13 @@ export function DataTable<TData, TValue = unknown>({
                         pin === 'left' && cell.column.getIsLastColumn('left')
                       const isFirstRightPinned =
                         pin === 'right' && cell.column.getIsFirstColumn('right')
-                      const size = cell.column.getSize()
-                      // Mirror the header sizing so sticky offsets match the
-                      // visual column widths. With `table-layout: fixed` every
-                      // cell needs an explicit width so resizing is honoured.
-                      const sizingStyle = pin ? getPinnedCellWidthStyle(size) : undefined
-                      const cellPinStyles = getPinningStyles(cell.column, 'body')
+                      // Width + sticky offset both read from the shared
+                      // geometry so header and body can never diverge.
+                      const size = geo.size.get(cell.column.id) ?? cell.column.getSize()
+                      const sizingStyle = pin
+                        ? { width: size, minWidth: size, maxWidth: size }
+                        : undefined
+                      const cellPinStyles = getBodyCellStyle(pin, geo, cell.column.id)
                       return (
                         <TableCell
                           key={cell.id}
