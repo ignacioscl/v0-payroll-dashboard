@@ -257,9 +257,8 @@ export function EditPunchDialog({
   const isProcessing = editMutation.isPending
   const isLoading = detailQuery.isLoading && !detailQuery.data
 
-  const title = useMemo(() => {
-    const name = detailQuery.data?.usuario?.nombre ?? employeeName ?? ''
-    return name ? `Edit Time Tracking: ${name}` : 'Edit Time Tracking'
+  const employeeDisplayName = useMemo(() => {
+    return (detailQuery.data?.usuario?.nombre ?? employeeName ?? '').trim()
   }, [detailQuery.data?.usuario?.nombre, employeeName])
 
   const renderTimeField = (key: TimeKey, icon: React.ReactNode, required = false) => {
@@ -287,9 +286,24 @@ export function EditPunchDialog({
     <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
-            <span className="truncate">{title}</span>
+          <DialogTitle className="flex items-start gap-2 pr-8">
+            <CalendarIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0 flex flex-col gap-0.5 text-left">
+              {employeeDisplayName ? (
+                <>
+                  <span className="text-xs font-medium tracking-wide text-muted-foreground">
+                    Edit Time Tracking:
+                  </span>
+                  <span className="text-base font-semibold leading-snug break-words text-foreground">
+                    {employeeDisplayName}
+                  </span>
+                </>
+              ) : (
+                <span className="text-base font-semibold leading-snug text-foreground">
+                  Edit Time Tracking
+                </span>
+              )}
+            </div>
           </DialogTitle>
           <DialogDescription>
             Adjust punch times for this shift. If you change a time, add a note explaining why.
@@ -427,7 +441,7 @@ function TimeField({
           disabled={disabled}
           aria-invalid={Boolean(error)}
           className={cn(
-            'font-mono',
+            'min-w-0 flex-1 font-mono',
             !value && 'text-muted-foreground',
             error && 'border-destructive focus-visible:ring-destructive/30',
           )}

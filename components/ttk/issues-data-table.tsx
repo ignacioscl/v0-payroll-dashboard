@@ -39,16 +39,7 @@ import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
 
@@ -100,6 +91,7 @@ export function IssuesDataTable() {
   const [deleteTarget, setDeleteTarget] = React.useState<{
     id: number | string
     employeeName: string
+    punchDateLabel: string
     action: 'delete' | 'activate'
   } | null>(null)
   const [logTarget, setLogTarget] = React.useState<{
@@ -387,6 +379,7 @@ export function IssuesDataTable() {
                       setDeleteTarget({
                         id: r.id,
                         employeeName: r.usuario?.nombre ?? 'employee',
+                        punchDateLabel: formatGmtDate(r.punchInGmt0) || '—',
                         action: 'delete',
                       })
                     }
@@ -403,6 +396,7 @@ export function IssuesDataTable() {
                       setDeleteTarget({
                         id: r.id,
                         employeeName: r.usuario?.nombre ?? 'employee',
+                        punchDateLabel: formatGmtDate(r.punchInGmt0) || '—',
                         action: 'activate',
                       })
                     }
@@ -605,44 +599,14 @@ export function IssuesDataTable() {
         />
       )}
 
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteTarget?.action === 'activate' ? 'Activate punch?' : 'Delete punch?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget?.action === 'activate'
-                ? `Restore the punch record for ${deleteTarget?.employeeName ?? 'this employee'}.`
-                : `Soft-delete the punch for ${deleteTarget?.employeeName ?? 'this employee'}. You can restore it later.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMutation.isPending}
-              onClick={(e) => {
-                e.preventDefault()
-                void confirmDeletePunch()
-              }}
-              className={
-                deleteTarget?.action === 'delete'
-                  ? 'bg-destructive hover:bg-destructive/90'
-                  : ''
-              }
-            >
-              {deleteMutation.isPending
-                ? 'Processing…'
-                : deleteTarget?.action === 'activate'
-                  ? 'Activate'
-                  : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PunchDeleteConfirmDialog
+        target={deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        onConfirm={confirmDeletePunch}
+        pending={deleteMutation.isPending}
+      />
     </>
   )
 }
