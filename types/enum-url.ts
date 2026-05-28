@@ -17,6 +17,7 @@ export const SrsPhpPath = {
   TTK_DELETE: 'php/api/payroll/ttk-delete.php',
   TTK_EMPLOYEES: 'php/api/payroll/ttk-employees.php',
   TTK_GET_BY_ID: 'php/api/payroll/ttk-get-by-id.php',
+  TTK_LOG: 'php/api/payroll/ttk-log.php',
   DEALERS: 'php/api/payroll/dealers.php',
   ME: 'php/api/payroll/me.php',
 } as const

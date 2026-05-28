@@ -54,8 +54,10 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
+  Info,
 } from 'lucide-react'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
+import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
@@ -167,12 +169,17 @@ export function TtkWithoutGroupTable() {
     employeeName: string
     action: 'delete' | 'activate'
   } | null>(null)
+  const [logTarget, setLogTarget] = useState<{
+    id: number | string
+    employeeName: string
+    punchDateLabel: string
+  } | null>(null)
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
   const deleteMutation = useTtkDeletePunch()
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
-  const showActions = !meLoading && (canEdit || canDelete)
+  const showActions = !meLoading
 
   const getEmployeeId = useCallback((row: TtkListRow) => Number(row.usuario?.id ?? 0), [])
 
@@ -376,7 +383,7 @@ export function TtkWithoutGroupTable() {
             <TableRow className="border-0 bg-[#1565C0] hover:bg-[#1565C0]">
               {visibleColumns.has('employee') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
-                  <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('employee')}>
+                  <button type="button" className="flex cursor-pointer items-center hover:text-white/80" onClick={() => handleSort('employee')}>
                     Employee <SortIcon field="employee" />
                   </button>
                 </TableHead>
@@ -386,7 +393,7 @@ export function TtkWithoutGroupTable() {
               )}
               {visibleColumns.has('date') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
-                  <button type="button" className="flex items-center hover:text-white/80" onClick={() => handleSort('date')}>
+                  <button type="button" className="flex cursor-pointer items-center hover:text-white/80" onClick={() => handleSort('date')}>
                     Date <SortIcon field="date" />
                   </button>
                 </TableHead>
@@ -514,6 +521,23 @@ export function TtkWithoutGroupTable() {
                   {showActions && (
                     <TableCell className="px-3 py-1.5 text-right">
                       <div className="flex items-center justify-end gap-0.5">
+                        {row.hasLog === 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                            onClick={() =>
+                              setLogTarget({
+                                id: row.id,
+                                employeeName: row.usuario?.nombre ?? '',
+                                punchDateLabel: formatGmtDate(row.punchInGmt0) || '—',
+                              })
+                            }
+                            aria-label={`View change log for ${row.usuario?.nombre ?? 'employee'}`}
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {canEdit && Number(row.estado ?? 1) === 1 && (
                           <Button
                             variant="ghost"
@@ -644,6 +668,16 @@ export function TtkWithoutGroupTable() {
           </Pagination>
         )}
       </div>
+
+      <PunchLogDialog
+        open={logTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setLogTarget(null)
+        }}
+        punchId={logTarget?.id ?? null}
+        employeeName={logTarget?.employeeName}
+        punchDateLabel={logTarget?.punchDateLabel}
+      />
 
       {canEdit && (
         <EditPunchDialog
