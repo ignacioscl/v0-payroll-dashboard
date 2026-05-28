@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Sparkles,
   Blocks,
+  Table as TableIcon,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ const navigation = [
   { name: 'Employee Ranking', href: '/ranking', icon: Trophy },
   { name: 'Costs by Dealer', href: '/costs', icon: DollarSign },
   { name: 'Components', href: '/components', icon: Blocks },
+  { name: 'Data Table', href: '/datatable-demo', icon: TableIcon },
 ]
 
 function userInitials(nombre: string) {

@@ -52,8 +52,25 @@ import {
   FileSpreadsheet,
   Loader2,
   Pencil,
+  Trash2,
+  CheckCircle,
 } from 'lucide-react'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
+import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
+import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type SortField = 'date' | 'employee'
 type SortDirection = 'asc' | 'desc'
@@ -145,6 +162,17 @@ export function TtkWithoutGroupTable() {
     breakEnd?: string | null
     punchOut?: string | null
   } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number | string
+    employeeName: string
+    action: 'delete' | 'activate'
+  } | null>(null)
+
+  const { user, hasPermission, loading: meLoading } = useSrsMe()
+  const deleteMutation = useTtkDeletePunch()
+  const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
+  const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
+  const showActions = !meLoading && (canEdit || canDelete)
 
   const getEmployeeId = useCallback((row: TtkListRow) => Number(row.usuario?.id ?? 0), [])
 
@@ -206,6 +234,24 @@ export function TtkWithoutGroupTable() {
       }
       return next
     })
+  }
+
+  const confirmDeletePunch = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteMutation.mutateAsync({
+        id_ttk: deleteTarget.id,
+        action: deleteTarget.action,
+      })
+      toast.success(
+        deleteTarget.action === 'activate'
+          ? `Punch restored for ${deleteTarget.employeeName}`
+          : `Punch deleted for ${deleteTarget.employeeName}`,
+      )
+      setDeleteTarget(null)
+    } catch (e: unknown) {
+      toast.error(getSrsErrorMessage(e, 'Failed to update punch'))
+    }
   }
 
   const handleExportCSV = () => {
@@ -363,20 +409,24 @@ export function TtkWithoutGroupTable() {
               {visibleColumns.has('timeBreak') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Time Break</TableHead>
               )}
-              <TableHead className="h-8 w-12 px-3 py-1.5 text-right text-xs font-semibold text-white">Edit</TableHead>
+              {showActions && (
+                <TableHead className="h-8 min-w-[72px] px-3 py-1.5 text-right text-xs font-semibold text-white">
+                  Actions
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {loading && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size + 1} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={visibleColumns.size + (showActions ? 1 : 0)} className="h-24 text-center text-muted-foreground">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size + 1} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={visibleColumns.size + (showActions ? 1 : 0)} className="h-24 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <AlertTriangle className="h-8 w-8 opacity-20" />
                     <span>
@@ -461,26 +511,67 @@ export function TtkWithoutGroupTable() {
                       {row.timeBreak || '—'}
                     </TableCell>
                   )}
-                  <TableCell className="px-3 py-1.5 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                      onClick={() =>
-                        setEditingPunch({
-                          id: row.id,
-                          employeeName: row.usuario?.nombre ?? '',
-                          punchIn: row.punchInGmt0,
-                          breakStart: row.breakStartGmt0,
-                          breakEnd: row.breakEndGmt0,
-                          punchOut: row.punchOutGmt0,
-                        })
-                      }
-                      aria-label={`Edit punch for ${row.usuario?.nombre ?? 'employee'}`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
+                  {showActions && (
+                    <TableCell className="px-3 py-1.5 text-right">
+                      <div className="flex items-center justify-end gap-0.5">
+                        {canEdit && Number(row.estado ?? 1) === 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                            onClick={() =>
+                              setEditingPunch({
+                                id: row.id,
+                                employeeName: row.usuario?.nombre ?? '',
+                                punchIn: row.punchInGmt0,
+                                breakStart: row.breakStartGmt0,
+                                breakEnd: row.breakEndGmt0,
+                                punchOut: row.punchOutGmt0,
+                              })
+                            }
+                            aria-label={`Edit punch for ${row.usuario?.nombre ?? 'employee'}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          Number(row.estado ?? 1) === 1 ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() =>
+                                setDeleteTarget({
+                                  id: row.id,
+                                  employeeName: row.usuario?.nombre ?? 'employee',
+                                  action: 'delete',
+                                })
+                              }
+                              aria-label={`Delete punch for ${row.usuario?.nombre ?? 'employee'}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-600"
+                              onClick={() =>
+                                setDeleteTarget({
+                                  id: row.id,
+                                  employeeName: row.usuario?.nombre ?? 'employee',
+                                  action: 'activate',
+                                })
+                              }
+                              aria-label={`Activate punch for ${row.usuario?.nombre ?? 'employee'}`}
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -554,24 +645,54 @@ export function TtkWithoutGroupTable() {
         )}
       </div>
 
-      <EditPunchDialog
-        open={editingPunch !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditingPunch(null)
-        }}
-        punchId={editingPunch?.id ?? null}
-        employeeName={editingPunch?.employeeName}
-        initial={
-          editingPunch
-            ? {
-                punchIn: editingPunch.punchIn,
-                breakStart: editingPunch.breakStart,
-                breakEnd: editingPunch.breakEnd,
-                punchOut: editingPunch.punchOut,
-              }
-            : undefined
-        }
-      />
+      {canEdit && (
+        <EditPunchDialog
+          open={editingPunch !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditingPunch(null)
+          }}
+          punchId={editingPunch?.id ?? null}
+          employeeName={editingPunch?.employeeName}
+          initial={
+            editingPunch
+              ? {
+                  punchIn: editingPunch.punchIn,
+                  breakStart: editingPunch.breakStart,
+                  breakEnd: editingPunch.breakEnd,
+                  punchOut: editingPunch.punchOut,
+                }
+              : undefined
+          }
+        />
+      )}
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteTarget?.action === 'activate' ? 'Activate punch?' : 'Delete punch?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.action === 'activate'
+                ? `Restore the punch record for ${deleteTarget?.employeeName ?? 'this employee'}.`
+                : `Soft-delete the punch for ${deleteTarget?.employeeName ?? 'this employee'}. You can restore it later.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeletePunch()
+              }}
+              className={deleteTarget?.action === 'delete' ? 'bg-destructive hover:bg-destructive/90' : ''}
+            >
+              {deleteMutation.isPending ? 'Processing…' : deleteTarget?.action === 'activate' ? 'Activate' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

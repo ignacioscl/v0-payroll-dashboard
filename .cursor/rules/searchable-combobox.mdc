@@ -1,0 +1,172 @@
+---
+description: Usar SearchableCombobox para selects con búsqueda (single select). Contrato de paginación.
+globs: v0-payroll-dashboard/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# SearchableCombobox
+
+Componente genérico para selects con búsqueda y selección única. Vive en
+`components/shared/searchable-combobox.tsx`.
+
+> ⚠️ Hay un re-export deprecado en `components/ui/searchable-combobox.tsx` —
+> **no usar**, migrar a `@/components/shared/searchable-combobox`.
+
+## Cuándo usar este componente
+
+Usar `SearchableCombobox` (o un wrapper de dominio sobre él) **siempre que el UI
+necesite**:
+
+- Un dropdown con input de búsqueda y selección **única**.
+- Listas largas o filtradas server-side (≥ ~20 items, o cualquier cantidad
+  donde un `Select` plano se vuelve incómodo).
+- Search asincrónico con TanStack Query (con o sin paginación).
+
+## Cuándo NO usar
+
+- Selects cortos y estáticos (3–10 opciones fijas): usar `<Select>` de shadcn.
+- Multi-selección: usar `DealerMultiSelect` (`components/filters/dealer-multi-select.tsx`)
+  o crear un wrapper análogo.
+- Confirmaciones / acciones (no es un picker): usar `<DropdownMenu>`.
+
+## Patrón de uso (single-select sin paginación)
+
+```tsx
+import { SearchableCombobox } from '@/components/shared/searchable-combobox'
+
+const [term, setTerm] = useState('')
+const [selected, setSelected] = useState<Project | null>(null)
+const projectsQuery = useProjectSearch(term, { enabled: term.length >= 2 })
+
+<SearchableCombobox<Project>
+  value={selected}
+  onChange={setSelected}
+  searchTerm={term}
+  onSearchTermChange={setTerm}
+  items={projectsQuery.data}
+  isLoading={projectsQuery.isFetching}
+  getItemKey={(p) => p.id}
+  getItemLabel={(p) => p.name}
+  minSearchChars={2}
+  placeholder="Select project…"
+/>
+```
+
+## Wrappers de dominio
+
+Si necesitás avatares, subtítulos o iconografía específica, **no copies el
+markup del combobox**: creá un wrapper fino que delegue al genérico usando
+`renderSelectedTrigger`, `renderEmptyTrigger`, `renderItem`. Ejemplo de
+referencia: `components/ttk/employee-combobox.tsx`.
+
+## Paginación
+
+`SearchableCombobox` soporta paginación opcional. Activala pasando
+`hasMore`, `isLoadingMore` y `onLoadMore`. Comportamiento:
+
+- IntersectionObserver dispara `onLoadMore()` al hacer scroll cerca del final.
+- Aparece además un botón **Load more** como fallback manual.
+- Mientras `isLoadingMore` está activo, el botón muestra un spinner.
+
+### Contrato del backend
+
+El endpoint debe devolver (o el route handler / hook debe normalizar a) la
+siguiente forma:
+
+```ts
+// Tipo expuesto por el componente — importable desde el mismo módulo.
+export interface PaginatedComboboxResponse<T> {
+  results: T[]      // items de la página actual
+  page: number      // página actual, base 1
+  pageSize: number  // tamaño de página (contrato del server)
+  total?: number    // total acumulado, si se conoce
+  hasMore: boolean  // true si quedan páginas; derivado server-side o calculado
+}
+```
+
+Reglas:
+
+- `page` es **base 1** (no 0). La primera request es `page=1`.
+- `pageSize` lo fija el server; el cliente lo respeta y lo manda como query
+  param para que sea estable entre páginas (`page_size` en SRS, camelCase en
+  BFFs nuevos).
+- `hasMore` es la fuente de verdad para "¿hay más?". Si el legacy no lo
+  expone, derivarlo en el BFF / hook como `page * pageSize < total`.
+- `total` es opcional pero **recomendado** para mostrar "X de Y resultados".
+
+### Query string esperado (search + paginación)
+
+```
+GET /api/srs/php/api/<resource>.php
+  ?term=<string>          # texto de búsqueda
+  &page=<int, base 1>
+  &page_size=<int>
+  &<otros filtros>
+```
+
+Endpoints nuevos / BFF dedicados pueden usar `pageSize` camelCase, pero
+**mantener el contrato `results / page / pageSize / total / hasMore` en la
+respuesta JSON**.
+
+### Wiring con TanStack Query (`useInfiniteQuery`)
+
+```ts
+const query = useInfiniteQuery({
+  queryKey: ['projects', term],
+  queryFn: ({ pageParam = 1 }) =>
+    fetchProjects({ term, page: pageParam, pageSize: 20 }),
+  getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+  initialPageParam: 1,
+  enabled: term.length >= 2,
+  staleTime: 30_000,
+})
+
+const items = useMemo(
+  () => query.data?.pages.flatMap((p) => p.results) ?? [],
+  [query.data],
+)
+
+<SearchableCombobox<Project>
+  value={selected}
+  onChange={setSelected}
+  searchTerm={term}
+  onSearchTermChange={setTerm}
+  items={items}
+  totalCount={query.data?.pages.at(-1)?.total}
+  isLoading={query.isLoading}
+  isLoadingMore={query.isFetchingNextPage}
+  hasMore={!!query.hasNextPage}
+  onLoadMore={() => query.fetchNextPage()}
+  getItemKey={(p) => p.id}
+  getItemLabel={(p) => p.name}
+  minSearchChars={2}
+/>
+```
+
+Notas:
+
+- Pasar `items` **acumulado** (todos los `results` aplanados), no la última
+  página suelta — el combobox no acumula por su cuenta.
+- Si cambia `searchTerm`, TanStack Query descarta páginas anteriores porque
+  forma parte de la `queryKey` — no hay que limpiar manualmente.
+
+## Estados visuales que cubre el componente
+
+- **Prerequisite gate**: cuando hay una condición previa (ej. "elegí dealer
+  primero") → pasar `prerequisite={{ met, title, description, icon }}`.
+- **Pre-search**: `searchTerm.trim().length < minSearchChars` → hint "empezá a
+  tipear".
+- **Loading inicial** (`isLoading`).
+- **Loading next page** (`isLoadingMore`) → spinner en el botón Load more.
+- **Empty** (sin resultados con término válido) → `emptyTitle` / `emptyDescription`.
+- **Selected** con botón X para limpiar.
+
+## Reglas
+
+- Importar desde `@/components/shared/searchable-combobox`. **No** importar
+  desde `@/components/ui/searchable-combobox`.
+- Mantener el contrato de paginación (`results / page / pageSize / total /
+  hasMore`). Si el endpoint legacy no cumple, normalizar en un BFF
+  (`app/api/<recurso>/route.ts`) según la regla `payroll-api-proxy.mdc`.
+- No reimplementar Popover + Command + cmdk a mano: o usás este componente, o
+  agregás render props al genérico.

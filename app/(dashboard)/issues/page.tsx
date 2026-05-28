@@ -1,16 +1,23 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { TtkWithoutGroupTable } from '@/components/ttk/ttk-without-group-table'
+import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
+import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import {
   AlertTriangle,
   LogOut,
   Hand,
   Trash2,
   DollarSign,
+  PlusCircle,
 } from 'lucide-react'
 
 type IssueType =
@@ -61,6 +68,7 @@ const ISSUE_CARDS: IssueCardConfig[] = [
 ]
 
 export default function IssuesPage() {
+  const [addPunchOpen, setAddPunchOpen] = useState(false)
   const {
     search,
     selectedDealers,
@@ -69,6 +77,30 @@ export default function IssuesPage() {
     setSelectedType,
     filtersHydrated,
   } = useFilters()
+
+  const { user, hasPermission, loading: meLoading } = useSrsMe()
+  const { dealers } = useSrsDealers()
+  const canAdd = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
+  const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
+
+  const singleDealerId = useMemo(() => {
+    if (selectedDealers.length !== 1) return null
+    const id = Number(selectedDealers[0])
+    return Number.isFinite(id) && id > 0 ? id : null
+  }, [selectedDealers])
+
+  const singleDealerName = useMemo(() => {
+    if (!singleDealerId) return undefined
+    return dealers.find((d) => String(d.id) === String(singleDealerId))?.label
+  }, [dealers, singleDealerId])
+
+  const visibleIssueCards = useMemo(
+    () =>
+      ISSUE_CARDS.filter(
+        (card) => card.type !== 'only_deletes' || canViewDeleted,
+      ),
+    [canViewDeleted],
+  )
 
   const { counts, loading } = useTtkIssueCounts({
     search,
@@ -106,12 +138,30 @@ export default function IssuesPage() {
             Without group — live counts from TTK punch validation
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
-          <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-          <span className="font-medium tabular-nums">
-            {loading ? '…' : totalPending} with errors
-          </span>
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {!meLoading && canAdd && (
+            <Button
+              size="sm"
+              className="gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              onClick={() => setAddPunchOpen(true)}
+              disabled={!filtersHydrated || singleDealerId == null}
+              title={
+                singleDealerId == null
+                  ? 'Select exactly one dealer to add a punch'
+                  : 'Add manual punch'
+              }
+            >
+              <PlusCircle className="h-4 w-4" />
+              Add punch
+            </Button>
+          )}
+          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+            <span className="font-medium tabular-nums">
+              {loading ? '…' : totalPending} with errors
+            </span>
+          </Badge>
+        </div>
       </div>
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
@@ -120,8 +170,12 @@ export default function IssuesPage() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {ISSUE_CARDS.map((card) => (
+      <div
+        className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${
+          visibleIssueCards.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'
+        }`}
+      >
+        {visibleIssueCards.map((card) => (
           <KPICard
             key={card.type}
             title={card.title}
@@ -137,6 +191,15 @@ export default function IssuesPage() {
       </div>
 
       <TtkWithoutGroupTable />
+
+      {canAdd && (
+        <AddPunchDialog
+          open={addPunchOpen}
+          onOpenChange={setAddPunchOpen}
+          idDealer={singleDealerId}
+          dealerName={singleDealerName}
+        />
+      )}
     </div>
   )
 }
