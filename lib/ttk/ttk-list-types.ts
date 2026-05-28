@@ -18,6 +18,16 @@ export type TtkListRow = {
   fixedBy?: { id?: number | string; nombre?: string } | null
   /** JSON or text from `TTK_PUNCH_WITH_ERROR` before correction. */
   fixedErrorSnapshot?: string | null
+  /** 1 = row created manually in SRS (supervisor add punch). */
+  manualCreate?: number
+  idPunchInLogValidation?: number | null
+  idBreakStartLogValidation?: number | null
+  idBreakEndLogValidation?: number | null
+  idPunchOutLogValidation?: number | null
+  idPunchInLogFingerValidation?: number | null
+  idBreakStartLogFingerValidation?: number | null
+  idBreakEndLogFingerValidation?: number | null
+  idPunchOutLogFingerValidation?: number | null
   usuario?: { id?: number | string; nombre?: string; thumbnailUuid?: string | null }
   rolDpto?: { role?: string; department?: string } | null
   dealer?: { id?: number; razonSocial?: string }

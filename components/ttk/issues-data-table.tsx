@@ -30,6 +30,14 @@ import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { SrsPhpPath } from '@/types/enum-url'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
+import { PunchTimeCell } from '@/components/ttk/punch-time-cell'
+import {
+  breakEndMethod,
+  breakStartMethod,
+  formatMethodForExport,
+  punchInMethod,
+  punchOutMethod,
+} from '@/lib/ttk/punch-method'
 import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
@@ -233,11 +241,20 @@ export function IssuesDataTable() {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Punch In" />
         ),
-        cell: ({ row }) => formatGmtTime(row.original.punchInGmt0) || '—',
+        cell: ({ row }) => {
+          const r = row.original
+          const time = formatGmtTime(r.punchInGmt0)
+          return (
+            <PunchTimeCell time={time} method={time ? punchInMethod(r) : null} />
+          )
+        },
         meta: {
           label: 'Punch In',
           mono: true,
-          exportValue: (r) => formatUsTimeForExport(r.punchInGmt0),
+          exportValue: (r) => {
+            const t = formatUsTimeForExport(r.punchInGmt0)
+            return t ? t + formatMethodForExport(punchInMethod(r)) : ''
+          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -246,11 +263,20 @@ export function IssuesDataTable() {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Break Start" />
         ),
-        cell: ({ row }) => formatGmtTime(row.original.breakStartGmt0) || '—',
+        cell: ({ row }) => {
+          const r = row.original
+          const time = formatGmtTime(r.breakStartGmt0)
+          return (
+            <PunchTimeCell time={time} method={time ? breakStartMethod(r) : null} />
+          )
+        },
         meta: {
           label: 'Break Start',
           mono: true,
-          exportValue: (r) => formatUsTimeForExport(r.breakStartGmt0),
+          exportValue: (r) => {
+            const t = formatUsTimeForExport(r.breakStartGmt0)
+            return t ? t + formatMethodForExport(breakStartMethod(r)) : ''
+          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -259,11 +285,20 @@ export function IssuesDataTable() {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Break End" />
         ),
-        cell: ({ row }) => formatGmtTime(row.original.breakEndGmt0) || '—',
+        cell: ({ row }) => {
+          const r = row.original
+          const time = formatGmtTime(r.breakEndGmt0)
+          return (
+            <PunchTimeCell time={time} method={time ? breakEndMethod(r) : null} />
+          )
+        },
         meta: {
           label: 'Break End',
           mono: true,
-          exportValue: (r) => formatUsTimeForExport(r.breakEndGmt0),
+          exportValue: (r) => {
+            const t = formatUsTimeForExport(r.breakEndGmt0)
+            return t ? t + formatMethodForExport(breakEndMethod(r)) : ''
+          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -272,11 +307,20 @@ export function IssuesDataTable() {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Punch Out" />
         ),
-        cell: ({ row }) => formatGmtTime(row.original.punchOutGmt0) || '—',
+        cell: ({ row }) => {
+          const r = row.original
+          const time = formatGmtTime(r.punchOutGmt0)
+          return (
+            <PunchTimeCell time={time} method={time ? punchOutMethod(r) : null} />
+          )
+        },
         meta: {
           label: 'Punch Out',
           mono: true,
-          exportValue: (r) => formatUsTimeForExport(r.punchOutGmt0),
+          exportValue: (r) => {
+            const t = formatUsTimeForExport(r.punchOutGmt0)
+            return t ? t + formatMethodForExport(punchOutMethod(r)) : ''
+          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -332,6 +376,14 @@ export function IssuesDataTable() {
           const r = row.original
           return (
             <div className="flex items-center justify-end gap-0.5">
+              {Number(r.manualCreate) === 1 ? (
+                <span
+                  className="mr-1 hidden max-w-[4.5rem] truncate text-[9px] font-medium leading-tight text-sky-700 dark:text-sky-400 xl:inline"
+                  title="Manual punch"
+                >
+                  Manual
+                </span>
+              ) : null}
               {r.hasLog === 1 && (
                 <Button
                   variant="ghost"
