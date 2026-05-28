@@ -22,7 +22,6 @@ import {
 import { Loader2, Database } from 'lucide-react'
 
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -453,10 +452,51 @@ export function DataTable<TData, TValue = unknown>({
   const headerStyle = headerIsColored ? { backgroundColor: headerColor } : undefined
   const headerClassName = headerIsColored ? 'text-white' : 'text-foreground'
 
-  /* Background applied to body rows. Sticky/pinned cells use `bg-inherit` so they
-   * sit opaque on top of horizontally-scrolled content. */
+  /* Background applied to body rows. Pinned cells use a solid color via inline
+   * `style.backgroundColor = 'var(--card)'` so horizontally-scrolled content
+   * never bleeds through. Zebra striping only applies to non-pinned cells. */
   const rowBg = (index: number) =>
     zebraRows && index % 2 !== 0 ? 'bg-muted/25' : 'bg-card'
+
+  /* ---------- Horizontal scroll sync (top mirror scrollbar) ----------
+   * The native horizontal scrollbar lives at the bottom of the table, which
+   * is far below the fold when there are many rows. We render a thin mirror
+   * scrollbar above the header (`sticky top-0`) so users can scroll
+   * horizontally without scrolling vertically first.  The two scroll
+   * containers are kept in sync via `scrollLeft` assignments. */
+  const mainScrollRef = React.useRef<HTMLDivElement>(null)
+  const topScrollRef = React.useRef<HTMLDivElement>(null)
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = React.useState(false)
+
+  const onTopScroll = React.useCallback(() => {
+    const top = topScrollRef.current
+    const main = mainScrollRef.current
+    if (!top || !main) return
+    if (main.scrollLeft !== top.scrollLeft) main.scrollLeft = top.scrollLeft
+  }, [])
+
+  const onMainScroll = React.useCallback(() => {
+    const top = topScrollRef.current
+    const main = mainScrollRef.current
+    if (!top || !main) return
+    if (top.scrollLeft !== main.scrollLeft) top.scrollLeft = main.scrollLeft
+  }, [])
+
+  React.useLayoutEffect(() => {
+    const el = mainScrollRef.current
+    if (!el) return
+    const update = () => {
+      setHasHorizontalOverflow(el.scrollWidth > el.clientWidth + 1)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    const inner = el.querySelector('table')
+    if (inner) ro.observe(inner)
+    return () => ro.disconnect()
+  }, [data, columnVisibility, columnSizing, internalPinning])
+
+  const totalTableWidth = table.getTotalSize()
 
   return (
     <Card
@@ -464,7 +504,12 @@ export function DataTable<TData, TValue = unknown>({
         // `min-w-0` lets the Card shrink inside a flex/grid container instead
         // of forcing the page to scroll horizontally when the inner table is
         // wider than its allotted space.
-        'min-w-0 gap-0 overflow-hidden border-border py-0 shadow-sm',
+        //
+        // `overflow-clip` (not `overflow-hidden`) keeps the rounded corners
+        // clipping but does NOT establish a scroll container — that's what
+        // lets the inner `sticky top-0` horizontal scrollbar mirror stick to
+        // the viewport instead of being trapped inside the Card.
+        'min-w-0 gap-0 overflow-clip border-border py-0 shadow-sm',
         className,
       )}
     >
@@ -483,16 +528,42 @@ export function DataTable<TData, TValue = unknown>({
         trailing={toolbarTrailing}
       />
 
-      {/* shadcn `<Table>` already wraps in an overflow-x-auto container, so we
-          just need `relative` here for the loading overlay positioning. */}
+      {/* Top horizontal scrollbar mirror — `position: sticky` makes it follow
+          the user as the page scrolls so they never have to scroll past all
+          rows to reach the native scrollbar at the bottom of the table.
+          `top-16` keeps it just below the dashboard's 4rem-tall fixed page
+          header. `aria-hidden` because the real scroll interaction is the
+          one in `mainScrollRef` below — this one just mirrors `scrollLeft`. */}
+      <div
+        ref={topScrollRef}
+        onScroll={onTopScroll}
+        aria-hidden="true"
+        className={cn(
+          'sticky top-16 z-20 w-full overflow-x-auto overflow-y-hidden border-b border-border bg-card',
+          // Reserve enough vertical space for any browser's horizontal
+          // scrollbar; on macOS the bar is overlay/auto-hiding, so the strip
+          // looks empty most of the time which is fine.
+          hasHorizontalOverflow ? 'h-3.5' : 'h-0 border-b-0',
+        )}
+      >
+        <div style={{ width: totalTableWidth, height: 1 }} />
+      </div>
+
       <div className="relative w-full min-w-0">
-        <Table
+        <div
+          ref={mainScrollRef}
+          onScroll={onMainScroll}
+          className="relative w-full overflow-x-auto"
+        >
+        <table
+          data-slot="table"
           // `table-layout: fixed` makes the column widths set on `<th>` the
           // single source of truth — required for column resizing and for the
           // sticky offsets used by pinned columns to match the visual layout.
+          className="w-full caption-bottom text-sm"
           style={{
             tableLayout: 'fixed',
-            width: table.getTotalSize(),
+            width: totalTableWidth,
             minWidth: '100%',
           }}
         >
@@ -579,20 +650,29 @@ export function DataTable<TData, TValue = unknown>({
                             header.column.resetSize()
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className={cn(
-                            'absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none',
-                            'transition-colors',
-                            headerIsColored
-                              ? cn(
-                                  'hover:bg-white/40',
-                                  isResizing && 'bg-white/60',
-                                )
-                              : cn(
-                                  'hover:bg-foreground/20',
-                                  isResizing && 'bg-foreground/30',
+                          className="group absolute top-0 right-0 z-10 flex h-full w-2 cursor-col-resize touch-none select-none items-center justify-end"
+                        >
+                          {/* Always-visible thin separator. Grows + brightens on
+                              hover and during active resize so users can see
+                              exactly where to grab. */}
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'block w-px transition-all',
+                              headerIsColored
+                                ? 'bg-white/40 group-hover:bg-white'
+                                : 'bg-foreground/30 group-hover:bg-foreground/80',
+                              'h-[60%] group-hover:h-full group-hover:w-0.5',
+                              isResizing &&
+                                cn(
+                                  'h-full w-0.5',
+                                  headerIsColored
+                                    ? 'bg-white'
+                                    : 'bg-foreground/80',
                                 ),
-                          )}
-                        />
+                            )}
+                          />
+                        </span>
                       )}
                     </TableHead>
                   )
@@ -656,21 +736,30 @@ export function DataTable<TData, TValue = unknown>({
                       const sizingStyle: React.CSSProperties = pin
                         ? { width: size, minWidth: size, maxWidth: size }
                         : { width: size }
+                      const cellPinStyles = getPinningStyles(cell.column)
                       return (
                         <TableCell
                           key={cell.id}
                           style={{
                             ...sizingStyle,
-                            ...getPinningStyles(cell.column),
+                            ...cellPinStyles,
+                            // Pinned cells MUST be opaque so the rest of the
+                            // row (zebra-striped via `bg-muted/25`) doesn't
+                            // bleed through behind them during horizontal
+                            // scroll. Solid `var(--card)` regardless of zebra.
+                            backgroundColor: pin
+                              ? 'var(--card)'
+                              : cellPinStyles.backgroundColor,
                           }}
                           className={cn(
                             'overflow-hidden px-3 text-xs whitespace-nowrap',
                             rowPadding,
                             meta?.mono && 'font-mono',
                             meta?.numeric && 'text-right tabular-nums',
-                            // Pinned cells must be opaque so the rest of the row
-                            // doesn't bleed through while scrolling.
-                            pin && baseBg,
+                            // Non-pinned cells inherit the row's zebra
+                            // background via the `<tr>`'s `baseBg` class —
+                            // no per-cell bg needed. Pinned cells use the
+                            // inline `var(--card)` override above.
                             isLastLeftPinned &&
                               'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)]',
                             isFirstRightPinned &&
@@ -687,7 +776,8 @@ export function DataTable<TData, TValue = unknown>({
               })
             )}
           </TableBody>
-        </Table>
+        </table>
+        </div>
 
         {isLoading && data.length > 0 && (
           <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-background/30 pt-3 backdrop-blur-[1px]">
