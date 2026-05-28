@@ -630,6 +630,13 @@ export function DataTable<TData, TValue = unknown>({
   // their widths and sticky offsets can never desync.
   const geo = buildColumnGeometry(table)
   const totalTableWidth = geo.total
+  const hasPinnedColumns = geo.ordered.some((c) => c.pin === 'left' || c.pin === 'right')
+  // Pinned tables must use the exact sum of column sizes — `minWidth: 100%`
+  // stretches columns while sticky `left` still uses logical sizes (drift).
+  // Unpinned tables (basic, filters) fill the panel when columns are narrower.
+  const tableWidthStyle: React.CSSProperties = hasPinnedColumns
+    ? { width: totalTableWidth }
+    : { width: '100%', minWidth: totalTableWidth }
 
   return (
     <Card
@@ -679,10 +686,15 @@ export function DataTable<TData, TValue = unknown>({
           hasHorizontalOverflow ? 'h-3.5' : 'h-0 border-b-0',
         )}
       >
-        <div style={{ width: totalTableWidth, height: 1 }} />
+        <div style={{ ...tableWidthStyle, height: 1 }} />
       </div>
 
-      <div className="relative w-full min-w-0">
+      <div
+        className={cn(
+          'relative w-full min-w-0',
+          isLoading && data.length === 0 && 'min-h-32',
+        )}
+      >
         <div
           ref={mainScrollRef}
           onScroll={onMainScroll}
@@ -696,10 +708,7 @@ export function DataTable<TData, TValue = unknown>({
           className="w-full caption-bottom text-sm"
           style={{
             tableLayout: 'fixed',
-            // Exact sum of column sizes — do NOT add `minWidth: '100%'` or the
-            // browser stretches columns beyond `getSize()` while sticky `left`
-            // still uses the logical sizes (2nd pinned column jitters / drifts).
-            width: totalTableWidth,
+            ...tableWidthStyle,
             borderCollapse: 'separate',
             borderSpacing: 0,
           }}
@@ -823,13 +832,14 @@ export function DataTable<TData, TValue = unknown>({
 
           <TableBody>
             {isLoading && data.length === 0 ? (
-              <TableRow>
+              /* Spacer only — spinner is in the viewport overlay below so wide
+                 pinned tables don't center the loader thousands of px to the right. */
+              <TableRow className="border-0 hover:bg-transparent">
                 <TableCell
                   colSpan={visibleColCount}
-                  className="h-32 text-center align-middle text-muted-foreground"
-                >
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                </TableCell>
+                  className="h-32 border-0 p-0"
+                  aria-hidden
+                />
               </TableRow>
             ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
@@ -911,6 +921,12 @@ export function DataTable<TData, TValue = unknown>({
           </TableBody>
         </table>
         </div>
+
+        {isLoading && data.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        )}
 
         {isLoading && data.length > 0 && (
           <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-background/30 pt-3 backdrop-blur-[1px]">
