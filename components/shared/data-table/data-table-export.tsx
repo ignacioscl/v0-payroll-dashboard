@@ -20,6 +20,11 @@ interface DataTableExportProps<TData> {
   /** Base filename (no extension). Will be suffixed with the current date. */
   fileName?: string
   /**
+   * When true (default), export every data column regardless of column visibility
+   * in the grid. When false, only currently visible columns are exported.
+   */
+  exportAllColumns?: boolean
+  /**
    * Optional async fetcher to export *all* rows from the server (recommended
    * for server-paginated tables). Receives the current sorting/filter state
    * via the table; the caller is responsible for fetching every page.
@@ -31,18 +36,44 @@ function todayStamp(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** Build a flat dictionary of cell values for a given row, honoring column visibility. */
-function rowToRecord<TData>(table: Table<TData>, row: TData): Record<string, unknown> {
+function getExportColumns<TData>(table: Table<TData>, exportAllColumns: boolean) {
+  const columns = exportAllColumns
+    ? table.getAllLeafColumns()
+    : table.getVisibleLeafColumns()
+  return columns.filter((column) => {
+    if (column.id === 'actions') return false
+    const meta = column.columnDef.meta as { exportable?: boolean } | undefined
+    if (meta?.exportable === false) return false
+    return true
+  })
+}
+
+/** Build a flat dictionary of cell values for a given row. */
+function rowToRecord<TData>(
+  table: Table<TData>,
+  row: TData,
+  exportAllColumns: boolean,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  for (const column of table.getVisibleLeafColumns()) {
-    if (!column.accessorFn) continue
-    const meta = (column.columnDef.meta ?? {}) as { label?: string; exportValue?: (row: TData) => unknown }
+  for (const column of getExportColumns(table, exportAllColumns)) {
+    const meta = (column.columnDef.meta ?? {}) as {
+      label?: string
+      exportValue?: (row: TData) => unknown
+    }
     const label =
       meta.label ??
       (typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id)
-    out[label] = meta.exportValue
-      ? meta.exportValue(row)
-      : column.accessorFn(row, 0)
+
+    if (meta.exportValue) {
+      out[label] = meta.exportValue(row)
+    } else if (column.accessorFn) {
+      out[label] = column.accessorFn(row, 0)
+    } else {
+      const key = (column.columnDef as { accessorKey?: string }).accessorKey
+      if (key && row && typeof row === 'object' && key in (row as object)) {
+        out[label] = (row as Record<string, unknown>)[key]
+      }
+    }
   }
   return out
 }
@@ -50,6 +81,7 @@ function rowToRecord<TData>(table: Table<TData>, row: TData): Record<string, unk
 export function DataTableExport<TData>({
   table,
   fileName = 'export',
+  exportAllColumns = true,
   fetchAllRows,
 }: DataTableExportProps<TData>) {
   const [busy, setBusy] = React.useState<'csv' | 'xlsx' | null>(null)
@@ -64,7 +96,7 @@ export function DataTableExport<TData>({
     setBusy(format)
     try {
       const rows = await getRows()
-      const records = rows.map((row) => rowToRecord(table, row))
+      const records = rows.map((row) => rowToRecord(table, row, exportAllColumns))
 
       const ws = XLSX.utils.json_to_sheet(records)
       const wb = XLSX.utils.book_new()

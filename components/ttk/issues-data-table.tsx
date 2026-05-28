@@ -22,14 +22,15 @@ import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
 import {
   buildTtkListFilterExtra,
-  formatFixedAt,
   formatGmtDate,
   formatGmtTime,
 } from '@/lib/ttk/map-header-filters'
+import { formatUsDateForExport, formatUsTimeForExport } from '@/lib/format-us-datetime'
 import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { SrsPhpPath } from '@/types/enum-url'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
+import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { Button } from '@/components/ui/button'
@@ -185,22 +186,17 @@ export function IssuesDataTable() {
                   {punchErrorLabel(r) ? (
                     <PunchErrorIndicator errorText={punchErrorLabel(r)!} />
                   ) : null}
+                  {r.fixedAt ? (
+                    <PunchFixedIndicator
+                      fixedAt={r.fixedAt}
+                      fixedByName={r.fixedBy?.nombre}
+                      errorSnapshot={r.fixedErrorSnapshot}
+                    />
+                  ) : null}
                 </div>
                 {r.dealer?.razonSocial ? (
                   <span className="truncate text-[10px] font-normal text-muted-foreground">
                     {r.dealer.razonSocial}
-                  </span>
-                ) : null}
-                {r.fixedAt ? (
-                  <span
-                    className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
-                    title={
-                      r.fixedBy?.nombre
-                        ? `Corrected by ${r.fixedBy.nombre}`
-                        : undefined
-                    }
-                  >
-                    Fixed by {r.fixedBy?.nombre ?? '—'} · {formatFixedAt(r.fixedAt)}
                   </span>
                 ) : null}
               </div>
@@ -211,6 +207,7 @@ export function IssuesDataTable() {
           label: 'Employee',
           pin: 'left',
           sortKey: 'us.nombre',
+          exportValue: (r) => r.usuario?.nombre ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -220,7 +217,10 @@ export function IssuesDataTable() {
           <DataTableColumnHeader column={column} title="Role / Dept" />
         ),
         cell: ({ row }) => roleLabel(row.original) || '—',
-        meta: { label: 'Role / Dept' } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Role / Dept',
+          exportValue: (r) => roleLabel(r),
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'date',
@@ -232,42 +232,64 @@ export function IssuesDataTable() {
         meta: {
           label: 'Date',
           sortKey: 'tew.punch_in',
+          exportValue: (r) => formatUsDateForExport(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'punchIn',
+        accessorFn: (row) => row.punchInGmt0 ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Punch In" />
         ),
         cell: ({ row }) => formatGmtTime(row.original.punchInGmt0) || '—',
-        meta: { label: 'Punch In', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Punch In',
+          mono: true,
+          exportValue: (r) => formatUsTimeForExport(r.punchInGmt0),
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'breakStart',
+        accessorFn: (row) => row.breakStartGmt0 ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Break Start" />
         ),
         cell: ({ row }) => formatGmtTime(row.original.breakStartGmt0) || '—',
-        meta: { label: 'Break Start', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Break Start',
+          mono: true,
+          exportValue: (r) => formatUsTimeForExport(r.breakStartGmt0),
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'breakEnd',
+        accessorFn: (row) => row.breakEndGmt0 ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Break End" />
         ),
         cell: ({ row }) => formatGmtTime(row.original.breakEndGmt0) || '—',
-        meta: { label: 'Break End', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Break End',
+          mono: true,
+          exportValue: (r) => formatUsTimeForExport(r.breakEndGmt0),
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'punchOut',
+        accessorFn: (row) => row.punchOutGmt0 ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Punch Out" />
         ),
         cell: ({ row }) => formatGmtTime(row.original.punchOutGmt0) || '—',
-        meta: { label: 'Punch Out', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Punch Out',
+          mono: true,
+          exportValue: (r) => formatUsTimeForExport(r.punchOutGmt0),
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'timeWork',
+        accessorFn: (row) => row.timeWork ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Time Work" />
         ),
@@ -275,15 +297,27 @@ export function IssuesDataTable() {
           const v = row.original.timeWork
           return v === '00:00' ? '00:00' : v || '—'
         },
-        meta: { label: 'Time Work', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Time Work',
+          mono: true,
+          exportValue: (r) => {
+            const v = r.timeWork
+            return v === '00:00' ? '00:00' : v ?? ''
+          },
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'timeBreak',
+        accessorFn: (row) => row.timeBreak ?? '',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Time Break" />
         ),
         cell: ({ row }) => row.original.timeBreak || '—',
-        meta: { label: 'Time Break', mono: true } satisfies DataTableColumnMeta<TtkListRow>,
+        meta: {
+          label: 'Time Break',
+          mono: true,
+          exportValue: (r) => r.timeBreak ?? '',
+        } satisfies DataTableColumnMeta<TtkListRow>,
       },
     ]
 
@@ -410,6 +444,37 @@ export function IssuesDataTable() {
     setPageIndex(0)
   }, [debouncedSearch, debouncedDealers, selectedType, dateRange, pageSize, sorting])
 
+  const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
+    if (!queryEnabled) return []
+
+    const exportPageSize = 500
+    const collected: TtkListRow[] = []
+    let pageIndex = 0
+    let totalRows = 0
+
+    do {
+      const params = ttkListAdapter.buildRequest({
+        pageIndex,
+        pageSize: exportPageSize,
+        sorting,
+        columnFilters: [],
+        columns: [],
+        extra: listExtra,
+      })
+      const data = await apiRequest.getCustom('', undefined, params)
+      throwIfSrsFail(data, 'Failed to load punches for export')
+      const parsed = ttkListAdapter.parseResponse(data as TtkListResponse, {
+        pageIndex,
+        pageSize: exportPageSize,
+      })
+      collected.push(...parsed.rows)
+      totalRows = parsed.total
+      pageIndex += 1
+    } while (collected.length < totalRows && collected.length > 0)
+
+    return collected
+  }, [apiRequest, listExtra, queryEnabled, sorting])
+
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: ttkListAdapter,
     queryKey: [
@@ -488,6 +553,7 @@ export function IssuesDataTable() {
           enableViewOptions
           enableExport
           exportFileName="punch-issues"
+          fetchAllRowsForExport={fetchAllRowsForExport}
           manualSorting
           sorting={sorting}
           onSortingChange={(next) => {

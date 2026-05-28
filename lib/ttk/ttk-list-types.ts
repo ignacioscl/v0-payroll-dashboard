@@ -16,6 +16,8 @@ export type TtkListRow = {
   hasLog?: number
   fixedAt?: string | null
   fixedBy?: { id?: number | string; nombre?: string } | null
+  /** JSON or text from `TTK_PUNCH_WITH_ERROR` before correction. */
+  fixedErrorSnapshot?: string | null
   usuario?: { id?: number | string; nombre?: string; thumbnailUuid?: string | null }
   rolDpto?: { role?: string; department?: string } | null
   dealer?: { id?: number; razonSocial?: string }
