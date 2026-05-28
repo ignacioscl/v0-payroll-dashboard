@@ -434,9 +434,14 @@ export function DataTable<TData, TValue = unknown>({
     [columnPinning, columns],
   )
   const [internalPinning, setInternalPinning] = React.useState<ColumnPinningState>(initialPinning)
+  // Re-sync when `columns` gain/lose `meta.pin` (e.g. actions column after auth loads).
   React.useEffect(() => {
-    if (columnPinning) setInternalPinning(columnPinning)
-  }, [columnPinning])
+    if (columnPinning) {
+      setInternalPinning(columnPinning)
+      return
+    }
+    setInternalPinning(buildInitialPinning(columns))
+  }, [columns, columnPinning])
 
   /* ---------- Persisted column sizing ----------
    * IMPORTANT: do NOT read localStorage in the initializer. During SSR

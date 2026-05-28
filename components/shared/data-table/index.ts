@@ -22,6 +22,23 @@ export {
   NUMBER_OPERATOR_LABELS,
   DATE_OPERATOR_LABELS,
 } from './data-table-helpers'
+
+export {
+  createPaginatedAdapter,
+  createDataTablesLegacyAdapter,
+  createTtkListAdapter,
+} from './data-table-adapters'
+export type {
+  DataTableQueryContext,
+  DataTableQueryResult,
+  DataTableServerAdapter,
+  DataTablesLegacyResponse,
+  PaginatedApiEnvelope,
+  DataTablesLegacyAdapterOptions,
+} from './data-table-adapters'
+
+export { useDataTableQuery } from './use-data-table-query'
+export type { UseDataTableQueryArgs, UseDataTableQueryResult } from './use-data-table-query'
 export type {
   TextFilterOperator,
   NumberFilterOperator,

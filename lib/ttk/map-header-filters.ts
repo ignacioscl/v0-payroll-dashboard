@@ -18,25 +18,19 @@ export function formatDateParam(date: Date | undefined): string {
   return format(date, 'yyyy-MM-dd')
 }
 
-export function buildTtkListParams(input: {
+/** TTK list filters excluding pagination / sort (for DataTable adapters). */
+export function buildTtkListFilterExtra(input: {
   search: string
   selectedDealers: string[]
   dateRange: DateRange | undefined
   selectedType: string
-  pageIndex: number
-  pageSize: number
-  orderBy: string
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
 
   const params: Record<string, string | number> = {
-    draw: input.pageIndex + 1,
-    start: input.pageIndex * input.pageSize,
-    length: input.pageSize,
     'search[value]': input.search.trim(),
     fecha_desde: formatDateParam(input.dateRange?.from),
     fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
-    order_by: input.orderBy,
     only_error: flags.only_error,
     only_error_clockout: flags.only_error_clockout,
     manual_punch: flags.manual_punch,
@@ -52,6 +46,24 @@ export function buildTtkListParams(input: {
   }
 
   return params
+}
+
+export function buildTtkListParams(input: {
+  search: string
+  selectedDealers: string[]
+  dateRange: DateRange | undefined
+  selectedType: string
+  pageIndex: number
+  pageSize: number
+  orderBy: string
+}): Record<string, string | number> {
+  return {
+    ...buildTtkListFilterExtra(input),
+    draw: input.pageIndex + 1,
+    start: input.pageIndex * input.pageSize,
+    length: input.pageSize,
+    order_by: input.orderBy,
+  }
 }
 
 /** Shared scope params for TTK list + issue KPI counts (dealers, dates, search). */

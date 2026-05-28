@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
-import { TtkWithoutGroupTable } from '@/components/ttk/ttk-without-group-table'
+import { IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { Badge } from '@/components/ui/badge'
@@ -198,7 +198,7 @@ export default function IssuesPage() {
         ))}
       </div>
 
-      <TtkWithoutGroupTable />
+      <IssuesDataTable />
 
       {canAdd && (
         <AddPunchDialog

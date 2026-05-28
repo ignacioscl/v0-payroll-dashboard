@@ -287,6 +287,37 @@ GET /api/srs/php/api/payroll/employees.php
 > nuevos / BFF dedicados pueden usar `pageSize` camelCase en el JSON, pero el
 > query param sigue siendo `page_size`.
 
+## Adapters (contratos de API distintos)
+
+Para endpoints que no usan `page` / `page_size` + `PaginatedDataTableResponse`,
+usar un adapter + `useDataTableQuery` en lugar de armar el fetch a mano:
+
+```ts
+import {
+  createPaginatedAdapter,      // mock / APIs nuevas
+  createDataTablesLegacyAdapter, // start / length / recordsFiltered
+  createTtkListAdapter,        // preset TTK (order_by)
+  useDataTableQuery,
+} from '@/components/shared/data-table'
+
+const adapter = createTtkListAdapter<MyRow>((sorting) => 'tew.punch_in DESC')
+
+const { rows, total, pageCount, isFetching } = useDataTableQuery({
+  adapter,
+  queryKey: ['my-list', ...scope],
+  queryFn: (params) => api.getCustom('', undefined, params),
+  pageIndex,
+  pageSize,
+  sorting,
+  columnFilters,
+  columns,
+  extra: { fecha_desde, fecha_hasta, id_dealer }, // params del endpoint
+})
+```
+
+Referencia en producción: `components/ttk/issues-data-table.tsx` (legacy `ttk-list.php`,
+columnas pinned **Employee** (izquierda) + **Actions** (derecha)).
+
 ## Wiring con TanStack Query (server-side completo)
 
 ```tsx
