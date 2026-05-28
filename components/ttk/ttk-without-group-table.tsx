@@ -55,10 +55,16 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
+  Images,
   Info,
 } from 'lucide-react'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
+import {
+  buildPunchFacePhotoValidation,
+  PunchFacePhotosDialog,
+} from '@/components/ttk/punch-face-photos-dialog'
+import { hasFaceValidationPhotos } from '@/lib/ttk/punch-method'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
@@ -166,6 +172,11 @@ export function TtkWithoutGroupTable() {
     id: number | string
     employeeName: string
     punchDateLabel: string
+  } | null>(null)
+  const [photoTarget, setPhotoTarget] = useState<{
+    employeeName: string
+    punchDateLabel: string
+    validation: ReturnType<typeof buildPunchFacePhotoValidation>
   } | null>(null)
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
@@ -521,6 +532,23 @@ export function TtkWithoutGroupTable() {
                   {showActions && (
                     <TableCell className="px-3 py-1.5 text-right">
                       <div className="flex items-center justify-end gap-0.5">
+                        {hasFaceValidationPhotos(row) ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                            onClick={() =>
+                              setPhotoTarget({
+                                employeeName: row.usuario?.nombre ?? '',
+                                punchDateLabel: formatGmtDate(row.punchInGmt0) || '—',
+                                validation: buildPunchFacePhotoValidation(row),
+                              })
+                            }
+                            aria-label={`View face recognition photos for ${row.usuario?.nombre ?? 'employee'}`}
+                          >
+                            <Images className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
                         {row.hasLog === 1 && (
                           <Button
                             variant="ghost"
@@ -670,6 +698,16 @@ export function TtkWithoutGroupTable() {
           </Pagination>
         )}
       </div>
+
+      <PunchFacePhotosDialog
+        open={photoTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setPhotoTarget(null)
+        }}
+        employeeName={photoTarget?.employeeName}
+        punchDateLabel={photoTarget?.punchDateLabel}
+        validation={photoTarget?.validation ?? null}
+      />
 
       <PunchLogDialog
         open={logTarget !== null}

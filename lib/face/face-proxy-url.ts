@@ -37,3 +37,8 @@ export function employeeThumbnailUrl(thumbnailUuid: string | null | undefined): 
 export function employeePunchPreviewUrl(logId: number | string): string {
   return faceProxyUrl(`api/employeePunchPreview/${encodeURIComponent(String(logId))}`)
 }
+
+/** Legacy `ttk_main` → `node-face-recognition…/images/getImagePunch/{validationLogId}`. */
+export function facePunchImageUrl(validationLogId: number | string): string {
+  return faceProxyUrl(`images/getImagePunch/${encodeURIComponent(String(validationLogId))}`)
+}

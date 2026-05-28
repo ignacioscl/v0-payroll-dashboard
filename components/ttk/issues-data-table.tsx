@@ -5,6 +5,7 @@ import type { ColumnDef, ColumnPinningState, SortingState } from '@tanstack/reac
 import {
   AlertTriangle,
   CheckCircle,
+  Images,
   Info,
   Pencil,
   Trash2,
@@ -35,9 +36,14 @@ import {
   breakEndMethod,
   breakStartMethod,
   formatMethodForExport,
+  hasFaceValidationPhotos,
   punchInMethod,
   punchOutMethod,
 } from '@/lib/ttk/punch-method'
+import {
+  buildPunchFacePhotoValidation,
+  PunchFacePhotosDialog,
+} from '@/components/ttk/punch-face-photos-dialog'
 import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
@@ -106,6 +112,11 @@ export function IssuesDataTable() {
     id: number | string
     employeeName: string
     punchDateLabel: string
+  } | null>(null)
+  const [photoTarget, setPhotoTarget] = React.useState<{
+    employeeName: string
+    punchDateLabel: string
+    validation: ReturnType<typeof buildPunchFacePhotoValidation>
   } | null>(null)
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
@@ -360,9 +371,9 @@ export function IssuesDataTable() {
     if (showActions) {
       defs.push({
         id: 'actions',
-        size: 120,
-        minSize: 96,
-        maxSize: 160,
+        size: 140,
+        minSize: 112,
+        maxSize: 180,
         enableSorting: false,
         enableHiding: false,
         header: ({ column }) => (
@@ -383,6 +394,23 @@ export function IssuesDataTable() {
                 >
                   Manual
                 </span>
+              ) : null}
+              {hasFaceValidationPhotos(r) ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                  onClick={() =>
+                    setPhotoTarget({
+                      employeeName: r.usuario?.nombre ?? '',
+                      punchDateLabel: formatGmtDate(r.punchInGmt0) || '—',
+                      validation: buildPunchFacePhotoValidation(r),
+                    })
+                  }
+                  aria-label={`View face recognition photos for ${r.usuario?.nombre ?? 'employee'}`}
+                >
+                  <Images className="h-3.5 w-3.5" />
+                </Button>
               ) : null}
               {r.hasLog === 1 && (
                 <Button
@@ -619,6 +647,16 @@ export function IssuesDataTable() {
           }}
         />
       </div>
+
+      <PunchFacePhotosDialog
+        open={photoTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setPhotoTarget(null)
+        }}
+        employeeName={photoTarget?.employeeName}
+        punchDateLabel={photoTarget?.punchDateLabel}
+        validation={photoTarget?.validation ?? null}
+      />
 
       <PunchLogDialog
         open={logTarget !== null}
