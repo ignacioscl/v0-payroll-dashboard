@@ -635,13 +635,14 @@ export function DataTable<TData, TValue = unknown>({
   // their widths and sticky offsets can never desync.
   const geo = buildColumnGeometry(table)
   const totalTableWidth = geo.total
-  const hasPinnedColumns = geo.ordered.some((c) => c.pin === 'left' || c.pin === 'right')
-  // Pinned tables must use the exact sum of column sizes — `minWidth: 100%`
-  // stretches columns while sticky `left` still uses logical sizes (drift).
-  // Unpinned tables (basic, filters) fill the panel when columns are narrower.
-  const tableWidthStyle: React.CSSProperties = hasPinnedColumns
-    ? { width: totalTableWidth }
-    : { width: '100%', minWidth: totalTableWidth }
+  // Fill the panel when there is extra space (e.g. sidebar collapsed). When
+  // columns are wider than the viewport, `minWidth` enables horizontal scroll.
+  // Pinned columns keep fixed widths via `<col>` + locked `<th>`/`<td>`; only
+  // center columns absorb extra space so sticky offsets stay aligned.
+  const tableWidthStyle: React.CSSProperties = {
+    width: '100%',
+    minWidth: totalTableWidth,
+  }
 
   return (
     <Card
@@ -720,7 +721,12 @@ export function DataTable<TData, TValue = unknown>({
         >
           <colgroup>
             {geo.ordered.map((c) => (
-              <col key={c.id} style={{ width: c.size }} />
+              <col
+                key={c.id}
+                // Pinned: fixed width for sticky offsets. Center: no width →
+                // grows to fill remaining space when the table is `width: 100%`.
+                style={c.pin ? { width: c.size } : undefined}
+              />
             ))}
           </colgroup>
           {/* NOTE: no `sticky` here — each `<th>` sticks on both axes itself
