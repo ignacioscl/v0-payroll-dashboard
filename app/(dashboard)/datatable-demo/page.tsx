@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import type { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import {
   Briefcase,
   CircleCheck,
@@ -12,15 +12,13 @@ import {
 import {
   DataTable,
   DataTableColumnHeader,
+  buildBackendQuery,
   type DataTableColumnMeta,
   type PaginatedDataTableResponse,
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { srsProxyUrl } from '@/lib/srs-proxy-url'
-
-/* -------------------------------------------------------------------------- */
-/* Domain types                                                                */
-/* -------------------------------------------------------------------------- */
+import { DemoExplainer } from './_components/demo-explainer'
 
 interface MockEmployee {
   id: number
@@ -38,16 +36,11 @@ interface MockResponse {
   data: PaginatedDataTableResponse<MockEmployee>
 }
 
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                     */
-/* -------------------------------------------------------------------------- */
-
 const usdFmt = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   maximumFractionDigits: 0,
 })
-
 const dateFmt = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   month: 'short',
@@ -76,12 +69,7 @@ const statusMeta: Record<
 }
 
 function initials(name: string) {
-  return name
-    .split(' ')
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  return name.split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase()
 }
 
 function avatarTone(id: number) {
@@ -96,39 +84,11 @@ function avatarTone(id: number) {
   return tones[id % tones.length]!
 }
 
-/* -------------------------------------------------------------------------- */
-/* Page                                                                        */
-/* -------------------------------------------------------------------------- */
-
-export default function DataTableDemoPage() {
+export default function DataTableBasicPage() {
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
-  const [sorting, setSorting] = React.useState<{ id: string; desc: boolean }[]>([
-    { id: 'id', desc: false },
-  ])
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: 'id', desc: false }])
   const [globalFilter, setGlobalFilter] = React.useState('')
-
-  const sortColumn = sorting[0]?.id ?? 'id'
-  const sortDir = sorting[0]?.desc ? 'desc' : 'asc'
-
-  const query = useQuery({
-    queryKey: ['datatable-mock', pageIndex, pageSize, sortColumn, sortDir, globalFilter],
-    queryFn: async () => {
-      const url = srsProxyUrl('php/api/payroll/datatable-mock.php', {
-        page: pageIndex + 1,
-        page_size: pageSize,
-        sort: sortColumn,
-        dir: sortDir,
-        term: globalFilter,
-      })
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`Mock fetch failed: ${res.status}`)
-      const json = (await res.json()) as MockResponse
-      return json.data
-    },
-    placeholderData: keepPreviousData,
-    staleTime: 10_000,
-  })
 
   const columns = React.useMemo<ColumnDef<MockEmployee>[]>(
     () => [
@@ -155,22 +115,16 @@ export default function DataTableDemoPage() {
               {initials(row.original.name)}
             </span>
             <div className="min-w-0">
-              <div className="truncate font-medium text-foreground">
-                {row.original.name}
-              </div>
-              <div className="truncate text-[10px] text-muted-foreground">
-                {row.original.email}
-              </div>
+              <div className="truncate font-medium text-foreground">{row.original.name}</div>
+              <div className="truncate text-[10px] text-muted-foreground">{row.original.email}</div>
             </div>
           </div>
         ),
-        meta: { label: 'Employee' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: 'Employee', sortKey: 'name' } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'department',
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Department" />
-        ),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Department" />,
         cell: ({ row }) => (
           <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground">
             <Briefcase className="size-2.5 text-muted-foreground" />
@@ -206,14 +160,14 @@ export default function DataTableDemoPage() {
         accessorKey: 'status',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
         cell: ({ row }) => {
-          const meta = statusMeta[row.original.status]
+          const m = statusMeta[row.original.status]
           return (
             <Badge
               variant="outline"
-              className={`gap-1 border-0 px-1.5 py-0.5 text-[10px] font-medium ring-1 ${meta.cls}`}
+              className={`gap-1 border-0 px-1.5 py-0.5 text-[10px] font-medium ring-1 ${m.cls}`}
             >
-              {meta.icon}
-              {meta.label}
+              {m.icon}
+              {m.label}
             </Badge>
           )
         },
@@ -226,24 +180,31 @@ export default function DataTableDemoPage() {
     [],
   )
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Data Table</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Reusable table powered by{' '}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">@tanstack/react-table</code>{' '}
-          with server-side pagination, sorting, column visibility and export.
-          Hits the mock at{' '}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-            /api/srs/php/api/payroll/datatable-mock.php
-          </code>
-          .
-        </p>
-      </div>
+  const query = useQuery({
+    queryKey: ['datatable-mock', 'basic', pageIndex, pageSize, sorting, globalFilter],
+    queryFn: async () => {
+      const params = buildBackendQuery({
+        columns,
+        sorting,
+        columnFilters: [],
+        page: pageIndex + 1,
+        pageSize,
+        extra: { term: globalFilter },
+      })
+      const url = srsProxyUrl('php/api/payroll/datatable-mock.php', params)
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Mock fetch failed: ${res.status}`)
+      const json = (await res.json()) as MockResponse
+      return json.data
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 10_000,
+  })
 
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <DataTable<MockEmployee>
-        tableId="demo-employees"
+        tableId="demo-basic"
         columns={columns}
         data={query.data?.results ?? []}
         isLoading={query.isFetching}
@@ -273,6 +234,61 @@ export default function DataTableDemoPage() {
           setPageIndex(0)
         }}
         globalFilterPlaceholder="Search name, email, department…"
+      />
+
+      <DemoExplainer
+        title="The basic table"
+        description="Server-side pagination, sort and global search. Column visibility & page size are persisted per `tableId` in localStorage."
+        steps={[
+          {
+            title: 'Declare columns',
+            badge: 'meta',
+            code: `{
+  accessorKey: 'salary',
+  header: ({ column }) => (
+    <DataTableColumnHeader column={column} title="Salary" />
+  ),
+  cell: ({ row }) => usdFmt.format(row.original.salary),
+  meta: {
+    label: 'Salary',
+    numeric: true,   // right-align + tabular-nums
+    mono: true,      // font-mono
+  },
+}`,
+          },
+          {
+            title: 'Build the backend query',
+            badge: 'helper',
+            code: `const params = buildBackendQuery({
+  columns,
+  sorting,
+  columnFilters: [],
+  page: pageIndex + 1,
+  pageSize,
+  extra: { term: globalFilter },
+})
+
+fetch(srsProxyUrl(endpoint, params))`,
+            note: 'Helper builds `page`, `page_size`, `sort`, `dir` plus any column filters using each column\'s `meta.filter.backendKey`.',
+          },
+          {
+            title: 'Mount the table',
+            badge: 'server-side',
+            code: `<DataTable
+  tableId="demo-basic"
+  columns={columns}
+  data={query.data?.results ?? []}
+  isLoading={query.isFetching}
+  pagination={{ ... }}
+  manualSorting
+  sorting={sorting}
+  onSortingChange={setSorting}
+  manualFiltering
+  globalFilter={term}
+  onGlobalFilterChange={setTerm}
+/>`,
+          },
+        ]}
       />
     </div>
   )

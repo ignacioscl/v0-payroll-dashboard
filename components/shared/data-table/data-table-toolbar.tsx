@@ -2,11 +2,17 @@
 
 import * as React from 'react'
 import type { Table } from '@tanstack/react-table'
-import { Loader2, Search, X } from 'lucide-react'
+import { Filter, Loader2, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  TEXT_OPERATOR_LABELS,
+  NUMBER_OPERATOR_LABELS,
+  DATE_OPERATOR_LABELS,
+  type ColumnFilterValue,
+} from './data-table-helpers'
 import {
   Select,
   SelectContent,
@@ -56,9 +62,24 @@ export function DataTableToolbar<TData>({
   leading,
 }: DataTableToolbarProps<TData>) {
   const globalFilter = (table.getState().globalFilter as string) ?? ''
-  const isFiltered =
-    table.getState().columnFilters.length > 0 || globalFilter.length > 0
+  const columnFilters = table.getState().columnFilters
+  const isFiltered = columnFilters.length > 0 || globalFilter.length > 0
   const pageSize = table.getState().pagination.pageSize
+
+  const operatorLabel = (v: ColumnFilterValue): string => {
+    if (v.type === 'text') return TEXT_OPERATOR_LABELS[v.operator]
+    if (v.type === 'number') return NUMBER_OPERATOR_LABELS[v.operator]
+    return DATE_OPERATOR_LABELS[v.operator]
+  }
+
+  const columnLabel = (columnId: string): string => {
+    const col = table.getColumn(columnId)
+    if (!col) return columnId
+    const meta = col.columnDef.meta as { label?: string } | undefined
+    if (meta?.label) return meta.label
+    if (typeof col.columnDef.header === 'string') return col.columnDef.header
+    return columnId
+  }
 
   // Fallback: when server-side total isn't provided, use filtered row count.
   const total = totalRows ?? table.getFilteredRowModel().rows.length
@@ -105,6 +126,37 @@ export function DataTableToolbar<TData>({
           </>
         )}
 
+        {columnFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            {columnFilters.map((f) => {
+              const v = f.value as ColumnFilterValue | undefined
+              if (!v) return null
+              return (
+                <Badge
+                  key={f.id}
+                  variant="secondary"
+                  className="h-6 gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0 text-[10px] font-medium text-amber-800"
+                >
+                  <Filter className="size-2.5" />
+                  <span className="font-semibold">{columnLabel(f.id)}</span>
+                  <span className="text-amber-600">{operatorLabel(v)}</span>
+                  <span className="rounded bg-white/70 px-1 font-mono">
+                    {String(v.value ?? '')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => table.getColumn(f.id)?.setFilterValue(undefined)}
+                    className="-mr-1 rounded p-0.5 hover:bg-amber-200"
+                    aria-label={`Remove ${columnLabel(f.id)} filter`}
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </Badge>
+              )
+            })}
+          </div>
+        )}
+
         {isFiltered && (
           <Button
             variant="ghost"
@@ -116,7 +168,7 @@ export function DataTableToolbar<TData>({
             }}
           >
             <X className="size-3" />
-            Clear
+            Clear all
           </Button>
         )}
       </div>

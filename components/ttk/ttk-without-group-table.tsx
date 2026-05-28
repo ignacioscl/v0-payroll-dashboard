@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkList } from '@/hooks/use-ttk-list'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
-import { formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
+import { formatFixedAt, formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { Card, CardContent } from '@/components/ui/card'
@@ -472,6 +472,14 @@ export function TtkWithoutGroupTable() {
                           {row.dealer?.razonSocial ? (
                             <span className="truncate text-[10px] font-normal text-muted-foreground">
                               {row.dealer.razonSocial}
+                            </span>
+                          ) : null}
+                          {row.fixedAt ? (
+                            <span
+                              className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
+                              title={row.fixedBy?.nombre ? `Corrected by ${row.fixedBy.nombre}` : undefined}
+                            >
+                              Fixed by {row.fixedBy?.nombre ?? '—'} · {formatFixedAt(row.fixedAt)}
                             </span>
                           ) : null}
                         </div>

@@ -18,6 +18,7 @@ import {
   Trash2,
   DollarSign,
   PlusCircle,
+  CheckCheck,
 } from 'lucide-react'
 
 type IssueType =
@@ -26,6 +27,7 @@ type IssueType =
   | 'manual_punch'
   | 'only_deletes'
   | 'without_salary'
+  | 'only_fixed'
 
 interface IssueCardConfig {
   type: IssueType
@@ -64,6 +66,12 @@ const ISSUE_CARDS: IssueCardConfig[] = [
     title: 'Without salary',
     icon: <DollarSign className="h-7 w-7" />,
     variant: 'success',
+  },
+  {
+    type: 'only_fixed',
+    title: 'Corrected punches',
+    icon: <CheckCheck className="h-7 w-7" />,
+    variant: 'info',
   },
 ]
 

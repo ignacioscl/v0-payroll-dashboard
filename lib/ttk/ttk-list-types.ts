@@ -14,6 +14,8 @@ export type TtkListRow = {
   numberBrake?: number | null
   estado?: number
   hasLog?: number
+  fixedAt?: string | null
+  fixedBy?: { id?: number | string; nombre?: string } | null
   usuario?: { id?: number | string; nombre?: string; thumbnailUuid?: string | null }
   rolDpto?: { role?: string; department?: string } | null
   dealer?: { id?: number; razonSocial?: string }
@@ -44,6 +46,7 @@ export type TtkListQueryParams = {
   without_salary?: number
   manual_punch?: number
   only_deletes?: number
+  only_fixed?: number
   show_deleted?: number
   filter_logic_or?: number
 }

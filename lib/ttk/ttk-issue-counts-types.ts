@@ -13,6 +13,7 @@ export type TtkIssueCountsData = {
   manual_punch: TtkIssueCountBucket
   without_salary: TtkIssueCountBucket
   only_deletes: TtkIssueCountBucket
+  only_fixed: TtkIssueCountBucket
 }
 
 export type TtkIssueCountsResponse = {
@@ -28,4 +29,5 @@ export const EMPTY_TTK_ISSUE_COUNTS: TtkIssueCountsData = {
   manual_punch: { pending: 0 },
   without_salary: { pending: 0 },
   only_deletes: { pending: 0 },
+  only_fixed: { pending: 0 },
 }

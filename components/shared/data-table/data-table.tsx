@@ -8,8 +8,11 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnPinningState,
+  type ColumnSizingState,
   type PaginationState,
   type Row,
   type SortingState,
@@ -31,6 +34,7 @@ import { cn } from '@/lib/utils'
 
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
+import type { ColumnFilterConfig } from './data-table-helpers'
 
 /* -------------------------------------------------------------------------- */
 /* Paginated server-side contract                                              */
@@ -64,6 +68,20 @@ export interface DataTableColumnMeta<TData> {
   mono?: boolean
   /** Convenience flag — applies `text-right` to header + body cell. */
   numeric?: boolean
+  /** Pin this column to the left/right edge. Reflected as a sticky CSS. */
+  pin?: 'left' | 'right'
+  /**
+   * Column-level filter config. When set, a filter icon is rendered in the
+   * header and the filter value is stored in TanStack's `columnFilters` state.
+   * Use `buildBackendFilters(columns, columnFilters)` to translate state into
+   * a query payload.
+   */
+  filter?: ColumnFilterConfig
+  /**
+   * Server-side sort key sent in the `sort` query param when this column is
+   * the active sort. Defaults to the column id.
+   */
+  sortKey?: string
 }
 
 /** Visual treatment for the header row. */
@@ -114,6 +132,71 @@ function persistPageSize(tableId: string | undefined, size: number) {
   }
 }
 
+function readPersistedSizing(tableId: string | undefined): ColumnSizingState {
+  if (!tableId || typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${tableId}.sizing`)
+    return raw ? (JSON.parse(raw) as ColumnSizingState) : {}
+  } catch {
+    return {}
+  }
+}
+
+function persistSizing(tableId: string | undefined, value: ColumnSizingState) {
+  if (!tableId || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      `${STORAGE_PREFIX}${tableId}.sizing`,
+      JSON.stringify(value),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pinning helpers                                                             */
+/* -------------------------------------------------------------------------- */
+
+function getColumnId<TData, TValue>(col: ColumnDef<TData, TValue>): string | undefined {
+  const explicit = (col as { id?: string }).id
+  if (explicit) return explicit
+  return (col as { accessorKey?: string }).accessorKey
+}
+
+function buildInitialPinning<TData, TValue>(
+  columns: ColumnDef<TData, TValue>[],
+): ColumnPinningState {
+  const left: string[] = []
+  const right: string[] = []
+  for (const col of columns) {
+    const id = getColumnId(col)
+    const meta = col.meta as DataTableColumnMeta<TData> | undefined
+    if (!id) continue
+    if (meta?.pin === 'left') left.push(id)
+    else if (meta?.pin === 'right') right.push(id)
+  }
+  return { left, right }
+}
+
+/** Sticky CSS for a pinned column. Falls back to `{}` for unpinned ones. */
+function getPinningStyles<TData>(column: Column<TData>): React.CSSProperties {
+  const pin = column.getIsPinned()
+  if (!pin) return {}
+  if (pin === 'left') {
+    return {
+      position: 'sticky',
+      left: `${column.getStart('left')}px`,
+      zIndex: 1,
+    }
+  }
+  return {
+    position: 'sticky',
+    right: `${column.getAfter('right')}px`,
+    zIndex: 1,
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Component                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -152,6 +235,18 @@ export interface DataTableProps<TData, TValue = unknown> {
   columnFilters?: ColumnFiltersState
   onColumnFiltersChange?: (s: ColumnFiltersState) => void
 
+  // ---------- Pinning ----------
+  /** Override the initial pinning state derived from `meta.pin`. */
+  columnPinning?: ColumnPinningState
+
+  // ---------- Resizing ----------
+  /**
+   * Allow the user to drag the right edge of each column header to resize it.
+   * Sizes are persisted per `tableId` in localStorage.
+   * Defaults to `true`.
+   */
+  enableColumnResizing?: boolean
+
   // ---------- Selection ----------
   enableRowSelection?: boolean
   rowSelection?: Record<string, boolean>
@@ -171,15 +266,10 @@ export interface DataTableProps<TData, TValue = unknown> {
 
   // ---------- Style ----------
   className?: string
-  /** `compact` (default) = `py-1.5 text-xs` rows. `comfortable` = roomier. */
   density?: 'comfortable' | 'compact'
-  /** `colored` (default) = solid blue header w/ white text. `subtle` = muted bg w/ foreground text. */
   headerVariant?: DataTableHeaderVariant
-  /** Custom hex color when `headerVariant === 'colored'`. Defaults to `#1565C0`. */
   headerColor?: string
-  /** Sticky header inside the scroll container. Defaults to true. */
   stickyHeader?: boolean
-  /** Zebra striping on alternate rows. Defaults to true. */
   zebraRows?: boolean
 }
 
@@ -202,6 +292,8 @@ export function DataTable<TData, TValue = unknown>({
   globalFilterPlaceholder = 'Search…',
   columnFilters,
   onColumnFiltersChange,
+  columnPinning,
+  enableColumnResizing = true,
   enableRowSelection = false,
   rowSelection,
   onRowSelectionChange,
@@ -227,6 +319,24 @@ export function DataTable<TData, TValue = unknown>({
   React.useEffect(() => {
     persistVisibility(tableId, columnVisibility)
   }, [tableId, columnVisibility])
+
+  /* ---------- Pinning (initial from meta.pin) ---------- */
+  const initialPinning = React.useMemo(
+    () => columnPinning ?? buildInitialPinning(columns),
+    [columnPinning, columns],
+  )
+  const [internalPinning, setInternalPinning] = React.useState<ColumnPinningState>(initialPinning)
+  React.useEffect(() => {
+    if (columnPinning) setInternalPinning(columnPinning)
+  }, [columnPinning])
+
+  /* ---------- Persisted column sizing ---------- */
+  const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>(() =>
+    readPersistedSizing(tableId),
+  )
+  React.useEffect(() => {
+    persistSizing(tableId, columnSizing)
+  }, [tableId, columnSizing])
 
   /* ---------- Local fallbacks for uncontrolled props ---------- */
   const [localSorting, setLocalSorting] = React.useState<SortingState>([])
@@ -261,6 +371,11 @@ export function DataTable<TData, TValue = unknown>({
   const table = useReactTable<TData>({
     data,
     columns,
+    defaultColumn: {
+      size: 160,
+      minSize: 60,
+      maxSize: 800,
+    },
     state: {
       sorting: sorting ?? localSorting,
       columnVisibility,
@@ -268,8 +383,14 @@ export function DataTable<TData, TValue = unknown>({
       globalFilter: globalFilter ?? localGlobalFilter,
       rowSelection: rowSelection ?? localSelection,
       pagination: paginationState,
+      columnPinning: internalPinning,
+      columnSizing,
     },
     enableRowSelection,
+    enableColumnPinning: true,
+    enableColumnResizing,
+    columnResizeMode: 'onChange',
+    onColumnSizingChange: setColumnSizing,
     getRowId,
 
     manualSorting: manualSorting ?? false,
@@ -313,6 +434,7 @@ export function DataTable<TData, TValue = unknown>({
     },
 
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setInternalPinning,
 
     manualPagination: isServerPagination,
     pageCount: isServerPagination ? pagination!.pageCount : undefined,
@@ -329,14 +451,20 @@ export function DataTable<TData, TValue = unknown>({
 
   const headerIsColored = headerVariant === 'colored'
   const headerStyle = headerIsColored ? { backgroundColor: headerColor } : undefined
-  const headerClassName = headerIsColored
-    ? 'text-white hover:[&_tr]:bg-transparent'
-    : 'bg-muted/40 text-foreground'
+  const headerClassName = headerIsColored ? 'text-white' : 'text-foreground'
+
+  /* Background applied to body rows. Sticky/pinned cells use `bg-inherit` so they
+   * sit opaque on top of horizontally-scrolled content. */
+  const rowBg = (index: number) =>
+    zebraRows && index % 2 !== 0 ? 'bg-muted/25' : 'bg-card'
 
   return (
     <Card
       className={cn(
-        'gap-0 overflow-hidden border-border py-0 shadow-sm',
+        // `min-w-0` lets the Card shrink inside a flex/grid container instead
+        // of forcing the page to scroll horizontally when the inner table is
+        // wider than its allotted space.
+        'min-w-0 gap-0 overflow-hidden border-border py-0 shadow-sm',
         className,
       )}
     >
@@ -355,12 +483,23 @@ export function DataTable<TData, TValue = unknown>({
         trailing={toolbarTrailing}
       />
 
-      <div className="relative w-full overflow-x-auto">
-        <Table>
+      {/* shadcn `<Table>` already wraps in an overflow-x-auto container, so we
+          just need `relative` here for the loading overlay positioning. */}
+      <div className="relative w-full min-w-0">
+        <Table
+          // `table-layout: fixed` makes the column widths set on `<th>` the
+          // single source of truth — required for column resizing and for the
+          // sticky offsets used by pinned columns to match the visual layout.
+          style={{
+            tableLayout: 'fixed',
+            width: table.getTotalSize(),
+            minWidth: '100%',
+          }}
+        >
           <TableHeader
             className={cn(
               '[&_tr]:border-0',
-              stickyHeader && 'sticky top-0 z-10',
+              stickyHeader && 'sticky top-0 z-20',
               headerClassName,
             )}
           >
@@ -377,23 +516,84 @@ export function DataTable<TData, TValue = unknown>({
                   const meta = header.column.columnDef.meta as
                     | DataTableColumnMeta<TData>
                     | undefined
+                  const pin = header.column.getIsPinned()
+                  const isLastLeftPinned = pin === 'left' && header.column.getIsLastColumn('left')
+                  const isFirstRightPinned =
+                    pin === 'right' && header.column.getIsFirstColumn('right')
+                  const pinStyles = getPinningStyles(header.column)
+                  const size = header.getSize()
+                  // For pinned columns we MUST enforce the width so the
+                  // sticky offset (which TanStack derives from
+                  // `column.getSize()`) matches the actual rendered width.
+                  // For non-pinned columns we still set width explicitly so
+                  // `table-layout: fixed` honors per-column sizing (and resizing).
+                  const sizingStyle: React.CSSProperties = pin
+                    ? { width: size, minWidth: size, maxWidth: size }
+                    : { width: size }
+                  const canResize = header.column.getCanResize()
+                  const isResizing = header.column.getIsResizing()
                   return (
                     <TableHead
                       key={header.id}
                       colSpan={header.colSpan}
                       style={{
-                        width: header.getSize() !== 150 ? header.getSize() : undefined,
+                        ...sizingStyle,
+                        ...pinStyles,
+                        backgroundColor: pin
+                          ? headerIsColored
+                            ? headerColor
+                            : 'var(--card)'
+                          : pinStyles.backgroundColor,
+                        zIndex: pin ? 3 : pinStyles.zIndex,
                       }}
                       className={cn(
-                        'h-8 px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
+                        'relative h-8 overflow-hidden px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
                         headerIsColored ? 'text-white' : 'text-foreground',
                         meta?.numeric && 'text-right',
+                        isLastLeftPinned &&
+                          'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)]',
+                        isFirstRightPinned &&
+                          'shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.18)]',
                         meta?.headerClassName,
                       )}
                     >
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
+
+                      {canResize && (
+                        <span
+                          role="separator"
+                          aria-orientation="vertical"
+                          aria-label="Resize column"
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            header.getResizeHandler()(e)
+                          }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation()
+                            header.getResizeHandler()(e)
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            header.column.resetSize()
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            'absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none',
+                            'transition-colors',
+                            headerIsColored
+                              ? cn(
+                                  'hover:bg-white/40',
+                                  isResizing && 'bg-white/60',
+                                )
+                              : cn(
+                                  'hover:bg-foreground/20',
+                                  isResizing && 'bg-foreground/30',
+                                ),
+                          )}
+                        />
+                      )}
                     </TableHead>
                   )
                 })}
@@ -427,38 +627,64 @@ export function DataTable<TData, TValue = unknown>({
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row: Row<TData>, index) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() ? 'selected' : undefined}
-                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={cn(
-                    'border-b border-border/50 transition-colors',
-                    zebraRows && index % 2 !== 0 && 'bg-muted/25',
-                    onRowClick && 'cursor-pointer hover:bg-accent/40',
-                  )}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    const meta = cell.column.columnDef.meta as
-                      | DataTableColumnMeta<TData>
-                      | undefined
-                    return (
-                      <TableCell
-                        key={cell.id}
-                        className={cn(
-                          'px-3 text-xs',
-                          rowPadding,
-                          meta?.mono && 'font-mono',
-                          meta?.numeric && 'text-right tabular-nums',
-                          meta?.cellClassName,
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row: Row<TData>, index) => {
+                const baseBg = rowBg(index)
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? 'selected' : undefined}
+                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    className={cn(
+                      'border-b border-border/50 transition-colors',
+                      baseBg,
+                      onRowClick && 'cursor-pointer hover:bg-accent/40',
+                    )}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const meta = cell.column.columnDef.meta as
+                        | DataTableColumnMeta<TData>
+                        | undefined
+                      const pin = cell.column.getIsPinned()
+                      const isLastLeftPinned =
+                        pin === 'left' && cell.column.getIsLastColumn('left')
+                      const isFirstRightPinned =
+                        pin === 'right' && cell.column.getIsFirstColumn('right')
+                      const size = cell.column.getSize()
+                      // Mirror the header sizing so sticky offsets match the
+                      // visual column widths. With `table-layout: fixed` every
+                      // cell needs an explicit width so resizing is honoured.
+                      const sizingStyle: React.CSSProperties = pin
+                        ? { width: size, minWidth: size, maxWidth: size }
+                        : { width: size }
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          style={{
+                            ...sizingStyle,
+                            ...getPinningStyles(cell.column),
+                          }}
+                          className={cn(
+                            'overflow-hidden px-3 text-xs whitespace-nowrap',
+                            rowPadding,
+                            meta?.mono && 'font-mono',
+                            meta?.numeric && 'text-right tabular-nums',
+                            // Pinned cells must be opaque so the rest of the row
+                            // doesn't bleed through while scrolling.
+                            pin && baseBg,
+                            isLastLeftPinned &&
+                              'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)]',
+                            isFirstRightPinned &&
+                              'shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.18)]',
+                            meta?.cellClassName,
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

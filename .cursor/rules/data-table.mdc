@@ -1,52 +1,60 @@
 ---
-description: Usar DataTable de components/shared para tablas con paginación, export, sort, filtros y column visibility.
+description: Usar DataTable de components/shared para tablas con paginación, sort, filtros por columna, export, pinning y column visibility (todo server-side por default).
 globs: v0-payroll-dashboard/**/*.{ts,tsx}
 alwaysApply: false
 ---
 
 # DataTable
 
-Componente reutilizable para listados con paginación, sort, filtros, export
-(CSV / XLSX) y column visibility con persistencia. Vive en
-`components/shared/data-table/`.
+Componente reutilizable para listados con:
 
-Stack:
+- Paginación, sort y filtros (client-side o **server-side**).
+- Filtros por columna por **tipo** (text / number / date), cada uno con
+  operadores configurables.
+- Columnas **pinned** a la izquierda o derecha (sticky).
+- **Column resizing** arrastrando el borde derecho de cada header (persistido).
+- Visibilidad de columnas con **persistencia** en `localStorage`.
+- Export a XLSX / CSV (respeta sort, filtros y columnas visibles).
 
-- `@tanstack/react-table` v8 (core de la tabla, sin renderizar).
-- shadcn `Table` (renderizado y estilos).
-- `xlsx` para exports (ya está como dep).
-- `localStorage` para persistir visibilidad de columnas + page size.
+Stack: `@tanstack/react-table` v8 + shadcn `Table` + `xlsx` + `localStorage`.
 
-Import canónico:
+Vive en `components/shared/data-table/`.
 
 ```ts
 import {
   DataTable,
   DataTableColumnHeader,
+  buildBackendQuery,           // sort + filtros → query string
+  buildBackendFilters,         // solo filtros
+  buildBackendSort,            // solo sort
   type DataTableColumnMeta,
   type PaginatedDataTableResponse,
 } from '@/components/shared/data-table'
 ```
 
+## Demos
+
+Tres páginas navegables por tabs en `/datatable-demo`:
+
+- `/datatable-demo`                  — Basic (paginación, sort, search, export).
+- `/datatable-demo/fixed-columns`    — columnas pinned left + right.
+- `/datatable-demo/filters`          — filtros por columna (text / number / date).
+
+Cada demo tiene un panel explicando paso a paso cómo se configura el feature.
+PHP mock: `public/php/api/payroll/datatable-mock.php`.
+
 ## Cuándo usar
 
-- Listados tabulares con > ~20 filas o que necesitan paginación.
-- Cualquier tabla en la que el usuario espere: buscar, ordenar, ocultar
-  columnas, exportar, recordar su vista entre sesiones.
-- Tanto modo **client-side** (data en memoria) como **server-side**
-  (paginación / sort / filter por el backend).
+- Listados con > ~20 filas o que necesiten paginación.
+- Cualquier tabla en la que el usuario espere: buscar, ordenar, filtrar,
+  ocultar columnas, fijar columnas, exportar y que recuerde su vista entre
+  sesiones.
 
 ## Cuándo NO usar
 
-- KPIs / cards / heatmaps → componentes específicos del dashboard.
+- KPIs / cards / heatmaps → componentes específicos.
 - Listas de selección con búsqueda → `SearchableCombobox`.
-- < ~10 filas estáticas → tabla manual con shadcn `Table` directamente.
-
-## Demo de referencia
-
-Página completa wireada al mock PHP:
-`app/(dashboard)/datatable-demo/page.tsx` →
-`/api/srs/php/api/payroll/datatable-mock.php`.
+- < ~10 filas estáticas → tabla manual con shadcn `Table`.
 
 ## API
 
@@ -54,38 +62,41 @@ Página completa wireada al mock PHP:
 <DataTable<Row>
   tableId="employees"          // requerido — clave de persistencia
   columns={columns}            // ColumnDef<Row>[] de TanStack
-  data={query.data ?? []}      // pageado (server) o completo (client)
+  data={query.data ?? []}
 
   isLoading={query.isFetching}
-  emptyState={<MyEmpty/>}      // opcional, hay default
+  emptyState={<MyEmpty/>}
 
   // --- Paginación ---
-  // Server-side: pasar `pagination`. Client-side: omitir.
   pagination={{
     pageIndex,                 // 0-based
     pageSize,
-    pageCount,                 // total páginas, -1 si desconocido
-    totalRows,                 // opcional, para el "of N"
-    onPaginationChange: (next) => { ... },
+    pageCount,                 // total páginas (o -1 si desconocido)
+    totalRows,                 // opcional pero recomendado
+    onPaginationChange,
   }}
-  defaultPageSize={20}
-  pageSizeOptions={[10, 20, 50, 100]}
+  defaultPageSize={25}
+  pageSizeOptions={[10, 25, 50, 100]}
 
   // --- Sorting ---
-  sorting={sorting}            // SortingState
-  onSortingChange={setSorting}
   manualSorting                // true = server-side
+  sorting={sorting}
+  onSortingChange={setSorting}
 
-  // --- Global filter (búsqueda global) ---
-  enableGlobalFilter
+  // --- Filtros ---
+  enableGlobalFilter           // search global en el toolbar
   globalFilter={term}
   onGlobalFilterChange={setTerm}
   manualFiltering              // true = server-side
-  globalFilterPlaceholder="Search…"
 
-  // --- Filtros por columna ---
-  columnFilters={...}
-  onColumnFiltersChange={...}
+  columnFilters={columnFilters}
+  onColumnFiltersChange={setColumnFilters}
+
+  // --- Pinning ---
+  columnPinning={{ left: ['id', 'name'], right: ['status'] }}  // opcional, override
+
+  // --- Resizing ---
+  enableColumnResizing                                          // default true
 
   // --- Selección de filas ---
   enableRowSelection
@@ -97,99 +108,212 @@ Página completa wireada al mock PHP:
   onRowClick={(row) => router.push(...)}
 
   // --- Toolbar ---
-  enableViewOptions            // dropdown "View" (column visibility)
-  enableExport                 // dropdown "Export" (CSV + XLSX)
+  enableViewOptions
+  enableExport
   exportFileName="employees"
-  fetchAllRowsForExport={...}  // ver "Export server-side" abajo
-  toolbarLeading={<...>}       // slot izquierdo
-  toolbarTrailing={<...>}      // slot a la izquierda de "Export"
+  fetchAllRowsForExport={...}  // ver "Export server-side"
+  toolbarLeading={<...>}
+  toolbarTrailing={<...>}
 
   // --- Estilo ---
-  density="compact"            // default | "comfortable" para más aire
-  headerVariant="colored"      // default | "subtle" (sin color)
-  headerColor="#1565C0"        // default — solo aplica con headerVariant="colored"
-  zebraRows                    // default true — alterna filas
+  density="compact"            // default | "comfortable"
+  headerVariant="colored"      // default | "subtle"
+  headerColor="#1565C0"        // default
+  zebraRows                    // default true
   stickyHeader                 // default true
 />
 ```
 
-### Columnas
+## Column meta (`DataTableColumnMeta`)
 
-Cada `ColumnDef` puede declarar `meta` tipado como `DataTableColumnMeta<Row>`:
+Cada `ColumnDef` declara su comportamiento vía `meta`:
 
 ```ts
 meta: {
-  label: 'Salary',                       // usado por export + view options
-  numeric: true,                         // alinea header + cell a la derecha + tabular-nums
-  mono: true,                            // font-mono en la celda (útil para horas / IDs)
-  headerClassName: 'w-[120px]',          // ancho fijo opcional
-  cellClassName: 'text-emerald-700',     // estilos extra opcionales
-  exportValue: (row) => row.salary,      // valor crudo para CSV/XLSX
+  label: 'Salary',                       // export + view options
+  numeric: true,                         // header + cell text-right + tabular-nums
+  mono: true,                            // font-mono en la celda
+  headerClassName: 'w-[120px]',
+  cellClassName: 'text-emerald-700',
+  exportValue: (row) => row.salary,      // valor crudo en CSV/XLSX
+
+  pin: 'left',                           // 'left' | 'right' — sticky column
+  sortKey: 'us.nombre',                  // override del id para el param `sort`
+
+  filter: {                              // ver "Filtros por columna" abajo
+    type: 'text',                        // 'text' | 'number' | 'date'
+    backendKey: 'name',
+    defaultOperator: 'contains',
+    placeholder: 'Search by name…',
+  },
 }
 ```
 
-Header con sort + dropdown (ocultar/orden):
+Header con sort + dropdown (también renderiza el icono de filter cuando hay
+`meta.filter`):
 
 ```tsx
 header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />
 ```
 
-## Persistencia (localStorage)
-
-El componente persiste por `tableId`:
-
-- `datatable.v1.<tableId>.cols`     → visibility map (`Record<columnId, boolean>`).
-- `datatable.v1.<tableId>.pageSize` → rows-per-page elegido.
-
-Recomendación: usar un `tableId` estable y único por pantalla
-(`"employees"`, `"punches.list"`, etc.). **No** incluir filtros en el id.
-
-## Contrato del backend (server-side)
-
-Cuando la tabla opera server-side, el endpoint debe devolver (o el route
-handler / hook debe normalizar) esta forma:
+## Columnas pinned (sticky)
 
 ```ts
-export interface PaginatedDataTableResponse<T> {
-  results: T[]      // filas de la página actual
-  page: number      // 1-based
-  pageSize: number  // tamaño de página
-  total?: number    // total acumulado (recomendado)
-  hasMore: boolean  // fuente de verdad
+meta: { pin: 'left' }    // o 'right'
+```
+
+- Múltiples columnas pueden estar pinned al mismo lado — se apilan en el orden
+  de declaración.
+- Se aplica `position: sticky` y un shadow sutil en el borde interno para
+  separarlas del contenido scrolleable.
+- También se puede pasar `columnPinning` como prop para overridear (ej.
+  preferencia del usuario).
+- El scroll horizontal vive **dentro** del contenedor de la tabla. Para que
+  no se rompa el layout cuando la tabla es más ancha que la pantalla, el
+  contenedor padre que aloja al `<DataTable>` debe poder shrinkear:
+  - En grid: `lg:grid-cols-[minmax(0,1fr)_320px]` (no `1fr`).
+  - En flex: añadir `min-w-0` al item.
+
+## Column resizing
+
+Habilitado por default (`enableColumnResizing={true}`). El usuario arrastra el
+borde derecho del header para cambiar el ancho. Doble-click resetea al tamaño
+declarado.
+
+- Internamente usa `table-layout: fixed` + `width = column.getSize()` en cada
+  cell para que los anchos sean autoritativos y los offsets sticky de las
+  columnas pinned coincidan con el render real.
+- Los anchos por columna se persisten en
+  `datatable.v1.<tableId>.sizing` (`localStorage`).
+- Tamaño default por columna: `{ size: 160, minSize: 60, maxSize: 800 }`.
+  Override por columna con `size` / `minSize` / `maxSize` en el `ColumnDef`:
+
+```ts
+{
+  accessorKey: 'id',
+  size: 80,
+  minSize: 60,
+  maxSize: 160,
+  ...
 }
 ```
 
-Reglas:
+- Para columnas pinned conviene declarar `size` explícito: el shadow y la
+  separación visual son más consistentes cuando el ancho es estable.
 
-- `page` es **base 1**. La primera request es `page=1`.
-- `pageSize` lo manda el cliente; el server respeta el query param (`page_size`).
-- `hasMore` es la fuente de verdad para "¿quedan más?". Si el legacy no lo
-  expone, derivarlo en el BFF / hook como `page * pageSize < total`.
-- `total` es opcional pero **recomendado** para mostrar "X – Y of Z" en el
-  footer.
+## Filtros por columna
 
-### Query string esperado
+Cada filtro tiene 3 tipos con operadores distintos:
+
+| Tipo | Operadores |
+|------|------------|
+| `text`   | `contains`, `not_contains`, `starts_with`, `ends_with`, `equals`, `not_equals` |
+| `number` | `eq`, `neq`, `lt`, `lte`, `gt`, `gte` |
+| `date`   | `eq`, `lt`, `lte`, `gt`, `gte` |
+
+Config en `meta.filter`:
+
+```ts
+filter: {
+  type: 'text' | 'number' | 'date',
+  backendKey: 'name',          // clave del query string
+  defaultOperator?: ...,
+  placeholder?: '...',
+  operatorParamSuffix?: '_op', // default '_op' → ?name_op=contains
+}
+```
+
+El icono de filtro aparece en el header. Al aplicarlo, el valor se guarda en
+el `columnFilters` state de TanStack como:
+
+```ts
+{ type: 'text', operator: 'contains', value: 'john' }
+```
+
+…y se muestra como un **chip** en el toolbar con el operador y un botón para
+limpiarlo individualmente. Hay también "Clear all" para resetear todos.
+
+## Sort
+
+Por default usa el `id` de la columna como param `sort`. Para overridear:
+
+```ts
+meta: {
+  sortKey: 'us.nombre',
+}
+```
+
+→ se envía como `?sort=us.nombre&dir=asc`.
+
+## Contrato del backend (server-side)
+
+### Response
+
+```ts
+export interface PaginatedDataTableResponse<T> {
+  results: T[]
+  page: number      // 1-based
+  pageSize: number
+  total?: number    // recomendado
+  hasMore: boolean
+}
+```
+
+### Query string
 
 ```
 GET <endpoint>
   ?page=<int, 1-based>
   &page_size=<int>
-  &sort=<columnId>
+  &sort=<columnId | meta.sortKey>
   &dir=<asc|desc>
-  &term=<string>             # global search
-  &<col>=<value>             # filtros por columna (cuando aplique)
+  &term=<string>                       # opcional, global search
+  &<backendKey>=<value>                # 1 por filtro de columna
+  &<backendKey>_op=<operator>          # operador del filtro
+```
+
+Ejemplo concreto con filtros activos:
+
+```
+GET /api/srs/php/api/payroll/employees.php
+  ?page=1&page_size=25
+  &sort=us.nombre&dir=asc
+  &name=john&name_op=starts_with
+  &salary=90000&salary_op=gte
+  &hire_date=2023-01-01&hire_date_op=gte
 ```
 
 > Coincide con el contrato documentado para `SearchableCombobox`. Endpoints
-> nuevos o BFF dedicados pueden usar `pageSize` camelCase en el JSON, pero
-> el query param debe ser `page_size`.
+> nuevos / BFF dedicados pueden usar `pageSize` camelCase en el JSON, pero el
+> query param sigue siendo `page_size`.
 
-### Wiring sugerido (React Query + server-side)
+## Wiring con TanStack Query (server-side completo)
 
 ```tsx
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import {
+  DataTable,
+  DataTableColumnHeader,
+  buildBackendQuery,
+} from '@/components/shared/data-table'
+
+const [pageIndex, setPageIndex] = useState(0)
+const [pageSize, setPageSize]   = useState(25)
+const [sorting, setSorting]     = useState<SortingState>([{ id: 'id', desc: false }])
+const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
 const query = useQuery({
-  queryKey: ['employees', { page, pageSize, sort, dir, term }],
-  queryFn: () => fetchEmployees({ page, pageSize, sort, dir, term }),
+  queryKey: ['employees', pageIndex, pageSize, sorting, columnFilters],
+  queryFn: () => {
+    const params = buildBackendQuery({
+      columns,
+      sorting,
+      columnFilters,
+      page: pageIndex + 1,
+      pageSize,
+    })
+    return fetchJson(srsProxyUrl(endpoint, params))
+  },
   placeholderData: keepPreviousData,
   staleTime: 10_000,
 })
@@ -200,21 +324,23 @@ const query = useQuery({
   data={query.data?.results ?? []}
   isLoading={query.isFetching}
   pagination={{
-    pageIndex: page - 1,
+    pageIndex,
     pageSize,
-    pageCount: query.data ? Math.ceil((query.data.total ?? 0) / pageSize) : -1,
+    pageCount: query.data
+      ? Math.max(1, Math.ceil((query.data.total ?? 0) / pageSize))
+      : -1,
     totalRows: query.data?.total,
     onPaginationChange: (next) => {
-      setPage(next.pageIndex + 1)
+      setPageIndex(next.pageIndex)
       setPageSize(next.pageSize)
     },
   }}
   manualSorting
   sorting={sorting}
-  onSortingChange={setSorting}
+  onSortingChange={(next) => { setSorting(next); setPageIndex(0) }}
   manualFiltering
-  globalFilter={term}
-  onGlobalFilterChange={setTerm}
+  columnFilters={columnFilters}
+  onColumnFiltersChange={(next) => { setColumnFilters(next); setPageIndex(0) }}
 />
 ```
 
@@ -222,14 +348,13 @@ const query = useQuery({
 
 ### Client-side (default)
 
-Cuando `data` ya tiene todas las filas en memoria, el dropdown **Export**
-arma el archivo con `getSortedRowModel()` (respeta filtros + orden + columnas
-visibles).
+Cuando `data` ya tiene todas las filas, el dropdown **Export** arma el archivo
+con `getSortedRowModel()` (respeta filtros + orden + columnas visibles).
 
 ### Server-side (paginado)
 
-Pasar `fetchAllRowsForExport` — debe traer **todas** las filas (no la página
-actual). Ejemplo:
+Pasar `fetchAllRowsForExport` — debe traer **todas** las filas (no solo la
+página actual):
 
 ```ts
 fetchAllRowsForExport={async () => {
@@ -245,26 +370,35 @@ fetchAllRowsForExport={async () => {
 }}
 ```
 
-El export usa `meta.label` como header de la columna y `meta.exportValue`
-para extraer el valor (fallback: accessor de la columna).
+El export usa `meta.label` como header de la columna y `meta.exportValue` para
+extraer el valor (fallback: accessor de la columna).
+
+## Persistencia (localStorage)
+
+Por `tableId`:
+
+- `datatable.v1.<tableId>.cols`     → visibility map (`Record<columnId, boolean>`).
+- `datatable.v1.<tableId>.pageSize` → rows-per-page elegido.
+
+Recomendación: usar un `tableId` estable y único por pantalla (`"employees"`,
+`"punches.list"`, etc.). **No** incluir filtros en el id.
 
 ## Mock PHP
 
-Mock listo para testing:
-`public/php/api/payroll/datatable-mock.php` — 250 empleados deterministas,
-soporta `term`, `sort`, `dir`, `page`, `page_size`, `department`, `status`.
-No usa auth ni DB. Borrar cuando ya no se necesite.
+`public/php/api/payroll/datatable-mock.php` — 250 empleados deterministas que
+soportan **todos los operadores** documentados (text, number, date). Sin auth,
+sin DB. Borrar cuando ya no se necesite.
 
 ## Reglas
 
 - Importar siempre desde `@/components/shared/data-table` (no del barrel
-  interno ni desde subpaths).
-- Usar `DataTableColumnHeader` para headers con sort/hide en lugar de
-  reimplementar el dropdown.
-- Para tablas server-side, normalizar el JSON a `PaginatedDataTableResponse`
-  en el hook o en un BFF (`app/api/<recurso>/route.ts`), de acuerdo con la
-  regla `payroll-api-proxy.mdc`.
-- `tableId` debe ser único y estable por pantalla — es la clave de
-  persistencia.
-- No reimplementar paginación / column visibility / export manualmente: o
-  usás este componente, o agregás slots al genérico.
+  interno ni de subpaths).
+- Usar `DataTableColumnHeader` para los headers — renderiza sort, hide column
+  y el icono de filter cuando hay `meta.filter`.
+- Para tablas server-side, usar `buildBackendQuery` para armar el query string;
+  no concatenar params a mano.
+- Normalizar el JSON a `PaginatedDataTableResponse` en el hook o en un BFF
+  (`app/api/<recurso>/route.ts`), respetando la regla `payroll-api-proxy.mdc`.
+- `tableId` debe ser único y estable por pantalla — es la clave de persistencia.
+- No reimplementar paginación / column visibility / export / filtros
+  manualmente: o usás este componente, o agregás slots al genérico.

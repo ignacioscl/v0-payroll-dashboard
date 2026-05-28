@@ -9,6 +9,7 @@ export function mapIssueTypeToTtkFlags(selectedType: string) {
     manual_punch: selectedType === 'manual_punch' ? 1 : 0,
     only_deletes: selectedType === 'only_deletes' ? 1 : 0,
     without_salary: selectedType === 'without_salary' ? 1 : 0,
+    only_fixed: selectedType === 'only_fixed' ? 1 : 0,
   }
 }
 
@@ -41,6 +42,7 @@ export function buildTtkListParams(input: {
     manual_punch: flags.manual_punch,
     only_deletes: flags.only_deletes,
     without_salary: flags.without_salary,
+    only_fixed: flags.only_fixed,
     show_deleted: 0,
     filter_logic_or: 0,
   }
@@ -76,6 +78,20 @@ export function formatGmtDate(gmt0?: string | null): string {
   const d = new Date(gmt0)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
+}
+
+export function formatFixedAt(fixedAt?: string | null): string {
+  if (!fixedAt) return ''
+  const d = new Date(fixedAt.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return fixedAt
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
 }
 
 export function formatGmtTime(gmt0?: string | null): string {
