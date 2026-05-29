@@ -2,6 +2,7 @@
 
 import { Sidebar } from './sidebar'
 import { Header } from './header'
+import { ProdRouteGuard } from './prod-route-guard'
 import { FilterProvider } from '@/lib/filter-context'
 import { SidebarProvider, useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -23,7 +24,9 @@ function MainContent({ children }: { children: React.ReactNode }) {
           collapsed ? 'ml-[72px]' : 'ml-[260px]'
         )}
       >
-        <div className="p-6">{children}</div>
+        <ProdRouteGuard>
+          <div className="p-6">{children}</div>
+        </ProdRouteGuard>
       </main>
     </>
   )

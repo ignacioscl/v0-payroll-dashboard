@@ -6,6 +6,10 @@
     "dev": "NODE_OPTIONS='--max-old-space-size=8192' next dev --webpack",
     "build": "next build",
     "start": "next start",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop payroll-dashboard",
+    "pm2:reload": "pm2 reload payroll-dashboard",
+    "pm2:logs": "pm2 logs payroll-dashboard",
     "lint": "eslint ."
   },
   "dependencies": {

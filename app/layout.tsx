@@ -10,23 +10,16 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Auto Wax - Time Tracking Dashboard',
   description: 'Payroll and attendance management dashboard for auto detailing services',
-  generator: 'v0.app',
   icons: {
-    icon: [
+    icon: [{ url: '/favicon.png', sizes: '32x32', type: 'image/png' }],
+    apple: '/favicon.png',
+    other: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        rel: 'mask-icon',
+        url: '/safari-pinned-tab.svg',
+        color: '#5bbad5',
       },
     ],
-    apple: '/apple-icon.png',
   },
 }
 

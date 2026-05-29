@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Bell, Search } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -18,6 +17,7 @@ import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
+import { NotificationsPopover } from './notifications-popover'
 
 const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
   '/issues': [
@@ -127,12 +127,7 @@ export function Header() {
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative hover:bg-muted">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-lg shadow-destructive/30">
-            12
-          </span>
-        </Button>
+        <NotificationsPopover />
       </div>
     </header>
   )

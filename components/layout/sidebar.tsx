@@ -6,13 +6,6 @@ import { cn } from '@/lib/utils'
 import { useSidebar } from '@/lib/sidebar-context'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard,
-  AlertCircle,
-  CalendarX,
-  Timer,
-  TrendingUp,
-  Trophy,
-  DollarSign,
   ChevronLeft,
   ChevronRight,
   Settings,
@@ -20,8 +13,6 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
-  Blocks,
-  Table as TableIcon,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -39,18 +30,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Punch Issues', href: '/issues', icon: AlertCircle },
-  { name: 'Schedule Violations', href: '/schedule', icon: CalendarX },
-  { name: 'Overtime', href: '/overtime', icon: Timer },
-  { name: 'Trends', href: '/trends', icon: TrendingUp },
-  { name: 'Employee Ranking', href: '/ranking', icon: Trophy },
-  { name: 'Costs by Dealer', href: '/costs', icon: DollarSign },
-  { name: 'Components', href: '/components', icon: Blocks },
-  { name: 'Data Table', href: '/datatable-demo', icon: TableIcon },
-]
+import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
+import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 
 function userInitials(nombre: string) {
   const parts = nombre.trim().split(/\s+/).filter(Boolean)
@@ -62,7 +43,13 @@ function userInitials(nombre: string) {
 export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useSidebar()
-  const { user } = useSrsMe()
+  const { user, hasPermission } = useSrsMe()
+
+  const canAccessTtk = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
+  const navigation = getVisibleNavigation({
+    isDev: isDevEnvironment(),
+    canAccessTtk,
+  })
 
   const displayName = user?.nombre ?? 'User'
   const displayRole =
