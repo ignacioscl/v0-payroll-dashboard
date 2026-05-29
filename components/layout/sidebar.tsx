@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -8,12 +9,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft,
   ChevronRight,
-  Settings,
   User,
   LogOut,
   ChevronDown,
   Sparkles,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +38,7 @@ import {
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
+import type { SrsMeUser } from '@/lib/auth/types'
 
 function userInitials(nombre: string) {
   const parts = nombre.trim().split(/\s+/).filter(Boolean)
@@ -40,10 +47,31 @@ function userInitials(nombre: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+function profileRoleLabel(user: SrsMeUser | null) {
+  if (!user) return '—'
+  if (user.isSystemAdmin) {
+    return user.rolSystemV2Name ?? 'System Admin'
+  }
+  return user.rolSystemV2Name ?? user.dealerName ?? '—'
+}
+
+function ProfileField({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className="text-sm text-foreground">{value}</span>
+    </div>
+  )
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, hasPermission } = useSrsMe()
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const canAccessTtk = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
   const navigation = getVisibleNavigation({
@@ -246,13 +274,15 @@ export function Sidebar() {
                   <p className="text-xs text-muted-foreground">{user?.email || displayRole}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2 cursor-pointer">
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault()
+                    setProfileOpen(true)
+                  }}
+                >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 cursor-pointer">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -267,6 +297,34 @@ export function Sidebar() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Profile</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-14 w-14 border-2 border-primary/20">
+                    <AvatarImage src={photoSrc} alt={displayName} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground font-semibold">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{displayName}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {profileRoleLabel(user)}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 pt-2">
+                  <ProfileField label="Email" value={user?.email} />
+                  <ProfileField label="Employee ID" value={user?.codigoInterno} />
+                  <ProfileField label="Role" value={profileRoleLabel(user)} />
+                  <ProfileField label="Dealer" value={user?.dealerName} />
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </motion.aside>
