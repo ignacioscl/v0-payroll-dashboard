@@ -55,6 +55,21 @@ import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
 
+import type { DateRange } from 'react-day-picker'
+
+export type IssuesDataTableProps = {
+  /** Overrides header date range (e.g. dashboard yesterday-only). */
+  dateRangeOverride?: DateRange
+  /** Overrides header issue-type filter. */
+  issueTypeOverride?: string
+  /** When true, ignores header search text. */
+  ignoreSearch?: boolean
+  tableId?: string
+  defaultPageSize?: number
+  exportFileName?: string
+  queryKeySuffix?: string
+}
+
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
 
 function mapTtkOrderBy(sorting: SortingState): string {
@@ -77,7 +92,15 @@ function punchErrorLabel(row: TtkListRow): string | null {
   return res ? res : null
 }
 
-export function IssuesDataTable() {
+export function IssuesDataTable({
+  dateRangeOverride,
+  issueTypeOverride,
+  ignoreSearch = false,
+  tableId = 'issues-punches',
+  defaultPageSize = 25,
+  exportFileName = 'punch-issues',
+  queryKeySuffix = 'issues',
+}: IssuesDataTableProps = {}) {
   const {
     search,
     selectedDealers,
@@ -86,8 +109,12 @@ export function IssuesDataTable() {
     filtersHydrated,
   } = useFilters()
 
+  const effectiveDateRange = dateRangeOverride ?? dateRange
+  const effectiveSelectedType = issueTypeOverride ?? selectedType
+  const effectiveSearch = ignoreSearch ? '' : search
+
   const [pageIndex, setPageIndex] = React.useState(0)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [pageSize, setPageSize] = React.useState(defaultPageSize)
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'date', desc: true },
   ])
@@ -137,12 +164,12 @@ export function IssuesDataTable() {
   const listExtra = React.useMemo(
     () =>
       buildTtkListFilterExtra({
-        search: debouncedSearch,
+        search: effectiveSearch,
         selectedDealers: debouncedDealers,
-        dateRange,
-        selectedType,
+        dateRange: effectiveDateRange,
+        selectedType: effectiveSelectedType,
       }),
-    [debouncedSearch, debouncedDealers, dateRange, selectedType],
+    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType],
   )
 
   const queryEnabled =
@@ -516,7 +543,15 @@ export function IssuesDataTable() {
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [debouncedSearch, debouncedDealers, selectedType, dateRange, pageSize, sorting])
+  }, [
+    debouncedSearch,
+    debouncedDealers,
+    effectiveSelectedType,
+    effectiveDateRange,
+    pageSize,
+    sorting,
+    ignoreSearch,
+  ])
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
     if (!queryEnabled) return []
@@ -553,12 +588,12 @@ export function IssuesDataTable() {
     adapter: ttkListAdapter,
     queryKey: [
       'ttk-list',
-      'issues-datatable',
+      queryKeySuffix,
       debouncedSearch,
       debouncedDealers.slice().sort().join(','),
-      dateRange?.from?.toISOString(),
-      dateRange?.to?.toISOString(),
-      selectedType,
+      effectiveDateRange?.from?.toISOString(),
+      effectiveDateRange?.to?.toISOString(),
+      effectiveSelectedType,
     ],
     queryFn: async (params) => {
       const data = await apiRequest.getCustom('', undefined, params)
@@ -616,7 +651,7 @@ export function IssuesDataTable() {
         ) : null}
 
         <DataTable<TtkListRow>
-          tableId="issues-punches"
+          tableId={tableId}
           columns={columns}
           columnPinning={columnPinning}
           data={rows}
@@ -626,7 +661,7 @@ export function IssuesDataTable() {
           enableGlobalFilter={false}
           enableViewOptions
           enableExport
-          exportFileName="punch-issues"
+          exportFileName={exportFileName}
           fetchAllRowsForExport={fetchAllRowsForExport}
           manualSorting
           sorting={sorting}

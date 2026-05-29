@@ -55,6 +55,13 @@ export function getDefaultDateRange(reference: Date = new Date()): DateRange {
   return getPresetRange(7, reference)
 }
 
+/** Single calendar day: yesterday (00:00 → 23:59 local). */
+export function getYesterdayOnlyDateRange(reference: Date = new Date()): DateRange {
+  const to = getYesterday(reference)
+  const from = subtractDays(to, 0)
+  return { from, to }
+}
+
 /**
  * Dado un rango, intenta matchearlo contra un preset (comparando solo año/mes/día).
  * Útil para resaltar el preset activo en la UI.

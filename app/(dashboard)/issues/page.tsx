@@ -20,6 +20,7 @@ import {
   PlusCircle,
   CheckCheck,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 type IssueType =
   | 'only_error'
@@ -137,6 +138,22 @@ export default function IssuesPage() {
     return null
   }
 
+  const handleAddPunchClick = () => {
+    if (selectedDealers.length === 0) {
+      toast.error('Select one dealer in the header to add a punch.')
+      return
+    }
+    if (selectedDealers.length > 1) {
+      toast.error('Select only one dealer in the header to add a punch.')
+      return
+    }
+    if (singleDealerId == null) {
+      toast.error('The selected dealer is invalid. Choose a dealer again.')
+      return
+    }
+    setAddPunchOpen(true)
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -150,14 +167,8 @@ export default function IssuesPage() {
           {!meLoading && canAdd && (
             <Button
               size="sm"
-              className="gap-1.5 cursor-pointer disabled:cursor-not-allowed"
-              onClick={() => setAddPunchOpen(true)}
-              disabled={!filtersHydrated || singleDealerId == null}
-              title={
-                singleDealerId == null
-                  ? 'Select exactly one dealer to add a punch'
-                  : 'Add manual punch'
-              }
+              className="gap-1.5 cursor-pointer"
+              onClick={handleAddPunchClick}
             >
               <PlusCircle className="h-4 w-4" />
               Add punch
