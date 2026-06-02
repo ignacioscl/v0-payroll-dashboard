@@ -1,0 +1,41 @@
+# v0 payroll dashboard — único servicio dockerizado en el servidor.
+# PHP, face API, etc. siguen en PM2 en el host.
+
+services:
+  payroll-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: srs-payroll-dashboard:latest
+    container_name: srs-payroll-dashboard
+    ports:
+      - "3010:3010"
+    environment:
+      NODE_ENV: production
+      PORT: "3010"
+      HOSTNAME: "0.0.0.0"
+    env_file:
+      # Ruta en el host (fuera del repo). Sobrescribir con PAYROLL_ENV_FILE en .env del compose.
+      - ${PAYROLL_ENV_FILE:-/opt/srs/payroll-dashboard.env}
+    volumes:
+      # Mismo archivo montado para que Next cargue .env.production al arrancar (opcional si usás env_file).
+      - ${PAYROLL_ENV_FILE:-/opt/srs/payroll-dashboard.env}:/app/.env.production:ro
+    extra_hosts:
+      # PHP en el host (PM2) o puerto 80 del compose php-dev (host.docker.internal:80).
+      - "host.docker.internal:host-gateway"
+      # Permite SRS_API_URL=http://srs.com (mismo Host que el vhost Apache).
+      - "srs.com:host-gateway"
+    # Siempre activo: reinicio si el proceso cae, si el contenedor sale con error, y tras reboot del servidor.
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-qO-",
+          "http://127.0.0.1:3010/login",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

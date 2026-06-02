@@ -1,13 +1,6 @@
 import type { SrsExchangeResponse, SrsLoginData } from '@/lib/auth/types'
 import { isLoginRoleSelection } from '@/lib/auth/types'
-
-function getSrsApiBaseUrl(): string {
-  const url = process.env.SRS_API_URL?.trim()
-  if (!url) {
-    throw new Error('SRS_API_URL is not configured')
-  }
-  return url.replace(/\/$/, '')
-}
+import { fetchSrsUpstream } from '@/lib/srs-upstream'
 
 function getSsoSecret(): string {
   const secret = process.env.SRS_SSO_SECRET?.trim()
@@ -20,7 +13,7 @@ function getSsoSecret(): string {
 export async function exchangeSsoCode(code: string) {
   const secret = getSsoSecret()
 
-  const res = await fetch(`${getSrsApiBaseUrl()}/php/api/sso/exchange.php`, {
+  const res = await fetchSrsUpstream('/php/api/sso/exchange.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -37,7 +30,7 @@ export async function exchangeSsoCode(code: string) {
   } catch {
     const preview = text.replace(/\s+/g, ' ').slice(0, 280)
     throw new Error(
-      `SRS server returned HTML instead of JSON (${res.status}). Check ${getSrsApiBaseUrl()}/php/api/sso/exchange.php — ${preview}`
+      `SRS server returned HTML instead of JSON (${res.status}). Check SRS_API_URL + Host from SRS_PUBLIC_URL — ${preview}`
     )
   }
 
@@ -54,7 +47,7 @@ export async function loginWithCredentials(
   password: string,
   idUsuarioRolrel?: number
 ) {
-  const res = await fetch(`${getSrsApiBaseUrl()}/php/api/sso/login.php`, {
+  const res = await fetchSrsUpstream('/php/api/sso/login.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -100,7 +93,7 @@ export async function loginWithCredentialsFlow(
 }
 
 export async function createPhpAdoptCode(token: string, user: unknown) {
-  const res = await fetch(`${getSrsApiBaseUrl()}/php/api/sso/adopt.php`, {
+  const res = await fetchSrsUpstream('/php/api/sso/adopt.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

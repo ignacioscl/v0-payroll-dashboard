@@ -1,0 +1,16 @@
+# Copiar a docker-compose.override.yml (local, no subir a prod).
+# Une v0 con el Apache de php-dev por nombre de contenedor.
+#
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   # En .env.production.local: SRS_API_URL=http://php-dev-apache
+
+services:
+  payroll-dashboard:
+    networks:
+      - default
+      - php-dev
+
+networks:
+  php-dev:
+    external: true
+    name: php-dev_default

@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
-
-function getSrsApiBaseUrl(): string {
-  const url = process.env.SRS_API_URL?.trim()
-  if (!url) {
-    throw new Error('SRS_API_URL is not configured')
-  }
-  return url.replace(/\/$/, '')
-}
+import { fetchSrsUpstream, getSrsApiBaseUrl } from '@/lib/srs-upstream'
 
 export type SrsProxyOptions = {
   method: string
@@ -35,7 +28,7 @@ export async function forwardToSrs({
   }
 
   const path = '/' + pathSegments.map((p) => encodeURIComponent(p)).join('/')
-  const target = new URL(path, getSrsApiBaseUrl())
+  const target = new URL(path, `${getSrsApiBaseUrl()}/`)
   if (search) {
     target.search = search.startsWith('?') ? search : `?${search}`
   }
@@ -52,11 +45,10 @@ export async function forwardToSrs({
 
   const hasBody = method !== 'GET' && method !== 'HEAD' && body != null
 
-  const upstream = await fetch(target.toString(), {
+  const upstream = await fetchSrsUpstream(target.toString(), {
     method,
     headers,
     body: hasBody ? body : undefined,
-    cache: 'no-store',
   })
 
   const responseHeaders = new Headers()

@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+.DS_Store
+*.md
+!DOCKER.md
+.env
+.env.*
+!.env.production.example
+npm-debug.log*
+.pnpm-debug.log*
+coverage
+.cursor
