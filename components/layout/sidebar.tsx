@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react'
 import {
   Dialog,
@@ -38,6 +39,7 @@ import {
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
+import { APP_SUBTITLE, getAppTitle } from '@/lib/branding'
 import type { SrsMeUser } from '@/lib/auth/types'
 
 function userInitials(nombre: string) {
@@ -82,6 +84,7 @@ export function Sidebar() {
   const displayName = user?.nombre ?? 'User'
   const displayRole =
     user?.rolSystemV2Name ?? user?.dealerName ?? user?.email ?? 'SRS'
+  const appTitle = getAppTitle(user)
   const initials = userInitials(displayName)
   const photoSrc = userAvatarUrl(user)
 
@@ -111,10 +114,10 @@ export function Sidebar() {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold text-sidebar-foreground text-sm tracking-tight">
-                      AUTO WAX
+                      {appTitle}
                     </span>
                     <span className="text-[11px] text-muted-foreground">
-                      Time Tracking
+                      {APP_SUBTITLE}
                     </span>
                   </div>
                 </motion.div>
@@ -283,6 +286,12 @@ export function Sidebar() {
                 >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+                  <a href="/api/sso/to-php">
+                    <ArrowLeft className="h-4 w-4" />
+                    <span>Back to SRS Legacy</span>
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

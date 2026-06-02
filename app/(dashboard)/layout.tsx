@@ -1,12 +1,12 @@
 import { MainLayout } from '@/components/layout/main-layout'
-import { requireSrsSession } from '@/lib/auth/require-session'
+import { requirePayrollDashboardAccess } from '@/lib/auth/require-session'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  await requireSrsSession()
+  await requirePayrollDashboardAccess()
 
   return <MainLayout>{children}</MainLayout>
 }

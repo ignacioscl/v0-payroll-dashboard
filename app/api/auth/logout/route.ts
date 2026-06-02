@@ -14,6 +14,14 @@ export async function GET() {
   return response
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  const accept = request.headers.get('accept') ?? ''
+  if (accept.includes('application/json')) {
+    const response = NextResponse.json({ ok: true })
+    for (const cookie of buildClearSessionCookies()) {
+      response.cookies.set(cookie)
+    }
+    return response
+  }
   return GET()
 }

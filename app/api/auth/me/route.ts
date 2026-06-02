@@ -31,7 +31,7 @@ export async function GET() {
           authenticated: false,
           error: json.error?.message ?? 'Failed to load user profile',
         },
-        { status: upstream.status >= 400 ? upstream.status : 400 },
+        { status: json.error?.code === '403' || json.error?.code === 403 ? 403 : upstream.status >= 400 ? upstream.status : 400 },
       )
     }
 

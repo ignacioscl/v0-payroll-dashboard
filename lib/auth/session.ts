@@ -49,3 +49,8 @@ export function buildClearSessionCookies() {
     { name: SRS_USER_COOKIE, value: '', ...base },
   ]
 }
+
+/** Use GET /api/auth/clear-session?to=... from Server Components (cookies cannot be set in layouts). */
+export function clearSessionRedirectUrl(to: string): string {
+  return `/api/auth/clear-session?to=${encodeURIComponent(to)}`
+}

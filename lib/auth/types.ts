@@ -7,6 +7,7 @@ export interface SrsSessionUser {
   idDealer: number | null
   dealerName: string | null
   idDealerProvider: number | null
+  providerName?: string | null
   rolesRelCount?: number
   isCompanyTypeCompany?: boolean
   thumbnailUuid?: string | null
@@ -25,6 +26,7 @@ export interface SrsMeUser {
   idDealer: number | null
   dealerName: string | null
   idDealerProvider: number | null
+  providerName?: string | null
   isCompanyTypeCompany: boolean
   isSystemAdmin: boolean
 }
@@ -59,11 +61,36 @@ export interface SrsSession {
   user: SrsSessionUser
 }
 
+/** One row in the v0 dealer/role picker (matches Legacy modal). */
+export interface SrsLoginRoleOption {
+  id: number
+  rolName: string
+  dealerName: string
+  companyName: string
+  departmentName: string | null
+  logoUrl: string | null
+}
+
+export interface SrsLoginSuccessData {
+  token: string
+  user: SrsSessionUser
+}
+
+export interface SrsLoginRoleSelectionData {
+  needsRoleSelection: true
+  rolesRel: SrsLoginRoleOption[]
+}
+
+export type SrsLoginData = SrsLoginSuccessData | SrsLoginRoleSelectionData
+
+export function isLoginRoleSelection(
+  data: SrsLoginData | undefined
+): data is SrsLoginRoleSelectionData {
+  return Boolean(data && 'needsRoleSelection' in data && data.needsRoleSelection)
+}
+
 export interface SrsExchangeResponse {
   status: 'success' | 'fail'
   error?: { code: string; message: string }
-  data?: {
-    token: string
-    user: SrsSessionUser
-  }
+  data?: SrsLoginData
 }
