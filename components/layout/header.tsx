@@ -19,21 +19,6 @@ import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 import { NotificationsPopover } from './notifications-popover'
 
-const issueTypesByPage: Record<string, { value: string; label: string }[]> = {
-  '/issues': [
-    { value: 'only_error', label: 'Only with errors' },
-    { value: 'only_error_clockout', label: 'Only without clock out' },
-    { value: 'manual_punch', label: 'Manual punch' },
-    { value: 'only_deletes', label: 'Deleted punches' },
-    { value: 'without_salary', label: 'Without salary' },
-  ],
-  '/schedule': [
-    { value: 'late_arrival', label: 'Late Arrival' },
-    { value: 'early_departure', label: 'Early Departure' },
-    { value: 'extended_lunch', label: 'Extended Lunch' },
-  ],
-}
-
 export function Header() {
   const pathname = usePathname()
   const { collapsed } = useSidebar()
@@ -43,8 +28,6 @@ export function Header() {
     setSearch,
     selectedDealers,
     setSelectedDealers,
-    selectedType,
-    setSelectedType,
     selectedStatus,
     setSelectedStatus,
     dateRange,
@@ -63,8 +46,6 @@ export function Header() {
     })
   }, [dealerOptions, setSelectedDealers])
 
-  const currentIssueTypes = issueTypesByPage[pathname] || []
-  const showTypeFilter = currentIssueTypes.length > 0
   const showStatusFilter = pathname === '/schedule'
 
   return (
@@ -92,22 +73,6 @@ export function Header() {
           loading={dealersLoading}
           className="w-[200px] shrink-0"
         />
-
-        {showTypeFilter && (
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="h-9 w-[150px] shrink-0 border-border bg-background/50">
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {currentIssueTypes.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
 
         {showStatusFilter && (
           <Select value={selectedStatus} onValueChange={setSelectedStatus}>

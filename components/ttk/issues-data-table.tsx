@@ -45,6 +45,7 @@ import {
   PunchFacePhotosDialog,
 } from '@/components/ttk/punch-face-photos-dialog'
 import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
+import { PunchManualIndicator } from '@/components/ttk/punch-manual-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { Button } from '@/components/ui/button'
@@ -224,6 +225,7 @@ export function IssuesDataTable({
                   {punchErrorLabel(r) ? (
                     <PunchErrorIndicator errorText={punchErrorLabel(r)!} />
                   ) : null}
+                  {Number(r.manualCreate) === 1 ? <PunchManualIndicator /> : null}
                   {r.fixedAt ? (
                     <PunchFixedIndicator
                       fixedAt={r.fixedAt}
@@ -414,14 +416,6 @@ export function IssuesDataTable({
           const r = row.original
           return (
             <div className="flex items-center justify-end gap-0.5">
-              {Number(r.manualCreate) === 1 ? (
-                <span
-                  className="mr-1 hidden max-w-[4.5rem] truncate text-[9px] font-medium leading-tight text-sky-700 dark:text-sky-400 xl:inline"
-                  title="Manual punch"
-                >
-                  Manual
-                </span>
-              ) : null}
               {hasFaceValidationPhotos(r) ? (
                 <Button
                   variant="ghost"

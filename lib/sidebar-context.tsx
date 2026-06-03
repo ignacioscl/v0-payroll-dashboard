@@ -1,6 +1,17 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react'
+import {
+  readSidebarCollapsedPreference,
+  writeSidebarCollapsedPreference,
+} from '@/lib/sidebar-preference'
 
 interface SidebarContextType {
   collapsed: boolean
@@ -11,9 +22,24 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsedState] = useState(true)
 
-  const toggle = () => setCollapsed((prev) => !prev)
+  useEffect(() => {
+    setCollapsedState(readSidebarCollapsedPreference())
+  }, [])
+
+  const setCollapsed = useCallback((value: boolean) => {
+    setCollapsedState(value)
+    writeSidebarCollapsedPreference(value)
+  }, [])
+
+  const toggle = useCallback(() => {
+    setCollapsedState((prev) => {
+      const next = !prev
+      writeSidebarCollapsedPreference(next)
+      return next
+    })
+  }, [])
 
   return (
     <SidebarContext.Provider value={{ collapsed, setCollapsed, toggle }}>

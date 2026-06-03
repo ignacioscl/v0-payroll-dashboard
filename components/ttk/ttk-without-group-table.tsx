@@ -8,6 +8,7 @@ import { formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
+import { PunchManualIndicator } from '@/components/ttk/punch-manual-indicator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -472,6 +473,7 @@ export function TtkWithoutGroupTable() {
                             {punchErrorLabel(row) ? (
                               <PunchErrorIndicator errorText={punchErrorLabel(row)!} />
                             ) : null}
+                            {Number(row.manualCreate) === 1 ? <PunchManualIndicator /> : null}
                             {row.fixedAt ? (
                               <PunchFixedIndicator
                                 fixedAt={row.fixedAt}
