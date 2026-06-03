@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { createPhpAdoptCode } from '@/lib/srs-api'
+import { appPublicUrl } from '@/lib/app-public-url'
 
 export async function GET(request: Request) {
   const session = await getSrsSession()
   const phpBase = (process.env.SRS_PUBLIC_URL ?? 'http://srs.com').replace(/\/$/, '')
 
   if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(appPublicUrl('/login', request))
   }
 
   try {

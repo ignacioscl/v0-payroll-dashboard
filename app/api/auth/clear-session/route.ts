@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildClearSessionCookies } from '@/lib/auth/session'
+import { appPublicUrl } from '@/lib/app-public-url'
 
 function safeRedirectPath(to: string | null): string {
   if (!to || !to.startsWith('/') || to.startsWith('//')) {
@@ -10,7 +11,7 @@ function safeRedirectPath(to: string | null): string {
 
 function responseWithClearedCookies(request: NextRequest, to: string | null) {
   const path = safeRedirectPath(to)
-  const response = NextResponse.redirect(new URL(path, request.url))
+  const response = NextResponse.redirect(appPublicUrl(path, request))
   for (const cookie of buildClearSessionCookies()) {
     response.cookies.set(cookie)
   }
