@@ -55,8 +55,12 @@ import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
+import { useMinWidth } from '@/hooks/use-mobile'
 
 import type { DateRange } from 'react-day-picker'
+
+/** Pin Employee / Actions only at this width and above. */
+const TABLE_PIN_MIN_WIDTH = 1200
 
 export type IssuesDataTableProps = {
   /** Overrides header date range (e.g. dashboard yesterday-only). */
@@ -152,6 +156,7 @@ export function IssuesDataTable({
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const showActions = !meLoading
+  const isWideScreen = useMinWidth(TABLE_PIN_MIN_WIDTH)
 
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -530,10 +535,10 @@ export function IssuesDataTable({
 
   const columnPinning = React.useMemo<ColumnPinningState>(
     () => ({
-      left: ['employee'],
-      right: showActions ? ['actions'] : [],
+      left: isWideScreen ? ['employee'] : [],
+      right: isWideScreen && showActions ? ['actions'] : [],
     }),
-    [showActions],
+    [isWideScreen, showActions],
   )
 
   React.useEffect(() => {

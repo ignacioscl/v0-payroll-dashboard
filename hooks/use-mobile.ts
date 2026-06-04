@@ -17,3 +17,18 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+/** True when viewport width is at least `minWidth` (client-only; false until mount). */
+export function useMinWidth(minWidth: number) {
+  const [matches, setMatches] = React.useState(false)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(min-width: ${minWidth}px)`)
+    const onChange = () => setMatches(mql.matches)
+    onChange()
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [minWidth])
+
+  return matches
+}
