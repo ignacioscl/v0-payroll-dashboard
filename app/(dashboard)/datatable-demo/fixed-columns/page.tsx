@@ -53,6 +53,21 @@ export default function DataTableFixedColumnsPage() {
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'id', desc: false }])
 
+  const [computedScrollHeight, setComputedScrollHeight] = React.useState<string | undefined>(undefined)
+  React.useLayoutEffect(() => {
+    const NAV_H = 64
+    const TOOLBAR_H = 40
+    const PAGINATION_H = 52
+    const BOTTOM_PAD = 24
+    const compute = () => {
+      const h = window.innerHeight - NAV_H - TOOLBAR_H - PAGINATION_H - BOTTOM_PAD
+      setComputedScrollHeight(h > 200 ? `${h}px` : undefined)
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [])
+
   const columns = React.useMemo<ColumnDef<MockEmployee>[]>(
     () => [
       {
@@ -227,6 +242,8 @@ export default function DataTableFixedColumnsPage() {
             setPageIndex(0)
           }}
           enableGlobalFilter={false}
+          enableTableFocus
+          tableScrollHeight={computedScrollHeight}
         />
       </div>
 
