@@ -13,6 +13,7 @@ export const SrsPhpPath = {
   TTK_LIST: 'php/api/payroll/ttk-list.php',
   TTK_ISSUE_COUNTS: 'php/api/payroll/ttk-issue-counts.php',
   TTK_DASHBOARD_SUMMARY: 'php/api/payroll/ttk-dashboard-summary.php',
+  TTK_TODAY_STATUS: 'php/api/payroll/ttk-today-status.php',
   TTK_EDIT: 'php/api/payroll/ttk-edit.php',
   TTK_ADD: 'php/api/payroll/ttk-add.php',
   TTK_DELETE: 'php/api/payroll/ttk-delete.php',

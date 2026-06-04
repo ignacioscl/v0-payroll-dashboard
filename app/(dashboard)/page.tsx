@@ -33,6 +33,7 @@ import {
   YAxis,
 } from 'recharts'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
+import { TodayStatusSection } from '@/components/dashboard/today-status-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardYesterdayIssuesTable } from '@/components/dashboard/dashboard-yesterday-issues-table'
 import { useFilters } from '@/lib/filter-context'
@@ -223,23 +224,49 @@ export default function DashboardPage() {
 
   const scopeReady = filtersHydrated && selectedDealers.length > 0
 
+  const reportPeriodLabel = useMemo(() => {
+    if (!dateRange?.from) return null
+    const toDate = dateRange.to ?? dateRange.from
+    const currentYear = new Date().getFullYear()
+    const omitYear =
+      dateRange.from.getFullYear() === currentYear &&
+      toDate.getFullYear() === currentYear
+    const dateFmt = omitYear ? 'MMM d' : 'MMM d, yyyy'
+    const from = format(dateRange.from, dateFmt)
+    const to = format(toDate, dateFmt)
+    return from === to ? from : `${from} — ${to}`
+  }, [dateRange])
+
   return (
     <motion.div className="space-y-8" variants={container} initial="hidden" animate="show">
       <motion.div variants={item}>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
         <p className="mt-1 text-muted-foreground">
-          Executive summary of punch validation for selected dealers and date range
+          Today&apos;s live headcount and period reports for selected dealers
         </p>
       </motion.div>
 
+      <motion.div variants={item}>
+        <TodayStatusSection />
+      </motion.div>
+
+      <motion.div variants={item} className="space-y-6 border-t border-border pt-8">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
+            Report from {reportPeriodLabel ?? '…'}
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Uses dealers and date range from the header filters
+          </p>
+        </div>
+
       {!scopeReady ? (
-        <motion.p variants={item} className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Select dealers in the header to load dashboard metrics.
-        </motion.p>
+        </p>
       ) : null}
 
-      <motion.div
-        variants={item}
+      <div
         className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
           kpiCards.length >= 8 ? '2xl:grid-cols-4' : ''
         }`}
@@ -256,9 +283,9 @@ export default function DashboardPage() {
             onClick={card.issueType ? () => goToIssues(card.issueType!) : undefined}
           />
         ))}
-      </motion.div>
+      </div>
 
-      <motion.div variants={item} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden border-blue-100 bg-gradient-to-br from-white to-blue-50/50">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -405,9 +432,9 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
-      <motion.div variants={item} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="overflow-hidden border-red-100 bg-gradient-to-br from-white to-red-50/50">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -480,6 +507,7 @@ export default function DashboardPage() {
             <DashboardYesterdayIssuesTable />
           </CardContent>
         </Card>
+      </div>
       </motion.div>
     </motion.div>
   )
