@@ -25,6 +25,8 @@ export function buildTtkListFilterExtra(input: {
   selectedDealers: string[]
   dateRange: DateRange | undefined
   selectedType: string
+  punchMinHours?: number | null
+  punchMaxHours?: number | null
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
 
@@ -45,6 +47,12 @@ export function buildTtkListFilterExtra(input: {
 
   if (input.selectedDealers.length > 0) {
     params.id_dealer = input.selectedDealers.join(',')
+  }
+  if (input.punchMinHours != null && input.punchMinHours > 0) {
+    params.punch_min_hours = input.punchMinHours
+  }
+  if (input.punchMaxHours != null && input.punchMaxHours > 0) {
+    params.punch_max_hours = input.punchMaxHours
   }
 
   return params

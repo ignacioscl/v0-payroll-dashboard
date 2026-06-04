@@ -49,6 +49,7 @@ import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
 import { PunchManualIndicator } from '@/components/ttk/punch-manual-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
+import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
@@ -159,6 +160,12 @@ export function IssuesDataTable({
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'date', desc: true },
   ])
+  const [punchMinHoursRaw, setPunchMinHoursRaw] = React.useState('')
+  const [punchMaxHoursRaw, setPunchMaxHoursRaw] = React.useState('')
+  const debouncedMinHours = useDebouncedValue(punchMinHoursRaw, 600)
+  const debouncedMaxHours = useDebouncedValue(punchMaxHoursRaw, 600)
+  const punchMinHours = debouncedMinHours !== '' ? Number(debouncedMinHours) : null
+  const punchMaxHours = debouncedMaxHours !== '' ? Number(debouncedMaxHours) : null
   const [thumbnailOverrides, setThumbnailOverrides] = React.useState<
     Record<string, string>
   >({})
@@ -210,8 +217,10 @@ export function IssuesDataTable({
         selectedDealers: debouncedDealers,
         dateRange: effectiveDateRange,
         selectedType: effectiveSelectedType,
+        punchMinHours,
+        punchMaxHours,
       }),
-    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType],
+    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType, punchMinHours, punchMaxHours],
   )
 
   const queryEnabled =
@@ -581,6 +590,8 @@ export function IssuesDataTable({
     pageSize,
     sorting,
     ignoreSearch,
+    punchMinHours,
+    punchMaxHours,
   ])
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
@@ -689,6 +700,14 @@ export function IssuesDataTable({
           isLoading={isFetching}
           emptyState={emptyState}
           enableGlobalFilter={false}
+          toolbarLeading={
+            <PunchHoursFilter
+              minHours={punchMinHoursRaw}
+              maxHours={punchMaxHoursRaw}
+              onMinChange={setPunchMinHoursRaw}
+              onMaxChange={setPunchMaxHoursRaw}
+            />
+          }
           enableViewOptions
           enableExport
           exportFileName={exportFileName}
