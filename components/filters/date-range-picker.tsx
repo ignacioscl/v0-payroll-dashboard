@@ -46,11 +46,11 @@ export function DateRangePicker({
     setMounted(true)
   }, [])
 
-  // Reset draft to current applied value whenever the popover opens
-  useEffect(() => {
-    if (open) setDraft(value)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  // Sync draft synchronously in onOpenChange so defaultMonth is correct on mount
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) setDraft(value)
+    setOpen(nextOpen)
+  }
 
   const activePresetKey = mounted ? matchPreset(value) : null
   const showPresets = presets.length > 0
@@ -76,7 +76,7 @@ export function DateRangePicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -128,6 +128,7 @@ export function DateRangePicker({
               mode="range"
               selected={draft}
               onSelect={setDraft}
+              defaultMonth={draft?.from}
               numberOfMonths={numberOfMonths}
             />
             {/* Footer with Apply / Clear */}
