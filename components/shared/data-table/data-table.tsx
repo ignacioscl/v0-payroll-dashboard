@@ -371,6 +371,14 @@ export interface DataTableProps<TData, TValue = unknown> {
   headerColor?: string
   stickyHeader?: boolean
   zebraRows?: boolean
+  /**
+   * CSS value applied as `max-height` on the scroll container.
+   * When set, the table scrolls within a bounded region so the sticky
+   * header actually works (`position:sticky top:0` requires a scroll
+   * container with constrained height).
+   * Example: `"calc(100dvh - 24rem)"`
+   */
+  tableScrollHeight?: string
 }
 
 export function DataTable<TData, TValue = unknown>({
@@ -411,6 +419,7 @@ export function DataTable<TData, TValue = unknown>({
   headerColor = '#1565C0',
   stickyHeader = true,
   zebraRows = true,
+  tableScrollHeight,
 }: DataTableProps<TData, TValue>) {
   /* ---------- Persisted visibility ----------
    * Same SSR/hydration rule as column sizing below: start empty so the server
@@ -704,7 +713,12 @@ export function DataTable<TData, TValue = unknown>({
         <div
           ref={mainScrollRef}
           onScroll={onMainScroll}
-          className="relative w-full overflow-x-auto"
+          className="relative w-full"
+          style={
+            tableScrollHeight
+              ? { maxHeight: tableScrollHeight, overflow: 'auto' }
+              : { overflowX: 'auto' }
+          }
         >
         <table
           data-slot="table"

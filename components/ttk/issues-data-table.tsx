@@ -74,6 +74,13 @@ export type IssuesDataTableProps = {
   defaultPageSize?: number
   exportFileName?: string
   queryKeySuffix?: string
+  /**
+   * Max-height of the scroll container. Enables sticky header.
+   * Defaults to `calc(100dvh - 24rem)` which fits the issues page layout
+   * (nav 4rem + padding + title + KPI cards + toolbar + pagination ≈ 24rem).
+   * Pass `false` to disable (page scrolls, no sticky header).
+   */
+  tableScrollHeight?: string | false
 }
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
@@ -106,6 +113,7 @@ export function IssuesDataTable({
   defaultPageSize = 25,
   exportFileName = 'punch-issues',
   queryKeySuffix = 'issues',
+  tableScrollHeight = 'calc(100dvh - 24rem)',
 }: IssuesDataTableProps = {}) {
   const {
     search,
@@ -675,6 +683,7 @@ export function IssuesDataTable({
               setPageSize(next.pageSize)
             },
           }}
+          tableScrollHeight={tableScrollHeight || undefined}
         />
       </div>
 
