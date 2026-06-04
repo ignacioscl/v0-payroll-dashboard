@@ -50,9 +50,16 @@ import { PunchManualIndicator } from '@/components/ttk/punch-manual-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
+import { PaymentTypeCell } from '@/components/ttk/payment-type-cell'
+import { EditPaymentTypeDialog, type EditPaymentTypeTarget } from '@/components/ttk/edit-payment-type-dialog'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
+import {
+  canAddOrEditPunch,
+  canDeletePunch,
+  canEditPaymentType,
+  canViewPaymentType,
+} from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
@@ -193,11 +200,15 @@ export function IssuesDataTable({
     punchDateLabel: string
     validation: ReturnType<typeof buildPunchFacePhotoValidation>
   } | null>(null)
+  const [paymentTypeTarget, setPaymentTypeTarget] =
+    React.useState<EditPaymentTypeTarget | null>(null)
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
   const deleteMutation = useTtkDeletePunch()
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
+  const canEditPayment = canEditPaymentType(hasPermission, user?.isSystemAdmin)
+  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
   const showActions = !meLoading
   const isWideScreen = useMinWidth(TABLE_PIN_MIN_WIDTH)
 
@@ -442,6 +453,45 @@ export function IssuesDataTable({
       },
     ]
 
+    if (canViewPayment) {
+      defs.push({
+        id: 'paymentType',
+        accessorFn: (row) => row.objPaymentType?.name ?? '',
+        size: 110,
+        minSize: 90,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Payment Type" />
+        ),
+        cell: ({ row }) => {
+          const r = row.original
+          const editable =
+            canEditPayment && Number(r.estado ?? 1) === 1
+          return (
+            <PaymentTypeCell
+              name={r.objPaymentType?.name}
+              editable={editable}
+              onEdit={() =>
+                setPaymentTypeTarget({
+                  id: r.id,
+                  employeeName: r.usuario?.nombre ?? '',
+                  punchDateLabel: formatGmtDate(r.punchInGmt0) || '—',
+                  idEmployee: Number(r.usuario?.id ?? 0),
+                  idDealer: Number(r.dealer?.id ?? 0),
+                  paymentTypeId: r.objPaymentType?.id ?? r.typePayment ?? null,
+                  paymentTypeName: r.objPaymentType?.name ?? null,
+                  hourlyRate: r.hourlyRate ?? null,
+                })
+              }
+            />
+          )
+        },
+        meta: {
+          label: 'Payment Type',
+          exportValue: (r) => r.objPaymentType?.name ?? '',
+        } satisfies DataTableColumnMeta<TtkListRow>,
+      })
+    }
+
     if (showActions) {
       defs.push({
         id: 'actions',
@@ -567,6 +617,8 @@ export function IssuesDataTable({
     showActions,
     canEdit,
     canDelete,
+    canEditPayment,
+    canViewPayment,
     getEmployeeId,
     getThumbnailUuid,
     handleThumbnailSaved,
@@ -772,6 +824,16 @@ export function IssuesDataTable({
                 }
               : undefined
           }
+        />
+      )}
+
+      {canEditPayment && (
+        <EditPaymentTypeDialog
+          open={paymentTypeTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setPaymentTypeTarget(null)
+          }}
+          target={paymentTypeTarget}
         />
       )}
 

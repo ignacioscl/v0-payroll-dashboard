@@ -21,6 +21,8 @@ export type TtkPunchLogEntry = {
   note?: string | null
   fileLog?: string | null
   updateStatusTo?: number | null
+  /** Set by API when payment fields were redacted (no perm 130/105/136). */
+  paymentDetailsRestricted?: boolean
 }
 
 export type TtkPunchLogResponse = {

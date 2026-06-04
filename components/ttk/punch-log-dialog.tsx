@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button'
 import { useTtkPunchLog } from '@/hooks/use-ttk-punch-log'
 import type { TtkPunchLogEntry } from '@/lib/ttk/ttk-log-types'
 import { ttkLogEvidenceUrl } from '@/lib/ttk/ttk-log-evidence-url'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
 
 function formatLogDateTime(gmt0?: string | null): string {
   if (!gmt0) return ''
@@ -130,7 +132,79 @@ function LogTimeCell({
   )
 }
 
-function LogRow({ entry }: { entry: TtkPunchLogEntry }) {
+function hasPaymentTypeChange(entry: TtkPunchLogEntry): boolean {
+  const oldName = entry.paymentTypeOld?.name?.trim() ?? ''
+  const newName = entry.paymentType?.name?.trim() ?? ''
+  if (oldName === '' && newName === '') return false
+  return oldName !== newName
+}
+
+function hasHourlyRateChange(entry: TtkPunchLogEntry): boolean {
+  if (entry.hourlyRateOld == null && entry.hourlyRate == null) return false
+  return String(entry.hourlyRateOld ?? '') !== String(entry.hourlyRate ?? '')
+}
+
+function hasTimeFieldChanges(entry: TtkPunchLogEntry): boolean {
+  return (
+    !timesEqual(entry.punchInGmt0, entry.punchInOldGmt0) ||
+    !timesEqual(entry.breakStartGmt0, entry.breakStartOldGmt0) ||
+    !timesEqual(entry.breakEndGmt0, entry.breakEndOldGmt0) ||
+    !timesEqual(entry.punchOutGmt0, entry.punchOutOldGmt0)
+  )
+}
+
+function PaymentDetailsRestrictedMessage() {
+  return (
+    <p className="text-xs italic text-muted-foreground">
+      Payment details hidden — insufficient permissions
+    </p>
+  )
+}
+
+function PaymentChangeCell({ entry }: { entry: TtkPunchLogEntry }) {
+  const paymentChanged = hasPaymentTypeChange(entry)
+  const hourlyChanged = hasHourlyRateChange(entry)
+
+  if (!paymentChanged && !hourlyChanged && !entry.note) {
+    return null
+  }
+
+  return (
+    <div className="space-y-1 text-xs">
+      {paymentChanged ? (
+        <div>
+          <span className="font-medium">Payment type:</span>{' '}
+          <span className="text-muted-foreground">New:</span>{' '}
+          {entry.paymentType?.name ?? '—'}
+          {' · '}
+          <span className="text-muted-foreground">Old:</span>{' '}
+          {entry.paymentTypeOld?.name ?? '—'}
+        </div>
+      ) : null}
+      {hourlyChanged ? (
+        <div>
+          <span className="font-medium">Hourly rate:</span>{' '}
+          <span className="text-muted-foreground">New:</span> {entry.hourlyRate ?? '—'}
+          {' · '}
+          <span className="text-muted-foreground">Old:</span> {entry.hourlyRateOld ?? '—'}
+        </div>
+      ) : null}
+      {entry.note ? (
+        <div>
+          <span className="font-medium">Note:</span> {entry.note}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function LogRow({
+  entry,
+  canViewPayment,
+}: {
+  entry: TtkPunchLogEntry
+  canViewPayment: boolean
+}) {
   const status = statusMessage(entry.updateStatusTo ?? null)
   const evidence =
     entry.fileLog && entry.fileLog.trim() !== '' ? (
@@ -161,7 +235,30 @@ function LogRow({ entry }: { entry: TtkPunchLogEntry }) {
     )
   }
 
-  if (entry.note) {
+  const paymentRestricted = entry.paymentDetailsRestricted === true
+  const paymentChanged = hasPaymentTypeChange(entry)
+  const hourlyChanged = hasHourlyRateChange(entry)
+  const timeChanged = hasTimeFieldChanges(entry)
+  const showPaymentDetails = canViewPayment && (paymentChanged || hourlyChanged)
+
+  if ((paymentChanged || hourlyChanged || paymentRestricted) && !timeChanged) {
+    return (
+      <TableRow>
+        <TableCell className="whitespace-nowrap text-xs">{formatLogDate(entry.dateUpdate)}</TableCell>
+        <TableCell className="text-xs">{entry.usuario?.nombre ?? '—'}</TableCell>
+        <TableCell colSpan={4} className="align-top text-xs">
+          {showPaymentDetails ? (
+            <PaymentChangeCell entry={entry} />
+          ) : paymentRestricted ? (
+            <PaymentDetailsRestrictedMessage />
+          ) : null}
+        </TableCell>
+        <TableCell className="text-center">{evidence}</TableCell>
+      </TableRow>
+    )
+  }
+
+  if (entry.note && !timeChanged && !paymentChanged && !hourlyChanged && !paymentRestricted) {
     return (
       <TableRow>
         <TableCell className="whitespace-nowrap text-xs">{formatLogDate(entry.dateUpdate)}</TableCell>
@@ -178,38 +275,77 @@ function LogRow({ entry }: { entry: TtkPunchLogEntry }) {
     <TableRow>
       <TableCell className="whitespace-nowrap text-xs">{formatLogDate(entry.dateUpdate)}</TableCell>
       <TableCell className="text-xs">{entry.usuario?.nombre ?? '—'}</TableCell>
-      <TableCell className="align-top text-xs">
-        <LogTimeCell
-          label="Punch in"
-          newGmt0={entry.punchInGmt0}
-          oldGmt0={entry.punchInOldGmt0}
-          note={entry.punchInNote}
-        />
-      </TableCell>
-      <TableCell className="align-top text-xs">
-        <LogTimeCell
-          label="Break start"
-          newGmt0={entry.breakStartGmt0}
-          oldGmt0={entry.breakStartOldGmt0}
-          note={entry.breakStartNote}
-        />
-      </TableCell>
-      <TableCell className="align-top text-xs">
-        <LogTimeCell
-          label="Break end"
-          newGmt0={entry.breakEndGmt0}
-          oldGmt0={entry.breakEndOldGmt0}
-          note={entry.breakEndNote}
-        />
-      </TableCell>
-      <TableCell className="align-top text-xs">
-        <LogTimeCell
-          label="Punch out"
-          newGmt0={entry.punchOutGmt0}
-          oldGmt0={entry.punchOutOldGmt0}
-          note={entry.punchOutNote}
-        />
-      </TableCell>
+      {(paymentChanged || hourlyChanged || paymentRestricted) && timeChanged ? (
+        <>
+          <TableCell colSpan={4} className="align-top text-xs">
+            <div className="space-y-2">
+              {showPaymentDetails ? <PaymentChangeCell entry={entry} /> : null}
+              {paymentRestricted ? <PaymentDetailsRestrictedMessage /> : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <LogTimeCell
+                  label="Punch in"
+                  newGmt0={entry.punchInGmt0}
+                  oldGmt0={entry.punchInOldGmt0}
+                  note={entry.punchInNote}
+                />
+                <LogTimeCell
+                  label="Break start"
+                  newGmt0={entry.breakStartGmt0}
+                  oldGmt0={entry.breakStartOldGmt0}
+                  note={entry.breakStartNote}
+                />
+                <LogTimeCell
+                  label="Break end"
+                  newGmt0={entry.breakEndGmt0}
+                  oldGmt0={entry.breakEndOldGmt0}
+                  note={entry.breakEndNote}
+                />
+                <LogTimeCell
+                  label="Punch out"
+                  newGmt0={entry.punchOutGmt0}
+                  oldGmt0={entry.punchOutOldGmt0}
+                  note={entry.punchOutNote}
+                />
+              </div>
+            </div>
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell className="align-top text-xs">
+            <LogTimeCell
+              label="Punch in"
+              newGmt0={entry.punchInGmt0}
+              oldGmt0={entry.punchInOldGmt0}
+              note={entry.punchInNote}
+            />
+          </TableCell>
+          <TableCell className="align-top text-xs">
+            <LogTimeCell
+              label="Break start"
+              newGmt0={entry.breakStartGmt0}
+              oldGmt0={entry.breakStartOldGmt0}
+              note={entry.breakStartNote}
+            />
+          </TableCell>
+          <TableCell className="align-top text-xs">
+            <LogTimeCell
+              label="Break end"
+              newGmt0={entry.breakEndGmt0}
+              oldGmt0={entry.breakEndOldGmt0}
+              note={entry.breakEndNote}
+            />
+          </TableCell>
+          <TableCell className="align-top text-xs">
+            <LogTimeCell
+              label="Punch out"
+              newGmt0={entry.punchOutGmt0}
+              oldGmt0={entry.punchOutOldGmt0}
+              note={entry.punchOutNote}
+            />
+          </TableCell>
+        </>
+      )}
       <TableCell className="text-center">{evidence}</TableCell>
     </TableRow>
   )
@@ -230,6 +366,9 @@ export function PunchLogDialog({
   employeeName,
   punchDateLabel,
 }: PunchLogDialogProps) {
+  const { user, hasPermission } = useSrsMe()
+  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+
   const { data: entries = [], isLoading, isError, error } = useTtkPunchLog(
     punchId,
     open,
@@ -288,7 +427,11 @@ export function PunchLogDialog({
               </TableHeader>
               <TableBody>
                 {entries.map((entry, i) => (
-                  <LogRow key={String(entry.id ?? i)} entry={entry} />
+                  <LogRow
+                    key={String(entry.id ?? i)}
+                    entry={entry}
+                    canViewPayment={canViewPayment}
+                  />
                 ))}
               </TableBody>
             </Table>

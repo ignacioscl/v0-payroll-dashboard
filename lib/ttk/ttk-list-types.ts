@@ -33,6 +33,9 @@ export type TtkListRow = {
   dealer?: { id?: number; razonSocial?: string }
   dealerProvider?: { id?: number }
   badPunch?: { res?: string } | null
+  objPaymentType?: { id?: number; name?: string } | null
+  hourlyRate?: number | null
+  typePayment?: number | null
 }
 
 export type TtkListResponse = {
