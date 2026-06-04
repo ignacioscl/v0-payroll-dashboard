@@ -201,6 +201,7 @@ export function IssuesDataTable({
     const defs: ColumnDef<TtkListRow>[] = [
       {
         id: 'employee',
+        accessorFn: (row) => row.usuario?.nombre ?? '',
         size: 280,
         minSize: 200,
         header: ({ column }) => (
