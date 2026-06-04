@@ -30,6 +30,8 @@ interface KPICardProps {
   active?: boolean
   /** Reemplaza el value por un spinner. */
   loading?: boolean
+  /** Tarjetas más compactas (p. ej. Punch Issues): iconos chicos y título sin truncar. */
+  compact?: boolean
   className?: string
 }
 
@@ -44,6 +46,7 @@ export function KPICard({
   onClick,
   active = false,
   loading = false,
+  compact = false,
   className,
 }: KPICardProps) {
   const variantConfig = {
@@ -137,8 +140,9 @@ export function KPICard({
       tabIndex={isInteractive ? 0 : undefined}
       aria-pressed={isInteractive ? active : undefined}
       className={cn(
-        'group relative overflow-hidden rounded-xl border p-5 transition-all duration-300',
-        'hover:shadow-xl hover:scale-[1.02] hover:border-border/80',
+        'group relative overflow-hidden rounded-xl border transition-all duration-300',
+        compact ? 'p-4 hover:shadow-lg hover:scale-[1.01]' : 'p-5 hover:shadow-xl hover:scale-[1.02]',
+        'hover:border-border/80',
         config.bg,
         config.border,
         config.glow,
@@ -148,21 +152,29 @@ export function KPICard({
       )}
     >
 
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="space-y-3 flex-1 min-w-0">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="space-y-2 flex-1 min-w-0">
+          <p
+            className={cn(
+              'font-medium text-muted-foreground uppercase tracking-wider leading-snug',
+              compact ? 'text-[11px] whitespace-normal' : 'text-xs truncate',
+            )}
+          >
             {title}
           </p>
 
           <div className="flex items-baseline gap-2">
             {loading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className={cn('animate-spin text-muted-foreground', compact ? 'h-6 w-6' : 'h-8 w-8')} />
             ) : (
               <motion.span
                 key={String(value)}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="text-4xl font-bold text-foreground tracking-tight tabular-nums"
+                className={cn(
+                  'font-bold text-foreground tracking-tight tabular-nums',
+                  compact ? 'text-3xl' : 'text-4xl',
+                )}
               >
                 {value}
               </motion.span>
@@ -201,8 +213,9 @@ export function KPICard({
         </div>
 
         <div className={cn(
-          'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300',
+          'flex shrink-0 items-center justify-center transition-all duration-300',
           'group-hover:scale-110 group-hover:-translate-y-0.5',
+          compact ? 'h-9 w-9 rounded-xl' : 'h-14 w-14 rounded-2xl',
           config.iconBg,
           config.iconShadow
         )}>

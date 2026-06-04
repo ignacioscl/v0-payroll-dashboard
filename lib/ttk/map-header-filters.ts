@@ -6,6 +6,7 @@ export function mapIssueTypeToTtkFlags(selectedType: string) {
   return {
     only_error: selectedType === 'only_error' ? 1 : 0,
     only_error_clockout: selectedType === 'only_error_clockout' ? 1 : 0,
+    only_error_break: selectedType === 'only_error_break' ? 1 : 0,
     manual_punch: selectedType === 'manual_punch' ? 1 : 0,
     only_deletes: selectedType === 'only_deletes' ? 1 : 0,
     without_salary: selectedType === 'without_salary' ? 1 : 0,
@@ -33,6 +34,7 @@ export function buildTtkListFilterExtra(input: {
     fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
     only_error: flags.only_error,
     only_error_clockout: flags.only_error_clockout,
+    only_error_break: flags.only_error_break,
     manual_punch: flags.manual_punch,
     only_deletes: flags.only_deletes,
     without_salary: flags.without_salary,

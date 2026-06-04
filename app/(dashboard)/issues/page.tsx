@@ -19,12 +19,14 @@ import {
   DollarSign,
   PlusCircle,
   CheckCheck,
+  Coffee,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type IssueType =
   | 'only_error'
   | 'only_error_clockout'
+  | 'only_error_break'
   | 'manual_punch'
   | 'only_deletes'
   | 'without_salary'
@@ -41,37 +43,43 @@ const ISSUE_CARDS: IssueCardConfig[] = [
   {
     type: 'only_error',
     title: 'Only with errors',
-    icon: <AlertTriangle className="h-7 w-7" />,
+    icon: <AlertTriangle className="h-5 w-5" />,
     variant: 'warning',
   },
   {
     type: 'only_error_clockout',
     title: 'Without clock out',
-    icon: <LogOut className="h-7 w-7" />,
+    icon: <LogOut className="h-5 w-5" />,
     variant: 'danger',
+  },
+  {
+    type: 'only_error_break',
+    title: 'Without break',
+    icon: <Coffee className="h-5 w-5" />,
+    variant: 'warning',
   },
   {
     type: 'manual_punch',
     title: 'Manual punch',
-    icon: <Hand className="h-7 w-7" />,
+    icon: <Hand className="h-5 w-5" />,
     variant: 'info',
   },
   {
     type: 'only_deletes',
     title: 'Deleted punches',
-    icon: <Trash2 className="h-7 w-7" />,
+    icon: <Trash2 className="h-5 w-5" />,
     variant: 'violet',
   },
   {
     type: 'without_salary',
     title: 'Without salary',
-    icon: <DollarSign className="h-7 w-7" />,
+    icon: <DollarSign className="h-5 w-5" />,
     variant: 'success',
   },
   {
     type: 'only_fixed',
     title: 'Corrected punches',
-    icon: <CheckCheck className="h-7 w-7" />,
+    icon: <CheckCheck className="h-5 w-5" />,
     variant: 'info',
   },
 ]
@@ -189,11 +197,7 @@ export default function IssuesPage() {
         </p>
       ) : null}
 
-      <div
-        className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${
-          visibleIssueCards.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'
-        }`}
-      >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7">
         {visibleIssueCards.map((card) => (
           <KPICard
             key={card.type}
@@ -202,6 +206,7 @@ export default function IssuesPage() {
             icon={card.icon}
             variant={card.variant}
             loading={loading}
+            compact
             onClick={() => selectFilter(card.type)}
             active={selectedType === card.type}
             subtitle={renderSubtitle(card.type)}
