@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
+import { enUS } from 'date-fns/locale'
 import { Calendar } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
+import { enUS as enUSDayPicker } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import {
@@ -14,8 +16,8 @@ import {
 import { cn } from '@/lib/utils'
 import {
   DATE_RANGE_PRESETS,
-  getPresetRange,
   matchPreset,
+  resolvePresetRange,
   type DateRangePreset,
 } from '@/lib/filters/date-range-presets'
 
@@ -57,7 +59,7 @@ export function DateRangePicker({
 
   // Presets apply immediately and close
   const handlePreset = (preset: DateRangePreset) => {
-    const range = getPresetRange(preset.days)
+    const range = resolvePresetRange(preset)
     onChange?.(range)
     setOpen(false)
   }
@@ -89,10 +91,13 @@ export function DateRangePicker({
           {mounted && value?.from ? (
             value.to ? (
               <span className="text-foreground">
-                {format(value.from, 'MMM dd')} - {format(value.to, 'MMM dd')}
+                {format(value.from, 'MMM dd', { locale: enUS })} -{' '}
+                {format(value.to, 'MMM dd', { locale: enUS })}
               </span>
             ) : (
-              <span className="text-foreground">{format(value.from, 'MMM dd, yyyy')}</span>
+              <span className="text-foreground">
+                {format(value.from, 'MMM dd, yyyy', { locale: enUS })}
+              </span>
             )
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -130,6 +135,7 @@ export function DateRangePicker({
               onSelect={setDraft}
               defaultMonth={draft?.from}
               numberOfMonths={numberOfMonths}
+              locale={enUSDayPicker}
             />
             {/* Footer with Apply / Clear */}
             <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">

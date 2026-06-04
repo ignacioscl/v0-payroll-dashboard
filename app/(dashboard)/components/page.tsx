@@ -49,7 +49,7 @@ export default function ComponentsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ComponentCard
           title="Date range picker"
-          description="Two-month calendar with quick presets (última semana, 15 días, 1 mes) — mismo control que el filtro de fechas del header."
+          description="Two-month calendar with quick presets (Last 7/15/30 days, This month, Last Month) — same control as the header date filter."
         >
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Preview label="Selection">
