@@ -711,6 +711,7 @@ export function IssuesDataTable({
             },
           }}
           tableScrollHeight={effectiveScrollHeight}
+          enableTableFocus
         />
       </div>
 

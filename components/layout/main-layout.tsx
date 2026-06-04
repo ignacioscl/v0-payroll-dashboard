@@ -3,6 +3,7 @@
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { ProdRouteGuard } from './prod-route-guard'
+import { ScrollToTopButton } from './scroll-to-top-button'
 import { FilterProvider } from '@/lib/filter-context'
 import { SidebarProvider, useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -40,6 +41,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <FilterProvider>
         <div className="min-h-screen bg-background">
           <MainContent>{children}</MainContent>
+          <ScrollToTopButton />
         </div>
       </FilterProvider>
     </SidebarProvider>

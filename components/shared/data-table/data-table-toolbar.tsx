@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import type { Table } from '@tanstack/react-table'
-import { Filter, Loader2, Search, X } from 'lucide-react'
+import { Filter, Loader2, Maximize2, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +45,10 @@ interface DataTableToolbarProps<TData> {
   trailing?: React.ReactNode
   /** Slot rendered at the very start of the toolbar (before the records counter). */
   leading?: React.ReactNode
+
+  /** Scroll the table card below the fixed nav so it fills the viewport. */
+  enableTableFocus?: boolean
+  onFocusTable?: () => void
 }
 
 export function DataTableToolbar<TData>({
@@ -60,6 +64,8 @@ export function DataTableToolbar<TData>({
   pageSizeOptions = [10, 25, 50, 100],
   trailing,
   leading,
+  enableTableFocus = false,
+  onFocusTable,
 }: DataTableToolbarProps<TData>) {
   const globalFilter = (table.getState().globalFilter as string) ?? ''
   const columnFilters = table.getState().columnFilters
@@ -174,6 +180,24 @@ export function DataTableToolbar<TData>({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
+        {enableTableFocus && onFocusTable ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px] cursor-pointer"
+              onClick={onFocusTable}
+              aria-label="Full screen table"
+              title="Full screen table"
+            >
+              <Maximize2 className="size-3.5" />
+              <span className="hidden sm:inline">Full screen</span>
+            </Button>
+            <Separator orientation="vertical" className="mx-0.5 h-4" />
+          </>
+        ) : null}
+
         {trailing}
 
         <div className="flex items-center gap-1">

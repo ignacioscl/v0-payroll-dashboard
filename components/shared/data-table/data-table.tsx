@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
 import type { ColumnFilterConfig } from './data-table-helpers'
+import { scrollElementBelowNav } from '@/lib/scroll/scroll-table-to-viewport'
 
 /* -------------------------------------------------------------------------- */
 /* Paginated server-side contract                                              */
@@ -364,6 +365,9 @@ export interface DataTableProps<TData, TValue = unknown> {
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
 
+  /** Show a toolbar button that scrolls the table below the fixed nav. */
+  enableTableFocus?: boolean
+
   // ---------- Style ----------
   className?: string
   density?: 'comfortable' | 'compact'
@@ -413,6 +417,7 @@ export function DataTable<TData, TValue = unknown>({
   fetchAllRowsForExport,
   toolbarLeading,
   toolbarTrailing,
+  enableTableFocus = false,
   className,
   density = 'compact',
   headerVariant = 'colored',
@@ -610,7 +615,12 @@ export function DataTable<TData, TValue = unknown>({
    * containers are kept in sync via `scrollLeft` assignments. */
   const mainScrollRef = React.useRef<HTMLDivElement>(null)
   const topScrollRef = React.useRef<HTMLDivElement>(null)
+  const cardRef = React.useRef<HTMLDivElement>(null)
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = React.useState(false)
+
+  const handleFocusTable = React.useCallback(() => {
+    if (cardRef.current) scrollElementBelowNav(cardRef.current)
+  }, [])
 
   const onTopScroll = React.useCallback(() => {
     const top = topScrollRef.current
@@ -654,6 +664,7 @@ export function DataTable<TData, TValue = unknown>({
   }
 
   return (
+    <div ref={cardRef} className="min-w-0">
     <Card
       className={cn(
         // `min-w-0` lets the Card shrink inside a flex/grid container instead
@@ -681,6 +692,8 @@ export function DataTable<TData, TValue = unknown>({
         pageSizeOptions={pageSizeOptions}
         leading={toolbarLeading}
         trailing={toolbarTrailing}
+        enableTableFocus={enableTableFocus}
+        onFocusTable={handleFocusTable}
       />
 
       {/* Top horizontal scrollbar mirror — `position: sticky` makes it follow
@@ -965,5 +978,6 @@ export function DataTable<TData, TValue = unknown>({
 
       <DataTablePagination table={table} totalRows={pagination?.totalRows} />
     </Card>
+    </div>
   )
 }

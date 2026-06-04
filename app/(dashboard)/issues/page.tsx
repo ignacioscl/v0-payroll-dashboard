@@ -166,7 +166,7 @@ export default function IssuesPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Punch Issues</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Punch Report</h1>
           <p className="mt-1 text-muted-foreground">
             Without group — live counts from TTK punch validation
           </p>
