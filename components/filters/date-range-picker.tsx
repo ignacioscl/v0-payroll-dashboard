@@ -38,20 +38,45 @@ export function DateRangePicker({
   presets = DATE_RANGE_PRESETS,
 }: DateRangePickerProps) {
   const [mounted, setMounted] = useState(false)
+  const [open, setOpen] = useState(false)
+  // Draft: in-progress selection that only applies on "Apply"
+  const [draft, setDraft] = useState<DateRange | undefined>(value)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Reset draft to current applied value whenever the popover opens
+  useEffect(() => {
+    if (open) setDraft(value)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
   const activePresetKey = mounted ? matchPreset(value) : null
   const showPresets = presets.length > 0
 
+  // Presets apply immediately and close
   const handlePreset = (preset: DateRangePreset) => {
-    onChange?.(getPresetRange(preset.days))
+    const range = getPresetRange(preset.days)
+    onChange?.(range)
+    setOpen(false)
+  }
+
+  // Apply button commits the draft and closes
+  const handleApply = () => {
+    onChange?.(draft)
+    setOpen(false)
+  }
+
+  // Clear resets everything
+  const handleClear = () => {
+    onChange?.(undefined)
+    setDraft(undefined)
+    setOpen(false)
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -97,12 +122,33 @@ export function DateRangePicker({
               })}
             </div>
           )}
-          <CalendarComponent
-            mode="range"
-            selected={value}
-            onSelect={onChange}
-            numberOfMonths={numberOfMonths}
-          />
+
+          <div className="flex flex-col">
+            <CalendarComponent
+              mode="range"
+              selected={draft}
+              onSelect={setDraft}
+              numberOfMonths={numberOfMonths}
+            />
+            {/* Footer with Apply / Clear */}
+            <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={handleClear}
+              >
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={!draft?.from}
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

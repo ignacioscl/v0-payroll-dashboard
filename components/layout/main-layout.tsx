@@ -21,11 +21,13 @@ function MainContent({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           'pt-16 transition-all duration-200 ease-in-out',
-          collapsed ? 'ml-[72px]' : 'ml-[260px]'
+          // Mobile: no left margin (sidebar is a drawer overlay)
+          // Desktop: offset by sidebar width
+          collapsed ? 'md:ml-[72px]' : 'md:ml-[260px]'
         )}
       >
         <ProdRouteGuard>
-          <div className="p-6">{children}</div>
+          <div className="p-4 md:p-6">{children}</div>
         </ProdRouteGuard>
       </main>
     </>
