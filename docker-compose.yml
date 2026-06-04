@@ -39,3 +39,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+networks:
+  default:
+    ipam:
+      config:
+        # Subnet fija para que FACE_RECOGNITION_URL y la regla CSF de iptables sean estables.
+        # Gateway del host: 172.20.0.1 → usar en FACE_RECOGNITION_URL=http://172.20.0.1:3002
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

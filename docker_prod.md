@@ -196,3 +196,44 @@ docker compose down
 | 404 contenedor | `main` → `172.17.0.1` o DNS a otro server | `extra_hosts: main.srssuite.com:IP` |
 | 405 JSON en browser GET | Normal | `login.php` solo POST |
 | `git pull` y no anda | Falta `.env` o PHP FTP | Crear env + subir `php/api/sso/*` |
+| 500 en `/api/face/*` | CSF bloquea `br-*` → Face (ConnectTimeoutError) | Ver sección **Face + CSF** abajo |
+
+---
+
+## Face + CSF (firewall cPanel)
+
+CSF bloquea por defecto tráfico desde la red bridge Docker (`172.20.0.0/16`) al host.
+El contenedor hace timeout al llamar a `host.docker.internal:3002` → Next devuelve 500.
+
+### Diagnóstico
+
+```bash
+# Desde el contenedor — si cuelga, es CSF
+docker exec srs-payroll-dashboard wget -T 5 -qO- http://172.20.0.1:3002/ 2>&1
+# Desde el host — si responde, es solo firewall
+curl -s http://172.20.0.1:3002/
+```
+
+### Solución permanente (una vez por server)
+
+Agregar regla específica en `/etc/csf/csfpre.sh` **en el server** (no está en el repo):
+
+```bash
+cat >> /etc/csf/csfpre.sh << 'EOF'
+
+# v0 Docker Compose -> Face API :3002
+iptables -I INPUT 1 -s 172.20.0.0/16 -p tcp --dport 3002 -j ACCEPT
+EOF
+
+chmod +x /etc/csf/csfpre.sh
+csf -r
+```
+
+Verificar:
+
+```bash
+docker exec srs-payroll-dashboard wget -T 5 -qO- http://172.20.0.1:3002/ 2>&1 | head
+# Debe responder: {"data":null,"status":"error","error":{"message":"Error token"...}}
+```
+
+La subnet `172.20.0.0/16` está fijada en `docker-compose.yml` (`networks.default.ipam`), por lo que no cambia al recrear el compose.
