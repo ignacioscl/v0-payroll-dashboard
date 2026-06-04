@@ -113,8 +113,35 @@ export function IssuesDataTable({
   defaultPageSize = 25,
   exportFileName = 'punch-issues',
   queryKeySuffix = 'issues',
-  tableScrollHeight = 'calc(100dvh - 24rem)',
+  tableScrollHeight,
 }: IssuesDataTableProps = {}) {
+  // Dynamic scroll height: fills the available viewport below the fixed nav,
+  // DataTable toolbar, pagination row, and page bottom padding.
+  // Updates on window resize so it works on every screen size.
+  const [computedScrollHeight, setComputedScrollHeight] = React.useState<string | undefined>(undefined)
+  React.useLayoutEffect(() => {
+    const NAV_H = 64      // dashboard nav h-16
+    const TOOLBAR_H = 40  // DataTable toolbar row
+    const PAGINATION_H = 52 // DataTable pagination row
+    const BOTTOM_PAD = 24  // page p-6 bottom padding
+
+    const compute = () => {
+      const h = window.innerHeight - NAV_H - TOOLBAR_H - PAGINATION_H - BOTTOM_PAD
+      setComputedScrollHeight(h > 200 ? `${h}px` : undefined)
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [])
+
+  // Prop overrides: string = explicit height, false = disable, undefined = dynamic
+  const effectiveScrollHeight: string | undefined =
+    tableScrollHeight === false
+      ? undefined
+      : typeof tableScrollHeight === 'string'
+      ? tableScrollHeight
+      : computedScrollHeight
+
   const {
     search,
     selectedDealers,
@@ -683,7 +710,7 @@ export function IssuesDataTable({
               setPageSize(next.pageSize)
             },
           }}
-          tableScrollHeight={tableScrollHeight || undefined}
+          tableScrollHeight={effectiveScrollHeight}
         />
       </div>
 
