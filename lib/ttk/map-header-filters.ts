@@ -110,7 +110,20 @@ export function formatFixedAt(fixedAt?: string | null): string {
 
 export function formatGmtTime(gmt0?: string | null): string {
   if (!gmt0) return ''
-  const d = new Date(gmt0)
+  const normalized = gmt0.includes('T') ? gmt0 : gmt0.replace(' ', 'T')
+  const d = new Date(normalized)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+/** Duration from API (e.g. `00:46:48.00`) → `00:46:48` */
+export function formatDurationDisplay(value?: string | null): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return trimmed.replace(/\.\d+$/, '')
 }

@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkList } from '@/hooks/use-ttk-list'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
-import { formatGmtDate, formatGmtTime } from '@/lib/ttk/map-header-filters'
+import {
+  formatDurationDisplay,
+  formatGmtDate,
+  formatGmtTime,
+} from '@/lib/ttk/map-header-filters'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { PunchFixedIndicator } from '@/components/ttk/punch-fixed-indicator'
@@ -277,8 +281,8 @@ export function TtkWithoutGroupTable() {
       if (visibleColumns.has('breakStart')) cells.push(formatGmtTime(row.breakStartGmt0))
       if (visibleColumns.has('breakEnd')) cells.push(formatGmtTime(row.breakEndGmt0))
       if (visibleColumns.has('punchOut')) cells.push(formatGmtTime(row.punchOutGmt0))
-      if (visibleColumns.has('timeWork')) cells.push(row.timeWork ?? '')
-      if (visibleColumns.has('timeBreak')) cells.push(row.timeBreak ?? '')
+      if (visibleColumns.has('timeWork')) cells.push(formatDurationDisplay(row.timeWork))
+      if (visibleColumns.has('timeBreak')) cells.push(formatDurationDisplay(row.timeBreak))
       return cells
     })
     const csv = [headers, ...csvRows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
@@ -523,12 +527,12 @@ export function TtkWithoutGroupTable() {
                   )}
                   {visibleColumns.has('timeWork') && (
                     <TableCell className="px-3 py-1.5 font-mono text-xs">
-                      {row.timeWork === '00:00' ? '00:00' : row.timeWork || '—'}
+                      {formatDurationDisplay(row.timeWork) || '—'}
                     </TableCell>
                   )}
                   {visibleColumns.has('timeBreak') && (
                     <TableCell className="px-3 py-1.5 font-mono text-xs">
-                      {row.timeBreak || '—'}
+                      {formatDurationDisplay(row.timeBreak) || '—'}
                     </TableCell>
                   )}
                   {showActions && (

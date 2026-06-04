@@ -23,6 +23,7 @@ import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
 import {
   buildTtkListFilterExtra,
+  formatDurationDisplay,
   formatGmtDate,
   formatGmtTime,
 } from '@/lib/ttk/map-header-filters'
@@ -375,17 +376,11 @@ export function IssuesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Time Work" />
         ),
-        cell: ({ row }) => {
-          const v = row.original.timeWork
-          return v === '00:00' ? '00:00' : v || '—'
-        },
+        cell: ({ row }) => formatDurationDisplay(row.original.timeWork) || '—',
         meta: {
           label: 'Time Work',
           mono: true,
-          exportValue: (r) => {
-            const v = r.timeWork
-            return v === '00:00' ? '00:00' : v ?? ''
-          },
+          exportValue: (r) => formatDurationDisplay(r.timeWork),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -394,11 +389,11 @@ export function IssuesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Time Break" />
         ),
-        cell: ({ row }) => row.original.timeBreak || '—',
+        cell: ({ row }) => formatDurationDisplay(row.original.timeBreak) || '—',
         meta: {
           label: 'Time Break',
           mono: true,
-          exportValue: (r) => r.timeBreak ?? '',
+          exportValue: (r) => formatDurationDisplay(r.timeBreak),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
     ]
