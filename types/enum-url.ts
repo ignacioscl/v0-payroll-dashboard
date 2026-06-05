@@ -21,6 +21,7 @@ export const SrsPhpPath = {
   TTK_GET_BY_ID: 'php/api/payroll/ttk-get-by-id.php',
   TTK_LOG: 'php/api/payroll/ttk-log.php',
   TTK_PAYMENT_TYPES: 'php/api/payroll/ttk-payment-types.php',
+  PAYMENT_TYPES_CATALOG: 'php/api/payroll/payment-types-catalog.php',
   TTK_SAVE_PAYMENT: 'php/api/payroll/ttk-save-payment.php',
   DEALERS: 'php/api/payroll/dealers.php',
   ME: 'php/api/payroll/me.php',

@@ -1,5 +1,10 @@
 import { format } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
+import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
+import {
+  PAYMENT_TYPE_FILTER_ALL,
+  PAYMENT_TYPE_FILTER_WITHOUT,
+} from '@/lib/ttk/payment-type-filter'
 
 /** Maps header "issue type" filter to TTK datatable flags (ttk_main without group). */
 export function mapIssueTypeToTtkFlags(selectedType: string) {
@@ -27,8 +32,17 @@ export function buildTtkListFilterExtra(input: {
   selectedType: string
   punchMinHours?: number | null
   punchMaxHours?: number | null
+  paymentTypeFilter?: PaymentTypeFilterValue
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
+  const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
+
+  let withoutSalary = flags.without_salary
+  if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
+    withoutSalary = 1
+  } else if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
+    withoutSalary = 0
+  }
 
   const params: Record<string, string | number> = {
     'search[value]': input.search.trim(),
@@ -39,7 +53,7 @@ export function buildTtkListFilterExtra(input: {
     only_error_break: flags.only_error_break,
     manual_punch: flags.manual_punch,
     only_deletes: flags.only_deletes,
-    without_salary: flags.without_salary,
+    without_salary: withoutSalary,
     only_fixed: flags.only_fixed,
     show_deleted: 0,
     filter_logic_or: 0,
@@ -53,6 +67,9 @@ export function buildTtkListFilterExtra(input: {
   }
   if (input.punchMaxHours != null && input.punchMaxHours > 0) {
     params.punch_max_hours = input.punchMaxHours
+  }
+  if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
+    params.id_payment_type = paymentTypeFilter
   }
 
   return params

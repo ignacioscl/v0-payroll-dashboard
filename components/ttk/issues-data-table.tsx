@@ -50,6 +50,7 @@ import { PunchManualIndicator } from '@/components/ttk/punch-manual-indicator'
 import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
+import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
 import { PaymentTypeCell } from '@/components/ttk/payment-type-cell'
 import { EditPaymentTypeDialog, type EditPaymentTypeTarget } from '@/components/ttk/edit-payment-type-dialog'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,12 @@ import {
   canViewPaymentType,
 } from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
+import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
+import {
+  PAYMENT_TYPE_FILTER_ALL,
+  PAYMENT_TYPE_FILTER_WITHOUT,
+  type PaymentTypeFilterValue,
+} from '@/lib/ttk/payment-type-filter'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
@@ -154,6 +161,7 @@ export function IssuesDataTable({
     search,
     selectedDealers,
     selectedType,
+    setSelectedType,
     dateRange,
     filtersHydrated,
   } = useFilters()
@@ -173,6 +181,39 @@ export function IssuesDataTable({
   const debouncedMaxHours = useDebouncedValue(punchMaxHoursRaw, 600)
   const punchMinHours = debouncedMinHours !== '' ? Number(debouncedMinHours) : null
   const punchMaxHours = debouncedMaxHours !== '' ? Number(debouncedMaxHours) : null
+  const [paymentTypeFilter, setPaymentTypeFilter] =
+    React.useState<PaymentTypeFilterValue>(PAYMENT_TYPE_FILTER_ALL)
+  const { user, hasPermission, loading: meLoading } = useSrsMe()
+  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+
+  const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
+    usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
+
+  React.useEffect(() => {
+    if (!canViewPayment) return
+    if (effectiveSelectedType === 'without_salary') {
+      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
+    } else {
+      setPaymentTypeFilter((prev) =>
+        prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
+      )
+    }
+  }, [effectiveSelectedType, canViewPayment])
+
+  const handlePaymentTypeFilterChange = React.useCallback(
+    (next: PaymentTypeFilterValue) => {
+      setPaymentTypeFilter(next)
+      setPageIndex(0)
+      if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
+        setSelectedType('without_salary')
+        return
+      }
+      if (selectedType === 'without_salary' || effectiveSelectedType === 'without_salary') {
+        setSelectedType('all')
+      }
+    },
+    [effectiveSelectedType, selectedType, setSelectedType],
+  )
   const [thumbnailOverrides, setThumbnailOverrides] = React.useState<
     Record<string, string>
   >({})
@@ -203,13 +244,14 @@ export function IssuesDataTable({
   const [paymentTypeTarget, setPaymentTypeTarget] =
     React.useState<EditPaymentTypeTarget | null>(null)
 
-  const { user, hasPermission, loading: meLoading } = useSrsMe()
   const deleteMutation = useTtkDeletePunch()
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canEditPayment = canEditPaymentType(hasPermission, user?.isSystemAdmin)
-  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
   const showActions = !meLoading
+  const effectivePaymentTypeFilter: PaymentTypeFilterValue = canViewPayment
+    ? paymentTypeFilter
+    : PAYMENT_TYPE_FILTER_ALL
   const isWideScreen = useMinWidth(TABLE_PIN_MIN_WIDTH)
 
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
@@ -230,8 +272,9 @@ export function IssuesDataTable({
         selectedType: effectiveSelectedType,
         punchMinHours,
         punchMaxHours,
+        paymentTypeFilter: effectivePaymentTypeFilter,
       }),
-    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType, punchMinHours, punchMaxHours],
+    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType, punchMinHours, punchMaxHours, effectivePaymentTypeFilter],
   )
 
   const queryEnabled =
@@ -687,6 +730,7 @@ export function IssuesDataTable({
       effectiveDateRange?.from?.toISOString(),
       effectiveDateRange?.to?.toISOString(),
       effectiveSelectedType,
+      effectivePaymentTypeFilter,
     ],
     queryFn: async (params) => {
       const data = await apiRequest.getCustom('', undefined, params)
@@ -753,12 +797,22 @@ export function IssuesDataTable({
           emptyState={emptyState}
           enableGlobalFilter={false}
           toolbarLeading={
-            <PunchHoursFilter
-              minHours={punchMinHoursRaw}
-              maxHours={punchMaxHoursRaw}
-              onMinChange={setPunchMinHoursRaw}
-              onMaxChange={setPunchMaxHoursRaw}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <PunchHoursFilter
+                minHours={punchMinHoursRaw}
+                maxHours={punchMaxHoursRaw}
+                onMinChange={setPunchMinHoursRaw}
+                onMaxChange={setPunchMaxHoursRaw}
+              />
+              {canViewPayment && !meLoading ? (
+                <PaymentTypeFilter
+                  value={paymentTypeFilter}
+                  onChange={handlePaymentTypeFilterChange}
+                  options={paymentTypeOptions}
+                  loading={paymentTypesLoading}
+                />
+              ) : null}
+            </div>
           }
           enableViewOptions
           enableExport
