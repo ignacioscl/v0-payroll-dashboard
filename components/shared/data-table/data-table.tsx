@@ -117,7 +117,7 @@ function readPersistedPageSize(tableId: string | undefined, fallback: number): n
   try {
     const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${tableId}.pageSize`)
     const n = raw ? Number(raw) : NaN
-    return Number.isFinite(n) && n > 0 ? n : fallback
+    return Number.isFinite(n) && (n > 0 || n === -1) ? n : fallback
   } catch {
     return fallback
   }
@@ -320,6 +320,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   }
   defaultPageSize?: number
   pageSizeOptions?: number[]
+  /** Adds "All" to the Rows selector (server-side tables: `length: -1`). */
+  includeAllPageSize?: boolean
 
   // ---------- Sorting ----------
   sorting?: SortingState
@@ -394,6 +396,7 @@ export function DataTable<TData, TValue = unknown>({
   pagination,
   defaultPageSize = 25,
   pageSizeOptions = [10, 25, 50, 100],
+  includeAllPageSize = false,
   sorting,
   onSortingChange,
   manualSorting,
@@ -690,6 +693,7 @@ export function DataTable<TData, TValue = unknown>({
         exportFileName={exportFileName}
         fetchAllRowsForExport={fetchAllRowsForExport}
         pageSizeOptions={pageSizeOptions}
+        includeAllPageSize={includeAllPageSize}
         leading={toolbarLeading}
         trailing={toolbarTrailing}
         enableTableFocus={enableTableFocus}

@@ -11,6 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
+import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>
@@ -38,11 +39,14 @@ export function DataTablePagination<TData>({
 
   // Total — prefer the explicit server-side value, fallback to row count.
   const total = totalRows ?? table.getFilteredRowModel().rows.length
-  const totalPages = Math.max(1, pageCount > 0 ? pageCount : Math.ceil(total / pageSize))
+  const isAllRows = pageSize === DATA_TABLE_PAGE_SIZE_ALL
+  const totalPages = isAllRows
+    ? 1
+    : Math.max(1, pageCount > 0 ? pageCount : Math.ceil(total / pageSize))
   const pages = generatePageNumbers(pageIndex + 1, totalPages)
 
-  const start = total === 0 ? 0 : pageIndex * pageSize + 1
-  const end = Math.min(total, (pageIndex + 1) * pageSize)
+  const start = total === 0 ? 0 : isAllRows ? 1 : pageIndex * pageSize + 1
+  const end = isAllRows ? total : Math.min(total, (pageIndex + 1) * pageSize)
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/15 px-3 py-1.5">

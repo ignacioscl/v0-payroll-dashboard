@@ -7,6 +7,9 @@
 
 import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
 
+/** TanStack pageSize sentinel → legacy DataTables `length: -1` (all rows). */
+export const DATA_TABLE_PAGE_SIZE_ALL = -1
+
 /* -------------------------------------------------------------------------- */
 /* Operator catalogues                                                         */
 /* -------------------------------------------------------------------------- */

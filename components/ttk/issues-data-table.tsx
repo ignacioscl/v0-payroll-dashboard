@@ -814,6 +814,7 @@ export function IssuesDataTable({
               ) : null}
             </div>
           }
+          includeAllPageSize
           enableViewOptions
           enableExport
           exportFileName={exportFileName}

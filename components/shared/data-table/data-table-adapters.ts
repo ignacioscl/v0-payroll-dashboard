@@ -4,6 +4,7 @@
  */
 
 import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
+import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
 import { buildBackendQuery } from './data-table-helpers'
 import type { PaginatedDataTableResponse } from './data-table'
 
@@ -150,10 +151,14 @@ export function createDataTablesLegacyAdapter<TData>(
 
     parseResponse: (raw, { pageSize }) => {
       const total = Number(raw.recordsFiltered ?? raw.recordsTotal ?? 0)
+      const pageCount =
+        pageSize === DATA_TABLE_PAGE_SIZE_ALL
+          ? 1
+          : Math.max(1, Math.ceil(total / pageSize))
       return {
         rows: raw.data ?? [],
         total,
-        pageCount: Math.max(1, Math.ceil(total / pageSize)),
+        pageCount,
       }
     },
   }

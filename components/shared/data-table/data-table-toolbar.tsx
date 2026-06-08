@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { DataTableViewOptions } from './data-table-view-options'
 import { DataTableExport } from './data-table-export'
+import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -40,6 +41,8 @@ interface DataTableToolbarProps<TData> {
   fetchAllRowsForExport?: () => Promise<TData[]>
 
   pageSizeOptions?: number[]
+  /** Adds an "All" option (server-side: `length: -1`). */
+  includeAllPageSize?: boolean
 
   /** Slot rendered between the records counter and the right-side actions. */
   trailing?: React.ReactNode
@@ -62,6 +65,7 @@ export function DataTableToolbar<TData>({
   exportFileName,
   fetchAllRowsForExport,
   pageSizeOptions = [10, 25, 50, 100],
+  includeAllPageSize = false,
   trailing,
   leading,
   enableTableFocus = false,
@@ -203,10 +207,21 @@ export function DataTableToolbar<TData>({
         <div className="flex items-center gap-1">
           <span className="whitespace-nowrap text-[11px] text-muted-foreground">Rows</span>
           <Select
-            value={String(pageSize)}
-            onValueChange={(value) => table.setPageSize(Number(value))}
+            value={
+              pageSize === DATA_TABLE_PAGE_SIZE_ALL ? 'all' : String(pageSize)
+            }
+            onValueChange={(value) => {
+              const nextPageSize =
+                value === 'all' ? DATA_TABLE_PAGE_SIZE_ALL : Number(value)
+              // Single update — separate setPageSize + setPageIndex reverts pageSize
+              // when pagination is controlled (second call reads stale state).
+              table.setPagination({ pageIndex: 0, pageSize: nextPageSize })
+            }}
           >
-            <SelectTrigger size="sm" className="h-7 w-[58px] px-2 text-[11px]">
+            <SelectTrigger
+              size="sm"
+              className="h-7 min-w-[58px] px-2 text-[11px]"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -215,6 +230,9 @@ export function DataTableToolbar<TData>({
                   {size}
                 </SelectItem>
               ))}
+              {includeAllPageSize ? (
+                <SelectItem value="all">All</SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
         </div>
