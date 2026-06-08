@@ -2,12 +2,22 @@
 
 import { QueryProvider } from '@/lib/providers/query-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { TOAST_DURATION_MS } from '@/lib/toast-config'
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
       {children}
-      <Toaster position="top-right" richColors />
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={TOAST_DURATION_MS}
+        toastOptions={{
+          duration: TOAST_DURATION_MS,
+          closeButton: true,
+        }}
+      />
     </QueryProvider>
   )
 }

@@ -145,3 +145,16 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
+
+/* Sonner: neutral grey close button on every toast (mac-style), including richColors */
+[data-sonner-toast] [data-close-button] {
+  background: var(--muted) !important;
+  border-color: var(--border) !important;
+  color: var(--muted-foreground) !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: var(--secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}

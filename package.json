@@ -44,6 +44,7 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@tanstack/react-query": "^5.100.11",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.2",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
     "axios": "^1.16.1",

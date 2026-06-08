@@ -19,6 +19,7 @@ import {
   type Updater,
   type VisibilityState,
 } from '@tanstack/react-table'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Loader2, Database } from 'lucide-react'
 
 import {
@@ -92,6 +93,13 @@ export type DataTableHeaderVariant = 'colored' | 'subtle'
 /* -------------------------------------------------------------------------- */
 
 const STORAGE_PREFIX = 'datatable.v1.'
+
+/** Row count at which the body switches to virtual scrolling. */
+const DEFAULT_VIRTUALIZE_THRESHOLD = 50
+const ROW_HEIGHT_COMPACT = 37
+const ROW_HEIGHT_COMFORTABLE = 45
+/** Fallback scroll region when virtualizing without an explicit `tableScrollHeight`. */
+const DEFAULT_VIRTUAL_SCROLL_MAX = 'min(70vh, calc(100dvh - 16rem))'
 
 function readPersistedVisibility(tableId: string | undefined): VisibilityState {
   if (!tableId || typeof window === 'undefined') return {}
@@ -385,6 +393,9 @@ export interface DataTableProps<TData, TValue = unknown> {
    * Example: `"calc(100dvh - 24rem)"`
    */
   tableScrollHeight?: string
+  /** Virtualize body rows when count >= threshold (default on, threshold 50). */
+  enableVirtualization?: boolean
+  virtualizeThreshold?: number
 }
 
 export function DataTable<TData, TValue = unknown>({
@@ -428,6 +439,8 @@ export function DataTable<TData, TValue = unknown>({
   stickyHeader = true,
   zebraRows = true,
   tableScrollHeight,
+  enableVirtualization = true,
+  virtualizeThreshold = DEFAULT_VIRTUALIZE_THRESHOLD,
 }: DataTableProps<TData, TValue>) {
   /* ---------- Persisted visibility ----------
    * Same SSR/hydration rule as column sizing below: start empty so the server
@@ -666,6 +679,97 @@ export function DataTable<TData, TValue = unknown>({
     minWidth: totalTableWidth,
   }
 
+  const bodyRows = table.getRowModel().rows
+  const shouldVirtualize =
+    enableVirtualization && bodyRows.length >= virtualizeThreshold
+  const estimatedRowHeight =
+    density === 'compact' ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE
+
+  const rowVirtualizer = useVirtualizer({
+    count: bodyRows.length,
+    getScrollElement: () => mainScrollRef.current,
+    estimateSize: () => estimatedRowHeight,
+    overscan: 12,
+    enabled: shouldVirtualize,
+  })
+
+  const virtualItems = shouldVirtualize ? rowVirtualizer.getVirtualItems() : []
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0]!.start : 0
+  const paddingBottom =
+    virtualItems.length > 0
+      ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
+      : 0
+
+  React.useEffect(() => {
+    if (!shouldVirtualize) return
+    mainScrollRef.current?.scrollTo({ top: 0 })
+  }, [paginationState.pageIndex, shouldVirtualize])
+
+  const scrollContainerStyle: React.CSSProperties = tableScrollHeight
+    ? { maxHeight: tableScrollHeight, overflow: 'auto' }
+    : shouldVirtualize
+      ? { maxHeight: DEFAULT_VIRTUAL_SCROLL_MAX, overflow: 'auto' }
+      : { overflowX: 'auto' }
+
+  const renderBodyRow = (row: Row<TData>, index: number) => {
+    const baseBg = rowBg(index)
+    return (
+      <TableRow
+        key={row.id}
+        data-state={row.getIsSelected() ? 'selected' : undefined}
+        onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+        className={cn(
+          'border-b border-border/50 transition-colors',
+          baseBg,
+          onRowClick && 'cursor-pointer hover:bg-accent/40',
+        )}
+      >
+        {row.getVisibleCells().map((cell) => {
+          const meta = cell.column.columnDef.meta as
+            | DataTableColumnMeta<TData>
+            | undefined
+          const pin = cell.column.getIsPinned()
+          const isLastLeftPinned =
+            pin === 'left' && cell.column.getIsLastColumn('left')
+          const isFirstRightPinned =
+            pin === 'right' && cell.column.getIsFirstColumn('right')
+          const size = geo.size.get(cell.column.id) ?? cell.column.getSize()
+          const sizingStyle = pin
+            ? { width: size, minWidth: size, maxWidth: size }
+            : undefined
+          const cellPinStyles = getBodyCellStyle(pin, geo, cell.column.id)
+          return (
+            <TableCell
+              key={cell.id}
+              style={{
+                ...cellPinStyles,
+                ...(sizingStyle ?? {}),
+                backgroundColor: pin
+                  ? 'var(--card)'
+                  : cellPinStyles.backgroundColor,
+                ...(isLastLeftPinned
+                  ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
+                  : {}),
+                ...(isFirstRightPinned
+                  ? { boxShadow: 'inset 4px 0 8px -4px rgba(0,0,0,0.14)' }
+                  : {}),
+              }}
+              className={cn(
+                'box-border overflow-hidden px-3 text-xs whitespace-nowrap',
+                rowPadding,
+                meta?.mono && 'font-mono',
+                meta?.numeric && 'text-right tabular-nums',
+                meta?.cellClassName,
+              )}
+            >
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </TableCell>
+          )
+        })}
+      </TableRow>
+    )
+  }
+
   return (
     <div ref={cardRef} className="min-w-0">
     <Card
@@ -731,11 +835,7 @@ export function DataTable<TData, TValue = unknown>({
           ref={mainScrollRef}
           onScroll={onMainScroll}
           className="relative w-full"
-          style={
-            tableScrollHeight
-              ? { maxHeight: tableScrollHeight, overflow: 'auto' }
-              : { overflowX: 'auto' }
-          }
+          style={scrollContainerStyle}
         >
         <table
           data-slot="table"
@@ -899,66 +999,31 @@ export function DataTable<TData, TValue = unknown>({
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row: Row<TData>, index) => {
-                const baseBg = rowBg(index)
-                return (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() ? 'selected' : undefined}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    className={cn(
-                      'border-b border-border/50 transition-colors',
-                      baseBg,
-                      onRowClick && 'cursor-pointer hover:bg-accent/40',
-                    )}
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      const meta = cell.column.columnDef.meta as
-                        | DataTableColumnMeta<TData>
-                        | undefined
-                      const pin = cell.column.getIsPinned()
-                      const isLastLeftPinned =
-                        pin === 'left' && cell.column.getIsLastColumn('left')
-                      const isFirstRightPinned =
-                        pin === 'right' && cell.column.getIsFirstColumn('right')
-                      // Width + sticky offset both read from the shared
-                      // geometry so header and body can never diverge.
-                      const size = geo.size.get(cell.column.id) ?? cell.column.getSize()
-                      const sizingStyle = pin
-                        ? { width: size, minWidth: size, maxWidth: size }
-                        : undefined
-                      const cellPinStyles = getBodyCellStyle(pin, geo, cell.column.id)
-                      return (
-                        <TableCell
-                          key={cell.id}
-                          style={{
-                            ...cellPinStyles,
-                            ...(sizingStyle ?? {}),
-                            backgroundColor: pin
-                              ? 'var(--card)'
-                              : cellPinStyles.backgroundColor,
-                            ...(isLastLeftPinned
-                              ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
-                              : {}),
-                            ...(isFirstRightPinned
-                              ? { boxShadow: 'inset 4px 0 8px -4px rgba(0,0,0,0.14)' }
-                              : {}),
-                          }}
-                          className={cn(
-                            'box-border overflow-hidden px-3 text-xs whitespace-nowrap',
-                            rowPadding,
-                            meta?.mono && 'font-mono',
-                            meta?.numeric && 'text-right tabular-nums',
-                            meta?.cellClassName,
-                          )}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      )
-                    })}
+              <>
+                {shouldVirtualize && paddingTop > 0 ? (
+                  <TableRow className="border-0 hover:bg-transparent" aria-hidden>
+                    <TableCell
+                      colSpan={visibleColCount}
+                      className="border-0 p-0"
+                      style={{ height: paddingTop }}
+                    />
                   </TableRow>
-                )
-              })
+                ) : null}
+                {shouldVirtualize
+                  ? virtualItems.map((virtualRow) =>
+                      renderBodyRow(bodyRows[virtualRow.index]!, virtualRow.index),
+                    )
+                  : bodyRows.map((row, index) => renderBodyRow(row, index))}
+                {shouldVirtualize && paddingBottom > 0 ? (
+                  <TableRow className="border-0 hover:bg-transparent" aria-hidden>
+                    <TableCell
+                      colSpan={visibleColCount}
+                      className="border-0 p-0"
+                      style={{ height: paddingBottom }}
+                    />
+                  </TableRow>
+                ) : null}
+              </>
             )}
           </TableBody>
         </table>
