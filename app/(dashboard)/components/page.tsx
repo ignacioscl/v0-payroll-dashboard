@@ -1,13 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
+import { PlusCircle } from 'lucide-react'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
+import { useTtkEmployeeSearch, type TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerSelect } from '@/components/filters/dealer-select'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
+import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
+import { EmployeeCombobox } from '@/components/ttk/employee-combobox'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import { ParallelRequestTest } from '@/components/dev/parallel-request-test'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 
@@ -16,7 +22,29 @@ export default function ComponentsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
   const [dealer, setDealer] = useState('all')
   const [dealers, setDealers] = useState<string[]>([])
+  const [employeeDealer, setEmployeeDealer] = useState('')
+  const [employeeSearch, setEmployeeSearch] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
+  const [addPunchOpen, setAddPunchOpen] = useState(false)
   const didInitDealers = useRef(false)
+  const didInitEmployeeDealer = useRef(false)
+
+  const employeeDealerId = useMemo(() => {
+    if (!employeeDealer) return null
+    const id = Number(employeeDealer)
+    return Number.isFinite(id) && id > 0 ? id : null
+  }, [employeeDealer])
+
+  const employeeDealerName = useMemo(() => {
+    if (!employeeDealerId) return undefined
+    return dealerOptions.find((d) => String(d.id) === String(employeeDealerId))?.label
+  }, [dealerOptions, employeeDealerId])
+
+  const employeesQuery = useTtkEmployeeSearch(
+    employeeSearch,
+    employeeDealerId,
+    employeeDealerId != null,
+  )
 
   useEffect(() => {
     setDateRange(getDefaultDateRange())
@@ -27,6 +55,13 @@ export default function ComponentsPage() {
     if (!didInitDealers.current && dealerOptions.length > 0) {
       setDealers(dealerOptions.map((d) => d.id))
       didInitDealers.current = true
+    }
+  }, [dealerOptions])
+
+  useEffect(() => {
+    if (!didInitEmployeeDealer.current && dealerOptions.length > 0) {
+      setEmployeeDealer(dealerOptions[0]!.id)
+      didInitEmployeeDealer.current = true
     }
   }, [dealerOptions])
 
@@ -108,6 +143,87 @@ export default function ComponentsPage() {
               </div>
             )}
           </Preview>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Employee combobox (Add punch)"
+          description="Searchable employee picker used in Add punch — type at least 2 characters after selecting one dealer."
+          className="lg:col-span-2"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Dealer (required)
+              </Label>
+              <DealerSelect
+                dealers={dealerOptions}
+                value={employeeDealer}
+                onValueChange={(next) => {
+                  setEmployeeDealer(next)
+                  setSelectedEmployee(null)
+                  setEmployeeSearch('')
+                }}
+                loading={loading}
+                disabled={!!error}
+                includeAll={false}
+                placeholder="Select dealer…"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Employee
+              </Label>
+              <EmployeeCombobox
+                value={selectedEmployee}
+                onChange={setSelectedEmployee}
+                searchTerm={employeeSearch}
+                onSearchTermChange={setEmployeeSearch}
+                employees={employeesQuery.data}
+                isLoading={employeesQuery.isFetching}
+                dealerSelected={employeeDealerId != null}
+              />
+            </div>
+          </div>
+          <Preview label="Selection">
+            {!employeeDealerId ? (
+              <span className="text-muted-foreground">Pick a dealer first</span>
+            ) : selectedEmployee ? (
+              <span>
+                {selectedEmployee.nombre}{' '}
+                <Badge variant="outline" className="ml-1">
+                  ID {selectedEmployee.id}
+                </Badge>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">No employee selected</span>
+            )}
+          </Preview>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Add punch dialog"
+          description="Full manual punch form — employee search, clock in/out, break, and notes (same as Punch Report)."
+          className="lg:col-span-2"
+        >
+          <p className="text-sm text-muted-foreground">
+            Uses the dealer selected in the employee combobox demo above.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5"
+            disabled={!employeeDealerId}
+            onClick={() => setAddPunchOpen(true)}
+          >
+            <PlusCircle className="h-4 w-4" />
+            Open Add punch
+          </Button>
+          <AddPunchDialog
+            open={addPunchOpen}
+            onOpenChange={setAddPunchOpen}
+            idDealer={employeeDealerId}
+            dealerName={employeeDealerName}
+          />
         </ComponentCard>
 
         <ComponentCard
