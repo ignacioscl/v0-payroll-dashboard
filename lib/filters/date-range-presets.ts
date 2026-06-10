@@ -133,6 +133,16 @@ export function getTodayDateRange(reference: Date = new Date()): DateRange {
   return { from, to }
 }
 
+/** True when the range covers today only (from and to are both today). */
+export function isTodayOnlyDateRange(
+  range: DateRange | undefined,
+  reference: Date = new Date(),
+): boolean {
+  if (!range?.from) return false
+  const to = range.to ?? range.from
+  return sameDay(range.from, reference) && sameDay(to, reference)
+}
+
 /** Match a range against a preset (year/month/day only). */
 export function matchPreset(
   range: DateRange | undefined,

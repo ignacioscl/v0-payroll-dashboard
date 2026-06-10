@@ -6,7 +6,7 @@ import {
   readSelectedDealersCookie,
   writeSelectedDealersCookie,
 } from '@/lib/filters/dealer-selection-cookie'
-import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
+import { getDefaultDateRange, isTodayOnlyDateRange } from '@/lib/filters/date-range-presets'
 import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
@@ -44,8 +44,15 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
     useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
+  const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
+
+  const setDateRange = useCallback((value: DateRange | undefined) => {
+    setDateRangeState(value)
+    if (!isTodayOnlyDateRange(value)) {
+      setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
+    }
+  }, [])
 
   const setSelectedDealers = useCallback((value: string[] | ((prev: string[]) => string[])) => {
     setSelectedDealersState((prev) => {
@@ -66,7 +73,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setDateRange(getDefaultDateRange())
-  }, [])
+  }, [setDateRange])
 
   const clearFilters = () => {
     setSearch('')
