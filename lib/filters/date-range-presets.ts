@@ -126,6 +126,13 @@ export function getYesterdayOnlyDateRange(reference: Date = new Date()): DateRan
   return { from, to }
 }
 
+/** Single calendar day: today (00:00 → 23:59 local). */
+export function getTodayDateRange(reference: Date = new Date()): DateRange {
+  const from = startOfDay(reference)
+  const to = endOfDay(reference)
+  return { from, to }
+}
+
 /** Match a range against a preset (year/month/day only). */
 export function matchPreset(
   range: DateRange | undefined,

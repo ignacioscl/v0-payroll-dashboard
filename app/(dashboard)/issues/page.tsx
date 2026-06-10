@@ -1,16 +1,23 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
+import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
 import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
+import { canAddOrEditPunch, canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
+import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
+import {
+  PAYMENT_TYPE_FILTER_ALL,
+  PAYMENT_TYPE_FILTER_WITHOUT,
+  type PaymentTypeFilterValue,
+} from '@/lib/ttk/payment-type-filter'
 import {
   AlertTriangle,
   LogOut,
@@ -86,6 +93,10 @@ const ISSUE_CARDS: IssueCardConfig[] = [
 
 export default function IssuesPage() {
   const [addPunchOpen, setAddPunchOpen] = useState(false)
+  const [punchMinHoursRaw, setPunchMinHoursRaw] = useState('')
+  const [punchMaxHoursRaw, setPunchMaxHoursRaw] = useState('')
+  const [paymentTypeFilter, setPaymentTypeFilter] =
+    useState<PaymentTypeFilterValue>(PAYMENT_TYPE_FILTER_ALL)
   const {
     search,
     selectedDealers,
@@ -99,6 +110,32 @@ export default function IssuesPage() {
   const { dealers } = useSrsDealers()
   const canAdd = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
+  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+
+  const { data: paymentTypeOptions = [] } =
+    usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
+
+  useEffect(() => {
+    if (!canViewPayment) return
+    if (selectedType === 'without_salary') {
+      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
+    } else {
+      setPaymentTypeFilter((prev) =>
+        prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
+      )
+    }
+  }, [selectedType, canViewPayment])
+
+  const handlePaymentTypeFilterChange = (next: PaymentTypeFilterValue) => {
+    setPaymentTypeFilter(next)
+    if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
+      setSelectedType('without_salary')
+      return
+    }
+    if (selectedType === 'without_salary') {
+      setSelectedType('all')
+    }
+  }
 
   const singleDealerId = useMemo(() => {
     if (selectedDealers.length !== 1) return null
@@ -197,24 +234,40 @@ export default function IssuesPage() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7">
-        {visibleIssueCards.map((card) => (
-          <KPICard
-            key={card.type}
-            title={card.title}
-            value={counts[card.type].pending}
-            icon={card.icon}
-            variant={card.variant}
-            loading={loading}
-            compact
-            onClick={() => selectFilter(card.type)}
-            active={selectedType === card.type}
-            subtitle={renderSubtitle(card.type)}
-          />
-        ))}
-      </div>
+      <PunchReportFilterPanel
+        punchMinHours={punchMinHoursRaw}
+        punchMaxHours={punchMaxHoursRaw}
+        onPunchMinHoursChange={setPunchMinHoursRaw}
+        onPunchMaxHoursChange={setPunchMaxHoursRaw}
+        paymentTypeFilter={paymentTypeFilter}
+        onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
+        paymentTypeOptions={paymentTypeOptions}
+        issueCards={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7">
+            {visibleIssueCards.map((card) => (
+              <KPICard
+                key={card.type}
+                title={card.title}
+                value={counts[card.type].pending}
+                icon={card.icon}
+                variant={card.variant}
+                loading={loading}
+                compact
+                onClick={() => selectFilter(card.type)}
+                active={selectedType === card.type}
+                subtitle={renderSubtitle(card.type)}
+              />
+            ))}
+          </div>
+        }
+      />
 
-      <IssuesDataTable />
+      <IssuesDataTable
+        punchMinHoursRaw={punchMinHoursRaw}
+        punchMaxHoursRaw={punchMaxHoursRaw}
+        paymentTypeFilter={paymentTypeFilter}
+        onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
+      />
 
       {canAdd && (
         <AddPunchDialog

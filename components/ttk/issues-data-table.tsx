@@ -68,6 +68,7 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
@@ -96,6 +97,13 @@ export type IssuesDataTableProps = {
    * Pass `false` to disable (page scrolls, no sticky header).
    */
   tableScrollHeight?: string | false
+  /** Controlled shift-duration filters (optional; defaults to internal state). */
+  punchMinHoursRaw?: string
+  punchMaxHoursRaw?: string
+  paymentTypeFilter?: PaymentTypeFilterValue
+  onPaymentTypeFilterChange?: (value: PaymentTypeFilterValue) => void
+  /** When false, hours/payment filters live in PunchReportFilterPanel only. */
+  showToolbarFilters?: boolean
 }
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
@@ -129,6 +137,11 @@ export function IssuesDataTable({
   exportFileName = 'punch-issues',
   queryKeySuffix = 'issues',
   tableScrollHeight,
+  punchMinHoursRaw: punchMinHoursRawProp,
+  punchMaxHoursRaw: punchMaxHoursRawProp,
+  paymentTypeFilter: paymentTypeFilterProp,
+  onPaymentTypeFilterChange,
+  showToolbarFilters = true,
 }: IssuesDataTableProps = {}) {
   // Dynamic scroll height: fills the available viewport below the fixed nav,
   // DataTable toolbar, pagination row, and page bottom padding.
@@ -162,6 +175,7 @@ export function IssuesDataTable({
     selectedDealers,
     selectedType,
     setSelectedType,
+    selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
   } = useFilters()
@@ -175,22 +189,30 @@ export function IssuesDataTable({
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'date', desc: true },
   ])
-  const [punchMinHoursRaw, setPunchMinHoursRaw] = React.useState('')
-  const [punchMaxHoursRaw, setPunchMaxHoursRaw] = React.useState('')
+  const [punchMinHoursRawInternal, setPunchMinHoursRawInternal] = React.useState('')
+  const [punchMaxHoursRawInternal, setPunchMaxHoursRawInternal] = React.useState('')
+  const punchMinHoursRaw = punchMinHoursRawProp ?? punchMinHoursRawInternal
+  const punchMaxHoursRaw = punchMaxHoursRawProp ?? punchMaxHoursRawInternal
+  const setPunchMinHoursRaw = punchMinHoursRawProp !== undefined ? () => {} : setPunchMinHoursRawInternal
+  const setPunchMaxHoursRaw = punchMaxHoursRawProp !== undefined ? () => {} : setPunchMaxHoursRawInternal
   const debouncedMinHours = useDebouncedValue(punchMinHoursRaw, 600)
   const debouncedMaxHours = useDebouncedValue(punchMaxHoursRaw, 600)
   const punchMinHours = debouncedMinHours !== '' ? Number(debouncedMinHours) : null
   const punchMaxHours = debouncedMaxHours !== '' ? Number(debouncedMaxHours) : null
-  const [paymentTypeFilter, setPaymentTypeFilter] =
+  const [paymentTypeFilterInternal, setPaymentTypeFilterInternal] =
     React.useState<PaymentTypeFilterValue>(PAYMENT_TYPE_FILTER_ALL)
+  const paymentTypeFilter = paymentTypeFilterProp ?? paymentTypeFilterInternal
+  const setPaymentTypeFilter = onPaymentTypeFilterChange ?? setPaymentTypeFilterInternal
   const { user, hasPermission, loading: meLoading } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
 
   const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
-    usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
+    usePaymentTypesCatalog(
+      filtersHydrated && canViewPayment && !meLoading && showToolbarFilters,
+    )
 
   React.useEffect(() => {
-    if (!canViewPayment) return
+    if (!canViewPayment || !showToolbarFilters) return
     if (effectiveSelectedType === 'without_salary') {
       setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
     } else {
@@ -198,7 +220,7 @@ export function IssuesDataTable({
         prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
       )
     }
-  }, [effectiveSelectedType, canViewPayment])
+  }, [effectiveSelectedType, canViewPayment, showToolbarFilters, setPaymentTypeFilter])
 
   const handlePaymentTypeFilterChange = React.useCallback(
     (next: PaymentTypeFilterValue) => {
@@ -212,7 +234,7 @@ export function IssuesDataTable({
         setSelectedType('all')
       }
     },
-    [effectiveSelectedType, selectedType, setSelectedType],
+    [effectiveSelectedType, selectedType, setSelectedType, setPaymentTypeFilter],
   )
   const [thumbnailOverrides, setThumbnailOverrides] = React.useState<
     Record<string, string>
@@ -273,8 +295,21 @@ export function IssuesDataTable({
         punchMinHours,
         punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
+        todayLiveStatus:
+          selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
+            ? selectedTodayLiveStatus
+            : undefined,
       }),
-    [effectiveSearch, debouncedDealers, effectiveDateRange, effectiveSelectedType, punchMinHours, punchMaxHours, effectivePaymentTypeFilter],
+    [
+      effectiveSearch,
+      debouncedDealers,
+      effectiveDateRange,
+      effectiveSelectedType,
+      punchMinHours,
+      punchMaxHours,
+      effectivePaymentTypeFilter,
+      selectedTodayLiveStatus,
+    ],
   )
 
   const queryEnabled =
@@ -687,6 +722,7 @@ export function IssuesDataTable({
     ignoreSearch,
     punchMinHours,
     punchMaxHours,
+    selectedTodayLiveStatus,
   ])
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
@@ -731,6 +767,7 @@ export function IssuesDataTable({
       effectiveDateRange?.to?.toISOString(),
       effectiveSelectedType,
       effectivePaymentTypeFilter,
+      selectedTodayLiveStatus,
     ],
     queryFn: async (params) => {
       const data = await apiRequest.getCustom('', undefined, params)
@@ -797,22 +834,24 @@ export function IssuesDataTable({
           emptyState={emptyState}
           enableGlobalFilter={false}
           toolbarLeading={
-            <div className="flex flex-wrap items-center gap-3">
-              <PunchHoursFilter
-                minHours={punchMinHoursRaw}
-                maxHours={punchMaxHoursRaw}
-                onMinChange={setPunchMinHoursRaw}
-                onMaxChange={setPunchMaxHoursRaw}
-              />
-              {canViewPayment && !meLoading ? (
-                <PaymentTypeFilter
-                  value={paymentTypeFilter}
-                  onChange={handlePaymentTypeFilterChange}
-                  options={paymentTypeOptions}
-                  loading={paymentTypesLoading}
+            showToolbarFilters ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <PunchHoursFilter
+                  minHours={punchMinHoursRaw}
+                  maxHours={punchMaxHoursRaw}
+                  onMinChange={setPunchMinHoursRaw}
+                  onMaxChange={setPunchMaxHoursRaw}
                 />
-              ) : null}
-            </div>
+                {canViewPayment && !meLoading ? (
+                  <PaymentTypeFilter
+                    value={paymentTypeFilter}
+                    onChange={handlePaymentTypeFilterChange}
+                    options={paymentTypeOptions}
+                    loading={paymentTypesLoading}
+                  />
+                ) : null}
+              </div>
+            ) : undefined
           }
           includeAllPageSize
           enableViewOptions

@@ -7,6 +7,10 @@ import {
   writeSelectedDealersCookie,
 } from '@/lib/filters/dealer-selection-cookie'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
+import {
+  TODAY_LIVE_STATUS_ALL,
+  type TodayLiveStatusFilter,
+} from '@/lib/ttk/today-live-status'
 
 interface FilterContextType {
   search: string
@@ -20,6 +24,9 @@ interface FilterContextType {
   setSelectedType: (value: string) => void
   selectedStatus: string
   setSelectedStatus: (value: string) => void
+  /** Dashboard live headcount filter: on_lunch | working | out */
+  selectedTodayLiveStatus: TodayLiveStatusFilter
+  setSelectedTodayLiveStatus: (value: TodayLiveStatusFilter) => void
   dateRange: DateRange | undefined
   setDateRange: (value: DateRange | undefined) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
@@ -35,6 +42,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedDealer, setSelectedDealer] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
+  const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
+    useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
@@ -66,6 +75,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSelectedDealer('all')
     setSelectedType('all')
     setSelectedStatus('all')
+    setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     setDateRange(getDefaultDateRange())
   }
 
@@ -81,6 +91,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setSelectedType,
       selectedStatus,
       setSelectedStatus,
+      selectedTodayLiveStatus,
+      setSelectedTodayLiveStatus,
       dateRange,
       setDateRange,
       filtersHydrated,

@@ -5,6 +5,7 @@ import {
   PAYMENT_TYPE_FILTER_ALL,
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
+import { isTodayLiveStatus } from '@/lib/ttk/today-live-status'
 
 /** Maps header "issue type" filter to TTK datatable flags (ttk_main without group). */
 export function mapIssueTypeToTtkFlags(selectedType: string) {
@@ -33,6 +34,7 @@ export function buildTtkListFilterExtra(input: {
   punchMinHours?: number | null
   punchMaxHours?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
+  todayLiveStatus?: string
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
@@ -70,6 +72,9 @@ export function buildTtkListFilterExtra(input: {
   }
   if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
     params.id_payment_type = paymentTypeFilter
+  }
+  if (input.todayLiveStatus && isTodayLiveStatus(input.todayLiveStatus)) {
+    params.today_live_status = input.todayLiveStatus
   }
 
   return params
