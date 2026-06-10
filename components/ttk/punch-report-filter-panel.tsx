@@ -66,6 +66,30 @@ type FilterChip = {
   onRemove?: () => void
 }
 
+function FilterChipBadge({ chip }: { chip: FilterChip }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-background px-2.5 py-1',
+        'text-xs font-medium text-foreground/75',
+        chip.onRemove && 'pr-1.5',
+      )}
+    >
+      {chip.label}
+      {chip.onRemove ? (
+        <button
+          type="button"
+          className="cursor-pointer rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label={`Remove filter ${chip.label}`}
+          onClick={chip.onRemove}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+    </span>
+  )
+}
+
 export type PunchReportFilterPanelProps = {
   punchMinHours: string
   punchMaxHours: string
@@ -249,7 +273,7 @@ export function PunchReportFilterPanel({
       open={open}
       onOpenChange={handleOpenChange}
       className={cn(
-        'rounded-xl border border-border/60 bg-card/40',
+        'overflow-hidden rounded-xl border border-border/60 bg-card',
         className,
       )}
     >
@@ -258,7 +282,7 @@ export function PunchReportFilterPanel({
           type="button"
           className={cn(
             'flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors',
-            'hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-t-xl',
+            'hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-t-xl',
             !open && chips.length === 0 && 'rounded-b-xl',
           )}
         >
@@ -272,22 +296,22 @@ export function PunchReportFilterPanel({
             Filters
           </span>
           {!open ? (
-            <span className="text-[11px] text-muted-foreground">
-              {chips.length > 0
-                ? `${chips.length} active`
-                : 'Click to expand'}
-            </span>
+            chips.length > 0 ? (
+              <span className="rounded-full border border-primary/20 bg-primary/6 px-2 py-0.5 text-[10px] font-medium text-primary/70">
+                {chips.length} active
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/60">Click to expand</span>
+            )
           ) : (
-            <span className="text-[11px] text-muted-foreground">
-              Click to collapse
-            </span>
+            <span className="text-[11px] text-muted-foreground/50">Click to collapse</span>
           )}
         </button>
       </CollapsibleTrigger>
 
       <div
         className={cn(
-          'flex flex-wrap items-center gap-1.5 border-t border-border/50 px-3 py-2',
+          'flex flex-wrap items-center gap-2 border-t border-border/40 px-3 py-2.5',
           !open && 'rounded-b-xl',
         )}
         onClick={(e) => e.stopPropagation()}
@@ -295,43 +319,27 @@ export function PunchReportFilterPanel({
       >
         {chips.length > 0 ? (
           chips.map((chip) => (
-            <Badge
-              key={chip.key}
-              variant="outline"
-              className="gap-1 bg-background py-0.5 pl-2 pr-1 text-[11px] font-normal"
-            >
-              {chip.label}
-              {chip.onRemove ? (
-                <button
-                  type="button"
-                  className="rounded-sm p-0.5 hover:bg-muted"
-                  aria-label={`Remove filter ${chip.label}`}
-                  onClick={chip.onRemove}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              ) : null}
-            </Badge>
+            <FilterChipBadge key={chip.key} chip={chip} />
           ))
         ) : (
-          <span className="text-[11px] text-muted-foreground">
-            No active filters — use the cards below or the header
+          <span className="text-[11px] text-muted-foreground/60">
+            No active filters
           </span>
         )}
         {activePreset ? (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground/50">
             ({DATE_RANGE_PRESETS.find((p) => p.key === activePreset)?.label})
           </span>
         ) : null}
       </div>
 
-      <CollapsibleContent className="space-y-6 border-t border-border/50 px-3 pb-4 pt-4">
+      <CollapsibleContent className="space-y-6 border-t border-border/40 px-3 pb-4 pt-4">
         <section className="space-y-3">
           <div>
             <h3 className="text-sm font-semibold tracking-tight text-foreground">
               Live status (today)
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground/90">
               Click a card to filter — click again to clear
             </p>
           </div>
