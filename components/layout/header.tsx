@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Menu, Search, SlidersHorizontal } from 'lucide-react'
+import Link from 'next/link'
+import { Menu, Search, Settings2, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -25,10 +26,14 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 
 export function Header() {
   const pathname = usePathname()
   const { collapsed, setMobileOpen } = useSidebar()
+  const { user, hasPermission } = useSrsMe()
+  const showSystemConfig = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const { dealers: dealerOptions, loading: dealersLoading } = useSrsDealers()
   const {
     search,
@@ -133,6 +138,17 @@ export function Header() {
               </span>
             )}
           </button>
+
+          {showSystemConfig && (
+            <Link
+              href="/settings/system"
+              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="System Config"
+              aria-label="System Config"
+            >
+              <Settings2 className="h-5 w-5" />
+            </Link>
+          )}
 
           <NotificationsPopover />
         </div>

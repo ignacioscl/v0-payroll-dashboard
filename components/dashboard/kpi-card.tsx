@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { Loader2 } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export type KPICardVariant =
@@ -32,6 +32,8 @@ interface KPICardProps {
   loading?: boolean
   /** Tarjetas más compactas (p. ej. Punch Issues): iconos chicos y título sin truncar. */
   compact?: boolean
+  /** Estilo FullKpiCard del design system (Punch Report filters). */
+  filterCard?: boolean
   className?: string
 }
 
@@ -47,12 +49,14 @@ export function KPICard({
   active = false,
   loading = false,
   compact = false,
+  filterCard = false,
   className,
 }: KPICardProps) {
   const variantConfig = {
     default: {
       bg: 'bg-gradient-to-br from-white to-blue-50/60',
       border: 'border-blue-100',
+      activeBorder: 'border-blue-600/70',
       iconBg: 'bg-gradient-to-br from-blue-500 to-blue-700',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-blue-500/30',
@@ -61,6 +65,7 @@ export function KPICard({
     warning: {
       bg: 'bg-gradient-to-br from-white to-amber-50/70',
       border: 'border-warning/25',
+      activeBorder: 'border-amber-500/70',
       iconBg: 'bg-gradient-to-br from-amber-400 to-orange-600',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-amber-400/30',
@@ -69,6 +74,7 @@ export function KPICard({
     danger: {
       bg: 'bg-gradient-to-br from-white to-red-50/70',
       border: 'border-destructive/25',
+      activeBorder: 'border-red-600/70',
       iconBg: 'bg-gradient-to-br from-red-500 to-rose-700',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-red-500/30',
@@ -77,6 +83,7 @@ export function KPICard({
     success: {
       bg: 'bg-gradient-to-br from-white to-emerald-50/70',
       border: 'border-success/25',
+      activeBorder: 'border-emerald-600/70',
       iconBg: 'bg-gradient-to-br from-emerald-400 to-green-700',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-emerald-500/30',
@@ -85,6 +92,7 @@ export function KPICard({
     info: {
       bg: 'bg-gradient-to-br from-white to-cyan-50/70',
       border: 'border-accent/25',
+      activeBorder: 'border-cyan-600/70',
       iconBg: 'bg-gradient-to-br from-cyan-400 to-sky-700',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-cyan-400/30',
@@ -93,6 +101,7 @@ export function KPICard({
     violet: {
       bg: 'bg-gradient-to-br from-white to-violet-50/70',
       border: 'border-violet-200/60',
+      activeBorder: 'border-violet-600/70',
       iconBg: 'bg-gradient-to-br from-violet-500 to-purple-700',
       iconColor: 'text-white',
       iconShadow: 'shadow-lg shadow-violet-500/30',
@@ -140,24 +149,42 @@ export function KPICard({
       tabIndex={isInteractive ? 0 : undefined}
       aria-pressed={isInteractive ? active : undefined}
       className={cn(
-        'group relative overflow-hidden rounded-xl border transition-all duration-300',
-        compact ? 'p-4 hover:shadow-lg hover:scale-[1.01]' : 'p-5 hover:shadow-xl hover:scale-[1.02]',
+        'group relative overflow-hidden border transition-all duration-300',
+        filterCard ? 'rounded-[14px] p-5 hover:scale-[1.01]' : 'rounded-xl',
+        !filterCard && (compact ? 'p-4 hover:shadow-lg hover:scale-[1.01]' : 'p-5 hover:shadow-xl hover:scale-[1.02]'),
+        filterCard && 'hover:shadow-md',
         'hover:border-border/80',
         config.bg,
-        config.border,
-        config.glow,
+        active && filterCard
+          ? cn('border-2 shadow-md', config.activeBorder)
+          : active
+            ? 'border-2 ring-2 ring-primary/60 border-primary shadow-lg'
+            : cn('border', config.border),
+        !active && config.glow,
         isInteractive && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-        active && 'ring-2 ring-primary/60 border-primary shadow-lg',
         className,
       )}
     >
+      {active && filterCard ? (
+        <div
+          className={cn(
+            'absolute inset-x-0 top-0 h-[3px] rounded-t-[14px]',
+            config.iconBg,
+          )}
+          aria-hidden
+        />
+      ) : null}
 
       <div className="relative flex items-start justify-between gap-2">
-        <div className="space-y-2 flex-1 min-w-0">
+        <div className={cn('min-w-0 flex-1', filterCard ? 'space-y-1.5' : 'space-y-2')}>
           <p
             className={cn(
-              'font-medium text-muted-foreground uppercase tracking-wider leading-snug',
-              compact ? 'text-[11px] whitespace-normal' : 'text-xs truncate',
+              'font-semibold uppercase tracking-wider leading-snug text-muted-foreground',
+              filterCard
+                ? 'text-[11px] whitespace-normal'
+                : compact
+                  ? 'text-[11px] whitespace-normal font-medium'
+                  : 'text-xs truncate font-medium',
             )}
           >
             {title}
@@ -165,7 +192,12 @@ export function KPICard({
 
           <div className="flex items-baseline gap-2">
             {loading ? (
-              <Loader2 className={cn('animate-spin text-muted-foreground', compact ? 'h-6 w-6' : 'h-8 w-8')} />
+              <Loader2
+                className={cn(
+                  'animate-spin text-muted-foreground',
+                  filterCard ? 'h-7 w-7' : compact ? 'h-6 w-6' : 'h-8 w-8',
+                )}
+              />
             ) : (
               <motion.span
                 key={String(value)}
@@ -173,7 +205,7 @@ export function KPICard({
                 animate={{ opacity: 1, scale: 1 }}
                 className={cn(
                   'font-bold text-foreground tracking-tight tabular-nums',
-                  compact ? 'text-3xl' : 'text-4xl',
+                  filterCard ? 'text-[34px] leading-none' : compact ? 'text-3xl' : 'text-4xl',
                 )}
               >
                 {value}
@@ -204,7 +236,7 @@ export function KPICard({
                 </span>
               )}
               {subtitle && (
-                <div className="text-xs text-muted-foreground">
+                <div className={cn('text-muted-foreground', filterCard ? 'text-[11px]' : 'text-xs')}>
                   {subtitle}
                 </div>
               )}
@@ -213,9 +245,13 @@ export function KPICard({
         </div>
 
         <div className={cn(
-          'flex shrink-0 items-center justify-center transition-all duration-300',
+          'relative flex shrink-0 items-center justify-center transition-all duration-300',
           'group-hover:scale-110 group-hover:-translate-y-0.5',
-          compact ? 'h-9 w-9 rounded-xl' : 'h-14 w-14 rounded-2xl',
+          filterCard
+            ? 'h-[52px] w-[52px] rounded-[14px]'
+            : compact
+              ? 'h-9 w-9 rounded-xl'
+              : 'h-14 w-14 rounded-2xl',
           config.iconBg,
           config.iconShadow
         )}>
@@ -224,6 +260,18 @@ export function KPICard({
           </span>
         </div>
       </div>
+
+      {active && filterCard ? (
+        <div
+          className={cn(
+            'pointer-events-none absolute right-2.5 top-2.5 z-10 flex h-[18px] w-[18px] items-center justify-center rounded-full shadow-sm',
+            config.iconBg,
+          )}
+          aria-hidden
+        >
+          <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+        </div>
+      ) : null}
 
       {/* Optional sparkline */}
       {sparkline && sparkline.length > 1 && (

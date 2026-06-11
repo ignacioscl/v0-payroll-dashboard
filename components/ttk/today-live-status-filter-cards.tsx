@@ -18,7 +18,7 @@ const CARD_ICONS: Record<TodayLiveStatus, React.ReactNode> = {
 }
 
 export function TodayLiveStatusFilterCards() {
-  const { selectedTodayLiveStatus, setSelectedTodayLiveStatus, setDateRange } =
+  const { selectedTodayLiveStatus, setSelectedTodayLiveStatus, setDateRange, setSelectedType } =
     useFilters()
   const { status, loading } = useTtkTodayStatus()
 
@@ -28,11 +28,12 @@ export function TodayLiveStatusFilterCards() {
       return
     }
     setSelectedTodayLiveStatus(liveStatus)
+    setSelectedType('all')
     setDateRange(getTodayDateRange())
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {TODAY_LIVE_STATUS_CARDS.map((card) => (
         <KPICard
           key={card.status}
@@ -42,7 +43,7 @@ export function TodayLiveStatusFilterCards() {
           icon={CARD_ICONS[card.status]}
           variant={card.variant}
           loading={loading}
-          compact
+          filterCard
           active={selectedTodayLiveStatus === card.status}
           onClick={() => toggleLiveStatus(card.status)}
         />

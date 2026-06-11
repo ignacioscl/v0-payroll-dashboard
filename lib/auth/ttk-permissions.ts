@@ -6,6 +6,7 @@ export const ROL_ACCION_DELETE_PUNCH = 68
 export const ROL_ACCION_EDIT_PAYMENT_TYPE = 105
 export const ROL_ACCION_VIEW_PAYMENT_TYPE = 130
 export const ROL_ACCION_EDIT_PAYMENT_TYPE_ALT = 136
+export const ROL_ACCION_SYSTEM_CONFIG = 141
 
 export function canAccessDailyPunch(
   hasPermission: (id: number) => boolean,
@@ -49,4 +50,11 @@ export function canViewPaymentType(
     canEditPaymentType(hasPermission, isSystemAdmin) ||
     hasPermission(ROL_ACCION_VIEW_PAYMENT_TYPE)
   )
+}
+
+export function canAccessSystemConfig(
+  hasPermission: (id: number) => boolean,
+  isSystemAdmin?: boolean,
+): boolean {
+  return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_SYSTEM_CONFIG)
 }

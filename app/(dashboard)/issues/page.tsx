@@ -18,6 +18,7 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import {
   AlertTriangle,
   LogOut,
@@ -103,6 +104,7 @@ export default function IssuesPage() {
     dateRange,
     selectedType,
     setSelectedType,
+    setSelectedTodayLiveStatus,
     filtersHydrated,
   } = useFilters()
 
@@ -112,7 +114,7 @@ export default function IssuesPage() {
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
 
-  const { data: paymentTypeOptions = [] } =
+  const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
     usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
 
   useEffect(() => {
@@ -164,7 +166,11 @@ export default function IssuesPage() {
   })
 
   const selectFilter = (type: string) => {
-    setSelectedType(selectedType === type ? 'all' : type)
+    const next = selectedType === type ? 'all' : type
+    setSelectedType(next)
+    if (next !== 'all') {
+      setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
+    }
   }
 
   const totalPending = counts.only_error.pending
@@ -242,8 +248,10 @@ export default function IssuesPage() {
         paymentTypeFilter={paymentTypeFilter}
         onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
         paymentTypeOptions={paymentTypeOptions}
+        showPaymentTypeFilter={canViewPayment && !meLoading}
+        paymentTypesLoading={paymentTypesLoading}
         issueCards={
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {visibleIssueCards.map((card) => (
               <KPICard
                 key={card.type}
@@ -252,7 +260,7 @@ export default function IssuesPage() {
                 icon={card.icon}
                 variant={card.variant}
                 loading={loading}
-                compact
+                filterCard
                 onClick={() => selectFilter(card.type)}
                 active={selectedType === card.type}
                 subtitle={renderSubtitle(card.type)}
@@ -267,6 +275,7 @@ export default function IssuesPage() {
         punchMaxHoursRaw={punchMaxHoursRaw}
         paymentTypeFilter={paymentTypeFilter}
         onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
+        showToolbarFilters={false}
       />
 
       {canAdd && (

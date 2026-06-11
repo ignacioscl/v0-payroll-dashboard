@@ -2,8 +2,7 @@
 
 import * as React from 'react'
 import { format } from 'date-fns'
-import { ChevronDown, X } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { ChevronDown, Filter, X } from 'lucide-react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -27,6 +26,8 @@ import {
 } from '@/lib/ttk/payment-type-filter'
 import type { PaymentTypeCatalogItem } from '@/lib/ttk/payment-type-filter'
 import { TodayLiveStatusFilterCards } from '@/components/ttk/today-live-status-filter-cards'
+import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
+import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
 
 const STORAGE_KEY = 'punch-report-filters-open'
 
@@ -70,8 +71,8 @@ function FilterChipBadge({ chip }: { chip: FilterChip }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-background px-2.5 py-1',
-        'text-xs font-medium text-foreground/75',
+        'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1',
+        'text-[11px] font-medium text-foreground',
         chip.onRemove && 'pr-1.5',
       )}
     >
@@ -83,7 +84,7 @@ function FilterChipBadge({ chip }: { chip: FilterChip }) {
           aria-label={`Remove filter ${chip.label}`}
           onClick={chip.onRemove}
         >
-          <X className="h-3 w-3" />
+          <X className="h-2.5 w-2.5" />
         </button>
       ) : null}
     </span>
@@ -98,6 +99,8 @@ export type PunchReportFilterPanelProps = {
   paymentTypeFilter: PaymentTypeFilterValue
   onPaymentTypeFilterChange: (v: PaymentTypeFilterValue) => void
   paymentTypeOptions: PaymentTypeCatalogItem[]
+  showPaymentTypeFilter?: boolean
+  paymentTypesLoading?: boolean
   issueCards: React.ReactNode
   className?: string
 }
@@ -110,6 +113,8 @@ export function PunchReportFilterPanel({
   paymentTypeFilter,
   onPaymentTypeFilterChange,
   paymentTypeOptions,
+  showPaymentTypeFilter = false,
+  paymentTypesLoading = false,
   issueCards,
   className,
 }: PunchReportFilterPanelProps) {
@@ -273,7 +278,7 @@ export function PunchReportFilterPanel({
       open={open}
       onOpenChange={handleOpenChange}
       className={cn(
-        'overflow-hidden rounded-xl border border-border/60 bg-card',
+        'overflow-hidden rounded-[14px] border border-border bg-card shadow-sm',
         className,
       )}
     >
@@ -281,83 +286,100 @@ export function PunchReportFilterPanel({
         <button
           type="button"
           className={cn(
-            'flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors',
-            'hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-t-xl',
-            !open && chips.length === 0 && 'rounded-b-xl',
+            'flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors',
+            'hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
           )}
         >
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
+            <Filter className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-sm font-semibold text-foreground">Filters</span>
+
+          <span className="flex-1" />
+
+          {chips.length > 0 ? (
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              {chips.length} active
+            </span>
+          ) : null}
+
           <ChevronDown
             className={cn(
-              'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+              'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200',
               open && 'rotate-180',
             )}
           />
-          <span className="text-sm font-semibold tracking-tight text-foreground">
-            Filters
-          </span>
-          {!open ? (
-            chips.length > 0 ? (
-              <span className="rounded-full border border-primary/20 bg-primary/6 px-2 py-0.5 text-[10px] font-medium text-primary/70">
-                {chips.length} active
-              </span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground/60">Click to expand</span>
-            )
-          ) : (
-            <span className="text-[11px] text-muted-foreground/50">Click to collapse</span>
-          )}
         </button>
       </CollapsibleTrigger>
 
-      <div
-        className={cn(
-          'flex flex-wrap items-center gap-2 border-t border-border/40 px-3 py-2.5',
-          !open && 'rounded-b-xl',
-        )}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {chips.length > 0 ? (
-          chips.map((chip) => (
+      {chips.length > 0 ? (
+        <div
+          className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {chips.map((chip) => (
             <FilterChipBadge key={chip.key} chip={chip} />
-          ))
-        ) : (
-          <span className="text-[11px] text-muted-foreground/60">
-            No active filters
-          </span>
-        )}
-        {activePreset ? (
-          <span className="text-[10px] text-muted-foreground/50">
-            ({DATE_RANGE_PRESETS.find((p) => p.key === activePreset)?.label})
-          </span>
-        ) : null}
-      </div>
+          ))}
+          {activePreset ? (
+            <span className="text-[10px] text-muted-foreground">
+              ({DATE_RANGE_PRESETS.find((p) => p.key === activePreset)?.label})
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
-      <CollapsibleContent className="space-y-6 border-t border-border/40 px-3 pb-4 pt-4">
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight text-foreground">
-              Live status (today)
+      <CollapsibleContent className="border-t border-border px-4 pb-4 pt-4">
+        <section className="mb-5">
+          <div className="mb-3 flex flex-wrap items-baseline gap-2">
+            <h3 className="text-[13px] font-semibold text-foreground">
+              Live status today
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground/90">
-              Click a card to filter — click again to clear
+            <p className="text-[11px] text-muted-foreground">
+              Click a card to filter · click again to clear
             </p>
           </div>
           <TodayLiveStatusFilterCards />
         </section>
 
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight text-foreground">
-              Punch issues
+        <div className="mb-5 border-t border-border" />
+
+        <section>
+          <div className="mb-3 flex flex-wrap items-baseline gap-2">
+            <h3 className="text-[13px] font-semibold text-foreground">
+              Filter by issue type
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Filter by validation issue type
+            <p className="text-[11px] text-muted-foreground">
+              Click a card to filter · click again to clear
             </p>
           </div>
           {issueCards}
         </section>
       </CollapsibleContent>
+
+      <div
+        className="flex flex-wrap items-center gap-4 border-t border-border bg-slate-50/45 px-4 py-2"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <PunchHoursFilter
+          minHours={punchMinHours}
+          maxHours={punchMaxHours}
+          onMinChange={onPunchMinHoursChange}
+          onMaxChange={onPunchMaxHoursChange}
+        />
+        {showPaymentTypeFilter ? (
+          <>
+            <div className="hidden h-[18px] w-px bg-border sm:block" />
+            <PaymentTypeFilter
+              value={paymentTypeFilter}
+              onChange={onPaymentTypeFilterChange}
+              options={paymentTypeOptions}
+              loading={paymentTypesLoading}
+            />
+          </>
+        ) : null}
+      </div>
     </Collapsible>
   )
 }
