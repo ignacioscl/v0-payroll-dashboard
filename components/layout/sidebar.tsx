@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sheet'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
+import { isAdminGeneralUser } from '@/lib/auth/payroll-access'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 import { APP_SUBTITLE, getAppTitle } from '@/lib/branding'
 import type { SrsMeUser } from '@/lib/auth/types'
@@ -94,6 +95,7 @@ function SidebarInner({
   const navigation = getVisibleNavigation({
     isDev: isDevEnvironment(),
     canAccessTtk,
+    canAccessProdKpis: isAdminGeneralUser(user),
   })
 
   const displayName = user?.nombre ?? 'User'

@@ -6,3 +6,9 @@ export function canAccessPayrollDashboard(user: SrsMeUser | null | undefined): b
   if (user.isSystemAdmin) return true
   return user.idRolSystemV2 != null && user.idRolSystemV2 > 0
 }
+
+/** Legacy Admin General (id_rol = 1). Unlocks KPI routes in production. */
+export function isAdminGeneralUser(user: SrsMeUser | null | undefined): boolean {
+  if (!user?.isSystemAdmin) return false
+  return user.rolSystemV2Name === 'Admin General'
+}
