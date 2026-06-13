@@ -228,18 +228,75 @@ function SidebarInner({
               </Link>
             )
 
+            const childItems = item.children ?? []
+
             if (effectiveCollapsed) {
               return (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium">
-                    {item.name}
-                  </TooltipContent>
-                </Tooltip>
+                <div key={item.href} className="space-y-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                    <TooltipContent side="right" className="font-medium">
+                      {item.name}
+                    </TooltipContent>
+                  </Tooltip>
+                  {childItems.map((child) => {
+                    const childActive = pathname === child.href
+                    const ChildIcon = child.icon
+                    return (
+                      <Tooltip key={child.href}>
+                        <TooltipTrigger asChild>
+                          <Link
+                            href={child.href}
+                            onClick={onNavigate}
+                            className={cn(
+                              'group relative flex items-center justify-center rounded-lg px-0 py-2 text-sm font-medium transition-all duration-200',
+                              childActive
+                                ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
+                                : 'text-white/60 hover:bg-white/15 hover:text-white'
+                            )}
+                          >
+                            <ChildIcon className="h-4 w-4 shrink-0" />
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="font-medium">
+                          {child.name}
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </div>
               )
             }
 
-            return linkContent
+            if (childItems.length === 0) return linkContent
+
+            return (
+              <div key={item.href} className="space-y-1">
+                {linkContent}
+                <div className="ml-5 space-y-1 border-l border-white/15 pl-3">
+                  {childItems.map((child) => {
+                    const childActive = pathname === child.href
+                    const ChildIcon = child.icon
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onNavigate}
+                        className={cn(
+                          'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200',
+                          childActive
+                            ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
+                            : 'text-white/70 hover:bg-white/15 hover:text-white'
+                        )}
+                      >
+                        <ChildIcon className="h-4 w-4 shrink-0" />
+                        <span className="whitespace-nowrap overflow-hidden">{child.name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )
           })}
         </div>
       </nav>

@@ -7,6 +7,8 @@ import {
   TrendingUp,
   Trophy,
   DollarSign,
+  FileSpreadsheet,
+  Gauge,
   Blocks,
   Table as TableIcon,
 } from 'lucide-react'
@@ -15,6 +17,8 @@ export interface NavItem {
   name: string
   href: string
   icon: LucideIcon
+  /** Optional nested items rendered as a submenu under the parent. */
+  children?: NavItem[]
 }
 
 export const ALL_NAVIGATION: NavItem[] = [
@@ -25,6 +29,16 @@ export const ALL_NAVIGATION: NavItem[] = [
   { name: 'Trends', href: '/trends', icon: TrendingUp },
   { name: 'Employee Ranking', href: '/ranking', icon: Trophy },
   { name: 'Costs by Dealer', href: '/costs', icon: DollarSign },
+  // DEV ONLY: /kpis is intentionally NOT in PROD_NAV_HREFS, so the item (and
+  // its children) is hidden from the menu and blocked by ProdRouteGuard in prod.
+  {
+    name: 'Business KPIs',
+    href: '/kpis',
+    icon: Gauge,
+    children: [
+      { name: 'Payroll Report', href: '/kpis/payroll-report', icon: FileSpreadsheet },
+    ],
+  },
   { name: 'Components', href: '/components', icon: Blocks },
   { name: 'Data Table', href: '/datatable-demo', icon: TableIcon },
 ]
@@ -48,5 +62,14 @@ export function getVisibleNavigation(options: {
   if (!canAccessTtk) return []
   return ALL_NAVIGATION.filter((item) =>
     (PROD_NAV_HREFS as readonly string[]).includes(item.href),
+  ).map((item) =>
+    item.children
+      ? {
+          ...item,
+          children: item.children.filter((child) =>
+            (PROD_NAV_HREFS as readonly string[]).includes(child.href),
+          ),
+        }
+      : item,
   )
 }
