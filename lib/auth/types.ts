@@ -16,6 +16,8 @@ export interface SrsSessionUser {
   isCompanyTypeCompany?: boolean
   thumbnailUuid?: string | null
   logoImg?: string | null
+  /** Legacy vhost where the user opened v0 (e.g. https://mooi.srssuite.com). */
+  legacyOrigin?: string | null
 }
 
 export interface SrsMeUser {

@@ -5,7 +5,7 @@ Desarrollo local → `DOCKER.md`.
 | Qué | Valor |
 |-----|--------|
 | Código v0 | `/home/srssui5/v0-payroll-dashboard` (git) |
-| PHP Legacy | `https://main.srssuite.com` |
+| PHP Legacy | `https://main.srssuite.com` (EN) · `https://mooi.srssuite.com` (SP) |
 | Dashboard v0 | `https://pro.srssuite.com` → Apache → `127.0.0.1:3010` |
 | Face | PM2 → Apache → `127.0.0.1:3002` |
 
@@ -39,15 +39,20 @@ FACE_RECOGNITION_URL=http://host.docker.internal:3002
 
 | Variable | Para qué |
 |----------|----------|
-| `SRS_*` | Contenedor → PHP (`main`) |
+| `SRS_API_URL` | Contenedor → PHP (host de conexión; suele ser `main`) |
+| `SRS_PUBLIC_URL` | **Fallback** Legacy si la sesión no trae `legacyOrigin` (login directo en v0). Default EN → `main` |
 | `PAYROLL_PUBLIC_URL` | Redirects del browser en v0 (`pro`) — **mismo valor que `PAYROLL_DASHBOARD_URL` en config.php** |
+
+**Back to Legacy (mooi vs main):** no hace falta `SRS_PUBLIC_URL_SP`. Al abrir v0 desde legacy, PHP guarda `legacyOrigin` (ej. `https://mooi.srssuite.com`) en la sesión; "Volver a SRS Legacy" redirige ahí. `SRS_PUBLIC_URL` solo aplica si el usuario entró por login directo en `pro`.
+
+**Variables nuevas:** ninguna. Mismas de siempre.
 
 ```bash
 chmod 600 /home/srssui5/payroll-dashboard.env
 echo 'PAYROLL_ENV_FILE=/home/srssui5/payroll-dashboard.env' > /home/srssui5/v0-payroll-dashboard/.env
 ```
 
-**`config.php` de `main.srssuite.com`:**
+**`config.php` de `main.srssuite.com` y `mooi.srssuite.com`** (mismos valores en ambos):
 
 ```php
 define("PAYROLL_DASHBOARD_URL", "https://pro.srssuite.com");
@@ -55,9 +60,12 @@ define("PAYROLL_SSO_SECRET", "MISMO_QUE_SRS_SSO_SECRET");
 define("FACE_RECOGNITION_API_URL", "http://127.0.0.1:3002");
 ```
 
+Subir por FTP `PayrollDashboardSsoService.php` (y resto SSO) en **main y mooi** si son docroots separados.
+
 | Variable | Dónde apunta |
 |----------|----------------|
-| `SRS_PUBLIC_URL` | **main** (PHP) — nunca `pro` |
+| `SRS_API_URL` | Host de conexión server-side (típ. **main**) |
+| `SRS_PUBLIC_URL` | Fallback Legacy (**main**) — usuarios SP usan `legacyOrigin` de sesión |
 | `PAYROLL_PUBLIC_URL` | **pro** (v0) — redirects SSO; = `PAYROLL_DASHBOARD_URL` en PHP |
 | `PAYROLL_DASHBOARD_URL` (PHP) | **pro** (v0) |
 

@@ -1,6 +1,7 @@
 import type { SrsExchangeResponse, SrsLoginData } from '@/lib/auth/types'
 import { isLoginRoleSelection } from '@/lib/auth/types'
-import { fetchSrsUpstream } from '@/lib/srs-upstream'
+import { fetchLegacyUpstream, fetchSrsUpstream } from '@/lib/srs-upstream'
+import { resolveLegacyPublicUrl } from '@/lib/legacy-origin'
 
 function getSsoSecret(): string {
   const secret = process.env.SRS_SSO_SECRET?.trim()
@@ -92,8 +93,21 @@ export async function loginWithCredentialsFlow(
   return { kind: 'session', token: data.token, user: data.user }
 }
 
-export async function createPhpAdoptCode(token: string, user: unknown) {
-  const res = await fetchSrsUpstream('/php/api/sso/adopt.php', {
+export async function createPhpAdoptCode(
+  token: string,
+  user: unknown,
+  legacyOrigin?: string | null,
+) {
+  const legacyBase = resolveLegacyPublicUrl(
+    typeof user === 'object' &&
+      user !== null &&
+      'legacyOrigin' in user &&
+      typeof (user as { legacyOrigin?: string }).legacyOrigin === 'string'
+      ? (user as { legacyOrigin: string }).legacyOrigin
+      : legacyOrigin,
+  )
+
+  const res = await fetchLegacyUpstream(legacyBase, '/php/api/sso/adopt.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -111,3 +111,31 @@ export async function fetchSrsUpstream(
 
   return fetch(target.toString(), { ...init, cache: 'no-store' })
 }
+
+/**
+ * Call a Legacy PHP endpoint on the user's vhost (e.g. mooi vs main).
+ * Connects via SRS_API_URL but sends Host for the legacy origin when they differ.
+ */
+export async function fetchLegacyUpstream(
+  legacyBase: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const base = legacyBase.replace(/\/$/, '')
+  const target = path.startsWith('http')
+    ? new URL(path)
+    : new URL(path.replace(/^\//, ''), `${base}/`)
+
+  const apiBase = new URL(getSrsApiBaseUrl())
+  const legacyHost = target.host
+
+  if (legacyHost !== apiBase.host) {
+    const connectUrl = new URL(
+      `${target.pathname}${target.search}`,
+      `${apiBase.protocol}//${apiBase.host}/`,
+    )
+    return nodeHttpFetch(connectUrl, legacyHost, init)
+  }
+
+  return fetch(target.toString(), { ...init, cache: 'no-store' })
+}
