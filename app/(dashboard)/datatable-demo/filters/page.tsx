@@ -17,6 +17,7 @@ import {
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { srsProxyUrl } from '@/lib/srs-proxy-url'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { DemoExplainer } from '../_components/demo-explainer'
 
 interface MockEmployee {
@@ -41,13 +42,14 @@ const usd = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-const statusMeta: Record<MockEmployee['status'], { label: string; cls: string; icon: React.ReactNode }> = {
-  active: { label: 'Active', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: <CircleCheck className="size-3" /> },
-  on_leave: { label: 'On leave', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20', icon: <CircleDashed className="size-3" /> },
-  terminated: { label: 'Terminated', cls: 'bg-rose-50 text-rose-700 ring-rose-600/20', icon: <CircleX className="size-3" /> },
+const statusMeta: Record<MockEmployee['status'], { labelKey: 'statusActive' | 'statusOnLeave' | 'statusTerminated'; cls: string; icon: React.ReactNode }> = {
+  active: { labelKey: 'statusActive', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: <CircleCheck className="size-3" /> },
+  on_leave: { labelKey: 'statusOnLeave', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20', icon: <CircleDashed className="size-3" /> },
+  terminated: { labelKey: 'statusTerminated', cls: 'bg-rose-50 text-rose-700 ring-rose-600/20', icon: <CircleX className="size-3" /> },
 }
 
 export default function DataTableFiltersPage() {
+  const { t } = useTranslation()
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'id', desc: false }])
@@ -72,10 +74,10 @@ export default function DataTableFiltersPage() {
     () => [
       {
         accessorKey: 'id',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="ID" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colId')} />,
         cell: ({ row }) => `#${row.original.id}`,
         meta: {
-          label: 'ID',
+          label: t('dataTableDemo.colId'),
           mono: true,
           headerClassName: 'w-[80px]',
           filter: {
@@ -88,10 +90,10 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'name',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colName')} />,
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
         meta: {
-          label: 'Name',
+          label: t('dataTableDemo.colName'),
           sortKey: 'name',
           filter: {
             type: 'text',
@@ -103,10 +105,10 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'email',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colEmail')} />,
         cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span>,
         meta: {
-          label: 'Email',
+          label: t('dataTableDemo.colEmail'),
           filter: {
             type: 'text',
             backendKey: 'email',
@@ -117,10 +119,10 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'department',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Department" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colDepartment')} />,
         cell: ({ row }) => row.original.department,
         meta: {
-          label: 'Department',
+          label: t('dataTableDemo.colDepartment'),
           filter: {
             type: 'text',
             backendKey: 'department',
@@ -131,10 +133,10 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'salary',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colSalary')} />,
         cell: ({ row }) => usd.format(row.original.salary),
         meta: {
-          label: 'Salary',
+          label: t('dataTableDemo.colSalary'),
           numeric: true,
           mono: true,
           exportValue: (row) => row.salary,
@@ -148,7 +150,7 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'hire_date',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Hire date" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colHireDate')} />,
         cell: ({ row }) =>
           new Intl.DateTimeFormat('en-US', {
             year: 'numeric',
@@ -156,7 +158,7 @@ export default function DataTableFiltersPage() {
             day: 'numeric',
           }).format(new Date(row.original.hire_date)),
         meta: {
-          label: 'Hire date',
+          label: t('dataTableDemo.colHireDate'),
           mono: true,
           filter: {
             type: 'date',
@@ -167,7 +169,7 @@ export default function DataTableFiltersPage() {
       },
       {
         accessorKey: 'status',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colStatus')} />,
         cell: ({ row }) => {
           const m = statusMeta[row.original.status]
           return (
@@ -176,13 +178,13 @@ export default function DataTableFiltersPage() {
               className={`gap-1 border-0 px-1.5 py-0.5 text-[10px] font-medium ring-1 ${m.cls}`}
             >
               {m.icon}
-              {m.label}
+              {t(`dataTableDemo.${m.labelKey}`)}
             </Badge>
           )
         },
         meta: {
-          label: 'Status',
-          exportValue: (row) => statusMeta[row.status].label,
+          label: t('dataTableDemo.colStatus'),
+          exportValue: (row) => t(`dataTableDemo.${statusMeta[row.status].labelKey}`),
           filter: {
             type: 'text',
             backendKey: 'status',
@@ -192,7 +194,7 @@ export default function DataTableFiltersPage() {
         } satisfies DataTableColumnMeta<MockEmployee>,
       },
     ],
-    [],
+    [t],
   )
 
   const query = useQuery({
@@ -218,11 +220,7 @@ export default function DataTableFiltersPage() {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0 space-y-2">
-        <p className="text-[11px] text-muted-foreground">
-          Hit the small <span className="font-mono">▾</span> /{' '}
-          <span className="font-mono">filter</span> icon on each header to filter. Active filters show
-          up as chips in the toolbar and the operator + value are sent to the backend.
-        </p>
+        <p className="text-[11px] text-muted-foreground">{t('dataTableDemo.filtersHint')}</p>
         <DataTable<MockEmployee>
           tableId="demo-filters"
           columns={columns}
@@ -260,17 +258,9 @@ export default function DataTableFiltersPage() {
       </div>
 
       <DemoExplainer
-        title="Server-side column filters"
-        description={
-          <>
-            Declare a filter per column with{' '}
-            <code className="rounded bg-muted px-1 text-[10px]">meta.filter</code>. The combobox icon
-            appears in the header; values land in TanStack's{' '}
-            <code className="rounded bg-muted px-1 text-[10px]">columnFilters</code> state and
-            <code className="ml-1 rounded bg-muted px-1 text-[10px]">buildBackendQuery</code> turns
-            them into the exact query string the backend expects.
-          </>
-        }
+        howConfiguredLabel={t('dataTableDemo.howConfigured')}
+        title={t('dataTableDemo.filtersTitle')}
+        description={t('dataTableDemo.filtersDescription')}
         steps={[
           {
             title: 'Text filter (contains / starts / etc)',

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface PunchHoursFilterProps {
   minHours: string
@@ -24,6 +25,8 @@ function HoursInput({
   placeholder: string
   label: string
 }) {
+  const { t } = useTranslation()
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value
     // Allow empty, digits and single decimal point
@@ -43,7 +46,7 @@ function HoursInput({
         inputMode="decimal"
         aria-label={label}
       />
-      <span className="text-[11px] text-muted-foreground">h</span>
+      <span className="text-[11px] text-muted-foreground">{t('common.hoursShort')}</span>
     </div>
   )
 }
@@ -55,6 +58,8 @@ export function PunchHoursFilter({
   onMaxChange,
   className,
 }: PunchHoursFilterProps) {
+  const { t } = useTranslation()
+
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -62,13 +67,13 @@ export function PunchHoursFilter({
         value={minHours}
         onChange={onMinChange}
         placeholder="0"
-        label="More than"
+        label={t('common.moreThan')}
       />
       <HoursInput
         value={maxHours}
         onChange={onMaxChange}
         placeholder="0"
-        label="Less than"
+        label={t('common.lessThan')}
       />
     </div>
   )

@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { getAgencyStats, agencies, employees, overtimeRecords } from '@/lib/mock-data'
+import { getAgencyStats, agencies, employees } from '@/lib/mock-data'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DollarSign, Search, Building2, Users, TrendingUp, Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,7 @@ type SortField = 'name' | 'employees' | 'issues' | 'overtime' | 'cost' | 'punctu
 type SortDirection = 'asc' | 'desc'
 
 export default function CostsPage() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('cost')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -57,50 +58,60 @@ export default function CostsPage() {
   const SortIcon = ({ field }: { field: SortField }) => { if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />; return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" /> }
 
   const topAgenciesByCost = filteredStats.sort((a, b) => b.estimatedCost - a.estimatedCost).slice(0, 10).map(a => ({ name: a.agencyName.split(' ').slice(0, 2).join(' '), cost: Math.round(a.estimatedCost), hours: Math.round(a.totalOvertimeHours) }))
-  const costDistribution = [{ name: 'Regular Hours', value: globalStats.regularCost, color: '#4CAF50' }, { name: 'Overtime', value: globalStats.totalOvertimeCost, color: '#FF9800' }]
+  const costDistribution = useMemo(() => [
+    { name: t('mockCosts.regularHours'), value: globalStats.regularCost, color: '#4CAF50' },
+    { name: t('mockCosts.overtime'), value: globalStats.totalOvertimeCost, color: '#FF9800' },
+  ], [t, globalStats.regularCost, globalStats.totalOvertimeCost])
 
-  const exportData = filteredStats.map(s => ({ 'Dealer': s.agencyName, 'Employees': s.totalEmployees, 'Issues': s.totalIssues, 'Overtime Hours': s.totalOvertimeHours, 'Overtime Cost': s.estimatedCost, 'Punctuality': s.punctualityRate }))
+  const exportData = filteredStats.map(s => ({
+    [t('dealer.label')]: s.agencyName,
+    [t('mockCosts.exportEmployees')]: s.totalEmployees,
+    [t('mockCosts.tableIssues')]: s.totalIssues,
+    [t('mockCosts.exportOvertimeHours')]: s.totalOvertimeHours,
+    [t('mockCosts.exportOvertimeCost')]: s.estimatedCost,
+    [t('mockCosts.exportPunctuality')]: s.punctualityRate
+  }))
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-3"><DollarSign className="h-7 w-7 text-[#4CAF50]" />Costs by Dealer</h1>
-          <p className="text-muted-foreground mt-1">Payroll and overtime cost estimation</p>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-3"><DollarSign className="h-7 w-7 text-[#4CAF50]" />{t('mockCosts.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('mockCosts.subtitle')}</p>
         </div>
-        <ExportButton data={exportData} filename="costs-by-dealer" title="Costs Report" />
+        <ExportButton data={exportData} filename="costs-by-dealer" title={t('mockCosts.exportTitle')} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Active Employees</p><p className="text-2xl font-bold text-foreground">{globalStats.totalEmployees}</p></div><Users className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
-        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Dealers</p><p className="text-2xl font-bold text-foreground">{agencies.length}</p></div><Building2 className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
-        <Card className="bg-[#2196F3]/10 border-[#2196F3]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#2196F3]">Total Overtime</p><p className="text-2xl font-bold text-[#2196F3]">{globalStats.totalOvertimeHours}h</p></div><Clock className="h-6 w-6 text-[#2196F3]/50" /></div></CardContent></Card>
-        <Card className="bg-[#FF9800]/10 border-[#FF9800]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#FF9800]">Overtime Cost</p><p className="text-2xl font-bold text-[#FF9800]">${globalStats.totalOvertimeCost.toLocaleString()}</p></div><DollarSign className="h-6 w-6 text-[#FF9800]/50" /></div></CardContent></Card>
-        <Card className="bg-[#4CAF50]/10 border-[#4CAF50]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#4CAF50]">Est. Payroll</p><p className="text-2xl font-bold text-[#4CAF50]">${globalStats.totalPayroll.toLocaleString()}</p></div><TrendingUp className="h-6 w-6 text-[#4CAF50]/50" /></div></CardContent></Card>
-        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Avg Punctuality</p><p className="text-2xl font-bold text-foreground">{globalStats.avgPunctuality}%</p></div><TrendingUp className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
+        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{t('mockCosts.activeEmployees')}</p><p className="text-2xl font-bold text-foreground">{globalStats.totalEmployees}</p></div><Users className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
+        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{t('mockCosts.totalDealers')}</p><p className="text-2xl font-bold text-foreground">{agencies.length}</p></div><Building2 className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
+        <Card className="bg-[#2196F3]/10 border-[#2196F3]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#2196F3]">{t('mockCosts.totalOvertime')}</p><p className="text-2xl font-bold text-[#2196F3]">{globalStats.totalOvertimeHours}h</p></div><Clock className="h-6 w-6 text-[#2196F3]/50" /></div></CardContent></Card>
+        <Card className="bg-[#FF9800]/10 border-[#FF9800]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#FF9800]">{t('mockCosts.overtimeCost')}</p><p className="text-2xl font-bold text-[#FF9800]">${globalStats.totalOvertimeCost.toLocaleString()}</p></div><DollarSign className="h-6 w-6 text-[#FF9800]/50" /></div></CardContent></Card>
+        <Card className="bg-[#4CAF50]/10 border-[#4CAF50]/30"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-[#4CAF50]">{t('mockCosts.estPayroll')}</p><p className="text-2xl font-bold text-[#4CAF50]">${globalStats.totalPayroll.toLocaleString()}</p></div><TrendingUp className="h-6 w-6 text-[#4CAF50]/50" /></div></CardContent></Card>
+        <Card className="bg-card border-border"><CardContent className="pt-4 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{t('mockCosts.avgPunctuality')}</p><p className="text-2xl font-bold text-foreground">{globalStats.avgPunctuality}%</p></div><TrendingUp className="h-6 w-6 text-muted-foreground/50" /></div></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-lg font-medium text-foreground">Top 10 Dealers by Overtime Cost</CardTitle></CardHeader>
-          <CardContent><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topAgenciesByCost} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis type="number" stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v}`} /><YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={100} /><Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }} formatter={(value, name) => [name === 'cost' ? `$${value}` : `${value}h`, name === 'cost' ? 'Cost' : 'Hours']} /><Bar dataKey="cost" name="Cost" fill="#FF9800" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-lg font-medium text-foreground">{t('mockCosts.top10ByOtCost')}</CardTitle></CardHeader>
+          <CardContent><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topAgenciesByCost} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis type="number" stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v}`} /><YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={100} /><Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }} formatter={(value, name) => [name === 'cost' ? `$${value}` : `${value}h`, name === 'cost' ? t('mockCosts.costTooltip') : t('mockCosts.hoursTooltip')]} /><Bar dataKey="cost" name="cost" fill="#FF9800" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-lg font-medium text-foreground">Payroll Distribution</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-lg font-medium text-foreground">{t('mockCosts.payrollDistribution')}</CardTitle></CardHeader>
           <CardContent><div className="h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={costDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>{costDistribution.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }} formatter={(value) => [`$${Number(value).toLocaleString()}`, '']} /><Legend /></PieChart></ResponsiveContainer></div></CardContent>
         </Card>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search dealer..." value={search} onChange={(e) => { setSearch(e.target.value); setPageIndex(0) }} className="pl-10 bg-background border-border" /></div>
-        <p className="text-sm text-muted-foreground">{filteredStats.length} dealers</p>
+        <div className="relative flex-1 max-w-sm"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder={t('mockCosts.searchDealer')} value={search} onChange={(e) => { setSearch(e.target.value); setPageIndex(0) }} className="pl-10 bg-background border-border" /></div>
+        <p className="text-sm text-muted-foreground">{t('mockCosts.dealerCount', { count: filteredStats.length })}</p>
       </div>
 
       <Card className="bg-card border-border">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-[#1565C0] text-white"><th className="px-4 py-3 text-left rounded-tl-md"><button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('name')}>Dealer <SortIcon field="name" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('employees')}>Employees <SortIcon field="employees" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('issues')}>Issues <SortIcon field="issues" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('overtime')}>Overtime <SortIcon field="overtime" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('cost')}>OT Cost <SortIcon field="cost" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('punctuality')}>Punctuality <SortIcon field="punctuality" /></button></th><th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">Cost/Employee</th></tr></thead>
+              <thead><tr className="bg-[#1565C0] text-white"><th className="px-4 py-3 text-left rounded-tl-md"><button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('name')}>{t('dealer.label')} <SortIcon field="name" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('employees')}>{t('mockCosts.tableEmployees')} <SortIcon field="employees" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('issues')}>{t('mockCosts.tableIssues')} <SortIcon field="issues" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('overtime')}>{t('mockCosts.tableOvertime')} <SortIcon field="overtime" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('cost')}>{t('mockCosts.otCost')} <SortIcon field="cost" /></button></th><th className="px-4 py-3 text-center"><button className="flex items-center justify-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('punctuality')}>{t('mockCosts.punctuality')} <SortIcon field="punctuality" /></button></th><th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">{t('mockCosts.costPerEmployee')}</th></tr></thead>
               <tbody className="divide-y divide-border">
                 {paginatedStats.map((stat, index) => {
                   const costPerEmployee = stat.totalEmployees > 0 ? Math.round(stat.estimatedCost / stat.totalEmployees) : 0
@@ -120,7 +131,7 @@ export default function CostsPage() {
             </table>
           </div>
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <p className="text-sm text-muted-foreground">Showing {paginatedStats.length} of {filteredStats.length}</p>
+            <p className="text-sm text-muted-foreground">{t('mockCosts.showingOf', { shown: paginatedStats.length, total: filteredStats.length })}</p>
             <div className="flex items-center gap-1"><Button variant="outline" size="icon" onClick={() => setPageIndex(pageIndex - 1)} disabled={pageIndex === 0}><ChevronLeft className="h-4 w-4" /></Button><span className="text-sm text-muted-foreground px-2">{pageIndex + 1} / {totalPages}</span><Button variant="outline" size="icon" onClick={() => setPageIndex(pageIndex + 1)} disabled={pageIndex >= totalPages - 1}><ChevronRight className="h-4 w-4" /></Button></div>
           </div>
         </CardContent>

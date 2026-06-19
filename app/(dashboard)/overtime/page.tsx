@@ -7,6 +7,7 @@ import {
   getAgencyById,
   agencies
 } from '@/lib/mock-data'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { EmployeeAvatar } from '@/components/employees/employee-avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -43,9 +44,9 @@ import {
 import { ExportButton } from '@/components/shared/export-button'
 
 export default function OvertimePage() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedAgency, setSelectedAgency] = useState<string>('all')
-  const [view, setView] = useState<'employees' | 'agencies'>('employees')
   const [pageIndex, setPageIndex] = useState(0)
   const pageSize = 20
 
@@ -187,39 +188,36 @@ export default function OvertimePage() {
   const totalPagesEmployees = Math.ceil(filteredEmployees.length / pageSize)
   const paginatedEmployees = filteredEmployees.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
 
-  // Export data
   const exportData = filteredEmployees.map(item => ({
-    'Employee': item.employee ? `${item.employee.firstName} ${item.employee.lastName}` : '',
-    'Dealer': item.agency?.name || '',
-    'Total Hours': Math.round(item.totalHours * 10) / 10,
-    'Total Cost': Math.round(item.totalCost * 100) / 100,
-    'Days with OT': item.records.length,
-    'Avg Hours/Day': Math.round((item.totalHours / item.records.length) * 10) / 10
+    [t('common.employee')]: item.employee ? `${item.employee.firstName} ${item.employee.lastName}` : '',
+    [t('dealer.label')]: item.agency?.name || '',
+    [t('mockOvertime.exportTotalHours')]: Math.round(item.totalHours * 10) / 10,
+    [t('mockOvertime.exportTotalCost')]: Math.round(item.totalCost * 100) / 100,
+    [t('mockOvertime.exportDaysWithOt')]: item.records.length,
+    [t('mockOvertime.exportAvgHoursDay')]: Math.round((item.totalHours / item.records.length) * 10) / 10
   }))
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <Timer className="h-7 w-7 text-[#2196F3]" />
-            Overtime
+            {t('mockOvertime.title')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Track overtime hours worked and associated costs
+            {t('mockOvertime.subtitle')}
           </p>
         </div>
-        <ExportButton data={exportData} filename="overtime-report" title="Overtime Report" />
+        <ExportButton data={exportData} filename="overtime-report" title={t('mockOvertime.exportTitle')} />
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-[#2196F3]/10 border-[#2196F3]/30">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-[#2196F3]">Total Hours</p>
+                <p className="text-xs text-[#2196F3]">{t('mockOvertime.totalHours')}</p>
                 <p className="text-2xl font-bold text-[#2196F3]">{stats.totalHours}h</p>
               </div>
               <Timer className="h-8 w-8 text-[#2196F3]/50" />
@@ -230,7 +228,7 @@ export default function OvertimePage() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-[#4CAF50]">Total Cost</p>
+                <p className="text-xs text-[#4CAF50]">{t('mockOvertime.totalCost')}</p>
                 <p className="text-2xl font-bold text-[#4CAF50]">${stats.totalCost.toLocaleString()}</p>
               </div>
               <DollarSign className="h-8 w-8 text-[#4CAF50]/50" />
@@ -241,7 +239,7 @@ export default function OvertimePage() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Employees with OT</p>
+                <p className="text-xs text-muted-foreground">{t('mockOvertime.employeesWithOt')}</p>
                 <p className="text-2xl font-bold text-foreground">{stats.uniqueEmployees}</p>
               </div>
               <Users className="h-8 w-8 text-muted-foreground/50" />
@@ -250,12 +248,11 @@ export default function OvertimePage() {
         </Card>
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium text-foreground">
-              Top 10 Employees with Most Overtime
+              {t('mockOvertime.top10Employees')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -267,7 +264,7 @@ export default function OvertimePage() {
                   <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={100} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }}
-                    formatter={(value) => [`${value}h`, 'Hours']}
+                    formatter={(value) => [`${value}h`, t('mockOvertime.hoursTooltip')]}
                   />
                   <Bar dataKey="hours" fill="#2196F3" radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -279,7 +276,7 @@ export default function OvertimePage() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium text-foreground">
-              Daily Trend (Last 7 days)
+              {t('mockOvertime.dailyTrendLast7')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -291,7 +288,7 @@ export default function OvertimePage() {
                   <YAxis stroke="#64748b" fontSize={12} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }}
-                    formatter={(value) => [`${value}h`, 'Hours']}
+                    formatter={(value) => [`${value}h`, t('mockOvertime.hoursTooltip')]}
                   />
                   <Line type="monotone" dataKey="hours" stroke="#2196F3" strokeWidth={2} dot={{ fill: '#2196F3' }} />
                 </LineChart>
@@ -301,17 +298,16 @@ export default function OvertimePage() {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="employees" onValueChange={(v) => { setView(v as 'employees' | 'agencies'); setPageIndex(0) }}>
+      <Tabs defaultValue="employees" onValueChange={() => setPageIndex(0)}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <TabsList>
             <TabsTrigger value="employees" className="gap-2">
               <Users className="h-4 w-4" />
-              By Employee
+              {t('mockOvertime.byEmployee')}
             </TabsTrigger>
             <TabsTrigger value="agencies" className="gap-2">
               <Building2 className="h-4 w-4" />
-              By Dealer
+              {t('mockOvertime.byDealer')}
             </TabsTrigger>
           </TabsList>
 
@@ -319,7 +315,7 @@ export default function OvertimePage() {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search..."
+                placeholder={t('common.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10 bg-background border-border"
@@ -327,10 +323,10 @@ export default function OvertimePage() {
             </div>
             <Select value={selectedAgency} onValueChange={setSelectedAgency}>
               <SelectTrigger className="w-[180px] border-border">
-                <SelectValue placeholder="Dealer" />
+                <SelectValue placeholder={t('dealer.label')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Dealers</SelectItem>
+                <SelectItem value="all">{t('dealer.all')}</SelectItem>
                 {agencies.slice(0, 20).map(agency => (
                   <SelectItem key={agency.id} value={agency.id}>{agency.name}</SelectItem>
                 ))}
@@ -345,12 +341,12 @@ export default function OvertimePage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-[#1565C0] text-white">
-                    <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">Employee</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium">Dealer</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Total Hours</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Total Cost</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Days with OT</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">Avg/Day</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">{t('common.employee')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">{t('dealer.label')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalHours')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalCost')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableDaysWithOt')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">{t('mockOvertime.tableAvgDay')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -381,10 +377,9 @@ export default function OvertimePage() {
                 </tbody>
               </table>
 
-              {/* Pagination */}
               <div className="flex items-center justify-between border-t border-border px-4 py-3">
                 <p className="text-sm text-muted-foreground">
-                  Showing {paginatedEmployees.length} of {filteredEmployees.length}
+                  {t('mockOvertime.showingOf', { shown: paginatedEmployees.length, total: filteredEmployees.length })}
                 </p>
                 <div className="flex items-center gap-1">
                   <Button variant="outline" size="icon" onClick={() => setPageIndex(pageIndex - 1)} disabled={pageIndex === 0}>
@@ -408,11 +403,11 @@ export default function OvertimePage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-[#1565C0] text-white">
-                    <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">Dealer</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Employees with OT</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Total Hours</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium">Total Cost</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">Avg/Employee</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">{t('dealer.label')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableEmployeesWithOt')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalHours')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalCost')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium rounded-tr-md">{t('mockOvertime.tableAvgEmployee')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">

@@ -14,6 +14,7 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface PaymentTypeFilterProps {
   value: PaymentTypeFilterValue
@@ -43,11 +44,13 @@ export function PaymentTypeFilter({
   loading = false,
   className,
 }: PaymentTypeFilterProps) {
+  const { t } = useTranslation()
+
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <DollarSign className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-        Payment type
+        {t('punch.paymentTypeFilter')}
       </span>
       <Select
         value={toSelectValue(value)}
@@ -57,16 +60,16 @@ export function PaymentTypeFilter({
         <SelectTrigger
           size="sm"
           className="h-7 min-w-[140px] max-w-[220px] px-2 text-[11px]"
-          aria-label="Filter by payment type"
+          aria-label={t('punch.filterByPaymentType')}
         >
-          <SelectValue placeholder="All types" />
+          <SelectValue placeholder={t('punch.allPaymentTypes')} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={PAYMENT_TYPE_FILTER_ALL} className="text-xs">
-            All types
+            {t('punch.allPaymentTypes')}
           </SelectItem>
           <SelectItem value={PAYMENT_TYPE_FILTER_WITHOUT} className="text-xs">
-            Without payment type
+            {t('punch.withoutPaymentType')}
           </SelectItem>
           {options.map((option) => (
             <SelectItem

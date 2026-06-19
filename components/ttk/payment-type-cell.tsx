@@ -2,6 +2,7 @@
 
 import { DollarSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface PaymentTypeCellProps {
   name?: string | null
@@ -10,6 +11,7 @@ interface PaymentTypeCellProps {
 }
 
 export function PaymentTypeCell({ name, editable = false, onEdit }: PaymentTypeCellProps) {
+  const { t } = useTranslation()
   const hasType = Boolean(name && name.trim())
 
   const chipClass = cn(
@@ -39,7 +41,7 @@ export function PaymentTypeCell({ name, editable = false, onEdit }: PaymentTypeC
     <button
       type="button"
       onClick={onEdit}
-      title="Edit payment type"
+      title={t('punch.editPaymentType')}
       className={cn(
         chipClass,
         'cursor-pointer transition-colors',
@@ -47,7 +49,7 @@ export function PaymentTypeCell({ name, editable = false, onEdit }: PaymentTypeC
       )}
     >
       <DollarSign className="size-3 shrink-0" aria-hidden />
-      <span className="truncate">{hasType ? name : 'Set payment'}</span>
+      <span className="truncate">{hasType ? name : t('punch.setPayment')}</span>
     </button>
   )
 }

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Download, FileSpreadsheet, Loader2 } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 type ExportButtonProps =
   | {
@@ -29,6 +30,7 @@ type ExportButtonProps =
     }
 
 export function ExportButton(props: ExportButtonProps) {
+  const { t } = useTranslation()
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async () => {
@@ -39,10 +41,10 @@ export function ExportButton(props: ExportButtonProps) {
       } else if (props.data) {
         const { data, filename = 'export', title } = props
         const headers = Object.keys(data[0] ?? {})
-        const rows = data.map(row => headers.map(h => `"${String(row[h] ?? '')}"`).join(','))
+        const rows = data.map((row) => headers.map((h) => `"${String(row[h] ?? '')}"`).join(','))
         const csv = [
           ...(title ? [`"${title}"`] : []),
-          headers.map(h => `"${h}"`).join(','),
+          headers.map((h) => `"${h}"`).join(','),
           ...rows,
         ].join('\n')
         const blob = new Blob([csv], { type: 'text/csv' })
@@ -73,14 +75,18 @@ export function ExportButton(props: ExportButtonProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="gap-2" disabled={props.disabled || isExporting}>
-            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {t('common.export')}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={handleExport} className="gap-2">
             <FileSpreadsheet className="h-4 w-4" />
-            Export to Excel
+            {t('dataTable.exportExcel')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -99,7 +105,7 @@ export function ExportButton(props: ExportButtonProps) {
       ) : (
         <FileSpreadsheet className="h-4 w-4 text-green-600" />
       )}
-      Export Excel
+      {t('dataTable.exportExcel')}
     </Button>
   )
 }

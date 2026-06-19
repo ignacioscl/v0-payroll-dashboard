@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 /* -------------------------------------------------------------------------- */
 /* Pagination contract                                                         */
@@ -196,16 +197,16 @@ export function SearchableCombobox<T>({
   isLoadingMore = false,
   onLoadMore,
   totalCount,
-  placeholder = 'Select…',
-  searchPlaceholder = 'Search…',
+  placeholder,
+  searchPlaceholder,
   resultsHeading,
-  emptyTitle = 'No results',
-  emptyDescription = 'Try a different search term.',
-  preSearchTitle = 'Start typing to search',
+  emptyTitle,
+  emptyDescription,
+  preSearchTitle,
   preSearchDescription,
-  loadingMessage = 'Searching…',
-  loadMoreLabel = 'Load more',
-  loadingMoreLabel = 'Loading more…',
+  loadingMessage,
+  loadMoreLabel,
+  loadingMoreLabel,
   prerequisite,
   className,
   popoverWidth = 'w-(--radix-popover-trigger-width)',
@@ -213,6 +214,15 @@ export function SearchableCombobox<T>({
   listMaxHeight = 'max-h-[280px]',
   showFooterHint = true,
 }: SearchableComboboxProps<T>) {
+  const { t } = useTranslation()
+  const resolvedPlaceholder = placeholder ?? t('combobox.select')
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t('combobox.search')
+  const resolvedEmptyTitle = emptyTitle ?? t('combobox.noResults')
+  const resolvedEmptyDescription = emptyDescription ?? t('combobox.tryDifferent')
+  const resolvedPreSearchTitle = preSearchTitle ?? t('combobox.startTyping')
+  const resolvedLoadingMessage = loadingMessage ?? t('combobox.searching')
+  const resolvedLoadMoreLabel = loadMoreLabel ?? t('combobox.loadMore')
+  const resolvedLoadingMoreLabel = loadingMoreLabel ?? t('combobox.loadingMore')
   const [open, setOpen] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const sentinelRef = React.useRef<HTMLDivElement>(null)
@@ -271,18 +281,21 @@ export function SearchableCombobox<T>({
 
   const computedPreSearchDescription =
     preSearchDescription ??
-    `Enter at least ${minSearchChars} character${minSearchChars === 1 ? '' : 's'} to begin.`
+    t('combobox.enterMinChars', {
+      count: minSearchChars,
+      plural: minSearchChars === 1 ? '' : 's',
+    })
 
   const renderedHeading =
     resultsHeading ?? (
       <span className="flex items-center justify-between gap-2 px-1">
-        <span>Results</span>
+        <span>{t('combobox.results')}</span>
         <span className="text-[10px] font-normal text-muted-foreground/80">
           {items!.length}
           {typeof totalCount === 'number' && totalCount > items!.length
-            ? ` of ${totalCount}`
+            ? t('combobox.ofTotal', { total: totalCount })
             : ''}{' '}
-          result{items!.length === 1 ? '' : 's'}
+          {items!.length === 1 ? t('combobox.resultSingular') : t('combobox.resultPlural')}
         </span>
       </span>
     )
@@ -316,7 +329,7 @@ export function SearchableCombobox<T>({
                   <span
                     role="button"
                     tabIndex={0}
-                    aria-label="Clear selection"
+                    aria-label={t('combobox.clearSelection')}
                     onClick={clearSelection}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') clearSelection(e)
@@ -328,11 +341,11 @@ export function SearchableCombobox<T>({
                 </>
               )
             : renderEmptyTrigger
-              ? renderEmptyTrigger({ placeholder, open, disabled })
+              ? renderEmptyTrigger({ placeholder: resolvedPlaceholder, open, disabled })
               : (
                 <>
                   <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">
-                    {placeholder}
+                    {resolvedPlaceholder}
                   </span>
                   <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
                 </>
@@ -351,7 +364,7 @@ export function SearchableCombobox<T>({
               ref={inputRef}
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
-              placeholder={searchPlaceholder}
+              placeholder={resolvedSearchPlaceholder}
               className="flex h-10 w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
               autoComplete="off"
               spellCheck={false}
@@ -361,7 +374,7 @@ export function SearchableCombobox<T>({
                 type="button"
                 onClick={() => onSearchTermChange('')}
                 className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Clear search"
+                aria-label={t('combobox.clearSearch')}
               >
                 <X className="size-3.5" />
               </button>
@@ -390,7 +403,7 @@ export function SearchableCombobox<T>({
                   <Search className="size-5" />
                 </div>
                 <p className="text-sm font-medium text-foreground">
-                  {preSearchTitle}
+                  {resolvedPreSearchTitle}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {computedPreSearchDescription}
@@ -401,15 +414,15 @@ export function SearchableCombobox<T>({
             {prereqMet && !needsMoreChars && isLoading && (
               <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                {loadingMessage}
+                {resolvedLoadingMessage}
               </div>
             )}
 
             {prereqMet && showEmpty && (
               <CommandEmpty>
                 <div className="flex flex-col items-center gap-1.5 px-4 py-2 text-center">
-                  <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-                  <p className="text-xs text-muted-foreground">{emptyDescription}</p>
+                  <p className="text-sm font-medium text-foreground">{resolvedEmptyTitle}</p>
+                  <p className="text-xs text-muted-foreground">{resolvedEmptyDescription}</p>
                 </div>
               </CommandEmpty>
             )}
@@ -470,10 +483,10 @@ export function SearchableCombobox<T>({
                       {isLoadingMore ? (
                         <>
                           <Loader2 className="size-3.5 animate-spin" />
-                          {loadingMoreLabel}
+                          {resolvedLoadingMoreLabel}
                         </>
                       ) : (
-                        loadMoreLabel
+                        resolvedLoadMoreLabel
                       )}
                     </Button>
                   </div>
@@ -484,11 +497,7 @@ export function SearchableCombobox<T>({
 
           {showFooterHint && prereqMet && !needsMoreChars && hasResults && (
             <div className="border-t border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] text-muted-foreground">
-              <kbd className="rounded border bg-background px-1 py-px font-mono text-[10px] text-muted-foreground">↑</kbd>{' '}
-              <kbd className="rounded border bg-background px-1 py-px font-mono text-[10px] text-muted-foreground">↓</kbd>{' '}
-              to navigate{' '}
-              <kbd className="ml-1 rounded border bg-background px-1 py-px font-mono text-[10px] text-muted-foreground">↵</kbd>{' '}
-              to select
+              {t('combobox.navigateHint')}
             </div>
           )}
         </Command>

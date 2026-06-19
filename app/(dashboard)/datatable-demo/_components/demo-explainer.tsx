@@ -8,6 +8,7 @@ import { Lightbulb } from 'lucide-react'
 interface DemoExplainerProps {
   title: string
   description: React.ReactNode
+  howConfiguredLabel?: string
   /** Steps with title, optional badge, and a snippet. */
   steps: { title: string; badge?: string; code: string; note?: React.ReactNode }[]
 }
@@ -16,13 +17,13 @@ interface DemoExplainerProps {
  * Side panel shown next to each demo, walking through how the feature is
  * configured. Keep snippets short and concrete — copy-pasteable.
  */
-export function DemoExplainer({ title, description, steps }: DemoExplainerProps) {
+export function DemoExplainer({ title, description, howConfiguredLabel = 'How this is configured', steps }: DemoExplainerProps) {
   return (
     <Card className="gap-0 overflow-hidden border-amber-200 bg-amber-50/40 p-0">
       <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-100/60 px-3 py-2">
         <Lightbulb className="size-3.5 text-amber-700" />
         <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-900">
-          How this is configured
+          {howConfiguredLabel}
         </h3>
       </div>
 

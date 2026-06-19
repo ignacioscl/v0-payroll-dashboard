@@ -5,6 +5,7 @@ import { ChevronsUpDown, User, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SearchableCombobox } from '@/components/shared/searchable-combobox'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface EmployeeComboboxProps {
   value: TtkEmployeeOption | null
@@ -85,11 +86,13 @@ export function EmployeeCombobox({
   employees,
   isLoading = false,
   disabled = false,
-  placeholder = 'Select an employee…',
+  placeholder,
   minSearchChars = 2,
   className,
   dealerSelected = true,
 }: EmployeeComboboxProps) {
+  const { t } = useTranslation()
+
   return (
     <SearchableCombobox<TtkEmployeeOption>
       value={value}
@@ -102,27 +105,27 @@ export function EmployeeCombobox({
       isLoading={isLoading}
       disabled={disabled}
       minSearchChars={minSearchChars}
-      placeholder={placeholder}
-      searchPlaceholder="Type at least 2 characters…"
-      preSearchTitle="Start typing to search"
-      preSearchDescription={`Enter at least ${minSearchChars} characters to find an employee.`}
-      loadingMessage="Searching employees…"
-      emptyTitle="No employees found"
-      emptyDescription="Try a different name or check the dealer selection."
+      placeholder={placeholder ?? t('employeeSearch.select')}
+      searchPlaceholder={t('employeeSearch.typeMinChars')}
+      preSearchTitle={t('employeeSearch.startTyping')}
+      preSearchDescription={t('employeeSearch.enterMinChars', { count: minSearchChars })}
+      loadingMessage={t('employeeSearch.searching')}
+      emptyTitle={t('employeeSearch.noneFound')}
+      emptyDescription={t('employeeSearch.tryDifferent')}
       resultsHeading={
         <span className="flex items-center justify-between gap-2 px-1">
-          <span>Employees</span>
+          <span>{t('employeeSearch.employees')}</span>
           {employees && (
             <span className="text-[10px] font-normal text-muted-foreground/80">
-              {employees.length} result{employees.length === 1 ? '' : 's'}
+              {t('employeeSearch.results', { count: employees.length })}
             </span>
           )}
         </span>
       }
       prerequisite={{
         met: dealerSelected,
-        title: 'Pick a dealer first',
-        description: 'Select a dealer in the header to look up employees.',
+        title: t('employeeSearch.pickDealerFirst'),
+        description: t('dealer.selectInHeaderToSearch'),
         icon: (
           <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <User className="size-5" />
@@ -136,13 +139,13 @@ export function EmployeeCombobox({
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate font-medium text-foreground">{item.nombre}</span>
             <span className="truncate text-[11px] text-muted-foreground">
-              Click to change employee
+              {t('employeeSearch.clickToChange')}
             </span>
           </span>
           <span
             role="button"
             tabIndex={0}
-            aria-label="Clear selected employee"
+            aria-label={t('employeeSearch.clearSelected')}
             onClick={clear}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') clear(e)
@@ -161,7 +164,7 @@ export function EmployeeCombobox({
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate font-medium text-muted-foreground">{p}</span>
             <span className="truncate text-[11px] text-muted-foreground/80">
-              Search by name to pick one
+              {t('employeeSearch.searchByName')}
             </span>
           </span>
           <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />

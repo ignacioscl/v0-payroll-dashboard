@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { facePunchImageUrl } from '@/lib/face/face-proxy-url'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export type PunchFacePhotoValidation = {
   punchIn?: number | null
@@ -25,7 +26,11 @@ type PhotoSlot = {
   validationId?: number | null
 }
 
-function PunchFacePhotoSlot({ label, validationId }: PhotoSlot) {
+function PunchFacePhotoSlot({
+  label,
+  validationId,
+  withoutImageLabel,
+}: PhotoSlot & { withoutImageLabel: string }) {
   const [status, setStatus] = React.useState<'loading' | 'loaded' | 'error'>(
     validationId ? 'loading' : 'error',
   )
@@ -38,7 +43,7 @@ function PunchFacePhotoSlot({ label, validationId }: PhotoSlot) {
     return (
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-        <p className="text-sm text-muted-foreground">Without image</p>
+        <p className="text-sm text-muted-foreground">{withoutImageLabel}</p>
       </section>
     )
   }
@@ -52,11 +57,11 @@ function PunchFacePhotoSlot({ label, validationId }: PhotoSlot) {
         </div>
       ) : null}
       {status === 'error' ? (
-        <p className="text-sm text-muted-foreground">Without image</p>
+        <p className="text-sm text-muted-foreground">{withoutImageLabel}</p>
       ) : null}
       <img
         src={facePunchImageUrl(validationId)}
-        alt={`${label} face recognition`}
+        alt={label}
         className={
           status === 'loaded'
             ? 'max-h-72 max-w-full rounded-lg border border-border object-contain'
@@ -84,8 +89,17 @@ export function PunchFacePhotosDialog({
   punchDateLabel,
   validation,
 }: PunchFacePhotosDialogProps) {
-  const titleName = employeeName?.trim() || 'Employee'
+  const { t } = useTranslation()
+  const titleName = employeeName?.trim() || t('common.employee')
   const datePart = punchDateLabel?.trim()
+  const withoutImageLabel = t('punch.withoutImage')
+
+  const slots = [
+    { label: t('punch.slotPunchIn'), validationId: validation?.punchIn },
+    { label: t('punch.slotBreakIn'), validationId: validation?.breakStart },
+    { label: t('punch.slotBreakOut'), validationId: validation?.breakEnd },
+    { label: t('punch.slotPunchOut'), validationId: validation?.punchOut },
+  ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,26 +109,30 @@ export function PunchFacePhotosDialog({
             <Images className="size-5 shrink-0 text-sky-600" />
             <span className="leading-snug">
               {titleName}
-              <span className="font-normal text-muted-foreground"> (Face recognition)</span>
+              <span className="font-normal text-muted-foreground"> {t('punch.faceRecognition')}</span>
             </span>
           </DialogTitle>
           {datePart ? (
-            <DialogDescription>Punch date: {datePart}</DialogDescription>
+            <DialogDescription>{t('punch.punchDate')} {datePart}</DialogDescription>
           ) : (
-            <DialogDescription>Face recognition photos for this punch</DialogDescription>
+            <DialogDescription>{t('punch.facePhotos')}</DialogDescription>
           )}
         </DialogHeader>
 
         <div className="space-y-6 py-1">
-          <PunchFacePhotoSlot label="Punch in" validationId={validation?.punchIn} />
-          <PunchFacePhotoSlot label="Break in" validationId={validation?.breakStart} />
-          <PunchFacePhotoSlot label="Break out" validationId={validation?.breakEnd} />
-          <PunchFacePhotoSlot label="Punch out" validationId={validation?.punchOut} />
+          {slots.map((slot) => (
+            <PunchFacePhotoSlot
+              key={slot.label}
+              label={slot.label}
+              validationId={slot.validationId}
+              withoutImageLabel={withoutImageLabel}
+            />
+          ))}
         </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t('common.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

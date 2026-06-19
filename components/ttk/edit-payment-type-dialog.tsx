@@ -26,6 +26,7 @@ import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { useTtkPaymentTypes } from '@/hooks/use-ttk-payment-types'
 import { useTtkSavePayment } from '@/hooks/use-ttk-save-payment'
 import type { TtkPaymentTypeOption } from '@/lib/ttk/ttk-payment-types'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export type EditPaymentTypeTarget = {
   id: number | string
@@ -49,6 +50,7 @@ function buildOptions(
   fetched: TtkPaymentTypeOption[],
   currentId?: number | null,
   currentName?: string | null,
+  unknownOverdueLabel = 'Unknown (overdue)',
 ): TtkPaymentTypeOption[] {
   if (!currentId || currentId <= 0) return fetched
   if (fetched.some((item) => item.id === currentId)) return fetched
@@ -56,7 +58,7 @@ function buildOptions(
     ...fetched,
     {
       id: currentId,
-      paymentTypeName: `${currentName ?? 'Unknown'} (overdue)`,
+      paymentTypeName: currentName ?? unknownOverdueLabel,
       price: null,
       isDefault: 0,
     },
@@ -69,6 +71,7 @@ export function EditPaymentTypeDialog({
   target,
   onSaved,
 }: EditPaymentTypeDialogProps) {
+  const { t } = useTranslation()
   const [paymentTypeId, setPaymentTypeId] = useState<string>('')
   const [hourlyRate, setHourlyRate] = useState<string>('0')
   const [note, setNote] = useState('')
@@ -87,8 +90,9 @@ export function EditPaymentTypeDialog({
         paymentTypesQuery.data ?? [],
         target?.paymentTypeId,
         target?.paymentTypeName,
+        t('punch.unknownOverdue'),
       ),
-    [paymentTypesQuery.data, target?.paymentTypeId, target?.paymentTypeName],
+    [paymentTypesQuery.data, target?.paymentTypeId, target?.paymentTypeName, t],
   )
 
   useEffect(() => {
@@ -117,7 +121,7 @@ export function EditPaymentTypeDialog({
     if (!target) return
     const typeId = Number(paymentTypeId)
     if (!typeId || typeId <= 0) {
-      toast.error('Select a payment type')
+      toast.error(t('punch.selectPaymentType'))
       return
     }
 
@@ -128,11 +132,11 @@ export function EditPaymentTypeDialog({
         hourly_rate: Number(hourlyRate) || 0,
         note: note.trim() || null,
       })
-      toast.success('Payment type updated')
+      toast.success(t('punch.paymentTypeUpdated'))
       onOpenChange(false)
       onSaved?.()
     } catch (error) {
-      toast.error(getSrsErrorMessage(error, 'Failed to update payment type'))
+      toast.error(getSrsErrorMessage(error, t('punch.paymentTypeUpdateFailed')))
     }
   }
 
@@ -142,27 +146,27 @@ export function EditPaymentTypeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
-            Edit payment type
+            {t('punch.editPaymentType')}
           </DialogTitle>
           <DialogDescription>
-            {target?.employeeName ?? 'Employee'}
+            {target?.employeeName ?? t('common.employee')}
             {target?.punchDateLabel ? ` · ${target.punchDateLabel}` : ''}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-1">
           <div className="space-y-2">
-            <Label htmlFor="payment-type-select">Payment type</Label>
+            <Label htmlFor="payment-type-select">{t('punch.paymentType')}</Label>
             {paymentTypesQuery.isLoading ? (
               <Skeleton className="h-9 w-full" />
             ) : paymentTypesQuery.isError ? (
               <p className="text-sm text-destructive">
-                {getSrsErrorMessage(paymentTypesQuery.error, 'Failed to load payment types')}
+                {getSrsErrorMessage(paymentTypesQuery.error, t('punch.loadPaymentTypesFailed'))}
               </p>
             ) : (
               <Select value={paymentTypeId} onValueChange={handlePaymentTypeChange}>
                 <SelectTrigger id="payment-type-select" className="w-full">
-                  <SelectValue placeholder="Select payment type" />
+                  <SelectValue placeholder={t('punch.selectPaymentType')} />
                 </SelectTrigger>
                 <SelectContent>
                   {options.map((item) => (
@@ -176,12 +180,12 @@ export function EditPaymentTypeDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="payment-note">Note</Label>
+            <Label htmlFor="payment-note">{t('common.note')}</Label>
             <Textarea
               id="payment-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Optional note for this change"
+              placeholder={t('punch.optionalNote')}
               rows={3}
             />
           </div>
@@ -195,7 +199,7 @@ export function EditPaymentTypeDialog({
             disabled={saveMutation.isPending}
           >
             <X className="mr-1.5 h-4 w-4" />
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -207,7 +211,7 @@ export function EditPaymentTypeDialog({
             ) : (
               <Save className="mr-1.5 h-4 w-4" />
             )}
-            Save
+            {t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

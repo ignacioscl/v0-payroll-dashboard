@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import type { PunchTimeKey } from '@/lib/ttk/punch-form-utils'
-import { PUNCH_FIELD_LABELS } from '@/lib/ttk/punch-form-utils'
+import type { PunchNoteKey, PunchTimeKey } from '@/lib/ttk/punch-form-utils'
+import { getPunchFieldLabel } from '@/lib/i18n/label-helpers'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export interface PunchTimeFieldProps {
   id: PunchTimeKey
@@ -39,7 +40,8 @@ export function PunchTimeField({
   noteError,
   alwaysShowNote,
 }: PunchTimeFieldProps) {
-  const label = PUNCH_FIELD_LABELS[id]
+  const { t } = useTranslation()
+  const label = getPunchFieldLabel(t, id)
   const showNote = alwaysShowNote || (noteValue !== undefined && onNoteChange)
 
   return (
@@ -50,7 +52,7 @@ export function PunchTimeField({
         {required && <span className="text-destructive">*</span>}
         {modified && (
           <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-            Modified
+            {t('common.modified')}
           </span>
         )}
       </Label>
@@ -77,7 +79,7 @@ export function PunchTimeField({
           onClick={onClear}
           disabled={disabled || !value || required}
           className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`Clear ${label}`}
+          aria-label={t('punch.clearField', { field: label })}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -92,12 +94,12 @@ export function PunchTimeField({
         <div className="space-y-1">
           <Label htmlFor={`${id}_note`} className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
             <StickyNote className="h-3 w-3" />
-            {label} Note {alwaysShowNote && id === 'punchIn' ? <span className="text-destructive">*</span> : null}
+            {getPunchFieldLabel(t, `${id}Note` as PunchNoteKey)}{' '}{alwaysShowNote && id === 'punchIn' ? <span className="text-destructive">*</span> : null}
           </Label>
           <Input
             id={`${id}_note`}
             type="text"
-            placeholder={`Note for ${label.toLowerCase()}`}
+            placeholder={t('punch.noteForField', { field: label.toLowerCase() })}
             maxLength={254}
             value={noteValue ?? ''}
             onChange={(e) => onNoteChange(e.target.value)}

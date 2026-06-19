@@ -73,6 +73,7 @@ import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
 import { useMinWidth } from '@/hooks/use-mobile'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 import type { DateRange } from 'react-day-picker'
 
@@ -143,6 +144,7 @@ export function IssuesDataTable({
   onPaymentTypeFilterChange,
   showToolbarFilters = true,
 }: IssuesDataTableProps = {}) {
+  const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
   // DataTable toolbar, pagination row, and page bottom padding.
   // Updates on window resize so it works on every screen size.
@@ -344,7 +346,7 @@ export function IssuesDataTable({
         size: 280,
         minSize: 200,
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Employee" />
+          <DataTableColumnHeader column={column} title={t('common.employee')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -384,7 +386,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Employee',
+          label: t('common.employee'),
           pin: 'left',
           sortKey: 'us.nombre',
           exportValue: (r) => r.usuario?.nombre ?? '',
@@ -394,11 +396,11 @@ export function IssuesDataTable({
         id: 'role',
         accessorFn: (row) => roleLabel(row),
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Role / Dept" />
+          <DataTableColumnHeader column={column} title={t('punch.roleDept')} />
         ),
         cell: ({ row }) => roleLabel(row.original) || '—',
         meta: {
-          label: 'Role / Dept',
+          label: t('punch.roleDept'),
           exportValue: (r) => roleLabel(r),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
@@ -406,11 +408,11 @@ export function IssuesDataTable({
         id: 'date',
         accessorFn: (row) => row.punchInGmt0 ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Date" />
+          <DataTableColumnHeader column={column} title={t('common.date')} />
         ),
         cell: ({ row }) => formatGmtDate(row.original.punchInGmt0) || '—',
         meta: {
-          label: 'Date',
+          label: t('common.date'),
           sortKey: 'tew.punch_in',
           exportValue: (r) => formatUsDateForExport(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
@@ -419,7 +421,7 @@ export function IssuesDataTable({
         id: 'punchIn',
         accessorFn: (row) => row.punchInGmt0 ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Punch In" />
+          <DataTableColumnHeader column={column} title={t('punch.punchIn')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -429,7 +431,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Punch In',
+          label: t('punch.punchIn'),
           mono: true,
           exportValue: (r) => {
             const t = formatUsTimeForExport(r.punchInGmt0)
@@ -441,7 +443,7 @@ export function IssuesDataTable({
         id: 'breakStart',
         accessorFn: (row) => row.breakStartGmt0 ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Break Start" />
+          <DataTableColumnHeader column={column} title={t('punch.breakStart')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -451,7 +453,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Break Start',
+          label: t('punch.breakStart'),
           mono: true,
           exportValue: (r) => {
             const t = formatUsTimeForExport(r.breakStartGmt0)
@@ -463,7 +465,7 @@ export function IssuesDataTable({
         id: 'breakEnd',
         accessorFn: (row) => row.breakEndGmt0 ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Break End" />
+          <DataTableColumnHeader column={column} title={t('punch.breakEnd')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -473,7 +475,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Break End',
+          label: t('punch.breakEnd'),
           mono: true,
           exportValue: (r) => {
             const t = formatUsTimeForExport(r.breakEndGmt0)
@@ -485,7 +487,7 @@ export function IssuesDataTable({
         id: 'punchOut',
         accessorFn: (row) => row.punchOutGmt0 ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Punch Out" />
+          <DataTableColumnHeader column={column} title={t('punch.punchOut')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -495,7 +497,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Punch Out',
+          label: t('punch.punchOut'),
           mono: true,
           exportValue: (r) => {
             const t = formatUsTimeForExport(r.punchOutGmt0)
@@ -507,11 +509,11 @@ export function IssuesDataTable({
         id: 'timeWork',
         accessorFn: (row) => row.timeWork ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Time Work" />
+          <DataTableColumnHeader column={column} title={t('punch.timeWork')} />
         ),
         cell: ({ row }) => formatDurationDisplay(row.original.timeWork) || '—',
         meta: {
-          label: 'Time Work',
+          label: t('punch.timeWork'),
           mono: true,
           exportValue: (r) => formatDurationDisplay(r.timeWork),
         } satisfies DataTableColumnMeta<TtkListRow>,
@@ -520,11 +522,11 @@ export function IssuesDataTable({
         id: 'timeBreak',
         accessorFn: (row) => row.timeBreak ?? '',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Time Break" />
+          <DataTableColumnHeader column={column} title={t('punch.timeBreak')} />
         ),
         cell: ({ row }) => formatDurationDisplay(row.original.timeBreak) || '—',
         meta: {
-          label: 'Time Break',
+          label: t('punch.timeBreak'),
           mono: true,
           exportValue: (r) => formatDurationDisplay(r.timeBreak),
         } satisfies DataTableColumnMeta<TtkListRow>,
@@ -538,7 +540,7 @@ export function IssuesDataTable({
         size: 110,
         minSize: 90,
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Payment Type" />
+          <DataTableColumnHeader column={column} title={t('punch.paymentType')} />
         ),
         cell: ({ row }) => {
           const r = row.original
@@ -564,7 +566,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'Payment Type',
+          label: t('punch.paymentType'),
           exportValue: (r) => r.objPaymentType?.name ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       })
@@ -581,7 +583,7 @@ export function IssuesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader
             column={column}
-            title="ACTIONS"
+            title={t('common.actions')}
             className="w-full justify-end pr-0 text-xs uppercase tracking-wide"
           />
         ),
@@ -601,7 +603,9 @@ export function IssuesDataTable({
                       validation: buildPunchFacePhotoValidation(r),
                     })
                   }
-                  aria-label={`View face recognition photos for ${r.usuario?.nombre ?? 'employee'}`}
+                  aria-label={t('punch.viewFacePhotos', {
+                    name: r.usuario?.nombre ?? t('common.employee'),
+                  })}
                 >
                   <Images className="h-3.5 w-3.5" />
                 </Button>
@@ -618,7 +622,9 @@ export function IssuesDataTable({
                       punchDateLabel: formatGmtDate(r.punchInGmt0) || '—',
                     })
                   }
-                  aria-label={`View change log for ${r.usuario?.nombre ?? 'employee'}`}
+                  aria-label={t('punch.viewChangeLog', {
+                    name: r.usuario?.nombre ?? t('common.employee'),
+                  })}
                 >
                   <Info className="h-3.5 w-3.5" />
                 </Button>
@@ -638,7 +644,9 @@ export function IssuesDataTable({
                       punchOut: r.punchOutGmt0,
                     })
                   }
-                  aria-label={`Edit punch for ${r.usuario?.nombre ?? 'employee'}`}
+                  aria-label={t('punch.editPunchFor', {
+                    name: r.usuario?.nombre ?? t('common.employee'),
+                  })}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -657,7 +665,9 @@ export function IssuesDataTable({
                         action: 'delete',
                       })
                     }
-                    aria-label={`Delete punch for ${r.usuario?.nombre ?? 'employee'}`}
+                    aria-label={t('punch.deletePunchFor', {
+                      name: r.usuario?.nombre ?? t('common.employee'),
+                    })}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -674,7 +684,9 @@ export function IssuesDataTable({
                         action: 'activate',
                       })
                     }
-                    aria-label={`Activate punch for ${r.usuario?.nombre ?? 'employee'}`}
+                    aria-label={t('punch.activatePunchFor', {
+                      name: r.usuario?.nombre ?? t('common.employee'),
+                    })}
                   >
                     <CheckCircle className="h-3.5 w-3.5" />
                   </Button>
@@ -683,7 +695,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
-          label: 'ACTIONS',
+          label: t('common.actions'),
           pin: 'right',
           headerClassName: 'min-w-[120px] text-right',
         } satisfies DataTableColumnMeta<TtkListRow>,
@@ -700,6 +712,7 @@ export function IssuesDataTable({
     getEmployeeId,
     getThumbnailUuid,
     handleThumbnailSaved,
+    t,
   ])
 
   const columnPinning = React.useMemo<ColumnPinningState>(
@@ -743,7 +756,7 @@ export function IssuesDataTable({
         extra: listExtra,
       })
       const data = await apiRequest.getCustom('', undefined, params)
-      throwIfSrsFail(data, 'Failed to load punches for export')
+      throwIfSrsFail(data, t('punch.loadExportFailed'))
       const parsed = ttkListAdapter.parseResponse(data as TtkListResponse, {
         pageIndex,
         pageSize: exportPageSize,
@@ -754,7 +767,7 @@ export function IssuesDataTable({
     } while (collected.length < totalRows && collected.length > 0)
 
     return collected
-  }, [apiRequest, listExtra, queryEnabled, sorting])
+  }, [apiRequest, listExtra, queryEnabled, sorting, t])
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: ttkListAdapter,
@@ -771,7 +784,7 @@ export function IssuesDataTable({
     ],
     queryFn: async (params) => {
       const data = await apiRequest.getCustom('', undefined, params)
-      throwIfSrsFail(data, 'Failed to load punch issues')
+      throwIfSrsFail(data, t('punch.loadIssuesFailed'))
       return data as TtkListResponse
     },
     enabled: queryEnabled,
@@ -793,25 +806,25 @@ export function IssuesDataTable({
       })
       toast.success(
         deleteTarget.action === 'activate'
-          ? `Punch restored for ${deleteTarget.employeeName}`
-          : `Punch deleted for ${deleteTarget.employeeName}`,
+          ? t('punch.restored', { name: deleteTarget.employeeName })
+          : t('punch.deleted', { name: deleteTarget.employeeName }),
       )
       setDeleteTarget(null)
     } catch (e: unknown) {
-      toast.error(getSrsErrorMessage(e, 'Failed to update punch'))
+      toast.error(getSrsErrorMessage(e, t('punch.deleteFailed')))
     }
   }
 
   const emptyState = !filtersHydrated ? (
-    <span className="text-xs text-muted-foreground">Loading filters…</span>
+    <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
   ) : selectedDealers.length === 0 ? (
     <span className="text-xs text-muted-foreground">
-      Select at least one dealer in the header.
+      {t('punch.loadFiltersFirst')}
     </span>
   ) : (
     <div className="flex flex-col items-center gap-2 text-muted-foreground">
       <AlertTriangle className="h-8 w-8 opacity-20" />
-      <span className="text-xs">No records for the current filters.</span>
+      <span className="text-xs">{t('punch.noRecordsForFilters')}</span>
     </div>
   )
 

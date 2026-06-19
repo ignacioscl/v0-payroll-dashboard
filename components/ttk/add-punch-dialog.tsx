@@ -36,6 +36,7 @@ import {
   validatePunchForm,
   punchFormToAddPayload,
 } from '@/lib/ttk/punch-form-utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface AddPunchDialogProps {
   open: boolean
@@ -52,6 +53,7 @@ export function AddPunchDialog({
   dealerName,
   onSaved,
 }: AddPunchDialogProps) {
+  const { t } = useTranslation()
   const [form, setForm] = useState<PunchFormState>(EMPTY_PUNCH_FORM)
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
@@ -84,15 +86,15 @@ export function AddPunchDialog({
 
   const handleSubmit = async () => {
     if (!idDealer || idDealer <= 0) {
-      setValidationError('Select exactly one dealer in the header.')
+      setValidationError(t('dealer.selectOnlyOneInHeader'))
       return
     }
     if (!selectedEmployee) {
-      setValidationError('Select an employee.')
+      setValidationError(t('employeeSearch.select'))
       return
     }
 
-    const { generalError, fieldErrors: errs } = validatePunchForm(form)
+    const { generalError, fieldErrors: errs } = validatePunchForm(form, t)
     setFieldErrors(errs)
     if (generalError) {
       setValidationError(generalError)
@@ -100,7 +102,7 @@ export function AddPunchDialog({
     }
 
     if (!form.punchInNote.trim()) {
-      setValidationError('Clock in note is required for a new manual punch.')
+      setValidationError(t('punch.clockInNoteRequired'))
       return
     }
 
@@ -108,11 +110,13 @@ export function AddPunchDialog({
       const saved = await addMutation.mutateAsync(
         punchFormToAddPayload(selectedEmployee.id, idDealer, form),
       )
-      toast.success(`Punch created${saved.usuario?.nombre ? ` — ${saved.usuario.nombre}` : ''}`)
+      toast.success(
+        t('punch.created', { name: saved.usuario?.nombre ?? t('common.employee') }),
+      )
       onOpenChange(false)
       onSaved?.()
     } catch (e: unknown) {
-      const message = getSrsErrorMessage(e, 'Failed to create punch')
+      const message = getSrsErrorMessage(e, t('punch.createFailed'))
       toast.error(message)
       setValidationError(message)
     }
@@ -121,8 +125,8 @@ export function AddPunchDialog({
   const isProcessing = addMutation.isPending
   const title = useMemo(() => {
     const dealer = dealerName ? ` @ ${dealerName}` : ''
-    return `Add Punch${dealer}`
-  }, [dealerName])
+    return `${t('punch.addTitle')}${dealer}`
+  }, [dealerName, t])
 
   const renderTimeField = (key: PunchTimeKey, icon: React.ReactNode, required = false) => (
     <PunchTimeField
@@ -148,14 +152,12 @@ export function AddPunchDialog({
             <CalendarIcon className="h-5 w-5 text-primary" />
             <span className="truncate">{title}</span>
           </DialogTitle>
-          <DialogDescription>
-            Create a manual punch for an employee. Clock in is required; add a note explaining the manual entry.
-          </DialogDescription>
+          <DialogDescription>{t('punch.addSubtitle')}</DialogDescription>
         </DialogHeader>
 
         {!idDealer ? (
           <p className="text-sm text-muted-foreground">
-            Select exactly one dealer in the header to add a punch.
+            {t('dealer.selectOnlyOneInHeader')}
           </p>
         ) : (
           <form
@@ -168,7 +170,7 @@ export function AddPunchDialog({
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 <User className="h-4 w-4" />
-                Employee <span className="text-destructive">*</span>
+                {t('common.employee')} <span className="text-destructive">*</span>
               </Label>
               <EmployeeCombobox
                 value={selectedEmployee}
@@ -205,18 +207,18 @@ export function AddPunchDialog({
                 className="gap-2"
               >
                 <X className="h-4 w-4" />
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={isProcessing} className="gap-2">
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving…
+                    {t('common.saving')}
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4" />
-                    Create punch
+                    {t('punch.create')}
                   </>
                 )}
               </Button>

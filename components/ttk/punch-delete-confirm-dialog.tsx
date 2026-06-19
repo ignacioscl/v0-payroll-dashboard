@@ -2,6 +2,7 @@
 
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export type PunchDeleteConfirmTarget = {
   id: number | string
@@ -23,8 +24,9 @@ export function PunchDeleteConfirmDialog({
   onConfirm,
   pending = false,
 }: PunchDeleteConfirmDialogProps) {
-  const employee = target?.employeeName?.trim() || 'this employee'
-  const dateLabel = target?.punchDateLabel?.trim() || 'the selected date'
+  const { t } = useTranslation()
+  const employee = target?.employeeName?.trim() || t('punch.thisEmployee')
+  const dateLabel = target?.punchDateLabel?.trim() || t('punch.selectedDate')
   const isDelete = target?.action === 'delete'
 
   return (
@@ -32,26 +34,14 @@ export function PunchDeleteConfirmDialog({
       open={target !== null}
       onOpenChange={onOpenChange}
       tone={isDelete ? 'warning' : 'success'}
-      title={isDelete ? 'Delete punch?' : 'Restore punch?'}
+      title={isDelete ? t('punch.deleteConfirmTitle') : t('punch.restoreConfirmTitle')}
       description={
-        isDelete ? (
-          <>
-            The punch for{' '}
-            <span className="font-semibold text-foreground">{employee}</span> on{' '}
-            <span className="font-semibold text-foreground">{dateLabel}</span> will be
-            deleted.
-          </>
-        ) : (
-          <>
-            The punch for{' '}
-            <span className="font-semibold text-foreground">{employee}</span> on{' '}
-            <span className="font-semibold text-foreground">{dateLabel}</span> will be
-            restored and shown again in the list.
-          </>
-        )
+        isDelete
+          ? t('punch.deleteConfirmBody', { employee, date: dateLabel })
+          : t('punch.restoreConfirmBody', { employee, date: dateLabel })
       }
-      cancelLabel="Cancel"
-      confirmLabel={isDelete ? 'Delete punch' : 'Restore punch'}
+      cancelLabel={t('common.cancel')}
+      confirmLabel={isDelete ? t('punch.deleteAction') : t('punch.restoreAction')}
       confirmIcon={isDelete ? Trash2 : RotateCcw}
       confirmVariant={isDelete ? 'destructive' : 'default'}
       confirmClassName={
@@ -61,7 +51,7 @@ export function PunchDeleteConfirmDialog({
       }
       onConfirm={onConfirm}
       pending={pending}
-      pendingLabel={isDelete ? 'Deleting…' : 'Restoring…'}
+      pendingLabel={isDelete ? t('common.deleting') : t('common.restoring')}
     />
   )
 }

@@ -74,6 +74,7 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAddOrEditPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
 
@@ -91,16 +92,16 @@ type ColumnKey =
   | 'timeWork'
   | 'timeBreak'
 
-const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
-  { key: 'employee', label: 'Employee' },
-  { key: 'role', label: 'Role / Dept' },
-  { key: 'date', label: 'Date' },
-  { key: 'punchIn', label: 'Punch In' },
-  { key: 'breakStart', label: 'Break Start' },
-  { key: 'breakEnd', label: 'Break End' },
-  { key: 'punchOut', label: 'Punch Out' },
-  { key: 'timeWork', label: 'Time Work' },
-  { key: 'timeBreak', label: 'Time Break' },
+const ALL_COLUMNS: { key: ColumnKey; labelKey: string }[] = [
+  { key: 'employee', labelKey: 'common.employee' },
+  { key: 'role', labelKey: 'ttkTable.roleDept' },
+  { key: 'date', labelKey: 'common.date' },
+  { key: 'punchIn', labelKey: 'punch.punchIn' },
+  { key: 'breakStart', labelKey: 'punch.breakStart' },
+  { key: 'breakEnd', labelKey: 'punch.breakEnd' },
+  { key: 'punchOut', labelKey: 'punch.punchOut' },
+  { key: 'timeWork', labelKey: 'punch.timeWork' },
+  { key: 'timeBreak', labelKey: 'punch.timeBreak' },
 ]
 
 function generatePageNumbers(current: number, total: number): (number | 'ellipsis')[] {
@@ -143,6 +144,7 @@ function punchErrorLabel(row: TtkListRow): string | null {
 }
 
 export function TtkWithoutGroupTable() {
+  const { t } = useTranslation()
   const {
     search,
     selectedDealers,
@@ -261,17 +263,17 @@ export function TtkWithoutGroupTable() {
       })
       toast.success(
         deleteTarget.action === 'activate'
-          ? `Punch restored for ${deleteTarget.employeeName}`
-          : `Punch deleted for ${deleteTarget.employeeName}`,
+          ? t('punch.restored')
+          : t('punch.deleted'),
       )
       setDeleteTarget(null)
     } catch (e: unknown) {
-      toast.error(getSrsErrorMessage(e, 'Failed to update punch'))
+      toast.error(getSrsErrorMessage(e, t('punch.updateFailed')))
     }
   }
 
   const handleExportCSV = () => {
-    const headers = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key)).map((c) => c.label)
+    const headers = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key)).map((c) => t(c.labelKey))
     const csvRows = rows.map((row) => {
       const cells: string[] = []
       if (visibleColumns.has('employee')) cells.push(employeeLabel(row, multiDealer))
@@ -311,15 +313,15 @@ export function TtkWithoutGroupTable() {
           ) : (
             <span className="font-semibold tabular-nums text-foreground">{total}</span>
           )}
-          <span>records</span>
+          <span>{t('common.records')}</span>
           {filtersHydrated && selectedDealers.length === 0 && (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">select dealers</Badge>
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{t('ttkTable.selectDealers')}</Badge>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="flex items-center gap-1">
-            <span className="whitespace-nowrap text-[11px] text-muted-foreground">Rows</span>
+            <span className="whitespace-nowrap text-[11px] text-muted-foreground">{t('common.rows')}</span>
             <Select
               value={String(pageSize)}
               onValueChange={(value) => {
@@ -345,14 +347,14 @@ export function TtkWithoutGroupTable() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]">
                 <SlidersHorizontal className="h-3 w-3" />
-                Columns
+                {t('common.columns')}
                 <Badge variant="secondary" className="ml-0 px-1 py-0 text-[10px]">
                   {visibleColumns.size}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">Toggle columns</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs">{t('common.toggleColumns')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {ALL_COLUMNS.map((col) => (
                 <DropdownMenuCheckboxItem
@@ -361,7 +363,7 @@ export function TtkWithoutGroupTable() {
                   checked={visibleColumns.has(col.key)}
                   onCheckedChange={() => toggleColumn(col.key)}
                 >
-                  {col.label}
+                  {t(col.labelKey)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -375,7 +377,7 @@ export function TtkWithoutGroupTable() {
             disabled={rows.length === 0}
           >
             <FileSpreadsheet className="h-3 w-3 text-green-600" />
-            Export
+            {t('common.export')}
           </Button>
         </div>
       </div>
@@ -393,41 +395,41 @@ export function TtkWithoutGroupTable() {
               {visibleColumns.has('employee') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
                   <button type="button" className="flex cursor-pointer items-center hover:text-white/80" onClick={() => handleSort('employee')}>
-                    Employee <SortIcon field="employee" />
+                    {t('common.employee')} <SortIcon field="employee" />
                   </button>
                 </TableHead>
               )}
               {visibleColumns.has('role') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Role / Dept</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('ttkTable.roleDept')}</TableHead>
               )}
               {visibleColumns.has('date') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
                   <button type="button" className="flex cursor-pointer items-center hover:text-white/80" onClick={() => handleSort('date')}>
-                    Date <SortIcon field="date" />
+                    {t('common.date')} <SortIcon field="date" />
                   </button>
                 </TableHead>
               )}
               {visibleColumns.has('punchIn') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Punch In</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.punchIn')}</TableHead>
               )}
               {visibleColumns.has('breakStart') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Break Start</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.breakStart')}</TableHead>
               )}
               {visibleColumns.has('breakEnd') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Break End</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.breakEnd')}</TableHead>
               )}
               {visibleColumns.has('punchOut') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Punch Out</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.punchOut')}</TableHead>
               )}
               {visibleColumns.has('timeWork') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Time Work</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.timeWork')}</TableHead>
               )}
               {visibleColumns.has('timeBreak') && (
-                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">Time Break</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">{t('punch.timeBreak')}</TableHead>
               )}
               {showActions && (
                 <TableHead className="h-8 min-w-[72px] px-3 py-1.5 text-right text-xs font-semibold text-white">
-                  Actions
+                  {t('common.actions')}
                 </TableHead>
               )}
             </TableRow>
@@ -447,10 +449,10 @@ export function TtkWithoutGroupTable() {
                     <AlertTriangle className="h-8 w-8 opacity-20" />
                     <span>
                       {!filtersHydrated
-                        ? 'Loading filters...'
+                        ? t('ttkTable.loadingFilters')
                         : selectedDealers.length === 0
-                          ? 'Select at least one dealer in the header.'
-                          : 'No records for the current filters.'}
+                          ? t('ttkTable.selectDealerInHeader')
+                          : t('ttkTable.noRecordsForFilters')}
                     </span>
                   </div>
                 </TableCell>
@@ -550,7 +552,7 @@ export function TtkWithoutGroupTable() {
                                 validation: buildPunchFacePhotoValidation(row),
                               })
                             }
-                            aria-label={`View face recognition photos for ${row.usuario?.nombre ?? 'employee'}`}
+                            aria-label={t('punch.viewFacePhotos')}
                           >
                             <Images className="h-3.5 w-3.5" />
                           </Button>
@@ -567,7 +569,7 @@ export function TtkWithoutGroupTable() {
                                 punchDateLabel: formatGmtDate(row.punchInGmt0) || '—',
                               })
                             }
-                            aria-label={`View change log for ${row.usuario?.nombre ?? 'employee'}`}
+                            aria-label={t('punch.viewChangeLog')}
                           >
                             <Info className="h-3.5 w-3.5" />
                           </Button>
@@ -587,7 +589,7 @@ export function TtkWithoutGroupTable() {
                                 punchOut: row.punchOutGmt0,
                               })
                             }
-                            aria-label={`Edit punch for ${row.usuario?.nombre ?? 'employee'}`}
+                            aria-label={t('punch.editPunchFor', { name: row.usuario?.nombre ?? t('common.employee') })}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -601,12 +603,12 @@ export function TtkWithoutGroupTable() {
                               onClick={() =>
                                 setDeleteTarget({
                                   id: row.id,
-                                  employeeName: row.usuario?.nombre ?? 'employee',
+                                  employeeName: row.usuario?.nombre ?? t('common.employee'),
                                   punchDateLabel: formatGmtDate(row.punchInGmt0) || '—',
                                   action: 'delete',
                                 })
                               }
-                              aria-label={`Delete punch for ${row.usuario?.nombre ?? 'employee'}`}
+                              aria-label={t('punch.deletePunchFor', { name: row.usuario?.nombre ?? t('common.employee') })}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -618,12 +620,12 @@ export function TtkWithoutGroupTable() {
                               onClick={() =>
                                 setDeleteTarget({
                                   id: row.id,
-                                  employeeName: row.usuario?.nombre ?? 'employee',
+                                  employeeName: row.usuario?.nombre ?? t('common.employee'),
                                   punchDateLabel: formatGmtDate(row.punchInGmt0) || '—',
                                   action: 'activate',
                                 })
                               }
-                              aria-label={`Activate punch for ${row.usuario?.nombre ?? 'employee'}`}
+                              aria-label={t('punch.activatePunchFor', { name: row.usuario?.nombre ?? t('common.employee') })}
                             >
                               <CheckCircle className="h-3.5 w-3.5" />
                             </Button>
@@ -642,13 +644,13 @@ export function TtkWithoutGroupTable() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5">
         <p className="shrink-0 text-[11px] text-muted-foreground">
           {total === 0 ? (
-            'No records'
+            t('common.noRecords')
           ) : (
             <>
               <span className="font-medium tabular-nums text-foreground">
                 {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, total)}
               </span>
-              {' '}of{' '}
+              {' '}{t('common.of')}{' '}
               <span className="font-medium tabular-nums text-foreground">{total}</span>
             </>
           )}

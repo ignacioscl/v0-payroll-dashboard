@@ -14,10 +14,19 @@
 
 export type KpiPeriod = '4w' | '12w'
 
-export const KPI_PERIOD_OPTIONS: { value: KpiPeriod; label: string }[] = [
-  { value: '4w', label: 'Last 4 weeks' },
-  { value: '12w', label: 'Last 12 weeks' },
+export type TranslateFn = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string
+
+export const KPI_PERIOD_OPTIONS: { value: KpiPeriod; labelKey: string }[] = [
+  { value: '4w', labelKey: 'mockKpis.periodLast4Weeks' },
+  { value: '12w', labelKey: 'mockKpis.periodLast12Weeks' },
 ]
+
+export function getKpiPeriodOptions(t: TranslateFn): { value: KpiPeriod; label: string }[] {
+  return KPI_PERIOD_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))
+}
 
 // ----------------------------------------------------------------------------
 // Weekly time series (12 weeks, ending Jun 8) — used by trend charts
@@ -118,19 +127,28 @@ export function getProductionKpis(period: KpiPeriod): ProductionKpis {
   return PRODUCTION_KPIS[period]
 }
 
-// Current WO pipeline snapshot (workflow ids 5,6,16,15)
+export type WoStatusKey = 'waiting' | 'inProcess' | 'pause' | 'inTransit'
+
 export interface WoStatusSlice {
-  status: 'Waiting' | 'In Process' | 'Pause' | 'In Transit'
+  statusKey: WoStatusKey
   count: number
   color: string
 }
 
 export const WO_STATUS_PIPELINE: WoStatusSlice[] = [
-  { status: 'Waiting', count: 182, color: '#f59e0b' },
-  { status: 'In Process', count: 174, color: '#3b82f6' },
-  { status: 'Pause', count: 36, color: '#8b5cf6' },
-  { status: 'In Transit', count: 45, color: '#06b6d4' },
+  { statusKey: 'waiting', count: 182, color: '#f59e0b' },
+  { statusKey: 'inProcess', count: 174, color: '#3b82f6' },
+  { statusKey: 'pause', count: 36, color: '#8b5cf6' },
+  { statusKey: 'inTransit', count: 45, color: '#06b6d4' },
 ]
+
+export function getWoStatusPipeline(t: TranslateFn): { status: string; count: number; color: string }[] {
+  return WO_STATUS_PIPELINE.map((s) => ({
+    status: t(`mockKpis.woStatus.${s.statusKey}`),
+    count: s.count,
+    color: s.color,
+  }))
+}
 
 export interface DealerProductionRow {
   dealer: string
@@ -188,18 +206,28 @@ export function getBillingKpis(period: KpiPeriod): BillingKpis {
   return BILLING_KPIS[period]
 }
 
+export type AgingBucketKey = 'days0_7' | 'days8_14' | 'days15_30' | 'days31Plus'
+
 export interface UnbilledAgingBucket {
-  bucket: string
+  bucketKey: AgingBucketKey
   wos: number
   value: number
 }
 
 export const UNBILLED_AGING: UnbilledAgingBucket[] = [
-  { bucket: '0-7 days', wos: 214, value: 11180 },
-  { bucket: '8-14 days', wos: 98, value: 5140 },
-  { bucket: '15-30 days', wos: 56, value: 2920 },
-  { bucket: '31+ days', wos: 23, value: 1220 },
+  { bucketKey: 'days0_7', wos: 214, value: 11180 },
+  { bucketKey: 'days8_14', wos: 98, value: 5140 },
+  { bucketKey: 'days15_30', wos: 56, value: 2920 },
+  { bucketKey: 'days31Plus', wos: 23, value: 1220 },
 ]
+
+export function getUnbilledAging(t: TranslateFn): { bucket: string; wos: number; value: number }[] {
+  return UNBILLED_AGING.map((b) => ({
+    bucket: t(`mockKpis.aging.${b.bucketKey}`),
+    wos: b.wos,
+    value: b.value,
+  }))
+}
 
 export interface UnbilledDealerRow {
   dealer: string
@@ -241,19 +269,30 @@ export function getCollectionsKpis(period: KpiPeriod): CollectionsKpis {
   return COLLECTIONS_KPIS[period]
 }
 
+export type ArAgingBucketKey = 'days0_30' | 'days31_60' | 'days61_90' | 'days90Plus'
+
 export interface ArAgingBucket {
-  bucket: string
+  bucketKey: ArAgingBucketKey
   value: number
   statements: number
   color: string
 }
 
 export const AR_AGING: ArAgingBucket[] = [
-  { bucket: '0-30 days', value: 41200, statements: 49, color: '#22c55e' },
-  { bucket: '31-60 days', value: 21900, statements: 26, color: '#f59e0b' },
-  { bucket: '61-90 days', value: 9500, statements: 13, color: '#f97316' },
-  { bucket: '90+ days', value: 5800, statements: 8, color: '#ef4444' },
+  { bucketKey: 'days0_30', value: 41200, statements: 49, color: '#22c55e' },
+  { bucketKey: 'days31_60', value: 21900, statements: 26, color: '#f59e0b' },
+  { bucketKey: 'days61_90', value: 9500, statements: 13, color: '#f97316' },
+  { bucketKey: 'days90Plus', value: 5800, statements: 8, color: '#ef4444' },
 ]
+
+export function getArAging(t: TranslateFn): { bucket: string; value: number; statements: number; color: string }[] {
+  return AR_AGING.map((b) => ({
+    bucket: t(`mockKpis.aging.${b.bucketKey}`),
+    value: b.value,
+    statements: b.statements,
+    color: b.color,
+  }))
+}
 
 export interface WorstPayerRow {
   dealer: string
@@ -298,20 +337,27 @@ export function getPunchQualityKpis(period: KpiPeriod): PunchQualityKpis {
   return PUNCH_KPIS[period]
 }
 
+export type PunchErrorTypeKey = 'missingPunchOut' | 'missingBreakEnd' | 'manualPunch' | 'deletedPunch'
+
 export interface PunchErrorTypeSlice {
-  type: string
+  typeKey: PunchErrorTypeKey
   count: number
   color: string
 }
 
-export function getPunchErrorBreakdown(period: KpiPeriod): PunchErrorTypeSlice[] {
+export function getPunchErrorBreakdown(period: KpiPeriod, t: TranslateFn): { type: string; count: number; color: string }[] {
   const k = PUNCH_KPIS[period]
-  return [
-    { type: 'Missing punch-out', count: k.missingPunchOut, color: '#ef4444' },
-    { type: 'Missing break end', count: k.missingBreakEnd, color: '#f97316' },
-    { type: 'Manual punch', count: k.manualPunches, color: '#f59e0b' },
-    { type: 'Deleted punch', count: k.deletedPunches, color: '#8b5cf6' },
+  const items: PunchErrorTypeSlice[] = [
+    { typeKey: 'missingPunchOut', count: k.missingPunchOut, color: '#ef4444' },
+    { typeKey: 'missingBreakEnd', count: k.missingBreakEnd, color: '#f97316' },
+    { typeKey: 'manualPunch', count: k.manualPunches, color: '#f59e0b' },
+    { typeKey: 'deletedPunch', count: k.deletedPunches, color: '#8b5cf6' },
   ]
+  return items.map((item) => ({
+    type: t(`mockKpis.punchErrorType.${item.typeKey}`),
+    count: item.count,
+    color: item.color,
+  }))
 }
 
 export interface PunchOffenderRow {
@@ -357,25 +403,30 @@ export function getPayrollKpis(period: KpiPeriod): PayrollKpis {
   return PAYROLL_KPIS[period]
 }
 
-// type_payment: hourly=1, piecework=2, salary=3, flat rate=4, daily pay=5, holiday=6, sick day=7
+export type PaymentTypeKey = 'hourly' | 'piecework' | 'salary' | 'flatRate' | 'dailyPay' | 'holiday' | 'sickDay'
+
 export interface PaymentTypeSlice {
-  type: string
+  typeKey: PaymentTypeKey
   value: number
   color: string
 }
 
-export function getPayrollByType(period: KpiPeriod): PaymentTypeSlice[] {
+export function getPayrollByType(period: KpiPeriod, t: TranslateFn): { type: string; value: number; color: string }[] {
   const total = PAYROLL_KPIS[period].totalPayroll
-  const mix: [string, number, string][] = [
-    ['Hourly', 0.52, '#3b82f6'],
-    ['Piecework', 0.28, '#22c55e'],
-    ['Salary', 0.09, '#8b5cf6'],
-    ['Flat Rate', 0.06, '#06b6d4'],
-    ['Daily Pay', 0.03, '#f59e0b'],
-    ['Holiday', 0.015, '#f97316'],
-    ['Sick Day', 0.005, '#ef4444'],
+  const mix: [PaymentTypeKey, number, string][] = [
+    ['hourly', 0.52, '#3b82f6'],
+    ['piecework', 0.28, '#22c55e'],
+    ['salary', 0.09, '#8b5cf6'],
+    ['flatRate', 0.06, '#06b6d4'],
+    ['dailyPay', 0.03, '#f59e0b'],
+    ['holiday', 0.015, '#f97316'],
+    ['sickDay', 0.005, '#ef4444'],
   ]
-  return mix.map(([type, pct, color]) => ({ type, value: Math.round(total * pct), color }))
+  return mix.map(([typeKey, pct, color]) => ({
+    type: t(`mockKpis.paymentType.${typeKey}`),
+    value: Math.round(total * pct),
+    color,
+  }))
 }
 
 export interface PayrollDealerRow {

@@ -12,6 +12,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>
@@ -33,6 +34,7 @@ export function DataTablePagination<TData>({
   table,
   totalRows,
 }: DataTablePaginationProps<TData>) {
+  const { t } = useTranslation()
   const pageIndex = table.getState().pagination.pageIndex
   const pageSize = table.getState().pagination.pageSize
   const pageCount = table.getPageCount()
@@ -52,16 +54,14 @@ export function DataTablePagination<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/15 px-3 py-1.5">
       <p className="shrink-0 text-[11px] text-muted-foreground">
         {total === 0 ? (
-          'No records'
+          t('common.noRecords')
         ) : (
           <>
-            <span className="font-medium tabular-nums text-foreground">
-              {start.toLocaleString()}–{end.toLocaleString()}
-            </span>{' '}
-            of{' '}
-            <span className="font-medium tabular-nums text-foreground">
-              {total.toLocaleString()}
-            </span>
+            {t('common.showing', {
+              from: start.toLocaleString(),
+              to: end.toLocaleString(),
+              total: total.toLocaleString(),
+            })}
           </>
         )}
       </p>

@@ -8,8 +8,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export function NotificationsPopover() {
+  const { t } = useTranslation()
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -17,7 +20,7 @@ export function NotificationsPopover() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9 rounded-full hover:bg-muted/80"
-          aria-label="Notifications"
+          aria-label={t('layout.notifications')}
         >
           <Bell className="h-5 w-5 text-muted-foreground transition-colors group-data-[state=open]:text-foreground" />
         </Button>
@@ -34,8 +37,8 @@ export function NotificationsPopover() {
               <Bell className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tight">Notifications</p>
-              <p className="text-[11px] text-muted-foreground">Stay updated on punch issues</p>
+              <p className="text-sm font-semibold tracking-tight">{t('layout.notifications')}</p>
+              <p className="text-[11px] text-muted-foreground">{t('layout.notificationsSubtitle')}</p>
             </div>
           </div>
         </div>
@@ -49,9 +52,11 @@ export function NotificationsPopover() {
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 shadow-inner ring-1 ring-border/50">
             <Sparkles className="h-6 w-6 text-primary/70" />
           </div>
-          <p className="text-sm font-medium text-foreground">Not yet implemented</p>
+          <p className="text-sm font-medium text-foreground">
+            {t('layout.notificationsNotImplemented')}
+          </p>
           <p className="mt-1.5 max-w-[220px] text-xs leading-relaxed text-muted-foreground">
-            Real-time alerts for punch issues will appear here in a future release.
+            {t('layout.notificationsFuture')}
           </p>
         </motion.div>
       </PopoverContent>

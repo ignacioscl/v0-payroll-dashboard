@@ -6,6 +6,7 @@ import type { Table } from '@tanstack/react-table'
 import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TOAST_DURATION_MS } from '@/lib/toast-config'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -85,6 +86,7 @@ export function DataTableExport<TData>({
   exportAllColumns = true,
   fetchAllRows,
 }: DataTableExportProps<TData>) {
+  const { t } = useTranslation()
   const [busy, setBusy] = React.useState<'csv' | 'xlsx' | null>(null)
 
   const getRows = async (): Promise<TData[]> => {
@@ -96,10 +98,7 @@ export function DataTableExport<TData>({
   const handleExport = async (format: 'csv' | 'xlsx') => {
     setBusy(format)
     const formatLabel = format === 'xlsx' ? 'Excel' : 'CSV'
-    // Use default toast (not toast.loading): Sonner disables the close button on loading type.
-    const toastId = toast(
-      `Generating ${formatLabel} export… Please wait while all rows are fetched.`,
-      {
+    const toastId = toast(t('dataTable.generatingExport', { format: formatLabel }), {
         duration: Infinity,
         dismissible: true,
         closeButton: true,
@@ -134,12 +133,12 @@ export function DataTableExport<TData>({
       } else {
         XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`)
       }
-      toast.success(
-        `Exported ${records.length.toLocaleString()} row${records.length === 1 ? '' : 's'}`,
-        { id: toastId, duration: TOAST_DURATION_MS },
-      )
+      toast.success(t('common.exportSuccess', { count: records.length }), {
+        id: toastId,
+        duration: TOAST_DURATION_MS,
+      })
     } catch (e) {
-      toast.error('Export failed. Please try again.', {
+      toast.error(t('common.exportFailed'), {
         id: toastId,
         duration: TOAST_DURATION_MS,
       })
@@ -158,7 +157,7 @@ export function DataTableExport<TData>({
           size="sm"
           className="h-7 gap-1 px-2 text-[11px]"
           disabled={busy !== null}
-          aria-label={busy ? 'Export in progress' : 'Export'}
+          aria-label={busy ? t('common.exportInProgress') : t('common.export')}
           aria-busy={busy !== null}
         >
           {busy ? (
@@ -166,11 +165,11 @@ export function DataTableExport<TData>({
           ) : (
             <FileSpreadsheet className="size-3 text-emerald-600" />
           )}
-          {busy ? 'Exporting…' : 'Export'}
+          {busy ? t('common.exporting') : t('common.export')}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
-        <DropdownMenuLabel className="text-xs">Download</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">{t('common.download')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={busy !== null}
@@ -181,7 +180,7 @@ export function DataTableExport<TData>({
           ) : (
             <FileSpreadsheet className="mr-2 size-3.5 text-emerald-600" />
           )}
-          Excel (.xlsx)
+          {t('dataTable.exportExcel')}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={busy !== null}
@@ -192,7 +191,7 @@ export function DataTableExport<TData>({
           ) : (
             <FileText className="mr-2 size-3.5 text-blue-600" />
           )}
-          CSV (.csv)
+          {t('dataTable.exportCsv')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

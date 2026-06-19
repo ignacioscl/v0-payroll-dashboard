@@ -13,12 +13,14 @@ import { useFilters } from '@/lib/filter-context'
 import {
   getDefaultDateRange,
   matchPreset,
-  DATE_RANGE_PRESETS,
 } from '@/lib/filters/date-range-presets'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import {
-  TODAY_LIVE_STATUS_ALL,
-  todayLiveStatusLabel,
-} from '@/lib/ttk/today-live-status'
+  getIssueFilterLabel,
+  getDateRangePresets,
+  todayLiveStatusLabelTranslated,
+} from '@/lib/i18n/label-helpers'
 import {
   PAYMENT_TYPE_FILTER_ALL,
   PAYMENT_TYPE_FILTER_WITHOUT,
@@ -31,16 +33,6 @@ import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
 
 const STORAGE_KEY = 'punch-report-filters-open'
 
-const ISSUE_TYPE_LABELS: Record<string, string> = {
-  only_error: 'With errors',
-  only_error_clockout: 'Without clock out',
-  only_error_break: 'Without break',
-  manual_punch: 'Manual punch',
-  only_deletes: 'Deleted punches',
-  without_salary: 'Without salary',
-  only_fixed: 'Corrected punches',
-}
-
 function sameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -52,11 +44,12 @@ function sameDay(a: Date, b: Date): boolean {
 function formatDateRangeLabel(
   from: Date | undefined,
   to: Date | undefined,
+  todayLabel: string,
 ): string | null {
   if (!from) return null
   const end = to ?? from
   const today = new Date()
-  if (sameDay(from, end) && sameDay(from, today)) return 'Today'
+  if (sameDay(from, end) && sameDay(from, today)) return todayLabel
   if (sameDay(from, end)) return format(from, 'MMM d, yyyy')
   return `${format(from, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
 }
@@ -67,7 +60,7 @@ type FilterChip = {
   onRemove?: () => void
 }
 
-function FilterChipBadge({ chip }: { chip: FilterChip }) {
+function FilterChipBadge({ chip, clearLabel }: { chip: FilterChip; clearLabel: string }) {
   return (
     <span
       className={cn(
@@ -81,7 +74,7 @@ function FilterChipBadge({ chip }: { chip: FilterChip }) {
         <button
           type="button"
           className="cursor-pointer rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label={`Remove filter ${chip.label}`}
+          aria-label={`${clearLabel} ${chip.label}`}
           onClick={chip.onRemove}
         >
           <X className="h-2.5 w-2.5" />
@@ -118,6 +111,8 @@ export function PunchReportFilterPanel({
   issueCards,
   className,
 }: PunchReportFilterPanelProps) {
+  const { t } = useTranslation()
+  const dateRangePresets = React.useMemo(() => getDateRangePresets(t), [t])
   const {
     search,
     setSearch,
@@ -148,15 +143,15 @@ export function PunchReportFilterPanel({
 
   const paymentTypeLabel = React.useMemo(() => {
     if (paymentTypeFilter === PAYMENT_TYPE_FILTER_ALL) return null
-    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) return 'Without payment type'
+    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) return t('punch.withoutPaymentType')
     const opt = paymentTypeOptions.find((o) => o.id === paymentTypeFilter)
-    return opt?.name ?? opt?.title ?? `Payment type #${paymentTypeFilter}`
-  }, [paymentTypeFilter, paymentTypeOptions])
+    return opt?.name ?? opt?.title ?? t('punch.paymentTypeChip', { id: paymentTypeFilter })
+  }, [paymentTypeFilter, paymentTypeOptions, t])
 
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
 
-    const dateLabel = formatDateRangeLabel(dateRange?.from, dateRange?.to)
+    const dateLabel = formatDateRangeLabel(dateRange?.from, dateRange?.to, t('common.today'))
     if (dateLabel && !isDefaultDateRange) {
       list.push({
         key: 'date',
@@ -168,7 +163,7 @@ export function PunchReportFilterPanel({
     if (search.trim()) {
       list.push({
         key: 'search',
-        label: `Search: “${search.trim()}”`,
+        label: t('punch.searchChip', { query: search.trim() }),
         onRemove: () => setSearch(''),
       })
     }
@@ -178,15 +173,15 @@ export function PunchReportFilterPanel({
         key: 'dealers',
         label:
           selectedDealers.length === 1
-            ? '1 dealer'
-            : `${selectedDealers.length} dealers`,
+            ? t('dealer.oneSelected')
+            : t('dealer.manySelected', { count: selectedDealers.length }),
       })
     }
 
     if (selectedType && selectedType !== 'all') {
       list.push({
         key: 'issue',
-        label: ISSUE_TYPE_LABELS[selectedType] ?? selectedType,
+        label: getIssueFilterLabel(t, selectedType),
         onRemove: () => setSelectedType('all'),
       })
     }
@@ -194,7 +189,7 @@ export function PunchReportFilterPanel({
     if (selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL) {
       list.push({
         key: 'live',
-        label: todayLiveStatusLabel(selectedTodayLiveStatus),
+        label: todayLiveStatusLabelTranslated(t, selectedTodayLiveStatus),
         onRemove: () => setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL),
       })
     }
@@ -202,7 +197,7 @@ export function PunchReportFilterPanel({
     if (punchMinHours.trim()) {
       list.push({
         key: 'min-hours',
-        label: `More than ${punchMinHours}h`,
+        label: t('punch.moreThanHours', { hours: punchMinHours }),
         onRemove: () => onPunchMinHoursChange(''),
       })
     }
@@ -210,7 +205,7 @@ export function PunchReportFilterPanel({
     if (punchMaxHours.trim()) {
       list.push({
         key: 'max-hours',
-        label: `Less than ${punchMaxHours}h`,
+        label: t('punch.lessThanHours', { hours: punchMaxHours }),
         onRemove: () => onPunchMaxHoursChange(''),
       })
     }
@@ -241,6 +236,7 @@ export function PunchReportFilterPanel({
     onPunchMinHoursChange,
     onPunchMaxHoursChange,
     onPaymentTypeFilterChange,
+    t,
   ])
 
   const activeKey = chips.map((c) => c.key).join('|')
@@ -293,13 +289,13 @@ export function PunchReportFilterPanel({
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
             <Filter className="h-3.5 w-3.5" />
           </div>
-          <span className="text-sm font-semibold text-foreground">Filters</span>
+          <span className="text-sm font-semibold text-foreground">{t('punch.filterPanelTitle')}</span>
 
           <span className="flex-1" />
 
           {chips.length > 0 ? (
             <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-              {chips.length} active
+              {t('punch.filtersActive', { count: chips.length })}
             </span>
           ) : null}
 
@@ -319,11 +315,11 @@ export function PunchReportFilterPanel({
           onKeyDown={(e) => e.stopPropagation()}
         >
           {chips.map((chip) => (
-            <FilterChipBadge key={chip.key} chip={chip} />
+            <FilterChipBadge key={chip.key} chip={chip} clearLabel={t('common.clear')} />
           ))}
           {activePreset ? (
             <span className="text-[10px] text-muted-foreground">
-              ({DATE_RANGE_PRESETS.find((p) => p.key === activePreset)?.label})
+              ({dateRangePresets.find((p) => p.key === activePreset)?.label})
             </span>
           ) : null}
         </div>
@@ -333,10 +329,10 @@ export function PunchReportFilterPanel({
         <section className="mb-5">
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
             <h3 className="text-[13px] font-semibold text-foreground">
-              Live status today
+              {t('punch.liveStatusToday')}
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              Click a card to filter · click again to clear
+              {t('punch.clickCardToFilter')}
             </p>
           </div>
           <TodayLiveStatusFilterCards />
@@ -347,10 +343,10 @@ export function PunchReportFilterPanel({
         <section>
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
             <h3 className="text-[13px] font-semibold text-foreground">
-              Filter by issue type
+              {t('punch.filterByIssueType')}
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              Click a card to filter · click again to clear
+              {t('punch.clickCardToFilter')}
             </p>
           </div>
           {issueCards}

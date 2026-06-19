@@ -32,34 +32,32 @@ import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { useTtkPunchDetail } from '@/hooks/use-ttk-punch-detail'
 import { useTtkEditPunch } from '@/hooks/use-ttk-edit-punch'
 import type { TtkPunchDetail, TtkEditPunchPayload } from '@/lib/ttk/ttk-edit-types'
-
-type TimeKey = 'punchIn' | 'breakStart' | 'breakEnd' | 'punchOut'
-type NoteKey = 'punchInNote' | 'breakStartNote' | 'breakEndNote' | 'punchOutNote'
-
-const TIME_TO_NOTE: Record<TimeKey, NoteKey> = {
-  punchIn: 'punchInNote',
-  breakStart: 'breakStartNote',
-  breakEnd: 'breakEndNote',
-  punchOut: 'punchOutNote',
-}
-
-const FIELD_LABELS: Record<TimeKey, string> = {
-  punchIn: 'Clock In',
-  breakStart: 'Break Start',
-  breakEnd: 'Break End',
-  punchOut: 'Clock Out',
-}
+import { useTranslation } from '@/lib/i18n/locale-context'
+import { getPunchFieldLabel, getPunchFieldLabels } from '@/lib/i18n/label-helpers'
+import {
+  validatePunchForm,
+  type PunchFormState,
+  type PunchNoteKey,
+  type PunchTimeKey,
+} from '@/lib/ttk/punch-form-utils'
 
 interface EditPunchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   punchId: number | string | null
   employeeName?: string
-  initial?: Partial<Record<TimeKey, string | null | undefined>>
+  initial?: Partial<Record<PunchTimeKey, string | null | undefined>>
   onSaved?: () => void
 }
 
-type FormState = Record<TimeKey, string> & Record<NoteKey, string>
+type FormState = PunchFormState
+
+const TIME_TO_NOTE: Record<PunchTimeKey, PunchNoteKey> = {
+  punchIn: 'punchInNote',
+  breakStart: 'breakStartNote',
+  breakEnd: 'breakEndNote',
+  punchOut: 'punchOutNote',
+}
 
 const EMPTY_FORM: FormState = {
   punchIn: '',
@@ -99,14 +97,6 @@ function toIsoTz(value: string): string | null {
   return d.toISOString()
 }
 
-function diffMinutes(from: string, to: string): number | null {
-  if (!from || !to) return null
-  const a = new Date(from).getTime()
-  const b = new Date(to).getTime()
-  if (Number.isNaN(a) || Number.isNaN(b)) return null
-  return (b - a) / 60_000
-}
-
 export function EditPunchDialog({
   open,
   onOpenChange,
@@ -115,10 +105,11 @@ export function EditPunchDialog({
   initial,
   onSaved,
 }: EditPunchDialogProps) {
+  const { t } = useTranslation()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [original, setOriginal] = useState<FormState>(EMPTY_FORM)
   const [validationError, setValidationError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<TimeKey, string>>>({})
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PunchTimeKey, string>>>({})
 
   const detailQuery = useTtkPunchDetail(open ? punchId : null, open)
   const editMutation = useTtkEditPunch()
@@ -146,80 +137,27 @@ export function EditPunchDialog({
   /**
    * Returns time fields modified vs. the loaded detail (shows note inputs).
    */
-  const modifiedTimeFields = useMemo<TimeKey[]>(() => {
-    const keys: TimeKey[] = ['punchIn', 'breakStart', 'breakEnd', 'punchOut']
+  const modifiedTimeFields = useMemo<PunchTimeKey[]>(() => {
+    const keys: PunchTimeKey[] = ['punchIn', 'breakStart', 'breakEnd', 'punchOut']
     return keys.filter((k) => form[k] !== original[k])
   }, [form, original])
-
-  /**
-   * Full validation, mirroring legacy `ttkSubmit()` ordering rules.
-   * Note requirements are enforced server-side via getLogFromTTK (same as legacy).
-   */
-  const validate = (
-    state: FormState,
-  ): { generalError: string | null; fieldErrors: Partial<Record<TimeKey, string>> } => {
-    const errors: Partial<Record<TimeKey, string>> = {}
-
-    if (!state.punchIn) {
-      errors.punchIn = 'Required'
-      return { generalError: 'Clock in is required', fieldErrors: errors }
-    }
-
-    if (state.punchOut) {
-      const d = diffMinutes(state.punchIn, state.punchOut)
-      if (d !== null) {
-        if (d <= 0) errors.punchOut = 'Must be after Clock In'
-        else if (d > 20 * 60) errors.punchOut = 'More than 20 hours after Clock In'
-      }
-    }
-
-    if (state.breakStart) {
-      const d = diffMinutes(state.punchIn, state.breakStart)
-      if (d !== null && d <= 0) errors.breakStart = 'Must be after Clock In'
-      if (state.punchOut && !errors.punchOut) {
-        const d2 = diffMinutes(state.breakStart, state.punchOut)
-        if (d2 !== null && d2 <= 0) errors.breakStart = 'Must be before Clock Out'
-      }
-    }
-
-    if (state.breakEnd) {
-      if (!state.breakStart) {
-        errors.breakEnd = 'Break Start is required when Break End is set'
-      } else {
-        const d = diffMinutes(state.breakStart, state.breakEnd)
-        if (d !== null && d <= 0) errors.breakEnd = 'Must be after Break Start'
-        if (state.punchOut && !errors.punchOut) {
-          const d2 = diffMinutes(state.breakEnd, state.punchOut)
-          if (d2 !== null && d2 <= 0) errors.breakEnd = 'Must be before Clock Out'
-        }
-      }
-    }
-
-    const firstField = (['punchIn', 'breakStart', 'breakEnd', 'punchOut'] as TimeKey[]).find(
-      (k) => errors[k],
-    )
-    const generalError = firstField
-      ? `${FIELD_LABELS[firstField]}: ${errors[firstField]}`
-      : null
-
-    return { generalError, fieldErrors: errors }
-  }
 
   const setField = (key: keyof FormState) => (value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
     setValidationError(null)
     setFieldErrors((prev) => {
-      if (!prev[key]) return prev
-      const { [key]: _omitted, ...rest } = prev
+      const timeKey = key as PunchTimeKey
+      if (!prev[timeKey]) return prev
+      const { [timeKey]: _omitted, ...rest } = prev
       return rest
     })
   }
 
-  const clearField = (key: TimeKey) => () => setField(key)('')
+  const clearField = (key: PunchTimeKey) => () => setField(key)('')
 
   const handleSubmit = async () => {
     if (!punchId) return
-    const { generalError, fieldErrors: errs } = validate(form)
+    const { generalError, fieldErrors: errs } = validatePunchForm(form, t)
     setFieldErrors(errs)
     if (generalError) {
       setValidationError(generalError)
@@ -244,11 +182,13 @@ export function EditPunchDialog({
 
     try {
       const saved = await editMutation.mutateAsync(payload)
-      toast.success(`Punch updated${saved.usuario?.nombre ? ` — ${saved.usuario.nombre}` : ''}`)
+      toast.success(
+        t('punch.updated', { name: saved.usuario?.nombre ?? t('common.employee') }),
+      )
       onOpenChange(false)
       onSaved?.()
     } catch (e: unknown) {
-      const message = getSrsErrorMessage(e, 'Failed to save punch')
+      const message = getSrsErrorMessage(e, t('punch.updateFailed'))
       toast.error(message)
       setValidationError(message)
     }
@@ -261,13 +201,15 @@ export function EditPunchDialog({
     return (detailQuery.data?.usuario?.nombre ?? employeeName ?? '').trim()
   }, [detailQuery.data?.usuario?.nombre, employeeName])
 
-  const renderTimeField = (key: TimeKey, icon: React.ReactNode, required = false) => {
+  const renderTimeField = (key: PunchTimeKey, icon: React.ReactNode, required = false) => {
     const noteKey = TIME_TO_NOTE[key]
     const isModified = modifiedTimeFields.includes(key)
+    const fieldLabels = getPunchFieldLabels(t)
     return (
       <TimeField
         id={key}
-        label={FIELD_LABELS[key]}
+        label={fieldLabels[key]}
+        noteLabel={getPunchFieldLabel(t, noteKey)}
         icon={icon}
         value={form[key]}
         onChange={setField(key)}
@@ -292,7 +234,7 @@ export function EditPunchDialog({
               {employeeDisplayName ? (
                 <>
                   <span className="text-xs font-medium tracking-wide text-muted-foreground">
-                    Edit Time Tracking:
+                    {t('punch.editFor')}
                   </span>
                   <span className="text-base font-semibold leading-snug break-words text-foreground">
                     {employeeDisplayName}
@@ -300,14 +242,12 @@ export function EditPunchDialog({
                 </>
               ) : (
                 <span className="text-base font-semibold leading-snug text-foreground">
-                  Edit Time Tracking
+                  {t('punch.editTitle')}
                 </span>
               )}
             </div>
           </DialogTitle>
-          <DialogDescription>
-            Adjust punch times for this shift. If you change a time, add a note explaining why.
-          </DialogDescription>
+          <DialogDescription>{t('punch.editSubtitle')}</DialogDescription>
         </DialogHeader>
 
         {detailQuery.error && (
@@ -316,7 +256,7 @@ export function EditPunchDialog({
             <span>
               {detailQuery.error instanceof Error
                 ? detailQuery.error.message
-                : 'Could not load punch details.'}
+                : t('punch.loadDetailsFailed')}
             </span>
           </div>
         )}
@@ -359,7 +299,7 @@ export function EditPunchDialog({
                 className="gap-2"
               >
                 <X className="h-4 w-4" />
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
@@ -369,12 +309,12 @@ export function EditPunchDialog({
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving…
+                    {t('common.saving')}
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4" />
-                    Update
+                    {t('common.update')}
                   </>
                 )}
               </Button>
@@ -389,6 +329,7 @@ export function EditPunchDialog({
 interface TimeFieldProps {
   id: string
   label: string
+  noteLabel: string
   icon: React.ReactNode
   value: string
   onChange: (value: string) => void
@@ -406,6 +347,7 @@ interface TimeFieldProps {
 function TimeField({
   id,
   label,
+  noteLabel,
   icon,
   value,
   onChange,
@@ -418,6 +360,8 @@ function TimeField({
   onNoteChange,
   noteError,
 }: TimeFieldProps) {
+  const { t } = useTranslation()
+
   return (
     <div className={cn('space-y-1.5 rounded-lg', modified && 'rounded-lg border border-primary/30 bg-primary/5 p-3')}>
       <Label htmlFor={id} className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -426,7 +370,7 @@ function TimeField({
         {required && <span className="text-destructive">*</span>}
         {modified && (
           <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-            Modified
+            {t('common.modified')}
           </span>
         )}
       </Label>
@@ -453,7 +397,7 @@ function TimeField({
           onClick={onClear}
           disabled={disabled || !value || required}
           className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`Clear ${label}`}
+          aria-label={t('punch.clearField', { field: label })}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -468,12 +412,12 @@ function TimeField({
         <div className="space-y-1">
           <Label htmlFor={`${id}_note`} className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
             <StickyNote className="h-3 w-3" />
-            {label} Note <span className="text-destructive">*</span>
+            {noteLabel} <span className="text-destructive">*</span>
           </Label>
           <Input
             id={`${id}_note`}
             type="text"
-            placeholder={`Why did you change ${label.toLowerCase()}?`}
+            placeholder={t('punch.whyChangedField', { field: label.toLowerCase() })}
             maxLength={254}
             value={noteValue}
             onChange={(e) => onNoteChange(e.target.value)}

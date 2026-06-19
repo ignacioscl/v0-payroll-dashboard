@@ -30,6 +30,8 @@ import {
   Coffee,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslation } from '@/lib/i18n/locale-context'
+import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
 type IssueType =
   | 'only_error'
@@ -47,52 +49,31 @@ interface IssueCardConfig {
   variant: KPICardVariant
 }
 
-const ISSUE_CARDS: IssueCardConfig[] = [
-  {
-    type: 'only_error',
-    title: 'Only with errors',
-    icon: <AlertTriangle className="h-5 w-5" />,
-    variant: 'warning',
-  },
-  {
-    type: 'only_error_clockout',
-    title: 'Without clock out',
-    icon: <LogOut className="h-5 w-5" />,
-    variant: 'danger',
-  },
-  {
-    type: 'only_error_break',
-    title: 'Without break',
-    icon: <Coffee className="h-5 w-5" />,
-    variant: 'warning',
-  },
-  {
-    type: 'manual_punch',
-    title: 'Manual punch',
-    icon: <Hand className="h-5 w-5" />,
-    variant: 'info',
-  },
-  {
-    type: 'only_deletes',
-    title: 'Deleted punches',
-    icon: <Trash2 className="h-5 w-5" />,
-    variant: 'violet',
-  },
-  {
-    type: 'without_salary',
-    title: 'Without salary',
-    icon: <DollarSign className="h-5 w-5" />,
-    variant: 'success',
-  },
-  {
-    type: 'only_fixed',
-    title: 'Corrected punches',
-    icon: <CheckCheck className="h-5 w-5" />,
-    variant: 'info',
-  },
+const ISSUE_CARD_TYPES: IssueType[] = [
+  'only_error',
+  'only_error_clockout',
+  'only_error_break',
+  'manual_punch',
+  'only_deletes',
+  'without_salary',
+  'only_fixed',
 ]
 
+const ISSUE_CARD_META: Record<
+  IssueType,
+  { icon: React.ReactNode; variant: KPICardVariant }
+> = {
+  only_error: { icon: <AlertTriangle className="h-5 w-5" />, variant: 'warning' },
+  only_error_clockout: { icon: <LogOut className="h-5 w-5" />, variant: 'danger' },
+  only_error_break: { icon: <Coffee className="h-5 w-5" />, variant: 'warning' },
+  manual_punch: { icon: <Hand className="h-5 w-5" />, variant: 'info' },
+  only_deletes: { icon: <Trash2 className="h-5 w-5" />, variant: 'violet' },
+  without_salary: { icon: <DollarSign className="h-5 w-5" />, variant: 'success' },
+  only_fixed: { icon: <CheckCheck className="h-5 w-5" />, variant: 'info' },
+}
+
 export default function IssuesPage() {
+  const { t } = useTranslation()
   const [addPunchOpen, setAddPunchOpen] = useState(false)
   const [punchMinHoursRaw, setPunchMinHoursRaw] = useState('')
   const [punchMaxHoursRaw, setPunchMaxHoursRaw] = useState('')
@@ -150,13 +131,15 @@ export default function IssuesPage() {
     return dealers.find((d) => String(d.id) === String(singleDealerId))?.label
   }, [dealers, singleDealerId])
 
-  const visibleIssueCards = useMemo(
-    () =>
-      ISSUE_CARDS.filter(
-        (card) => card.type !== 'only_deletes' || canViewDeleted,
-      ),
-    [canViewDeleted],
-  )
+  const visibleIssueCards = useMemo((): IssueCardConfig[] => {
+    return ISSUE_CARD_TYPES.filter((type) => type !== 'only_deletes' || canViewDeleted).map(
+      (type) => ({
+        type,
+        title: getIssueFilterLabel(t, type),
+        ...ISSUE_CARD_META[type],
+      }),
+    )
+  }, [canViewDeleted, t])
 
   const { counts, loading } = useTtkIssueCounts({
     search,
@@ -180,9 +163,18 @@ export default function IssuesPage() {
       const { clock_out_missing, break_missing, shift_20h_plus } = counts.only_error.by_type
       return (
         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
-          <span>Clock out: <span className="font-medium text-foreground">{clock_out_missing}</span></span>
-          <span>Break: <span className="font-medium text-foreground">{break_missing}</span></span>
-          <span>20h+: <span className="font-medium text-foreground">{shift_20h_plus}</span></span>
+          <span>
+            {t('punch.clockOutBreakdown')}{' '}
+            <span className="font-medium text-foreground">{clock_out_missing}</span>
+          </span>
+          <span>
+            {t('punch.breakBreakdown')}{' '}
+            <span className="font-medium text-foreground">{break_missing}</span>
+          </span>
+          <span>
+            {t('punch.shift20hBreakdown')}{' '}
+            <span className="font-medium text-foreground">{shift_20h_plus}</span>
+          </span>
         </div>
       )
     }
@@ -191,15 +183,15 @@ export default function IssuesPage() {
 
   const handleAddPunchClick = () => {
     if (selectedDealers.length === 0) {
-      toast.error('Select one dealer in the header to add a punch.')
+      toast.error(t('dealer.selectOneInHeader'))
       return
     }
     if (selectedDealers.length > 1) {
-      toast.error('Select only one dealer in the header to add a punch.')
+      toast.error(t('dealer.selectOnlyOneInHeader'))
       return
     }
     if (singleDealerId == null) {
-      toast.error('The selected dealer is invalid. Choose a dealer again.')
+      toast.error(t('dealer.invalidSelected'))
       return
     }
     setAddPunchOpen(true)
@@ -209,10 +201,8 @@ export default function IssuesPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Punch Report</h1>
-          <p className="mt-1 text-muted-foreground">
-            Without group — live counts from TTK punch validation
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('punch.report')}</h1>
+          <p className="mt-1 text-muted-foreground">{t('punch.reportSubtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!meLoading && canAdd && (
@@ -222,22 +212,22 @@ export default function IssuesPage() {
               onClick={handleAddPunchClick}
             >
               <PlusCircle className="h-4 w-4" />
-              Add punch
+              {t('punch.add')}
             </Button>
           )}
           <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
             <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
             <span className="font-medium tabular-nums">
-              {loading ? '…' : totalPending} with errors
+              {loading
+                ? '…'
+                : t('punch.withErrorsCount', { count: totalPending })}
             </span>
           </Badge>
         </div>
       </div>
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Select dealers in the header to load issue counts.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>
       ) : null}
 
       <PunchReportFilterPanel

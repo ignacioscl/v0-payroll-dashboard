@@ -13,6 +13,7 @@ import {
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { srsProxyUrl } from '@/lib/srs-proxy-url'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { DemoExplainer } from '../_components/demo-explainer'
 
 interface MockEmployee {
@@ -37,10 +38,10 @@ const usd = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-const statusMeta: Record<MockEmployee['status'], { label: string; cls: string; icon: React.ReactNode }> = {
-  active: { label: 'Active', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: <CircleCheck className="size-3" /> },
-  on_leave: { label: 'On leave', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20', icon: <CircleDashed className="size-3" /> },
-  terminated: { label: 'Terminated', cls: 'bg-rose-50 text-rose-700 ring-rose-600/20', icon: <CircleX className="size-3" /> },
+const statusMeta: Record<MockEmployee['status'], { labelKey: 'statusActive' | 'statusOnLeave' | 'statusTerminated'; cls: string; icon: React.ReactNode }> = {
+  active: { labelKey: 'statusActive', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: <CircleCheck className="size-3" /> },
+  on_leave: { labelKey: 'statusOnLeave', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20', icon: <CircleDashed className="size-3" /> },
+  terminated: { labelKey: 'statusTerminated', cls: 'bg-rose-50 text-rose-700 ring-rose-600/20', icon: <CircleX className="size-3" /> },
 }
 
 /** Synthetic extra columns to make the table wide enough that scroll-pinning shines. */
@@ -49,6 +50,7 @@ function quarterSalary(base: number, multiplier: number): number {
 }
 
 export default function DataTableFixedColumnsPage() {
+  const { t } = useTranslation()
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'id', desc: false }])
@@ -73,10 +75,10 @@ export default function DataTableFixedColumnsPage() {
       {
         accessorKey: 'id',
         size: 80, // explicit — required for pinned columns so sticky offsets are accurate
-        header: ({ column }) => <DataTableColumnHeader column={column} title="ID" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colId')} />,
         cell: ({ row }) => `#${row.original.id}`,
         meta: {
-          label: 'ID',
+          label: t('dataTableDemo.colId'),
           mono: true,
           pin: 'left',
         } satisfies DataTableColumnMeta<MockEmployee>,
@@ -84,7 +86,7 @@ export default function DataTableFixedColumnsPage() {
       {
         accessorKey: 'name',
         size: 240, // explicit — required for pinned columns
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colEmployee')} />,
         cell: ({ row }) => (
           <div className="flex min-w-0 items-center gap-2">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-[9px] font-semibold text-white shadow-sm">
@@ -102,28 +104,28 @@ export default function DataTableFixedColumnsPage() {
           </div>
         ),
         meta: {
-          label: 'Employee',
+          label: t('dataTableDemo.colEmployee'),
           pin: 'left',
         } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'department',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Department" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colDepartment')} />,
         cell: ({ row }) => row.original.department,
-        meta: { label: 'Department' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colDepartment') } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'position',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colPosition')} />,
         cell: ({ row }) => row.original.position,
-        meta: { label: 'Position' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colPosition') } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'salary',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colSalary')} />,
         cell: ({ row }) => usd.format(row.original.salary),
         meta: {
-          label: 'Salary',
+          label: t('dataTableDemo.colSalary'),
           numeric: true,
           mono: true,
           exportValue: (row) => row.salary,
@@ -135,35 +137,35 @@ export default function DataTableFixedColumnsPage() {
         accessorFn: (row: MockEmployee) => quarterSalary(row.salary, 0.04 + i * 0.01),
         header: ({ column }: { column: ReturnType<typeof Object> }) => (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          <DataTableColumnHeader column={column as any} title={`${q} bonus`} />
+          <DataTableColumnHeader column={column as any} title={t('dataTableDemo.qBonus', { quarter: q })} />
         ),
         cell: ({ getValue }: { getValue: () => unknown }) => usd.format(Number(getValue())),
         meta: {
-          label: `${q} bonus`,
+          label: t('dataTableDemo.qBonus', { quarter: q }),
           numeric: true,
           mono: true,
         } satisfies DataTableColumnMeta<MockEmployee>,
       })) as ColumnDef<MockEmployee>[],
       {
         accessorKey: 'hire_date',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Hire date" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colHireDate')} />,
         cell: ({ row }) =>
           new Intl.DateTimeFormat('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
           }).format(new Date(row.original.hire_date)),
-        meta: { label: 'Hire date', mono: true } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colHireDate'), mono: true } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'email',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colEmail')} />,
         cell: ({ row }) => row.original.email,
-        meta: { label: 'Email' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colEmail') } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'status',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colStatus')} />,
         cell: ({ row }) => {
           const m = statusMeta[row.original.status]
           return (
@@ -172,19 +174,19 @@ export default function DataTableFixedColumnsPage() {
               className={`gap-1 border-0 px-1.5 py-0.5 text-[10px] font-medium ring-1 ${m.cls}`}
             >
               {m.icon}
-              {m.label}
+              {t(`dataTableDemo.${m.labelKey}`)}
             </Badge>
           )
         },
         meta: {
-          label: 'Status',
+          label: t('dataTableDemo.colStatus'),
           pin: 'right',
           headerClassName: 'min-w-[120px]',
-          exportValue: (row) => statusMeta[row.status].label,
+          exportValue: (row) => t(`dataTableDemo.${statusMeta[row.status].labelKey}`),
         } satisfies DataTableColumnMeta<MockEmployee>,
       },
     ],
-    [],
+    [t],
   )
 
   const query = useQuery({
@@ -212,10 +214,7 @@ export default function DataTableFixedColumnsPage() {
       <div className="min-w-0 space-y-2">
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Pin className="size-3 rotate-45 text-blue-600" />
-          Scroll horizontally — <span className="font-semibold text-foreground">ID</span> and{' '}
-          <span className="font-semibold text-foreground">Employee</span> stay pinned on the left,{' '}
-          <span className="font-semibold text-foreground">Status</span> stays pinned on the right.
-          Drag the right edge of any column header to resize it.
+          {t('dataTableDemo.fixedPinHint')}
         </p>
         <DataTable<MockEmployee>
           tableId="demo-pinned"
@@ -248,15 +247,9 @@ export default function DataTableFixedColumnsPage() {
       </div>
 
       <DemoExplainer
-        title="Pin columns to the edges"
-        description={
-          <>
-            Add <code className="rounded bg-muted px-1 text-[10px]">pin: 'left' | 'right'</code> to the
-            column's <code className="rounded bg-muted px-1 text-[10px]">meta</code>. The cell becomes{' '}
-            <code className="rounded bg-muted px-1 text-[10px]">position: sticky</code> and gets a soft
-            shadow on the inner edge to separate it from the scrolling content.
-          </>
-        }
+        howConfiguredLabel={t('dataTableDemo.howConfigured')}
+        title={t('dataTableDemo.fixedTitle')}
+        description={t('dataTableDemo.fixedDescription')}
         steps={[
           {
             title: 'Pin a column to the left',

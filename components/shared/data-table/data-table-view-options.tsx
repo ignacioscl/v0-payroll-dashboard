@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface DataTableViewOptionsProps<TData> {
   table: Table<TData>
@@ -24,6 +25,7 @@ interface DataTableViewOptionsProps<TData> {
 export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
+  const { t } = useTranslation()
   const hideableColumns = table
     .getAllColumns()
     .filter((c) => typeof c.accessorFn !== 'undefined' && c.getCanHide())
@@ -39,17 +41,17 @@ export function DataTableViewOptions<TData>({
           variant="outline"
           size="sm"
           className="h-7 gap-1 px-2 text-[11px]"
-          aria-label="Toggle columns"
+          aria-label={t('common.toggleColumns')}
         >
           <SlidersHorizontal className="size-3 text-blue-600" />
-          Columns
+          {t('common.columns')}
           <Badge variant="secondary" className="ml-0 px-1 py-0 text-[10px]">
             {visibleCount}
           </Badge>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[200px]">
-        <DropdownMenuLabel className="text-xs">Toggle columns</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">{t('common.toggleColumns')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {hideableColumns.map((column) => {
           const label =

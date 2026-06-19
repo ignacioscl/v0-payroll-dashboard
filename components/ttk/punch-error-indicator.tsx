@@ -5,6 +5,7 @@ import { AlertTriangle, Clock, Coffee, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 type PunchErrorBadge = {
   label: string
@@ -54,6 +55,7 @@ export function parsePunchErrorBadges(res: string): PunchErrorBadge[] {
 }
 
 export function PunchErrorIndicator({ errorText }: { errorText: string }) {
+  const { t } = useTranslation()
   const badges = parsePunchErrorBadges(errorText)
 
   return (
@@ -62,14 +64,14 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
         <button
           type="button"
           className="inline-flex shrink-0 cursor-pointer rounded-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Punch errors: ${errorText}`}
+          aria-label={`${t('punch.issues')}: ${errorText}`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto max-w-xs space-y-2 p-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Punch issues
+          {t('punch.issues')}
         </p>
         <div className="flex flex-col gap-1.5">
           {badges.map((badge) => {

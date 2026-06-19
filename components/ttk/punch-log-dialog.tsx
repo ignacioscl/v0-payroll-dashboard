@@ -22,6 +22,8 @@ import type { TtkPunchLogEntry } from '@/lib/ttk/ttk-log-types'
 import { ttkLogEvidenceUrl } from '@/lib/ttk/ttk-log-evidence-url'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { useTranslation } from '@/lib/i18n/locale-context'
+import type { TranslateFn } from '@/lib/i18n/locale-context'
 
 function formatLogDateTime(gmt0?: string | null): string {
   if (!gmt0) return ''
@@ -51,10 +53,10 @@ function formatLogDate(dateUpdate?: string | null): string {
   })
 }
 
-function statusMessage(updateStatusTo: number | null | undefined): string | null {
-  if (updateStatusTo === 0) return 'Deleted punch'
-  if (updateStatusTo === 1) return 'Activated punch'
-  if (updateStatusTo === 2) return 'Manually created punch'
+function statusMessage(updateStatusTo: number | null | undefined, t: TranslateFn): string | null {
+  if (updateStatusTo === 0) return t('punch.deletedPunch')
+  if (updateStatusTo === 1) return t('punch.activatedPunch')
+  if (updateStatusTo === 2) return t('punch.manualCreatedPunch')
   return null
 }
 
@@ -69,11 +71,13 @@ function LogTimeCell({
   newGmt0,
   oldGmt0,
   note,
+  t,
 }: {
   label: string
   newGmt0?: string | null
   oldGmt0?: string | null
   note?: string | null
+  t: TranslateFn
 }) {
   if (!newGmt0 && !oldGmt0) {
     return <span className="text-muted-foreground">—</span>
@@ -88,43 +92,43 @@ function LogTimeCell({
       {deleted ? (
         <>
           <div>
-            <span className="font-medium text-destructive">New:</span> Deleted
+            <span className="font-medium text-destructive">{t('common.newLabel')}</span> {t('common.delete')}
           </div>
           <div>
-            <span className="font-medium text-muted-foreground">Old:</span>{' '}
+            <span className="font-medium text-muted-foreground">{t('common.oldLabel')}</span>{' '}
             {formatLogDateTime(oldGmt0)}
           </div>
         </>
       ) : added ? (
         <>
           <div>
-            <span className="font-medium text-muted-foreground">New:</span>{' '}
+            <span className="font-medium text-muted-foreground">{t('common.newLabel')}</span>{' '}
             {formatLogDateTime(newGmt0)}
           </div>
           <div>
-            <span className="font-medium text-muted-foreground">Old:</span> Not set
+            <span className="font-medium text-muted-foreground">{t('common.oldLabel')}</span> {t('common.notSet')}
           </div>
         </>
       ) : changed ? (
         <>
           <div>
-            <span className="font-medium text-muted-foreground">New:</span>{' '}
+            <span className="font-medium text-muted-foreground">{t('common.newLabel')}</span>{' '}
             {formatLogDateTime(newGmt0)}
           </div>
           <div>
-            <span className="font-medium text-muted-foreground">Old:</span>{' '}
+            <span className="font-medium text-muted-foreground">{t('common.oldLabel')}</span>{' '}
             {formatLogDateTime(oldGmt0)}
           </div>
         </>
       ) : (
         <div>
           {formatLogDateTime(newGmt0 ?? oldGmt0)}
-          <span className="text-muted-foreground"> (Not modified)</span>
+          <span className="text-muted-foreground"> ({t('common.notModified')})</span>
         </div>
       )}
       {note ? (
         <div className="text-muted-foreground">
-          <span className="font-medium">Note:</span> {note}
+          <span className="font-medium">{t('common.note')}:</span> {note}
         </div>
       ) : null}
       <span className="sr-only">{label}</span>
@@ -153,15 +157,15 @@ function hasTimeFieldChanges(entry: TtkPunchLogEntry): boolean {
   )
 }
 
-function PaymentDetailsRestrictedMessage() {
+function PaymentDetailsRestrictedMessage({ t }: { t: TranslateFn }) {
   return (
     <p className="text-xs italic text-muted-foreground">
-      Payment details hidden — insufficient permissions
+      {t('punch.paymentDetailsHidden')}
     </p>
   )
 }
 
-function PaymentChangeCell({ entry }: { entry: TtkPunchLogEntry }) {
+function PaymentChangeCell({ entry, t }: { entry: TtkPunchLogEntry; t: TranslateFn }) {
   const paymentChanged = hasPaymentTypeChange(entry)
   const hourlyChanged = hasHourlyRateChange(entry)
 
@@ -173,25 +177,25 @@ function PaymentChangeCell({ entry }: { entry: TtkPunchLogEntry }) {
     <div className="space-y-1 text-xs">
       {paymentChanged ? (
         <div>
-          <span className="font-medium">Payment type:</span>{' '}
-          <span className="text-muted-foreground">New:</span>{' '}
+          <span className="font-medium">{t('punch.paymentType')}:</span>{' '}
+          <span className="text-muted-foreground">{t('common.newLabel')}</span>{' '}
           {entry.paymentType?.name ?? '—'}
           {' · '}
-          <span className="text-muted-foreground">Old:</span>{' '}
+          <span className="text-muted-foreground">{t('common.oldLabel')}</span>{' '}
           {entry.paymentTypeOld?.name ?? '—'}
         </div>
       ) : null}
       {hourlyChanged ? (
         <div>
-          <span className="font-medium">Hourly rate:</span>{' '}
-          <span className="text-muted-foreground">New:</span> {entry.hourlyRate ?? '—'}
+          <span className="font-medium">{t('punch.hourlyRate')}</span>{' '}
+          <span className="text-muted-foreground">{t('common.newLabel')}</span> {entry.hourlyRate ?? '—'}
           {' · '}
-          <span className="text-muted-foreground">Old:</span> {entry.hourlyRateOld ?? '—'}
+          <span className="text-muted-foreground">{t('common.oldLabel')}</span> {entry.hourlyRateOld ?? '—'}
         </div>
       ) : null}
       {entry.note ? (
         <div>
-          <span className="font-medium">Note:</span> {entry.note}
+          <span className="font-medium">{t('common.note')}:</span> {entry.note}
         </div>
       ) : null}
     </div>
@@ -201,11 +205,15 @@ function PaymentChangeCell({ entry }: { entry: TtkPunchLogEntry }) {
 function LogRow({
   entry,
   canViewPayment,
+  t,
+  slotLabels,
 }: {
   entry: TtkPunchLogEntry
   canViewPayment: boolean
+  t: TranslateFn
+  slotLabels: { punchIn: string; breakStart: string; breakEnd: string; punchOut: string }
 }) {
-  const status = statusMessage(entry.updateStatusTo ?? null)
+  const status = statusMessage(entry.updateStatusTo ?? null, t)
   const evidence =
     entry.fileLog && entry.fileLog.trim() !== '' ? (
       <Button variant="outline" size="icon" className="h-7 w-7" asChild>
@@ -213,7 +221,7 @@ function LogRow({
           href={ttkLogEvidenceUrl(entry.fileLog)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Download evidence"
+          aria-label={t('punch.downloadEvidence')}
         >
           <Download className="h-3.5 w-3.5" />
         </a>
@@ -248,9 +256,9 @@ function LogRow({
         <TableCell className="text-xs">{entry.usuario?.nombre ?? '—'}</TableCell>
         <TableCell colSpan={4} className="align-top text-xs">
           {showPaymentDetails ? (
-            <PaymentChangeCell entry={entry} />
+            <PaymentChangeCell entry={entry} t={t} />
           ) : paymentRestricted ? (
-            <PaymentDetailsRestrictedMessage />
+            <PaymentDetailsRestrictedMessage t={t} />
           ) : null}
         </TableCell>
         <TableCell className="text-center">{evidence}</TableCell>
@@ -264,7 +272,7 @@ function LogRow({
         <TableCell className="whitespace-nowrap text-xs">{formatLogDate(entry.dateUpdate)}</TableCell>
         <TableCell className="text-xs">{entry.usuario?.nombre ?? '—'}</TableCell>
         <TableCell colSpan={4} className="text-xs">
-          <span className="font-medium">Note:</span> {entry.note}
+          <span className="font-medium">{t('common.note')}:</span> {entry.note}
         </TableCell>
         <TableCell className="text-center">{evidence}</TableCell>
       </TableRow>
@@ -279,32 +287,36 @@ function LogRow({
         <>
           <TableCell colSpan={4} className="align-top text-xs">
             <div className="space-y-2">
-              {showPaymentDetails ? <PaymentChangeCell entry={entry} /> : null}
-              {paymentRestricted ? <PaymentDetailsRestrictedMessage /> : null}
+              {showPaymentDetails ? <PaymentChangeCell entry={entry} t={t} /> : null}
+              {paymentRestricted ? <PaymentDetailsRestrictedMessage t={t} /> : null}
               <div className="grid gap-2 sm:grid-cols-2">
                 <LogTimeCell
-                  label="Punch in"
+                  label={slotLabels.punchIn}
                   newGmt0={entry.punchInGmt0}
                   oldGmt0={entry.punchInOldGmt0}
                   note={entry.punchInNote}
+                  t={t}
                 />
                 <LogTimeCell
-                  label="Break start"
+                  label={slotLabels.breakStart}
                   newGmt0={entry.breakStartGmt0}
                   oldGmt0={entry.breakStartOldGmt0}
                   note={entry.breakStartNote}
+                  t={t}
                 />
                 <LogTimeCell
-                  label="Break end"
+                  label={slotLabels.breakEnd}
                   newGmt0={entry.breakEndGmt0}
                   oldGmt0={entry.breakEndOldGmt0}
                   note={entry.breakEndNote}
+                  t={t}
                 />
                 <LogTimeCell
-                  label="Punch out"
+                  label={slotLabels.punchOut}
                   newGmt0={entry.punchOutGmt0}
                   oldGmt0={entry.punchOutOldGmt0}
                   note={entry.punchOutNote}
+                  t={t}
                 />
               </div>
             </div>
@@ -314,34 +326,38 @@ function LogRow({
         <>
           <TableCell className="align-top text-xs">
             <LogTimeCell
-              label="Punch in"
+              label={slotLabels.punchIn}
               newGmt0={entry.punchInGmt0}
               oldGmt0={entry.punchInOldGmt0}
               note={entry.punchInNote}
+              t={t}
             />
           </TableCell>
           <TableCell className="align-top text-xs">
             <LogTimeCell
-              label="Break start"
+              label={slotLabels.breakStart}
               newGmt0={entry.breakStartGmt0}
               oldGmt0={entry.breakStartOldGmt0}
               note={entry.breakStartNote}
+              t={t}
             />
           </TableCell>
           <TableCell className="align-top text-xs">
             <LogTimeCell
-              label="Break end"
+              label={slotLabels.breakEnd}
               newGmt0={entry.breakEndGmt0}
               oldGmt0={entry.breakEndOldGmt0}
               note={entry.breakEndNote}
+              t={t}
             />
           </TableCell>
           <TableCell className="align-top text-xs">
             <LogTimeCell
-              label="Punch out"
+              label={slotLabels.punchOut}
               newGmt0={entry.punchOutGmt0}
               oldGmt0={entry.punchOutOldGmt0}
               note={entry.punchOutNote}
+              t={t}
             />
           </TableCell>
         </>
@@ -366,8 +382,16 @@ export function PunchLogDialog({
   employeeName,
   punchDateLabel,
 }: PunchLogDialogProps) {
+  const { t } = useTranslation()
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+
+  const slotLabels = {
+    punchIn: t('punch.slotPunchIn'),
+    breakStart: t('punch.slotBreakIn'),
+    breakEnd: t('punch.slotBreakOut'),
+    punchOut: t('punch.slotPunchOut'),
+  }
 
   const { data: entries = [], isLoading, isError, error } = useTtkPunchLog(
     punchId,
@@ -377,13 +401,13 @@ export function PunchLogDialog({
   const title =
     employeeName && punchDateLabel
       ? `${employeeName} — ${punchDateLabel}`
-      : employeeName ?? 'Punch change log'
+      : employeeName ?? t('punch.logTitle')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-[min(96vw,90rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,90rem)]">
         <DialogHeader className="border-b border-border px-4 py-3">
-          <DialogTitle className="text-base">View change log</DialogTitle>
+          <DialogTitle className="text-base">{t('punch.logView')}</DialogTitle>
           <DialogDescription className="text-xs">{title}</DialogDescription>
         </DialogHeader>
 
@@ -394,34 +418,34 @@ export function PunchLogDialog({
             </div>
           ) : isError ? (
             <p className="text-sm text-destructive">
-              {error instanceof Error ? error.message : 'Failed to load change log'}
+              {error instanceof Error ? error.message : t('punch.logLoadFailed')}
             </p>
           ) : entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No change log entries.</p>
+            <p className="text-sm text-muted-foreground">{t('punch.logEmpty')}</p>
           ) : (
             <Table className="min-w-[56rem]">
               <TableHeader>
                 <TableRow className="bg-primary hover:bg-primary">
                   <TableHead className="h-8 min-w-[9rem] whitespace-nowrap text-xs font-semibold text-primary-foreground">
-                    Change date
+                    {t('punch.changeDate')}
                   </TableHead>
                   <TableHead className="h-8 min-w-[7rem] text-xs font-semibold text-primary-foreground">
-                    User
+                    {t('punch.user')}
                   </TableHead>
                   <TableHead className="h-8 min-w-[11rem] text-xs font-semibold text-primary-foreground">
-                    Punch in
+                    {slotLabels.punchIn}
                   </TableHead>
                   <TableHead className="h-8 min-w-[11rem] text-xs font-semibold text-primary-foreground">
-                    Break in
+                    {slotLabels.breakStart}
                   </TableHead>
                   <TableHead className="h-8 min-w-[11rem] text-xs font-semibold text-primary-foreground">
-                    Break out
+                    {slotLabels.breakEnd}
                   </TableHead>
                   <TableHead className="h-8 min-w-[11rem] text-xs font-semibold text-primary-foreground">
-                    Punch out
+                    {slotLabels.punchOut}
                   </TableHead>
                   <TableHead className="h-8 w-[4.5rem] text-center text-xs font-semibold text-primary-foreground">
-                    Evidence
+                    {t('punch.evidence')}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -431,6 +455,8 @@ export function PunchLogDialog({
                     key={String(entry.id ?? i)}
                     entry={entry}
                     canViewPayment={canViewPayment}
+                    t={t}
+                    slotLabels={slotLabels}
                   />
                 ))}
               </TableBody>

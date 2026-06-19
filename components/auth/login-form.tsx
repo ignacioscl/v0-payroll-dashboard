@@ -20,27 +20,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
-import { APP_SUBTITLE, SRS_SUITE_TITLE } from '@/lib/branding'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { RoleSelectionDialog } from '@/components/auth/role-selection-dialog'
 import type { SrsLoginRoleOption } from '@/lib/auth/types'
 
-const features = [
-  {
-    icon: Clock,
-    title: 'Time tracking',
-    description: 'Monitor punches, hours, and attendance in real time.',
-  },
-  {
-    icon: Users,
-    title: 'Team visibility',
-    description: 'See who is on site and manage your workforce.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Payroll insights',
-    description: 'Dashboard KPIs and issue tracking at a glance.',
-  },
-]
+const FEATURE_KEYS = [
+  { icon: Clock, titleKey: 'auth.featureTimeTitle', descKey: 'auth.featureTimeDesc' },
+  { icon: Users, titleKey: 'auth.featureTeamTitle', descKey: 'auth.featureTeamDesc' },
+  { icon: BarChart3, titleKey: 'auth.featurePayrollTitle', descKey: 'auth.featurePayrollDesc' },
+] as const
 
 interface LoginFormProps {
   phpLoginUrl: string
@@ -48,6 +36,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
+  const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
@@ -58,10 +47,8 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
 
   useEffect(() => {
     if (searchParams.get('error') !== 'forbidden') return
-    setError(
-      'You do not have access to the payroll dashboard. Contact your administrator if you believe this is an error.',
-    )
-  }, [searchParams])
+    setError(t('auth.noAccess'))
+  }, [searchParams, t])
 
   async function completeLogin(payload: {
     email: string
@@ -75,7 +62,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
     })
     const json = await res.json()
     if (!res.ok || json.status !== 'success') {
-      throw new Error(json?.error?.message || 'Invalid username or password')
+      throw new Error(json?.error?.message || t('auth.invalidCredentials'))
     }
     if (json.needsRoleSelection && Array.isArray(json.rolesRel) && json.rolesRel.length > 0) {
       setRoleOptions(json.rolesRel)
@@ -93,7 +80,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
     try {
       await completeLogin({ email, password })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('auth.loginFailed'))
     } finally {
       setLoading(false)
     }
@@ -105,7 +92,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
     try {
       await completeLogin({ email, password, idUsuarioRolrel })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('auth.loginFailed'))
     } finally {
       setLoading(false)
     }
@@ -145,8 +132,8 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-lg font-bold tracking-tight">{SRS_SUITE_TITLE}</p>
-                <p className="text-xs font-medium text-white/70">{APP_SUBTITLE} Dashboard</p>
+                <p className="text-lg font-bold tracking-tight">{t('auth.suiteTitle')}</p>
+                <p className="text-xs font-medium text-white/70">{t('auth.appSubtitle')}</p>
               </div>
             </div>
           </div>
@@ -158,8 +145,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
               transition={{ delay: 0.15, duration: 0.5 }}
               className="max-w-md text-3xl font-bold leading-tight tracking-tight xl:text-4xl"
             >
-              Payroll &amp; attendance,{' '}
-              <span className="text-cyan-200">all in one place</span>
+              {t('auth.heroTitle')}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 16 }}
@@ -167,14 +153,13 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
               transition={{ delay: 0.25, duration: 0.5 }}
               className="mt-4 max-w-sm text-sm leading-relaxed text-white/75"
             >
-              Sign in with your SRS credentials to access the dashboard. Your session
-              stays in sync with SRS Legacy.
+              {t('auth.heroSubtitle')}
             </motion.p>
 
             <ul className="mt-10 space-y-5">
-              {features.map((feature, i) => (
+              {FEATURE_KEYS.map((feature, i) => (
                 <motion.li
-                  key={feature.title}
+                  key={feature.titleKey}
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.35 + i * 0.1, duration: 0.4 }}
@@ -184,9 +169,9 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                     <feature.icon className="h-5 w-5 text-cyan-200" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">{feature.title}</p>
+                    <p className="text-sm font-semibold">{t(feature.titleKey)}</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-white/65">
-                      {feature.description}
+                      {t(feature.descKey)}
                     </p>
                   </div>
                 </motion.li>
@@ -195,7 +180,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
           </div>
 
           <p className="relative z-10 hidden text-xs text-white/50 lg:block">
-            &copy; {new Date().getFullYear()} {SRS_SUITE_TITLE}
+            &copy; {new Date().getFullYear()} {t('auth.suiteTitle')}
           </p>
         </motion.div>
 
@@ -211,30 +196,28 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-semibold tracking-tight">{SRS_SUITE_TITLE}</p>
-                <p className="text-xs text-muted-foreground">{APP_SUBTITLE} Dashboard</p>
+                <p className="font-semibold tracking-tight">{t('auth.suiteTitle')}</p>
+                <p className="text-xs text-muted-foreground">{t('auth.appSubtitle')}</p>
               </div>
             </div>
 
             <div className="mb-8">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                Welcome back
+                {t('auth.welcomeBack')}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Enter your SRS username and password to continue.
-              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{t('auth.signInPrompt')}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email">Username / Email</Label>
+                <Label htmlFor="email">{t('auth.usernameEmail')}</Label>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     type="text"
                     autoComplete="username"
-                    placeholder="you@company.com"
+                    placeholder={t('auth.usernamePlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -245,7 +228,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('auth.password')}</Label>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -286,11 +269,11 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                 {loading && !roleOptions ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in…
+                    {t('auth.signingIn')}
                   </>
                 ) : (
                   <>
-                    Sign in
+                    {t('auth.signIn')}
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -299,12 +282,12 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
 
             <div className="mt-8 rounded-xl border border-border/60 bg-muted/40 px-4 py-3">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Prefer the classic SRS interface?{' '}
+                {t('auth.preferClassic')}{' '}
                 <a
                   href={phpLoginUrl}
                   className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
                 >
-                  Sign in via SRS Legacy
+                  {t('auth.signInLegacy')}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </p>

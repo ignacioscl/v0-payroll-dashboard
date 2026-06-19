@@ -28,8 +28,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export function Header() {
+  const { t } = useTranslation()
   const pathname = usePathname()
   const { collapsed, setMobileOpen } = useSidebar()
   const { user, hasPermission } = useSrsMe()
@@ -81,7 +83,7 @@ export function Header() {
         <button
           className="flex md:hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
+          aria-label={t('layout.openMenu')}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -91,7 +93,7 @@ export function Header() {
           <div className="relative w-56 shrink-0 lg:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search employee, dealer..."
+              placeholder={t('filters.searchEmployeeDealer')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 border-border bg-background/50 pl-10 focus:bg-background"
@@ -109,13 +111,13 @@ export function Header() {
           {showStatusFilter && (
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="h-9 w-[130px] shrink-0 border-border bg-background/50">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={t('filters.allStatus')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="reviewed">Reviewed</SelectItem>
-                <SelectItem value="justified">Justified</SelectItem>
+                <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
+                <SelectItem value="pending">{t('filters.pending')}</SelectItem>
+                <SelectItem value="reviewed">{t('filters.reviewed')}</SelectItem>
+                <SelectItem value="justified">{t('filters.justified')}</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -129,7 +131,7 @@ export function Header() {
           <button
             className="relative flex md:hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             onClick={() => setFiltersOpen(true)}
-            aria-label="Open filters"
+            aria-label={t('filters.openFilters')}
           >
             <SlidersHorizontal className="h-5 w-5" />
             {activeFilterCount > 0 && (
@@ -143,8 +145,8 @@ export function Header() {
             <Link
               href="/settings/system"
               className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              title="System Config"
-              aria-label="System Config"
+              title={t('filters.systemConfig')}
+              aria-label={t('filters.systemConfig')}
             >
               <Settings2 className="h-5 w-5" />
             </Link>
@@ -158,17 +160,17 @@ export function Header() {
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
         <SheetContent side="bottom" className="h-auto rounded-t-2xl pb-8">
           <SheetHeader className="pb-4">
-            <SheetTitle>Filters</SheetTitle>
+            <SheetTitle>{t('punch.filterPanelTitle')}</SheetTitle>
           </SheetHeader>
 
           <div className="flex flex-col gap-4 px-4">
             {/* Search */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-muted-foreground">Search</span>
+              <span className="text-sm font-medium text-muted-foreground">{t('common.search')}</span>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search employee, dealer..."
+                  placeholder={t('filters.searchEmployeeDealer')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-10 pl-10"
@@ -178,7 +180,7 @@ export function Header() {
 
             {/* Dealers */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-muted-foreground">Dealers</span>
+              <span className="text-sm font-medium text-muted-foreground">{t('dealer.labelPlural')}</span>
               <DealerMultiSelect
                 dealers={dealerOptions}
                 value={selectedDealers}
@@ -191,16 +193,16 @@ export function Header() {
             {/* Status — only on schedule page */}
             {showStatusFilter && (
               <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-muted-foreground">Status</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('common.status')}</span>
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                   <SelectTrigger className="h-10 w-full">
-                    <SelectValue placeholder="All Status" />
+                    <SelectValue placeholder={t('filters.allStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="reviewed">Reviewed</SelectItem>
-                    <SelectItem value="justified">Justified</SelectItem>
+                    <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
+                    <SelectItem value="pending">{t('filters.pending')}</SelectItem>
+                    <SelectItem value="reviewed">{t('filters.reviewed')}</SelectItem>
+                    <SelectItem value="justified">{t('filters.justified')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -208,7 +210,7 @@ export function Header() {
 
             {/* Date range */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-muted-foreground">Date range</span>
+              <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
               <DateRangePicker value={dateRange} onChange={setDateRange} />
             </div>
 
@@ -216,7 +218,7 @@ export function Header() {
               className="mt-2 w-full"
               onClick={() => setFiltersOpen(false)}
             >
-              Apply
+              {t('common.apply')}
             </Button>
           </div>
         </SheetContent>

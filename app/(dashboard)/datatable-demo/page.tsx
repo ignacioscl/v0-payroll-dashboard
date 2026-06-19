@@ -18,6 +18,7 @@ import {
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { srsProxyUrl } from '@/lib/srs-proxy-url'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { DemoExplainer } from './_components/demo-explainer'
 
 interface MockEmployee {
@@ -49,20 +50,20 @@ const dateFmt = new Intl.DateTimeFormat('en-US', {
 
 const statusMeta: Record<
   MockEmployee['status'],
-  { label: string; cls: string; icon: React.ReactNode }
+  { labelKey: 'statusActive' | 'statusOnLeave' | 'statusTerminated'; cls: string; icon: React.ReactNode }
 > = {
   active: {
-    label: 'Active',
+    labelKey: 'statusActive',
     cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
     icon: <CircleCheck className="size-3" />,
   },
   on_leave: {
-    label: 'On leave',
+    labelKey: 'statusOnLeave',
     cls: 'bg-amber-50 text-amber-700 ring-amber-600/20',
     icon: <CircleDashed className="size-3" />,
   },
   terminated: {
-    label: 'Terminated',
+    labelKey: 'statusTerminated',
     cls: 'bg-rose-50 text-rose-700 ring-rose-600/20',
     icon: <CircleX className="size-3" />,
   },
@@ -85,6 +86,7 @@ function avatarTone(id: number) {
 }
 
 export default function DataTableBasicPage() {
+  const { t } = useTranslation()
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'id', desc: false }])
@@ -109,17 +111,17 @@ export default function DataTableBasicPage() {
     () => [
       {
         accessorKey: 'id',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="ID" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colId')} />,
         cell: ({ row }) => `#${row.original.id}`,
         meta: {
-          label: 'ID',
+          label: t('dataTableDemo.colId'),
           headerClassName: 'w-[68px]',
           mono: true,
         } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'name',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colEmployee')} />,
         cell: ({ row }) => (
           <div className="flex min-w-0 items-center gap-2">
             <span
@@ -135,31 +137,31 @@ export default function DataTableBasicPage() {
             </div>
           </div>
         ),
-        meta: { label: 'Employee', sortKey: 'name' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colEmployee'), sortKey: 'name' } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'department',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Department" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colDepartment')} />,
         cell: ({ row }) => (
           <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground">
             <Briefcase className="size-2.5 text-muted-foreground" />
             {row.original.department}
           </span>
         ),
-        meta: { label: 'Department' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colDepartment') } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'position',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colPosition')} />,
         cell: ({ row }) => row.original.position,
-        meta: { label: 'Position' } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colPosition') } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'salary',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colSalary')} />,
         cell: ({ row }) => usdFmt.format(row.original.salary),
         meta: {
-          label: 'Salary',
+          label: t('dataTableDemo.colSalary'),
           numeric: true,
           mono: true,
           exportValue: (row) => row.salary,
@@ -167,13 +169,13 @@ export default function DataTableBasicPage() {
       },
       {
         accessorKey: 'hire_date',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Hire date" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colHireDate')} />,
         cell: ({ row }) => dateFmt.format(new Date(row.original.hire_date)),
-        meta: { label: 'Hire date', mono: true } satisfies DataTableColumnMeta<MockEmployee>,
+        meta: { label: t('dataTableDemo.colHireDate'), mono: true } satisfies DataTableColumnMeta<MockEmployee>,
       },
       {
         accessorKey: 'status',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colStatus')} />,
         cell: ({ row }) => {
           const m = statusMeta[row.original.status]
           return (
@@ -182,17 +184,17 @@ export default function DataTableBasicPage() {
               className={`gap-1 border-0 px-1.5 py-0.5 text-[10px] font-medium ring-1 ${m.cls}`}
             >
               {m.icon}
-              {m.label}
+              {t(`dataTableDemo.${m.labelKey}`)}
             </Badge>
           )
         },
         meta: {
-          label: 'Status',
-          exportValue: (row) => statusMeta[row.status].label,
+          label: t('dataTableDemo.colStatus'),
+          exportValue: (row) => t(`dataTableDemo.${statusMeta[row.status].labelKey}`),
         } satisfies DataTableColumnMeta<MockEmployee>,
       },
     ],
-    [],
+    [t],
   )
 
   const query = useQuery({
@@ -248,14 +250,15 @@ export default function DataTableBasicPage() {
           setGlobalFilter(v)
           setPageIndex(0)
         }}
-        globalFilterPlaceholder="Search name, email, department…"
+        globalFilterPlaceholder={t('dataTableDemo.searchPlaceholder')}
         enableTableFocus
         tableScrollHeight={computedScrollHeight}
       />
 
       <DemoExplainer
-        title="The basic table"
-        description="Server-side pagination, sort and global search. Column visibility & page size are persisted per `tableId` in localStorage."
+        howConfiguredLabel={t('dataTableDemo.howConfigured')}
+        title={t('dataTableDemo.basicTitle')}
+        description={t('dataTableDemo.basicDescription')}
         steps={[
           {
             title: 'Declare columns',

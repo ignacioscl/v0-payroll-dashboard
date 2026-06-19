@@ -69,19 +69,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ExportButton } from '@/components/shared/export-button'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 import {
-  AR_AGING,
-  KPI_PERIOD_OPTIONS,
   PUNCH_OFFENDERS,
-  UNBILLED_AGING,
   UNBILLED_BY_DEALER,
-  WO_STATUS_PIPELINE,
   WORST_PAYERS,
+  getArAging,
   getBillingKpis,
   getCollectionsKpis,
   getDealerProduction,
   getExecutiveSummary,
+  getKpiPeriodOptions,
   getKpiSeries,
   getPayrollByDealer,
   getPayrollByType,
@@ -89,6 +88,8 @@ import {
   getProductionKpis,
   getPunchErrorBreakdown,
   getPunchQualityKpis,
+  getUnbilledAging,
+  getWoStatusPipeline,
   type KpiPeriod,
 } from '@/lib/kpi-mock-data'
 
@@ -110,7 +111,13 @@ function AttainmentBadge({ pct }: { pct: number }) {
 }
 
 export default function KpisPage() {
+  const { t } = useTranslation()
   const [period, setPeriod] = useState<KpiPeriod>('4w')
+
+  const periodOptions = getKpiPeriodOptions(t)
+  const woStatusPipeline = getWoStatusPipeline(t)
+  const unbilledAging = getUnbilledAging(t)
+  const arAging = getArAging(t)
 
   const series = getKpiSeries(period)
   const exec = getExecutiveSummary(period)
@@ -121,8 +128,8 @@ export default function KpisPage() {
   const payroll = getPayrollKpis(period)
 
   const dealerProduction = getDealerProduction(period)
-  const punchErrorBreakdown = getPunchErrorBreakdown(period)
-  const payrollByType = getPayrollByType(period)
+  const punchErrorBreakdown = getPunchErrorBreakdown(period, t)
+  const payrollByType = getPayrollByType(period, t)
   const payrollByDealer = getPayrollByDealer(period)
 
   const errorRateSeries = series.map((w) => ({
@@ -144,13 +151,13 @@ export default function KpisPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <Gauge className="h-7 w-7 text-primary" />
-            Business KPIs
+            {t('mockKpis.title')}
             <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-700">
-              DEV
+              {t('common.dev')}
             </Badge>
           </h1>
           <p className="text-muted-foreground mt-1">
-            Production, billing, collections, punch quality and payroll spend — mock data modeled on the SRS database
+            {t('mockKpis.subtitle')}
           </p>
         </div>
         <Select value={period} onValueChange={(v) => setPeriod(v as KpiPeriod)}>
@@ -158,7 +165,7 @@ export default function KpisPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {KPI_PERIOD_OPTIONS.map((o) => (
+            {periodOptions.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>
@@ -171,62 +178,62 @@ export default function KpisPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <KPICard
           compact
-          title="Production Value"
+          title={t('mockKpis.productionValue')}
           value={fmtMoneyK(exec.productionValue)}
           icon={<Wrench className="h-5 w-5" />}
           variant="success"
-          trend={{ value: exec.productionTrend, label: 'vs prev' }}
+          trend={{ value: exec.productionTrend, label: t('mockKpis.vsPrev') }}
         />
         <KPICard
           compact
-          title="WOs Completed"
+          title={t('mockKpis.wosCompleted')}
           value={exec.woCompleted.toLocaleString()}
           icon={<CheckCheck className="h-5 w-5" />}
           variant="default"
-          trend={{ value: exec.woTrend, label: 'vs prev' }}
+          trend={{ value: exec.woTrend, label: t('mockKpis.vsPrev') }}
         />
         <KPICard
           compact
-          title="Invoiced"
+          title={t('mockKpis.invoiced')}
           value={fmtMoneyK(exec.invoicedValue)}
           icon={<Receipt className="h-5 w-5" />}
           variant="info"
-          trend={{ value: exec.invoicedTrend, label: 'vs prev' }}
+          trend={{ value: exec.invoicedTrend, label: t('mockKpis.vsPrev') }}
         />
         <KPICard
           compact
-          title="DSO (Days to Collect)"
+          title={t('mockKpis.dsoDaysToCollect')}
           value={`${exec.dsoDays}d`}
           icon={<CalendarClock className="h-5 w-5" />}
           variant="warning"
-          subtitle={`${exec.dsoTrend}d vs prev — lower is better`}
+          subtitle={t('mockKpis.daysVsPrevLowerBetter', { value: exec.dsoTrend })}
         />
         <KPICard
           compact
-          title="Punch Error Rate"
+          title={t('mockKpis.punchErrorRate')}
           value={`${exec.punchErrorRate}%`}
           icon={<Fingerprint className="h-5 w-5" />}
           variant="danger"
-          subtitle={`${exec.punchErrorTrend}pp vs prev`}
+          subtitle={t('mockKpis.ppVsPrev', { value: exec.punchErrorTrend })}
         />
         <KPICard
           compact
-          title="Labor Cost / Revenue"
+          title={t('mockKpis.laborCostRevenue')}
           value={`${exec.laborCostPct}%`}
           icon={<Percent className="h-5 w-5" />}
           variant="violet"
-          subtitle={`${exec.laborCostTrend}pp vs prev`}
+          subtitle={t('mockKpis.ppVsPrev', { value: exec.laborCostTrend })}
         />
       </div>
 
       {/* Tabs by area */}
       <Tabs defaultValue="production" className="gap-4">
         <TabsList className="flex h-auto w-full flex-wrap justify-start">
-          <TabsTrigger value="production">WO Production</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="collections">Collections</TabsTrigger>
-          <TabsTrigger value="punch">Punch Quality</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll Spend</TabsTrigger>
+          <TabsTrigger value="production">{t('mockKpis.tabProduction')}</TabsTrigger>
+          <TabsTrigger value="billing">{t('mockKpis.tabBilling')}</TabsTrigger>
+          <TabsTrigger value="collections">{t('mockKpis.tabCollections')}</TabsTrigger>
+          <TabsTrigger value="punch">{t('mockKpis.tabPunch')}</TabsTrigger>
+          <TabsTrigger value="payroll">{t('mockKpis.tabPayroll')}</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------------------------ WO PRODUCTION */}
@@ -234,58 +241,58 @@ export default function KpisPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KPICard
               compact
-              title="WOs Completed"
+              title={t('mockKpis.wosCompleted')}
               value={prod.woCompleted.toLocaleString()}
               icon={<CheckCheck className="h-5 w-5" />}
               variant="success"
-              trend={{ value: prod.woCompletedTrend, label: 'vs prev' }}
+              trend={{ value: prod.woCompletedTrend, label: t('mockKpis.vsPrev') }}
             />
             <KPICard
               compact
-              title="Avg Cycle Time"
+              title={t('mockKpis.avgCycleTime')}
               value={`${prod.avgCycleHours}h`}
               icon={<Clock className="h-5 w-5" />}
               variant="info"
-              subtitle="Created → Done"
+              subtitle={t('mockKpis.createdToDone')}
             />
             <KPICard
               compact
-              title="On-Time Completion"
+              title={t('mockKpis.onTimeCompletion')}
               value={`${prod.onTimePct}%`}
               icon={<Target className="h-5 w-5" />}
               variant="default"
-              subtitle="vs promise date"
+              subtitle={t('mockKpis.vsPromiseDate')}
             />
             <KPICard
               compact
-              title="Open Backlog"
+              title={t('mockKpis.openBacklog')}
               value={prod.openBacklog}
               icon={<Layers className="h-5 w-5" />}
               variant="warning"
-              subtitle={`${prod.backlogOver7d} older than 7 days`}
+              subtitle={t('mockKpis.olderThan7Days', { count: prod.backlogOver7d })}
             />
             <KPICard
               compact
-              title="Pending Approval"
+              title={t('mockKpis.pendingApproval')}
               value={prod.pendingApproval}
               icon={<ClipboardCheck className="h-5 w-5" />}
               variant="violet"
-              subtitle={`avg ${prod.avgApprovalHours}h to approve`}
+              subtitle={t('mockKpis.avgHoursToApprove', { hours: prod.avgApprovalHours })}
             />
             <KPICard
               compact
-              title="Inspection Fail Rate"
+              title={t('mockKpis.inspectionFailRate')}
               value={`${prod.inspectionFailPct}%`}
               icon={<AlertTriangle className="h-5 w-5" />}
               variant="danger"
-              subtitle="failed / inspected WOs"
+              subtitle={t('mockKpis.failedOverInspected')}
             />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Completed WOs & Production Value by Week</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartCompletedWosProduction')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -294,10 +301,10 @@ export default function KpisPage() {
                     <XAxis dataKey="week" fontSize={12} />
                     <YAxis yAxisId="left" fontSize={12} />
                     <YAxis yAxisId="right" orientation="right" fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
-                    <Tooltip formatter={(value: number, name: string) => (name === 'Production $' ? fmtMoney(value) : value)} />
+                    <Tooltip formatter={(value: number, name: string) => (name === t('mockKpis.chartProductionDollar') ? fmtMoney(value) : value)} />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="woCompleted" name="WOs Done" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="right" dataKey="productionValue" name="Production $" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    <Bar yAxisId="left" dataKey="woCompleted" name={t('mockKpis.chartWosDone')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" dataKey="productionValue" name={t('mockKpis.chartProductionDollar')} stroke="#22c55e" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -305,13 +312,13 @@ export default function KpisPage() {
 
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Open WO Pipeline (now)</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartOpenWoPipeline')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-                    <Pie data={WO_STATUS_PIPELINE} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                      {WO_STATUS_PIPELINE.map((s) => (
+                    <Pie data={woStatusPipeline} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
+                      {woStatusPipeline.map((s) => (
                         <Cell key={s.status} fill={s.color} />
                       ))}
                     </Pie>
@@ -325,22 +332,28 @@ export default function KpisPage() {
 
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Production vs Goal by Dealer</CardTitle>
+              <CardTitle className="text-base">{t('mockKpis.chartProductionVsGoal')}</CardTitle>
               <ExportButton
-                data={dealerProduction.map((r) => ({ Dealer: r.dealer, 'WOs': r.wos, 'Value': r.value, 'Goal': r.goal, 'Attainment %': r.attainmentPct }))}
+                data={dealerProduction.map((r) => ({
+                  [t('dealer.label')]: r.dealer,
+                  [t('mockKpis.tableWosDone')]: r.wos,
+                  [t('mockKpis.tableProductionValue')]: r.value,
+                  [t('mockKpis.tableGoal')]: r.goal,
+                  [t('mockKpis.tableAttainmentPct')]: r.attainmentPct,
+                }))}
                 filename="kpi-production-by-dealer"
-                title="Production vs Goal by Dealer"
+                title={t('mockKpis.chartProductionVsGoal')}
               />
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Dealer</TableHead>
-                    <TableHead className="text-right">WOs Done</TableHead>
-                    <TableHead className="text-right">Production Value</TableHead>
-                    <TableHead className="text-right">Goal</TableHead>
-                    <TableHead className="text-right">Attainment</TableHead>
+                    <TableHead>{t('dealer.label')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableWosDone')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableProductionValue')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableGoal')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableAttainment')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -362,60 +375,18 @@ export default function KpisPage() {
         {/* ------------------------------------------------------ BILLING */}
         <TabsContent value="billing" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard
-              compact
-              title="Invoiced"
-              value={fmtMoneyK(billing.invoicedValue)}
-              icon={<Receipt className="h-5 w-5" />}
-              variant="success"
-              trend={{ value: billing.invoicedTrend, label: 'vs prev' }}
-            />
-            <KPICard
-              compact
-              title="Statements Issued"
-              value={billing.statementsIssued}
-              icon={<FileText className="h-5 w-5" />}
-              variant="default"
-              subtitle={`avg ${fmtMoney(billing.avgInvoiceValue)} / statement`}
-            />
-            <KPICard
-              compact
-              title="Done, Not Invoiced"
-              value={billing.unbilledWos}
-              icon={<Hourglass className="h-5 w-5" />}
-              variant="danger"
-              subtitle={`${fmtMoney(billing.unbilledValue)} unbilled revenue`}
-            />
-            <KPICard
-              compact
-              title="WO Done → Invoiced"
-              value={`${billing.avgDoneToInvoicedDays}d`}
-              icon={<CalendarClock className="h-5 w-5" />}
-              variant="warning"
-              subtitle="avg billing lag"
-            />
-            <KPICard
-              compact
-              title="Statements Sent"
-              value={`${billing.sentPct}%`}
-              icon={<Send className="h-5 w-5" />}
-              variant="info"
-              subtitle={`${billing.unsentStatements} created but never sent`}
-            />
-            <KPICard
-              compact
-              title="Billing Coverage"
-              value={`${Math.round((billing.invoicedValue / exec.productionValue) * 1000) / 10}%`}
-              icon={<Percent className="h-5 w-5" />}
-              variant="violet"
-              subtitle="invoiced / production value"
-            />
+            <KPICard compact title={t('mockKpis.invoiced')} value={fmtMoneyK(billing.invoicedValue)} icon={<Receipt className="h-5 w-5" />} variant="success" trend={{ value: billing.invoicedTrend, label: t('mockKpis.vsPrev') }} />
+            <KPICard compact title={t('mockKpis.statementsIssued')} value={billing.statementsIssued} icon={<FileText className="h-5 w-5" />} variant="default" subtitle={t('mockKpis.avgPerStatement', { amount: fmtMoney(billing.avgInvoiceValue) })} />
+            <KPICard compact title={t('mockKpis.doneNotInvoiced')} value={billing.unbilledWos} icon={<Hourglass className="h-5 w-5" />} variant="danger" subtitle={t('mockKpis.unbilledRevenue', { amount: fmtMoney(billing.unbilledValue) })} />
+            <KPICard compact title={t('mockKpis.woDoneToInvoiced')} value={`${billing.avgDoneToInvoicedDays}d`} icon={<CalendarClock className="h-5 w-5" />} variant="warning" subtitle={t('mockKpis.avgBillingLag')} />
+            <KPICard compact title={t('mockKpis.statementsSent')} value={`${billing.sentPct}%`} icon={<Send className="h-5 w-5" />} variant="info" subtitle={t('mockKpis.neverSent', { count: billing.unsentStatements })} />
+            <KPICard compact title={t('mockKpis.billingCoverage')} value={`${Math.round((billing.invoicedValue / exec.productionValue) * 1000) / 10}%`} icon={<Percent className="h-5 w-5" />} variant="violet" subtitle={t('mockKpis.invoicedOverProduction')} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Invoiced vs Production Value by Week</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartInvoicedVsProduction')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -425,8 +396,8 @@ export default function KpisPage() {
                     <YAxis fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
                     <Tooltip formatter={(value: number) => fmtMoney(value)} />
                     <Legend />
-                    <Bar dataKey="productionValue" name="Production $" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="invoicedValue" name="Invoiced $" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="productionValue" name={t('mockKpis.chartProductionDollar')} fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -434,17 +405,17 @@ export default function KpisPage() {
 
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Unbilled WOs Aging (now)</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartUnbilledAging')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={UNBILLED_AGING} layout="vertical">
+                  <BarChart data={unbilledAging} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis type="number" fontSize={12} />
                     <YAxis type="category" dataKey="bucket" fontSize={12} width={80} />
-                    <Tooltip formatter={(value: number, name: string) => (name === 'Value $' ? fmtMoney(value) : value)} />
+                    <Tooltip formatter={(value: number, name: string) => (name === t('mockKpis.chartValueDollar') ? fmtMoney(value) : value)} />
                     <Legend />
-                    <Bar dataKey="wos" name="WOs" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="wos" name={t('mockKpis.chartWos')} fill="#f59e0b" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -453,21 +424,26 @@ export default function KpisPage() {
 
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Unbilled Work by Dealer (Done WOs not in any statement)</CardTitle>
+              <CardTitle className="text-base">{t('mockKpis.chartUnbilledByDealer')}</CardTitle>
               <ExportButton
-                data={UNBILLED_BY_DEALER.map((r) => ({ Dealer: r.dealer, 'WOs': r.wos, 'Value': r.value, 'Oldest (days)': r.oldestDays }))}
+                data={UNBILLED_BY_DEALER.map((r) => ({
+                  [t('dealer.label')]: r.dealer,
+                  [t('mockKpis.chartWos')]: r.wos,
+                  [t('mockKpis.tableProductionValue')]: r.value,
+                  [t('mockKpis.tableOldestDays')]: r.oldestDays,
+                }))}
                 filename="kpi-unbilled-by-dealer"
-                title="Unbilled Work by Dealer"
+                title={t('mockKpis.chartUnbilledByDealer')}
               />
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Dealer</TableHead>
-                    <TableHead className="text-right">Unbilled WOs</TableHead>
-                    <TableHead className="text-right">Unbilled Value</TableHead>
-                    <TableHead className="text-right">Oldest (days)</TableHead>
+                    <TableHead>{t('dealer.label')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableUnbilledWos')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableUnbilledValue')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableOldestDays')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -490,70 +466,28 @@ export default function KpisPage() {
         {/* -------------------------------------------------- COLLECTIONS */}
         <TabsContent value="collections" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard
-              compact
-              title="Outstanding AR"
-              value={fmtMoneyK(collections.outstandingAr)}
-              icon={<Banknote className="h-5 w-5" />}
-              variant="warning"
-              subtitle={`${collections.openStatements} open statements`}
-            />
-            <KPICard
-              compact
-              title="DSO"
-              value={`${collections.dsoDays}d`}
-              icon={<CalendarClock className="h-5 w-5" />}
-              variant="danger"
-              subtitle={`${collections.dsoTrend}d vs prev — statement → check`}
-            />
-            <KPICard
-              compact
-              title="Collected"
-              value={fmtMoneyK(collections.collectedValue)}
-              icon={<DollarSign className="h-5 w-5" />}
-              variant="success"
-              trend={{ value: collections.collectedTrend, label: 'vs prev' }}
-            />
-            <KPICard
-              compact
-              title="Collection Rate"
-              value={`${collections.collectionRatePct}%`}
-              icon={<Percent className="h-5 w-5" />}
-              variant="info"
-              subtitle="collected / invoiced"
-            />
-            <KPICard
-              compact
-              title="AR Over 60 Days"
-              value={`${collections.arOver60Pct}%`}
-              icon={<AlertTriangle className="h-5 w-5" />}
-              variant="violet"
-              subtitle="of total outstanding"
-            />
-            <KPICard
-              compact
-              title="Cash Gap"
-              value={fmtMoneyK(collections.outstandingAr - billing.unbilledValue > 0 ? collections.outstandingAr + billing.unbilledValue : 0)}
-              icon={<Hourglass className="h-5 w-5" />}
-              variant="default"
-              subtitle="AR + unbilled work"
-            />
+            <KPICard compact title={t('mockKpis.outstandingAr')} value={fmtMoneyK(collections.outstandingAr)} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={t('mockKpis.openStatements', { count: collections.openStatements })} />
+            <KPICard compact title={t('mockKpis.dso')} value={`${collections.dsoDays}d`} icon={<CalendarClock className="h-5 w-5" />} variant="danger" subtitle={t('mockKpis.dsoVsPrevCheck', { value: collections.dsoTrend })} />
+            <KPICard compact title={t('mockKpis.collected')} value={fmtMoneyK(collections.collectedValue)} icon={<DollarSign className="h-5 w-5" />} variant="success" trend={{ value: collections.collectedTrend, label: t('mockKpis.vsPrev') }} />
+            <KPICard compact title={t('mockKpis.collectionRate')} value={`${collections.collectionRatePct}%`} icon={<Percent className="h-5 w-5" />} variant="info" subtitle={t('mockKpis.collectedOverInvoiced')} />
+            <KPICard compact title={t('mockKpis.arOver60')} value={`${collections.arOver60Pct}%`} icon={<AlertTriangle className="h-5 w-5" />} variant="violet" subtitle={t('mockKpis.ofTotalOutstanding')} />
+            <KPICard compact title={t('mockKpis.cashGap')} value={fmtMoneyK(collections.outstandingAr - billing.unbilledValue > 0 ? collections.outstandingAr + billing.unbilledValue : 0)} icon={<Hourglass className="h-5 w-5" />} variant="default" subtitle={t('mockKpis.arPlusUnbilled')} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">AR Aging (now)</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartArAging')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={AR_AGING}>
+                  <BarChart data={arAging}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis dataKey="bucket" fontSize={11} />
                     <YAxis fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
                     <Tooltip formatter={(value: number) => fmtMoney(value)} />
-                    <Bar dataKey="value" name="Outstanding $" radius={[4, 4, 0, 0]}>
-                      {AR_AGING.map((b) => (
+                    <Bar dataKey="value" name={t('mockKpis.chartOutstandingDollar')} radius={[4, 4, 0, 0]}>
+                      {arAging.map((b) => (
                         <Cell key={b.bucket} fill={b.color} />
                       ))}
                     </Bar>
@@ -564,7 +498,7 @@ export default function KpisPage() {
 
             <Card className="lg:col-span-2 bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Collected vs Invoiced by Week</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartCollectedVsInvoiced')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -574,8 +508,8 @@ export default function KpisPage() {
                     <YAxis fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
                     <Tooltip formatter={(value: number) => fmtMoney(value)} />
                     <Legend />
-                    <Line dataKey="invoicedValue" name="Invoiced $" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                    <Line dataKey="collectedValue" name="Collected $" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    <Line dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    <Line dataKey="collectedValue" name={t('mockKpis.chartCollectedDollar')} stroke="#22c55e" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -584,22 +518,28 @@ export default function KpisPage() {
 
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Slowest Payers</CardTitle>
+              <CardTitle className="text-base">{t('mockKpis.chartSlowestPayers')}</CardTitle>
               <ExportButton
-                data={WORST_PAYERS.map((r) => ({ Dealer: r.dealer, 'Outstanding': r.outstanding, 'Avg Days to Pay': r.avgDaysToPay, 'Oldest Open (days)': r.oldestOpenDays, 'Open Statements': r.openStatements }))}
+                data={WORST_PAYERS.map((r) => ({
+                  [t('dealer.label')]: r.dealer,
+                  [t('mockKpis.tableOutstanding')]: r.outstanding,
+                  [t('mockKpis.tableAvgDaysToPay')]: r.avgDaysToPay,
+                  [t('mockKpis.tableOldestDays')]: r.oldestOpenDays,
+                  [t('mockKpis.tableOpenStatements')]: r.openStatements,
+                }))}
                 filename="kpi-slowest-payers"
-                title="Slowest Payers"
+                title={t('mockKpis.chartSlowestPayers')}
               />
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Dealer</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead className="text-right">Avg Days to Pay</TableHead>
-                    <TableHead className="text-right">Oldest Open</TableHead>
-                    <TableHead className="text-right">Open Statements</TableHead>
+                    <TableHead>{t('dealer.label')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableOutstanding')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableAvgDaysToPay')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableOldestOpen')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableOpenStatements')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -623,60 +563,18 @@ export default function KpisPage() {
         {/* ------------------------------------------------ PUNCH QUALITY */}
         <TabsContent value="punch" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard
-              compact
-              title="Punch Error Rate"
-              value={`${punch.errorRatePct}%`}
-              icon={<Fingerprint className="h-5 w-5" />}
-              variant="danger"
-              subtitle={`${punch.errorRateTrend}pp vs prev — of ${punch.totalPunches.toLocaleString()} punches`}
-            />
-            <KPICard
-              compact
-              title="Missing Punch-Out"
-              value={punch.missingPunchOut}
-              icon={<AlertTriangle className="h-5 w-5" />}
-              variant="warning"
-              subtitle={`+ ${punch.missingBreakEnd} missing break end`}
-            />
-            <KPICard
-              compact
-              title="Manual Punches"
-              value={punch.manualPunches}
-              icon={<Pencil className="h-5 w-5" />}
-              variant="violet"
-              subtitle="created by hand"
-            />
-            <KPICard
-              compact
-              title="Admin Corrections"
-              value={punch.adminCorrections}
-              icon={<ClipboardCheck className="h-5 w-5" />}
-              variant="info"
-              subtitle="punches fixed by admins"
-            />
-            <KPICard
-              compact
-              title="Correction Delay"
-              value={`${punch.avgCorrectionDelayDays}d`}
-              icon={<Clock className="h-5 w-5" />}
-              variant="default"
-              subtitle="punch date → fixed"
-            />
-            <KPICard
-              compact
-              title="Deleted Punches"
-              value={punch.deletedPunches}
-              icon={<Trash2 className="h-5 w-5" />}
-              variant="danger"
-              subtitle="from punch audit log"
-            />
+            <KPICard compact title={t('mockKpis.punchErrorRate')} value={`${punch.errorRatePct}%`} icon={<Fingerprint className="h-5 w-5" />} variant="danger" subtitle={t('mockKpis.errorRateOfPunches', { trend: punch.errorRateTrend, count: punch.totalPunches.toLocaleString() })} />
+            <KPICard compact title={t('mockKpis.missingPunchOut')} value={punch.missingPunchOut} icon={<AlertTriangle className="h-5 w-5" />} variant="warning" subtitle={t('mockKpis.missingBreakEndSuffix', { count: punch.missingBreakEnd })} />
+            <KPICard compact title={t('mockKpis.manualPunches')} value={punch.manualPunches} icon={<Pencil className="h-5 w-5" />} variant="violet" subtitle={t('mockKpis.createdByHand')} />
+            <KPICard compact title={t('mockKpis.adminCorrections')} value={punch.adminCorrections} icon={<ClipboardCheck className="h-5 w-5" />} variant="info" subtitle={t('mockKpis.fixedByAdmins')} />
+            <KPICard compact title={t('mockKpis.correctionDelay')} value={`${punch.avgCorrectionDelayDays}d`} icon={<Clock className="h-5 w-5" />} variant="default" subtitle={t('mockKpis.punchDateToFixed')} />
+            <KPICard compact title={t('mockKpis.deletedPunches')} value={punch.deletedPunches} icon={<Trash2 className="h-5 w-5" />} variant="danger" subtitle={t('mockKpis.fromAuditLog')} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Errors by Type</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartErrorsByType')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -695,7 +593,7 @@ export default function KpisPage() {
 
             <Card className="lg:col-span-2 bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Error Rate by Week</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartErrorRateByWeek')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -704,7 +602,7 @@ export default function KpisPage() {
                     <XAxis dataKey="week" fontSize={12} />
                     <YAxis fontSize={12} tickFormatter={(v) => `${v}%`} />
                     <Tooltip formatter={(value: number) => `${value}%`} />
-                    <Line dataKey="errorRate" name="Error Rate" stroke="#ef4444" strokeWidth={2} />
+                    <Line dataKey="errorRate" name={t('mockKpis.chartErrorRate')} stroke="#ef4444" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -713,23 +611,30 @@ export default function KpisPage() {
 
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Employees With Most Punch Issues</CardTitle>
+              <CardTitle className="text-base">{t('mockKpis.chartPunchOffenders')}</CardTitle>
               <ExportButton
-                data={PUNCH_OFFENDERS.map((r) => ({ Employee: r.employee, Dealer: r.dealer, 'Missing Out': r.missingOut, 'Manual': r.manual, 'Corrected': r.corrected, 'Total': r.total }))}
+                data={PUNCH_OFFENDERS.map((r) => ({
+                  [t('common.employee')]: r.employee,
+                  [t('dealer.label')]: r.dealer,
+                  [t('mockKpis.tableMissingOut')]: r.missingOut,
+                  [t('mockKpis.tableManual')]: r.manual,
+                  [t('mockKpis.tableCorrected')]: r.corrected,
+                  [t('mockKpis.tableTotalIssues')]: r.total,
+                }))}
                 filename="kpi-punch-offenders"
-                title="Employees With Most Punch Issues"
+                title={t('mockKpis.chartPunchOffenders')}
               />
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Dealer</TableHead>
-                    <TableHead className="text-right">Missing Out</TableHead>
-                    <TableHead className="text-right">Manual</TableHead>
-                    <TableHead className="text-right">Corrected</TableHead>
-                    <TableHead className="text-right">Total Issues</TableHead>
+                    <TableHead>{t('common.employee')}</TableHead>
+                    <TableHead>{t('dealer.label')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableMissingOut')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableManual')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableCorrected')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableTotalIssues')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -752,60 +657,18 @@ export default function KpisPage() {
         {/* ------------------------------------------------- PAYROLL SPEND */}
         <TabsContent value="payroll" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard
-              compact
-              title="Total Payroll"
-              value={fmtMoneyK(payroll.totalPayroll)}
-              icon={<HandCoins className="h-5 w-5" />}
-              variant="success"
-              trend={{ value: payroll.payrollTrend, label: 'vs prev' }}
-            />
-            <KPICard
-              compact
-              title="Overtime Cost"
-              value={fmtMoneyK(payroll.overtimeCost)}
-              icon={<Timer className="h-5 w-5" />}
-              variant="warning"
-              subtitle={`${payroll.overtimePct}% of payroll`}
-            />
-            <KPICard
-              compact
-              title="Labor Cost / Revenue"
-              value={`${payroll.laborCostPct}%`}
-              icon={<Percent className="h-5 w-5" />}
-              variant="violet"
-              subtitle="payroll / production value"
-            />
-            <KPICard
-              compact
-              title="Cost per WO"
-              value={`$${payroll.avgCostPerWo.toFixed(2)}`}
-              icon={<Wrench className="h-5 w-5" />}
-              variant="info"
-              subtitle="payroll / completed WOs"
-            />
-            <KPICard
-              compact
-              title="Active Employees"
-              value={payroll.activeEmployees}
-              icon={<Users className="h-5 w-5" />}
-              variant="default"
-              subtitle={`avg rate $${payroll.avgHourlyRate}/h`}
-            />
-            <KPICard
-              compact
-              title="Revenue per Employee"
-              value={fmtMoneyK(Math.round(exec.productionValue / payroll.activeEmployees))}
-              icon={<TrendingUp className="h-5 w-5" />}
-              variant="success"
-              subtitle="production / headcount"
-            />
+            <KPICard compact title={t('mockKpis.totalPayroll')} value={fmtMoneyK(payroll.totalPayroll)} icon={<HandCoins className="h-5 w-5" />} variant="success" trend={{ value: payroll.payrollTrend, label: t('mockKpis.vsPrev') }} />
+            <KPICard compact title={t('mockKpis.overtimeCost')} value={fmtMoneyK(payroll.overtimeCost)} icon={<Timer className="h-5 w-5" />} variant="warning" subtitle={t('mockKpis.pctOfPayroll', { pct: payroll.overtimePct })} />
+            <KPICard compact title={t('mockKpis.laborCostRevenue')} value={`${payroll.laborCostPct}%`} icon={<Percent className="h-5 w-5" />} variant="violet" subtitle={t('mockKpis.payrollOverProduction')} />
+            <KPICard compact title={t('mockKpis.costPerWo')} value={`$${payroll.avgCostPerWo.toFixed(2)}`} icon={<Wrench className="h-5 w-5" />} variant="info" subtitle={t('mockKpis.payrollOverCompletedWos')} />
+            <KPICard compact title={t('mockCosts.activeEmployees')} value={payroll.activeEmployees} icon={<Users className="h-5 w-5" />} variant="default" subtitle={t('mockKpis.avgRatePerHour', { rate: payroll.avgHourlyRate })} />
+            <KPICard compact title={t('mockKpis.revenuePerEmployee')} value={fmtMoneyK(Math.round(exec.productionValue / payroll.activeEmployees))} icon={<TrendingUp className="h-5 w-5" />} variant="success" subtitle={t('mockKpis.productionOverHeadcount')} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Payroll by Payment Type</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartPayrollByType')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -824,7 +687,7 @@ export default function KpisPage() {
 
             <Card className="lg:col-span-2 bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-base">Payroll vs Production Value by Week</CardTitle>
+                <CardTitle className="text-base">{t('mockKpis.chartPayrollVsProduction')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -835,13 +698,13 @@ export default function KpisPage() {
                     <YAxis yAxisId="right" orientation="right" fontSize={12} tickFormatter={(v) => `${v}%`} domain={[0, 40]} />
                     <Tooltip
                       formatter={(value: number, name: string) =>
-                        name === 'Labor %' ? `${value}%` : fmtMoney(value)
+                        name === t('mockKpis.chartLaborPct') ? `${value}%` : fmtMoney(value)
                       }
                     />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="payroll" name="Payroll $" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="production" name="Production $" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="right" dataKey="laborPct" name="Labor %" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                    <Bar yAxisId="left" dataKey="payroll" name={t('mockKpis.chartPayrollDollar')} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="production" name={t('mockKpis.chartProductionDollar')} fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" dataKey="laborPct" name={t('mockKpis.chartLaborPct')} stroke="#f59e0b" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -850,23 +713,30 @@ export default function KpisPage() {
 
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Labor Cost by Dealer</CardTitle>
+              <CardTitle className="text-base">{t('mockKpis.chartLaborByDealer')}</CardTitle>
               <ExportButton
-                data={payrollByDealer.map((r) => ({ Dealer: r.dealer, 'Hours': r.hours, 'OT Hours': r.otHours, 'Cost': r.cost, 'Cost per WO': r.costPerWo, 'Labor %': r.laborPct }))}
+                data={payrollByDealer.map((r) => ({
+                  [t('dealer.label')]: r.dealer,
+                  [t('mockKpis.tableHours')]: r.hours,
+                  [t('mockKpis.tableOtHours')]: r.otHours,
+                  [t('mockKpis.tableLaborCost')]: r.cost,
+                  [t('mockKpis.tableCostPerWo')]: r.costPerWo,
+                  [t('mockKpis.tableLaborPct')]: r.laborPct,
+                }))}
                 filename="kpi-labor-by-dealer"
-                title="Labor Cost by Dealer"
+                title={t('mockKpis.chartLaborByDealer')}
               />
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Dealer</TableHead>
-                    <TableHead className="text-right">Hours</TableHead>
-                    <TableHead className="text-right">OT Hours</TableHead>
-                    <TableHead className="text-right">Labor Cost</TableHead>
-                    <TableHead className="text-right">Cost / WO</TableHead>
-                    <TableHead className="text-right">Labor %</TableHead>
+                    <TableHead>{t('dealer.label')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableHours')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableOtHours')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableLaborCost')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableCostPerWo')}</TableHead>
+                    <TableHead className="text-right">{t('mockKpis.tableLaborPct')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -893,15 +763,9 @@ export default function KpisPage() {
       <Card className="border-dashed bg-muted/30">
         <CardContent className="pt-4 pb-4 text-xs text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground flex items-center gap-2">
-            <Building2 className="h-3.5 w-3.5" /> Data lineage (when wired to real APIs)
+            <Building2 className="h-3.5 w-3.5" /> {t('mockKpis.lineageTitle')}
           </p>
-          <p>
-            <span className="font-medium">Production:</span> INVOICE + WORKFLOW (Waiting/In Process/Pause/In Transit/Done), promise_datetime, approved_date, inspected ·{' '}
-            <span className="font-medium">Billing:</span> INVOICE_STATEMENT (fecha_create, sended, last_sended) vs Done WOs ·{' '}
-            <span className="font-medium">Collections:</span> BILLING + BILLING_WO_REL check date vs statement date (DSO, aging) ·{' '}
-            <span className="font-medium">Punch Quality:</span> TTK_EMPLOYEE_WORK (punch_out null, manual_create, fixed_at/fixed_by) + punch audit log ·{' '}
-            <span className="font-medium">Payroll:</span> type_payment (hourly/piecework/salary/flat/daily/holiday/sick), hourly_rate, OT split
-          </p>
+          <p>{t('mockKpis.lineageBody')}</p>
         </CardContent>
       </Card>
     </div>

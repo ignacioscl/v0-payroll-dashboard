@@ -1,3 +1,7 @@
+import type { AppLocale } from '@/lib/i18n/locale'
+
+export type { AppLocale }
+
 export interface SrsSessionUser {
   id: number
   nombre: string
@@ -29,6 +33,8 @@ export interface SrsMeUser {
   providerName?: string | null
   isCompanyTypeCompany: boolean
   isSystemAdmin: boolean
+  navTemplate?: 1 | 2
+  locale?: AppLocale
 }
 
 export interface SrsPermission {

@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { enUS } from 'date-fns/locale'
+import { enUS, es } from 'date-fns/locale'
 import { Calendar } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
-import { enUS as enUSDayPicker } from 'react-day-picker/locale'
+import { enUS as enUSDayPicker, es as esDayPicker } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import {
@@ -15,11 +15,12 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import {
-  DATE_RANGE_PRESETS,
   matchPreset,
   resolvePresetRange,
   type DateRangePreset,
 } from '@/lib/filters/date-range-presets'
+import { useTranslation } from '@/lib/i18n/locale-context'
+import { getDateRangePresets } from '@/lib/i18n/label-helpers'
 
 interface DateRangePickerProps {
   value?: DateRange
@@ -34,43 +35,44 @@ interface DateRangePickerProps {
 export function DateRangePicker({
   value,
   onChange,
-  placeholder = 'Select dates',
+  placeholder,
   className,
   numberOfMonths = 2,
-  presets = DATE_RANGE_PRESETS,
+  presets,
 }: DateRangePickerProps) {
+  const { t, locale } = useTranslation()
+  const dateFnsLocale = locale === 'es' ? es : enUS
+  const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
+  const resolvedPresets = presets ?? getDateRangePresets(t)
+  const resolvedPlaceholder = placeholder ?? t('filters.selectDates')
+
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
-  // Draft: in-progress selection that only applies on "Apply"
   const [draft, setDraft] = useState<DateRange | undefined>(value)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Sync draft synchronously in onOpenChange so defaultMonth is correct on mount
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) setDraft(value)
     setOpen(nextOpen)
   }
 
   const activePresetKey = mounted ? matchPreset(value) : null
-  const showPresets = presets.length > 0
+  const showPresets = resolvedPresets.length > 0
 
-  // Presets apply immediately and close
   const handlePreset = (preset: DateRangePreset) => {
     const range = resolvePresetRange(preset)
     onChange?.(range)
     setOpen(false)
   }
 
-  // Apply button commits the draft and closes
   const handleApply = () => {
     onChange?.(draft)
     setOpen(false)
   }
 
-  // Clear resets everything
   const handleClear = () => {
     onChange?.(undefined)
     setDraft(undefined)
@@ -84,23 +86,23 @@ export function DateRangePicker({
           variant="outline"
           className={cn(
             'gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors',
-            className
+            className,
           )}
         >
           <Calendar className="h-4 w-4 text-muted-foreground" />
           {mounted && value?.from ? (
             value.to ? (
               <span className="text-foreground">
-                {format(value.from, 'MMM dd', { locale: enUS })} -{' '}
-                {format(value.to, 'MMM dd', { locale: enUS })}
+                {format(value.from, 'MMM dd', { locale: dateFnsLocale })} -{' '}
+                {format(value.to, 'MMM dd', { locale: dateFnsLocale })}
               </span>
             ) : (
               <span className="text-foreground">
-                {format(value.from, 'MMM dd, yyyy', { locale: enUS })}
+                {format(value.from, 'MMM dd, yyyy', { locale: dateFnsLocale })}
               </span>
             )
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="text-muted-foreground">{resolvedPlaceholder}</span>
           )}
         </Button>
       </PopoverTrigger>
@@ -108,7 +110,7 @@ export function DateRangePicker({
         <div className="flex flex-col sm:flex-row">
           {showPresets && (
             <div className="flex shrink-0 flex-row gap-1 border-b border-border p-2 sm:flex-col sm:border-b-0 sm:border-r sm:p-3">
-              {presets.map((preset) => {
+              {resolvedPresets.map((preset) => {
                 const isActive = activePresetKey === preset.key
                 return (
                   <Button
@@ -117,7 +119,7 @@ export function DateRangePicker({
                     size="sm"
                     className={cn(
                       'justify-start whitespace-nowrap text-sm font-normal',
-                      !isActive && 'text-muted-foreground hover:text-foreground'
+                      !isActive && 'text-muted-foreground hover:text-foreground',
                     )}
                     onClick={() => handlePreset(preset)}
                   >
@@ -135,9 +137,8 @@ export function DateRangePicker({
               onSelect={setDraft}
               defaultMonth={draft?.from}
               numberOfMonths={numberOfMonths}
-              locale={enUSDayPicker}
+              locale={dayPickerLocale}
             />
-            {/* Footer with Apply / Clear */}
             <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">
               <Button
                 variant="ghost"
@@ -145,14 +146,10 @@ export function DateRangePicker({
                 className="text-muted-foreground"
                 onClick={handleClear}
               >
-                Clear
+                {t('common.clear')}
               </Button>
-              <Button
-                size="sm"
-                onClick={handleApply}
-                disabled={!draft?.from}
-              >
-                Apply
+              <Button size="sm" onClick={handleApply} disabled={!draft?.from}>
+                {t('common.apply')}
               </Button>
             </div>
           </div>

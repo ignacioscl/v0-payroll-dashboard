@@ -14,9 +14,11 @@ import {
   type InvoiceNoteStatusItem,
 } from '@/hooks/use-invoice-note-status'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { toast } from 'sonner'
 
 export default function SystemConfigPage() {
+  const { t } = useTranslation()
   const { user, hasPermission, loading: meLoading } = useSrsMe()
   const canAccess = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const { data, isLoading, error } = useInvoiceNoteStatuses(canAccess)
@@ -33,14 +35,14 @@ export default function SystemConfigPage() {
   }, [data?.statuses])
 
   if (meLoading) {
-    return <p className="text-muted-foreground">Loading...</p>
+    return <p className="text-muted-foreground">{t('common.loading')}</p>
   }
 
   if (!canAccess) {
     return (
       <Card className="border-border">
         <CardContent className="pt-6">
-          <p className="text-muted-foreground">You do not have access to system configuration.</p>
+          <p className="text-muted-foreground">{t('systemConfig.noAccess')}</p>
         </CardContent>
       </Card>
     )
@@ -49,14 +51,14 @@ export default function SystemConfigPage() {
   const handleSave = async (status: InvoiceNoteStatusItem) => {
     const displayName = (drafts[status.id] ?? '').trim()
     if (!displayName) {
-      toast.error('Label cannot be empty')
+      toast.error(t('systemConfig.labelEmpty'))
       return
     }
     try {
       await updateLabel.mutateAsync({ id: status.id, displayName })
-      toast.success('Label updated')
+      toast.success(t('systemConfig.labelUpdated'))
     } catch (err) {
-      toast.error(getSrsErrorMessage(err, 'Failed to update label'))
+      toast.error(getSrsErrorMessage(err, t('systemConfig.updateFailed')))
     }
   }
 
@@ -65,22 +67,20 @@ export default function SystemConfigPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
           <Settings2 className="h-7 w-7 text-primary" />
-          System Config
+          {t('systemConfig.title')}
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Customize invoice note status labels for your company. Default English names remain as fallback.
-        </p>
+        <p className="text-muted-foreground mt-1">{t('systemConfig.subtitle')}</p>
       </div>
 
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-lg">Invoice note statuses</CardTitle>
+          <CardTitle className="text-lg">{t('systemConfig.invoiceNoteStatuses')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isLoading && <p className="text-sm text-muted-foreground">Loading statuses...</p>}
+          {isLoading && <p className="text-sm text-muted-foreground">{t('systemConfig.loadingStatuses')}</p>}
           {error && (
             <p className="text-sm text-destructive">
-              {getSrsErrorMessage(error, 'Failed to load statuses')}
+              {getSrsErrorMessage(error, t('systemConfig.loadFailed'))}
             </p>
           )}
           {data?.statuses.map((status) => (
@@ -104,18 +104,16 @@ export default function SystemConfigPage() {
                 disabled={updateLabel.isPending}
                 onClick={() => void handleSave(status)}
               >
-                Save
+                {t('common.save')}
               </Button>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      <p className="text-sm text-muted-foreground">
-        Need billing notes? Use the sticky-note button on each invoice in legacy billing.
-      </p>
+      <p className="text-sm text-muted-foreground">{t('systemConfig.billingNoteHint')}</p>
       <Link href="/" className="text-sm text-primary hover:underline">
-        Back to dashboard
+        {t('systemConfig.backToDashboard')}
       </Link>
     </div>
   )

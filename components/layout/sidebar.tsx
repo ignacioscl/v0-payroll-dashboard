@@ -45,7 +45,8 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import { isAdminGeneralUser } from '@/lib/auth/payroll-access'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
-import { APP_SUBTITLE, getAppTitle } from '@/lib/branding'
+import { getAppTitle } from '@/lib/branding'
+import { useTranslation } from '@/lib/i18n/locale-context'
 import type { SrsMeUser } from '@/lib/auth/types'
 
 function userInitials(nombre: string) {
@@ -55,10 +56,13 @@ function userInitials(nombre: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function profileRoleLabel(user: SrsMeUser | null) {
+function profileRoleLabel(
+  user: SrsMeUser | null,
+  systemAdminLabel: string,
+) {
   if (!user) return '—'
   if (user.isSystemAdmin) {
-    return user.rolSystemV2Name ?? 'System Admin'
+    return user.rolSystemV2Name ?? systemAdminLabel
   }
   return user.rolSystemV2Name ?? user.dealerName ?? '—'
 }
@@ -86,6 +90,7 @@ function SidebarInner({
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, hasPermission } = useSrsMe()
+  const { t } = useTranslation()
   const [profileOpen, setProfileOpen] = useState(false)
 
   // On mobile sheet, always treat as expanded
@@ -96,9 +101,10 @@ function SidebarInner({
     isDev: isDevEnvironment(),
     canAccessTtk,
     canAccessProdKpis: isAdminGeneralUser(user),
+    t,
   })
 
-  const displayName = user?.nombre ?? 'User'
+  const displayName = user?.nombre ?? t('sidebar.user')
   const displayRole =
     user?.rolSystemV2Name ?? user?.dealerName ?? user?.email ?? 'SRS'
   const appTitle = getAppTitle(user)
@@ -127,7 +133,7 @@ function SidebarInner({
                   {appTitle}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {APP_SUBTITLE}
+                  {t('sidebar.appSubtitle')}
                 </span>
               </div>
             </motion.div>
@@ -156,7 +162,7 @@ function SidebarInner({
                 <ChevronLeft className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">Collapse menu</TooltipContent>
+            <TooltipContent side="right">{t('sidebar.collapseMenu')}</TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -173,7 +179,7 @@ function SidebarInner({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">Expand menu</TooltipContent>
+            <TooltipContent side="right">{t('sidebar.expandMenu')}</TooltipContent>
           </Tooltip>
         </div>
       )}
@@ -352,12 +358,12 @@ function SidebarInner({
               }}
             >
               <User className="h-4 w-4" />
-              <span>Profile</span>
+              <span>{t('sidebar.profile')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem asChild className="gap-2 cursor-pointer">
               <a href="/api/sso/to-php">
                 <ArrowLeft className="h-4 w-4" />
-                <span>Back to SRS Legacy</span>
+                <span>{t('sidebar.backToLegacy')}</span>
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -369,7 +375,7 @@ function SidebarInner({
               }}
             >
               <LogOut className="h-4 w-4" />
-              <span>Log out</span>
+              <span>{t('sidebar.logOut')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -377,7 +383,7 @@ function SidebarInner({
         <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Profile</DialogTitle>
+              <DialogTitle>{t('profile.title')}</DialogTitle>
             </DialogHeader>
             <div className="flex items-center gap-4">
               <Avatar className="h-14 w-14 border-2 border-primary/20">
@@ -389,15 +395,15 @@ function SidebarInner({
               <div className="min-w-0">
                 <p className="truncate font-semibold">{displayName}</p>
                 <p className="truncate text-sm text-muted-foreground">
-                  {profileRoleLabel(user)}
+                  {profileRoleLabel(user, t('profile.systemAdmin'))}
                 </p>
               </div>
             </div>
             <div className="grid gap-4 pt-2">
-              <ProfileField label="Email" value={user?.email} />
-              <ProfileField label="Employee ID" value={user?.codigoInterno} />
-              <ProfileField label="Role" value={profileRoleLabel(user)} />
-              <ProfileField label="Dealer" value={user?.dealerName} />
+              <ProfileField label={t('profile.email')} value={user?.email} />
+              <ProfileField label={t('profile.employeeId')} value={user?.codigoInterno} />
+              <ProfileField label={t('profile.role')} value={profileRoleLabel(user, t('profile.systemAdmin'))} />
+              <ProfileField label={t('profile.dealer')} value={user?.dealerName} />
             </div>
           </DialogContent>
         </Dialog>
@@ -409,6 +415,7 @@ function SidebarInner({
 export function Sidebar() {
   const { mobileOpen, setMobileOpen } = useSidebar()
   const { collapsed } = useSidebar()
+  const { t } = useTranslation()
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -428,7 +435,7 @@ export function Sidebar() {
           side="left"
           className="p-0 w-[260px] bg-sidebar border-sidebar-border [&>button]:text-white/60 [&>button]:hover:text-white"
         >
-          <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+          <SheetTitle className="sr-only">{t('sidebar.navigationMenu')}</SheetTitle>
           <SidebarInner
             isMobileSheet
             onNavigate={() => setMobileOpen(false)}

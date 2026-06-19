@@ -7,8 +7,9 @@ import {
   getAgencyById 
 } from '@/lib/mock-data'
 import type { IssueType } from '@/lib/types'
-import { issueTypeLabels, issueStatusLabels } from '@/lib/types'
 import { useFilters } from '@/lib/filter-context'
+import { useTranslation } from '@/lib/i18n/locale-context'
+import { getIssueTypeLabels, getIssueStatusLabels } from '@/lib/i18n/label-helpers'
 import { EmployeeAvatar } from '@/components/employees/employee-avatar'
 import { IssueTypeBadge, StatusBadge } from '@/components/shared/status-badge'
 import { TimeDiffBadge } from '@/components/shared/time-diff-badge'
@@ -40,7 +41,10 @@ type SortField = 'date' | 'employee' | 'agency' | 'type' | 'minutesDiff' | 'stat
 type SortDirection = 'asc' | 'desc'
 
 export default function SchedulePage() {
-  // Get filters from global context
+  const { t } = useTranslation()
+  const issueTypeLabels = useMemo(() => getIssueTypeLabels(t), [t])
+  const issueStatusLabels = useMemo(() => getIssueStatusLabels(t), [t])
+
   const { search, selectedDealers, selectedType, selectedStatus, dateRange } = useFilters()
   
   const [pageIndex, setPageIndex] = useState(0)
@@ -154,76 +158,72 @@ export default function SchedulePage() {
     }
   }, [filteredIssues])
 
-  // Export data
   const exportData = filteredIssues.map(issue => {
     const employee = getEmployeeById(issue.employeeId)
     const agency = getAgencyById(issue.agencyId)
     return {
-      'Employee': employee ? `${employee.firstName} ${employee.lastName}` : '',
-      'Dealer': agency?.name || '',
-      'Date': issue.date,
-      'Violation Type': issueTypeLabels[issue.type],
-      'Expected Time': issue.expectedTime || '',
-      'Actual Time': issue.actualTime || '',
-      'Difference (min)': issue.minutesDiff || '',
-      'Status': issueStatusLabels[issue.status]
+      [t('common.employee')]: employee ? `${employee.firstName} ${employee.lastName}` : '',
+      [t('dealer.label')]: agency?.name || '',
+      [t('common.date')]: issue.date,
+      [t('mockSchedule.exportViolationType')]: issueTypeLabels[issue.type],
+      [t('mockSchedule.exportExpectedTime')]: issue.expectedTime || '',
+      [t('mockSchedule.actualTime')]: issue.actualTime || '',
+      [t('mockSchedule.exportDifferenceMin')]: issue.minutesDiff || '',
+      [t('common.status')]: issueStatusLabels[issue.status]
     }
   })
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <Clock className="h-7 w-7 text-[#FF9800]" />
-            Schedule Violations
+            {t('mockSchedule.title')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Late arrivals, early departures, and extended lunches
+            {t('mockSchedule.subtitle')}
           </p>
         </div>
-        <ExportButton data={exportData} filename="schedule-violations" title="Schedule Violations Report" />
+        <ExportButton data={exportData} filename="schedule-violations" title={t('mockSchedule.exportTitle')} />
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-xs text-muted-foreground">{t('mockSchedule.total')}</p>
             <p className="text-2xl font-bold text-foreground">{stats.total}</p>
           </CardContent>
         </Card>
         <Card className="bg-[#FF9800]/10 border-[#FF9800]/30">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-[#FF9800]">Late Arrivals</p>
+            <p className="text-xs text-[#FF9800]">{t('mockSchedule.lateArrivals')}</p>
             <p className="text-2xl font-bold text-[#FF9800]">{stats.lateArrivals}</p>
           </CardContent>
         </Card>
         <Card className="bg-orange-500/10 border-orange-500/30">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-orange-500">Early Departures</p>
+            <p className="text-xs text-orange-500">{t('mockSchedule.earlyDepartures')}</p>
             <p className="text-2xl font-bold text-orange-500">{stats.earlyDepartures}</p>
           </CardContent>
         </Card>
         <Card className="bg-purple-500/10 border-purple-500/30">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-purple-400">Extended Lunch</p>
+            <p className="text-xs text-purple-400">{t('mockSchedule.extendedLunch')}</p>
             <p className="text-2xl font-bold text-purple-400">{stats.extendedLunch}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Avg. Minutes</p>
+            <p className="text-xs text-muted-foreground">{t('mockSchedule.avgMinutes')}</p>
             <p className="text-2xl font-bold text-foreground">{stats.avgMinutes}m</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Results */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {paginatedIssues.length} of {filteredIssues.length} records
+          {t('mockSchedule.showingOfRecords', { shown: paginatedIssues.length, total: filteredIssues.length })}
         </p>
         <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPageIndex(0) }}>
           <SelectTrigger className="w-[80px]">
@@ -237,7 +237,6 @@ export default function SchedulePage() {
         </Select>
       </div>
 
-      {/* Table */}
       <Card className="bg-card border-border">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -246,34 +245,34 @@ export default function SchedulePage() {
                 <tr className="bg-[#1565C0] text-white">
                   <th className="px-4 py-3 text-left rounded-tl-md">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('employee')}>
-                      Employee <SortIcon field="employee" />
+                      {t('common.employee')} <SortIcon field="employee" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('agency')}>
-                      Dealer <SortIcon field="agency" />
+                      {t('dealer.label')} <SortIcon field="agency" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('date')}>
-                      Date <SortIcon field="date" />
+                      {t('common.date')} <SortIcon field="date" />
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium">Assigned Schedule</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium">{t('mockSchedule.assignedSchedule')}</th>
                   <th className="px-4 py-3 text-left">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('type')}>
-                      Violation <SortIcon field="type" />
+                      {t('mockSchedule.violation')} <SortIcon field="type" />
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium">Actual Time</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium">{t('mockSchedule.actualTime')}</th>
                   <th className="px-4 py-3 text-left">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('minutesDiff')}>
-                      Difference <SortIcon field="minutesDiff" />
+                      {t('mockSchedule.difference')} <SortIcon field="minutesDiff" />
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left rounded-tr-md">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('status')}>
-                      Status <SortIcon field="status" />
+                      {t('common.status')} <SortIcon field="status" />
                     </button>
                   </th>
                 </tr>
@@ -320,9 +319,8 @@ export default function SchedulePage() {
             </table>
           </div>
 
-          {/* Pagination */}
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <p className="text-sm text-muted-foreground">Page {pageIndex + 1} of {totalPages}</p>
+            <p className="text-sm text-muted-foreground">{t('common.pageOf', { page: pageIndex + 1, total: totalPages })}</p>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" onClick={() => setPageIndex(0)} disabled={pageIndex === 0}>
                 <ChevronsLeft className="h-4 w-4" />

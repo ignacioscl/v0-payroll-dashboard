@@ -138,7 +138,26 @@ export interface PaginationState {
   pageSize: number
 }
 
-// Issue type to labels mapping
+import type { TranslateFn } from '@/lib/i18n/locale-context'
+import {
+  getIssueStatusLabels,
+  getIssueTypeLabels,
+  getPunchTypeLabels,
+} from '@/lib/i18n/label-helpers'
+
+export function getIssueTypeLabelsMap(t: TranslateFn): Record<IssueType, string> {
+  return getIssueTypeLabels(t)
+}
+
+export function getIssueStatusLabelsMap(t: TranslateFn): Record<IssueStatus, string> {
+  return getIssueStatusLabels(t)
+}
+
+export function getPunchTypeLabelsMap(t: TranslateFn): Record<PunchType, string> {
+  return getPunchTypeLabels(t)
+}
+
+/** @deprecated Use getIssueTypeLabelsMap(t) with useTranslation instead. */
 export const issueTypeLabels: Record<IssueType, string> = {
   missing_entry: 'Missing Entry Punch',
   missing_exit: 'Missing Exit Punch',
@@ -152,18 +171,20 @@ export const issueTypeLabels: Record<IssueType, string> = {
   no_punches: 'No Punches',
   manual_punch: 'Manual Punch',
   deleted_punch: 'Deleted Punch',
-  modified_payment: 'Modified Payment'
+  modified_payment: 'Modified Payment',
 }
 
+/** @deprecated Use getIssueStatusLabelsMap(t) with useTranslation instead. */
 export const issueStatusLabels: Record<IssueStatus, string> = {
   pending: 'Pending',
   reviewed: 'Reviewed',
-  justified: 'Justified'
+  justified: 'Justified',
 }
 
+/** @deprecated Use getPunchTypeLabelsMap(t) with useTranslation instead. */
 export const punchTypeLabels: Record<PunchType, string> = {
   entry: 'Entry',
   lunch_out: 'Lunch Out',
   lunch_in: 'Lunch Return',
-  exit: 'Exit'
+  exit: 'Exit',
 }

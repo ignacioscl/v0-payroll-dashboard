@@ -7,8 +7,10 @@ import { canAccessPayrollDashboard, isAdminGeneralUser } from '@/lib/auth/payrol
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import { isDevEnvironment, isProdAllowedPath } from '@/lib/navigation'
 import { AccessDenied } from './access-denied'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const pathname = usePathname()
   const router = useRouter()
   const { user, loading, hasPermission } = useSrsMe()
@@ -27,7 +29,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
 
   if (!loading && !canAccessDashboard) {
     return (
-      <AccessDenied message="You do not have access to the payroll dashboard. Contact your administrator if you believe this is an error." />
+      <AccessDenied message={t('access.noDashboardAccess')} />
     )
   }
 

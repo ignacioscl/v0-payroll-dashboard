@@ -20,36 +20,29 @@ import {
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 import {
-  DATE_OPERATOR_LABELS,
   DEFAULT_OPERATOR_BY_TYPE,
-  NUMBER_OPERATOR_LABELS,
-  TEXT_OPERATOR_LABELS,
   type ColumnFilterConfig,
   type ColumnFilterValue,
   type DateFilterOperator,
   type NumberFilterOperator,
   type TextFilterOperator,
 } from './data-table-helpers'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface DataTableColumnFilterProps<TData> {
   column: Column<TData>
   config: ColumnFilterConfig
 }
 
-/**
- * Active-state filter icon + popover with operator select and value input.
- * Wires straight into TanStack's `columnFilters` state — values are stored
- * as `ColumnFilterValue` so the backend payload helper knows how to read them.
- */
 export function DataTableColumnFilter<TData>({
   column,
   config,
 }: DataTableColumnFilterProps<TData>) {
+  const { t } = useTranslation()
   const [open, setOpen] = React.useState(false)
   const stored = column.getFilterValue() as ColumnFilterValue | undefined
   const isActive = !!stored && stored.value !== '' && stored.value !== null
 
-  // Local draft state — only commit on Apply.
   const [operator, setOperator] = React.useState<string>(
     stored?.operator ?? config.defaultOperator ?? DEFAULT_OPERATOR_BY_TYPE[config.type],
   )
@@ -57,7 +50,41 @@ export function DataTableColumnFilter<TData>({
     stored ? (stored.value == null ? '' : String(stored.value)) : '',
   )
 
-  // Reset draft from stored value when popover opens.
+  const textOperatorLabels = React.useMemo(
+    (): Record<TextFilterOperator, string> => ({
+      contains: t('dataTable.contains'),
+      not_contains: t('dataTable.notContains'),
+      starts_with: t('dataTable.startsWith'),
+      ends_with: t('dataTable.endsWith'),
+      equals: t('dataTable.equals'),
+      not_equals: t('dataTable.notEquals'),
+    }),
+    [t],
+  )
+
+  const numberOperatorLabels = React.useMemo(
+    (): Record<NumberFilterOperator, string> => ({
+      eq: t('dataTable.eqNumber'),
+      neq: t('dataTable.neNumber'),
+      lt: t('dataTable.ltNumber'),
+      lte: t('dataTable.lteNumber'),
+      gt: t('dataTable.gtNumber'),
+      gte: t('dataTable.gteNumber'),
+    }),
+    [t],
+  )
+
+  const dateOperatorLabels = React.useMemo(
+    (): Record<DateFilterOperator, string> => ({
+      eq: t('dataTable.onDate'),
+      lt: t('dataTable.beforeDate'),
+      lte: t('dataTable.onOrBeforeDate'),
+      gt: t('dataTable.afterDate'),
+      gte: t('dataTable.onOrAfterDate'),
+    }),
+    [t],
+  )
+
   React.useEffect(() => {
     if (!open) return
     setOperator(
@@ -106,17 +133,17 @@ export function DataTableColumnFilter<TData>({
 
   const operatorOptions =
     config.type === 'text'
-      ? Object.entries(TEXT_OPERATOR_LABELS)
+      ? Object.entries(textOperatorLabels)
       : config.type === 'number'
-        ? Object.entries(NUMBER_OPERATOR_LABELS)
-        : Object.entries(DATE_OPERATOR_LABELS)
+        ? Object.entries(numberOperatorLabels)
+        : Object.entries(dateOperatorLabels)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={isActive ? 'Filter (active)' : 'Filter'}
+          aria-label={isActive ? t('common.filterActive') : t('common.filter')}
           onClick={(e) => e.stopPropagation()}
           className={cn(
             'inline-flex size-5 items-center justify-center rounded transition-colors',
@@ -137,12 +164,12 @@ export function DataTableColumnFilter<TData>({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Filter
+              {t('common.filter')}
             </span>
             {isActive && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                 <span className="size-1.5 rounded-full bg-amber-500" />
-                Active
+                {t('common.active')}
               </span>
             )}
           </div>
@@ -164,7 +191,7 @@ export function DataTableColumnFilter<TData>({
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder={config.placeholder ?? 'Value…'}
+              placeholder={config.placeholder ?? t('common.valuePlaceholder')}
               className="h-8 text-xs"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') apply()
@@ -192,7 +219,7 @@ export function DataTableColumnFilter<TData>({
               <div className="flex items-center gap-2 rounded border border-input bg-background px-2 py-1.5">
                 <CalendarIcon className="size-3.5 text-muted-foreground" />
                 <span className="text-xs tabular-nums text-foreground">
-                  {value || 'Pick a date'}
+                  {value || t('common.pickDate')}
                 </span>
               </div>
               <div className="rounded-md border border-border">
@@ -201,7 +228,6 @@ export function DataTableColumnFilter<TData>({
                   selected={value ? new Date(value + 'T00:00:00') : undefined}
                   onSelect={(d) => {
                     if (!d) return
-                    // Convert to YYYY-MM-DD without timezone drift.
                     const yyyy = d.getFullYear()
                     const mm = String(d.getMonth() + 1).padStart(2, '0')
                     const dd = String(d.getDate()).padStart(2, '0')
@@ -223,7 +249,7 @@ export function DataTableColumnFilter<TData>({
               disabled={!isActive && value === ''}
             >
               <FilterX className="size-3" />
-              Clear
+              {t('common.clear')}
             </Button>
             <Button
               type="button"
@@ -231,7 +257,7 @@ export function DataTableColumnFilter<TData>({
               className="h-7 px-3 text-[11px]"
               onClick={apply}
             >
-              Apply
+              {t('common.apply')}
             </Button>
           </div>
         </div>

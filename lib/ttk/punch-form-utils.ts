@@ -1,3 +1,6 @@
+import type { TranslateFn } from '@/lib/i18n/locale-context'
+import { getPunchFieldLabels } from '@/lib/i18n/label-helpers'
+
 export type PunchTimeKey = 'punchIn' | 'breakStart' | 'breakEnd' | 'punchOut'
 export type PunchNoteKey = 'punchInNote' | 'breakStartNote' | 'breakEndNote' | 'punchOutNote'
 
@@ -56,43 +59,56 @@ function diffMinutes(from: string, to: string): number | null {
   return (b - a) / 60_000
 }
 
-export function validatePunchForm(state: PunchFormState): {
+export function validatePunchForm(
+  state: PunchFormState,
+  t?: TranslateFn,
+): {
   generalError: string | null
   fieldErrors: Partial<Record<PunchTimeKey, string>>
 } {
   const errors: Partial<Record<PunchTimeKey, string>> = {}
+  const required = t ? t('common.required') : 'Required'
+  const mustBeAfterClockIn = t ? t('punch.mustBeAfterClockIn') : 'Must be after Clock In'
+  const moreThan20Hours = t ? t('punch.moreThan20Hours') : 'More than 20 hours after Clock In'
+  const mustBeBeforeClockOut = t ? t('punch.mustBeBeforeClockOut') : 'Must be before Clock Out'
+  const breakStartRequiredWhenEnd = t
+    ? t('punch.breakStartRequiredWhenEnd')
+    : 'Break Start is required when Break End is set'
+  const mustBeAfterBreakStart = t ? t('punch.mustBeAfterBreakStart') : 'Must be after Break Start'
+  const clockInRequired = t ? t('punch.clockInRequired') : 'Clock in is required'
+  const fieldLabels = t ? getPunchFieldLabels(t) : PUNCH_FIELD_LABELS
 
   if (!state.punchIn) {
-    errors.punchIn = 'Required'
-    return { generalError: 'Clock in is required', fieldErrors: errors }
+    errors.punchIn = required
+    return { generalError: clockInRequired, fieldErrors: errors }
   }
 
   if (state.punchOut) {
     const d = diffMinutes(state.punchIn, state.punchOut)
     if (d !== null) {
-      if (d <= 0) errors.punchOut = 'Must be after Clock In'
-      else if (d > 20 * 60) errors.punchOut = 'More than 20 hours after Clock In'
+      if (d <= 0) errors.punchOut = mustBeAfterClockIn
+      else if (d > 20 * 60) errors.punchOut = moreThan20Hours
     }
   }
 
   if (state.breakStart) {
     const d = diffMinutes(state.punchIn, state.breakStart)
-    if (d !== null && d <= 0) errors.breakStart = 'Must be after Clock In'
+    if (d !== null && d <= 0) errors.breakStart = mustBeAfterClockIn
     if (state.punchOut && !errors.punchOut) {
       const d2 = diffMinutes(state.breakStart, state.punchOut)
-      if (d2 !== null && d2 <= 0) errors.breakStart = 'Must be before Clock Out'
+      if (d2 !== null && d2 <= 0) errors.breakStart = mustBeBeforeClockOut
     }
   }
 
   if (state.breakEnd) {
     if (!state.breakStart) {
-      errors.breakEnd = 'Break Start is required when Break End is set'
+      errors.breakEnd = breakStartRequiredWhenEnd
     } else {
       const d = diffMinutes(state.breakStart, state.breakEnd)
-      if (d !== null && d <= 0) errors.breakEnd = 'Must be after Break Start'
+      if (d !== null && d <= 0) errors.breakEnd = mustBeAfterBreakStart
       if (state.punchOut && !errors.punchOut) {
         const d2 = diffMinutes(state.breakEnd, state.punchOut)
-        if (d2 !== null && d2 <= 0) errors.breakEnd = 'Must be before Clock Out'
+        if (d2 !== null && d2 <= 0) errors.breakEnd = mustBeBeforeClockOut
       }
     }
   }
@@ -101,7 +117,7 @@ export function validatePunchForm(state: PunchFormState): {
     (k) => errors[k],
   )
   const generalError = firstField
-    ? `${PUNCH_FIELD_LABELS[firstField]}: ${errors[firstField]}`
+    ? `${fieldLabels[firstField]}: ${errors[firstField]}`
     : null
 
   return { generalError, fieldErrors: errors }

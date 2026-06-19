@@ -8,12 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  TEXT_OPERATOR_LABELS,
-  NUMBER_OPERATOR_LABELS,
-  DATE_OPERATOR_LABELS,
-  type ColumnFilterValue,
-} from './data-table-helpers'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,6 +17,13 @@ import {
 import { DataTableViewOptions } from './data-table-view-options'
 import { DataTableExport } from './data-table-export'
 import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
+import { useTranslation } from '@/lib/i18n/locale-context'
+import type {
+  ColumnFilterValue,
+  DateFilterOperator,
+  NumberFilterOperator,
+  TextFilterOperator,
+} from './data-table-helpers'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -71,15 +72,51 @@ export function DataTableToolbar<TData>({
   enableTableFocus = false,
   onFocusTable,
 }: DataTableToolbarProps<TData>) {
+  const { t } = useTranslation()
   const globalFilter = (table.getState().globalFilter as string) ?? ''
   const columnFilters = table.getState().columnFilters
   const isFiltered = columnFilters.length > 0 || globalFilter.length > 0
   const pageSize = table.getState().pagination.pageSize
 
+  const textOperatorLabels = React.useMemo(
+    (): Record<TextFilterOperator, string> => ({
+      contains: t('dataTable.contains'),
+      not_contains: t('dataTable.notContains'),
+      starts_with: t('dataTable.startsWith'),
+      ends_with: t('dataTable.endsWith'),
+      equals: t('dataTable.equals'),
+      not_equals: t('dataTable.notEquals'),
+    }),
+    [t],
+  )
+
+  const numberOperatorLabels = React.useMemo(
+    (): Record<NumberFilterOperator, string> => ({
+      eq: t('dataTable.eqNumber'),
+      neq: t('dataTable.neNumber'),
+      lt: t('dataTable.ltNumber'),
+      lte: t('dataTable.lteNumber'),
+      gt: t('dataTable.gtNumber'),
+      gte: t('dataTable.gteNumber'),
+    }),
+    [t],
+  )
+
+  const dateOperatorLabels = React.useMemo(
+    (): Record<DateFilterOperator, string> => ({
+      eq: t('dataTable.onDate'),
+      lt: t('dataTable.beforeDate'),
+      lte: t('dataTable.onOrBeforeDate'),
+      gt: t('dataTable.afterDate'),
+      gte: t('dataTable.onOrAfterDate'),
+    }),
+    [t],
+  )
+
   const operatorLabel = (v: ColumnFilterValue): string => {
-    if (v.type === 'text') return TEXT_OPERATOR_LABELS[v.operator]
-    if (v.type === 'number') return NUMBER_OPERATOR_LABELS[v.operator]
-    return DATE_OPERATOR_LABELS[v.operator]
+    if (v.type === 'text') return textOperatorLabels[v.operator]
+    if (v.type === 'number') return numberOperatorLabels[v.operator]
+    return dateOperatorLabels[v.operator]
   }
 
   const columnLabel = (columnId: string): string => {
@@ -93,6 +130,7 @@ export function DataTableToolbar<TData>({
 
   // Fallback: when server-side total isn't provided, use filtered row count.
   const total = totalRows ?? table.getFilteredRowModel().rows.length
+  const searchPlaceholder = globalFilterPlaceholder ?? t('common.searchPlaceholder')
 
   return (
     <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border bg-muted/25 px-3 py-1.5">
@@ -108,7 +146,7 @@ export function DataTableToolbar<TData>({
               {total.toLocaleString()}
             </span>
           )}
-          <span>record{total === 1 ? '' : 's'}</span>
+          <span>{total === 1 ? t('common.record') : t('common.records')}</span>
         </div>
 
         {enableGlobalFilter && (
@@ -119,7 +157,7 @@ export function DataTableToolbar<TData>({
               <Input
                 value={globalFilter}
                 onChange={(e) => table.setGlobalFilter(e.target.value)}
-                placeholder={globalFilterPlaceholder}
+                placeholder={searchPlaceholder}
                 className="h-7 w-[180px] px-2 pl-7 text-[11px] sm:w-[240px]"
               />
               {globalFilter && (
@@ -127,7 +165,7 @@ export function DataTableToolbar<TData>({
                   type="button"
                   onClick={() => table.setGlobalFilter('')}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Clear search"
+                  aria-label={t('common.clearSearch')}
                 >
                   <X className="size-3" />
                 </button>
@@ -178,7 +216,7 @@ export function DataTableToolbar<TData>({
             }}
           >
             <X className="size-3" />
-            Clear all
+            {t('common.clearAll')}
           </Button>
         )}
       </div>
@@ -192,11 +230,11 @@ export function DataTableToolbar<TData>({
               size="sm"
               className="h-7 gap-1.5 px-2 text-[11px] cursor-pointer"
               onClick={onFocusTable}
-              aria-label="Full screen table"
-              title="Full screen table"
+              aria-label={t('common.fullScreen')}
+              title={t('common.fullScreen')}
             >
               <Maximize2 className="size-3.5" />
-              <span className="hidden sm:inline">Full screen</span>
+              <span className="hidden sm:inline">{t('common.fullScreen')}</span>
             </Button>
             <Separator orientation="vertical" className="mx-0.5 h-4" />
           </>
@@ -205,7 +243,7 @@ export function DataTableToolbar<TData>({
         {trailing}
 
         <div className="flex items-center gap-1">
-          <span className="whitespace-nowrap text-[11px] text-muted-foreground">Rows</span>
+          <span className="whitespace-nowrap text-[11px] text-muted-foreground">{t('common.rows')}</span>
           <Select
             value={
               pageSize === DATA_TABLE_PAGE_SIZE_ALL ? 'all' : String(pageSize)
@@ -231,7 +269,7 @@ export function DataTableToolbar<TData>({
                 </SelectItem>
               ))}
               {includeAllPageSize ? (
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
               ) : null}
             </SelectContent>
           </Select>

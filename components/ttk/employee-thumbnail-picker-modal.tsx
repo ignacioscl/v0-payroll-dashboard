@@ -16,6 +16,7 @@ import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 type EmployeeThumbnailPickerModalProps = {
   open: boolean
@@ -55,15 +56,13 @@ function PunchPreviewTile({
   item,
   saving,
   onSelect,
+  dateLabel,
 }: {
   item: EmployeePunchPhotoItem
   saving: boolean
   onSelect: () => void
+  dateLabel: string
 }) {
-  const dateLabel = item.createDate
-    ? format(new Date(item.createDate), 'MMM d, yyyy HH:mm')
-    : `Punch #${item.logId}`
-
   return (
     <button
       type="button"
@@ -97,6 +96,7 @@ export function EmployeeThumbnailPickerModal({
   employeeName,
   onSaved,
 }: EmployeeThumbnailPickerModalProps) {
+  const { t } = useTranslation()
   const setThumbnail = useSetEmployeeThumbnail()
 
   const photosQuery = useQuery({
@@ -122,7 +122,7 @@ export function EmployeeThumbnailPickerModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Choose thumbnail — {employeeName}</DialogTitle>
+          <DialogTitle>{t('employeeThumbnail.title', { name: employeeName })}</DialogTitle>
         </DialogHeader>
 
         {photosQuery.isLoading ? (
@@ -131,11 +131,11 @@ export function EmployeeThumbnailPickerModal({
           </div>
         ) : photosQuery.error ? (
           <p className="text-sm text-destructive">
-            {photosQuery.error instanceof Error ? photosQuery.error.message : 'Failed to load photos'}
+            {photosQuery.error instanceof Error ? photosQuery.error.message : t('employeeThumbnail.loadFailed')}
           </p>
         ) : items.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No sharp punch photos available for this employee.
+            {t('employeeThumbnail.noPhotos')}
           </p>
         ) : (
           <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
@@ -144,6 +144,11 @@ export function EmployeeThumbnailPickerModal({
                 key={item.logId}
                 item={item}
                 saving={saving}
+                dateLabel={
+                  item.createDate
+                    ? format(new Date(item.createDate), 'MMM d, yyyy HH:mm')
+                    : t('employeeThumbnail.punchNumber', { id: item.logId })
+                }
                 onSelect={() => void handleSelect(item.logId)}
               />
             ))}
@@ -152,13 +157,13 @@ export function EmployeeThumbnailPickerModal({
 
         {setThumbnail.error ? (
           <p className="text-sm text-destructive">
-            {setThumbnail.error instanceof Error ? setThumbnail.error.message : 'Failed to save thumbnail'}
+            {setThumbnail.error instanceof Error ? setThumbnail.error.message : t('employeeThumbnail.saveFailed')}
           </p>
         ) : null}
 
         <div className="flex justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </DialogContent>
