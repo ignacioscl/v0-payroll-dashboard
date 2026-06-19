@@ -43,7 +43,7 @@ FACE_RECOGNITION_URL=http://host.docker.internal:3002
 | `SRS_PUBLIC_URL` | **Fallback** Legacy si la sesión no trae `legacyOrigin` (login directo en v0). Default EN → `main` |
 | `PAYROLL_PUBLIC_URL` | Redirects del browser en v0 (`pro`) — **mismo valor que `PAYROLL_DASHBOARD_URL` en config.php** |
 
-**Back to Legacy (mooi vs main):** no hace falta `SRS_PUBLIC_URL_SP`. Al abrir v0 desde legacy, PHP guarda `legacyOrigin` (ej. `https://mooi.srssuite.com`) en la sesión; "Volver a SRS Legacy" redirige ahí. `SRS_PUBLIC_URL` solo aplica si el usuario entró por login directo en `pro`.
+**Back to Legacy (mooi vs main):** no hace falta `SRS_PUBLIC_URL_SP`. Al abrir v0 desde legacy, PHP guarda `legacyOrigin` en la sesión. "Volver a SRS Legacy" redirige el browser a ese host (`consume.php`); `adopt.php` se llama siempre vía `SRS_API_URL` (mismo `uploads/sso_codes` en el server).
 
 **Variables nuevas:** ninguna. Mismas de siempre.
 

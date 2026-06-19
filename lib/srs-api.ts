@@ -1,7 +1,6 @@
 import type { SrsExchangeResponse, SrsLoginData } from '@/lib/auth/types'
 import { isLoginRoleSelection } from '@/lib/auth/types'
-import { fetchLegacyUpstream, fetchSrsUpstream } from '@/lib/srs-upstream'
-import { resolveLegacyPublicUrl } from '@/lib/legacy-origin'
+import { fetchSrsUpstream } from '@/lib/srs-upstream'
 
 function getSsoSecret(): string {
   const secret = process.env.SRS_SSO_SECRET?.trim()
@@ -93,21 +92,8 @@ export async function loginWithCredentialsFlow(
   return { kind: 'session', token: data.token, user: data.user }
 }
 
-export async function createPhpAdoptCode(
-  token: string,
-  user: unknown,
-  legacyOrigin?: string | null,
-) {
-  const legacyBase = resolveLegacyPublicUrl(
-    typeof user === 'object' &&
-      user !== null &&
-      'legacyOrigin' in user &&
-      typeof (user as { legacyOrigin?: string }).legacyOrigin === 'string'
-      ? (user as { legacyOrigin: string }).legacyOrigin
-      : legacyOrigin,
-  )
-
-  const res = await fetchLegacyUpstream(legacyBase, '/php/api/sso/adopt.php', {
+export async function createPhpAdoptCode(token: string, user: unknown) {
+  const res = await fetchSrsUpstream('/php/api/sso/adopt.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -116,9 +102,20 @@ export async function createPhpAdoptCode(
     body: JSON.stringify({ token, user }),
     cache: 'no-store',
   })
-  const json = await res.json()
+
+  const text = await res.text()
+  let json: { status?: string; data?: { code?: string }; error?: { message?: string } }
+  try {
+    json = JSON.parse(text) as typeof json
+  } catch {
+    const preview = text.replace(/\s+/g, ' ').slice(0, 280)
+    throw new Error(
+      `adopt.php returned non-JSON (${res.status}). ${preview}`,
+    )
+  }
+
   if (!res.ok || json.status !== 'success' || !json.data?.code) {
-    throw new Error(json?.error?.message || 'Failed to open SRS Legacy session')
+    throw new Error(json.error?.message || 'Failed to open SRS Legacy session')
   }
   return json.data.code as string
 }
