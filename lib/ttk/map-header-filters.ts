@@ -7,6 +7,50 @@ import {
 } from '@/lib/ttk/payment-type-filter'
 import { isTodayLiveStatus } from '@/lib/ttk/today-live-status'
 
+/** Session user fields needed to map header dealer combo → SRS scope params. */
+export type PayrollScopeUser = {
+  isCompanyTypeCompany?: boolean
+  idDealer?: number | null
+}
+
+/**
+ * Legacy billing swap: externo (company-type dealer) selects providers in combo;
+ * interno detailer selects sucursales.
+ */
+export function appendPayrollDealerScopeParams(
+  params: Record<string, string | number>,
+  selectedDealers: string[],
+  user?: PayrollScopeUser | null,
+): void {
+  if (selectedDealers.length === 0) {
+    return
+  }
+
+  const selected = selectedDealers.join(',')
+
+  if (user?.isCompanyTypeCompany) {
+    if (user.idDealer != null && user.idDealer > 0) {
+      params.id_dealer = String(user.idDealer)
+    }
+    params.id_dealer_provider = selected
+    return
+  }
+
+  params.id_dealer = selected
+}
+
+export function toPayrollScopeUser(
+  user?: { isCompanyTypeCompany?: boolean; idDealer?: number | null } | null,
+): PayrollScopeUser | null {
+  if (!user) {
+    return null
+  }
+  return {
+    isCompanyTypeCompany: user.isCompanyTypeCompany,
+    idDealer: user.idDealer,
+  }
+}
+
 /** Maps header "issue type" filter to TTK datatable flags (ttk_main without group). */
 export function mapIssueTypeToTtkFlags(selectedType: string) {
   return {
@@ -35,6 +79,7 @@ export function buildTtkListFilterExtra(input: {
   punchMaxHours?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
   todayLiveStatus?: string
+  scopeUser?: PayrollScopeUser | null
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
@@ -61,9 +106,7 @@ export function buildTtkListFilterExtra(input: {
     filter_logic_or: 0,
   }
 
-  if (input.selectedDealers.length > 0) {
-    params.id_dealer = input.selectedDealers.join(',')
-  }
+  appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
   if (input.punchMinHours != null && input.punchMinHours > 0) {
     params.punch_min_hours = input.punchMinHours
   }
@@ -88,6 +131,7 @@ export function buildTtkListParams(input: {
   pageIndex: number
   pageSize: number
   orderBy: string
+  scopeUser?: PayrollScopeUser | null
 }): Record<string, string | number> {
   return {
     ...buildTtkListFilterExtra(input),
@@ -103,6 +147,7 @@ export function buildTtkScopeParams(input: {
   search: string
   selectedDealers: string[]
   dateRange: DateRange | undefined
+  scopeUser?: PayrollScopeUser | null
 }): Record<string, string | number> {
   const params: Record<string, string | number> = {
     'search[value]': input.search.trim(),
@@ -110,9 +155,7 @@ export function buildTtkScopeParams(input: {
     fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
   }
 
-  if (input.selectedDealers.length > 0) {
-    params.id_dealer = input.selectedDealers.join(',')
-  }
+  appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
 
   return params
 }

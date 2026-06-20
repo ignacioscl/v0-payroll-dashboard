@@ -26,6 +26,7 @@ import {
   formatDurationDisplay,
   formatGmtDate,
   formatGmtTime,
+  toPayrollScopeUser,
 } from '@/lib/ttk/map-header-filters'
 import { formatUsDateForExport, formatUsTimeForExport } from '@/lib/format-us-datetime'
 import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
@@ -301,6 +302,7 @@ export function IssuesDataTable({
           selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
             ? selectedTodayLiveStatus
             : undefined,
+        scopeUser: toPayrollScopeUser(user),
       }),
     [
       effectiveSearch,
@@ -311,6 +313,7 @@ export function IssuesDataTable({
       punchMaxHours,
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
+      user,
     ],
   )
 

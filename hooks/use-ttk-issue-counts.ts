@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
-import { buildTtkScopeParams } from '@/lib/ttk/map-header-filters'
+import { buildTtkScopeParams, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
 import {
   EMPTY_TTK_ISSUE_COUNTS,
   type TtkIssueCountsData,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/ttk/ttk-issue-counts-types'
 import { SrsPhpPath } from '@/types/enum-url'
 import type { DateRange } from 'react-day-picker'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 
 export type UseTtkIssueCountsArgs = {
   search: string
@@ -36,6 +37,8 @@ export function ttkIssueCountsQueryKey(args: {
 }
 
 export function useTtkIssueCounts(args: UseTtkIssueCountsArgs) {
+  const { user } = useSrsMe()
+  const scopeUser = toPayrollScopeUser(user)
   const debouncedDealers = useDebouncedValue(args.selectedDealers, 450)
   const debouncedSearch = useDebouncedValue(args.search, 300)
 
@@ -49,7 +52,7 @@ export function useTtkIssueCounts(args: UseTtkIssueCountsArgs) {
     dateRange: args.dateRange,
   }
 
-  const params = buildTtkScopeParams(queryArgs)
+  const params = buildTtkScopeParams({ ...queryArgs, scopeUser })
   const enabled =
     (args.filtersHydrated ?? true) &&
     (args.enabled ?? true) &&

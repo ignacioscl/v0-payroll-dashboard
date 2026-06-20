@@ -17,10 +17,11 @@ import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
 import { getYesterdayOnlyDateRange } from '@/lib/filters/date-range-presets'
-import { buildTtkListFilterExtra, formatGmtDate } from '@/lib/ttk/map-header-filters'
+import { buildTtkListFilterExtra, formatGmtDate, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
 import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { SrsPhpPath } from '@/types/enum-url'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
 
@@ -31,6 +32,8 @@ function mapTtkOrderBy(): string {
 /** Dashboard widget: yesterday punch issues — slim columns, DataTable shell. */
 export function DashboardYesterdayIssuesTable() {
   const { t, locale } = useTranslation()
+  const { user } = useSrsMe()
+  const scopeUser = toPayrollScopeUser(user)
   const dateFnsLocale = locale === 'es' ? es : enUS
   const { selectedDealers, filtersHydrated } = useFilters()
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
@@ -144,8 +147,9 @@ export function DashboardYesterdayIssuesTable() {
         selectedDealers: debouncedDealers,
         dateRange: yesterdayRange,
         selectedType: 'only_error',
+        scopeUser,
       }),
-    [debouncedDealers, yesterdayRange],
+    [debouncedDealers, yesterdayRange, scopeUser],
   )
 
   const queryEnabled =
