@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -68,6 +68,15 @@ export function DealerMultiSelect({
   const resolvedEmptyLabel = emptyLabel ?? t('dealer.noneFound')
 
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Avoid SSR/client mismatch: React Query loading differs until after mount.
+  const showLoading = mounted && loading
+  const isDisabled = mounted && (disabled || loading)
 
   const allIds = useMemo(() => dealers.map((d) => d.id), [dealers])
   const allSelected = dealers.length > 0 && allIds.every((id) => value.includes(id))
@@ -102,22 +111,22 @@ export function DealerMultiSelect({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(next) => !isDisabled && setOpen(next)}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          disabled={disabled || loading}
+          disabled={isDisabled}
           className={cn(
             'min-w-[200px] justify-between border-border bg-background/50 font-normal text-foreground hover:bg-background hover:text-foreground',
             className,
           )}
         >
           <span className="truncate text-foreground">
-            {loading ? t('dealer.loading') : label}
+            {showLoading ? t('dealer.loading') : label}
           </span>
-          {loading ? (
+          {showLoading ? (
             <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
           ) : (
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

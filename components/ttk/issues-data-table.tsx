@@ -273,7 +273,7 @@ export function IssuesDataTable({
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canEditPayment = canEditPaymentType(hasPermission, user?.isSystemAdmin)
-  const showActions = !meLoading
+  const showActions = !meLoading && !user?.isCompanyTypeCompany
   const effectivePaymentTypeFilter: PaymentTypeFilterValue = canViewPayment
     ? paymentTypeFilter
     : PAYMENT_TYPE_FILTER_ALL

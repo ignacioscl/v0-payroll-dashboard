@@ -190,7 +190,7 @@ export function TtkWithoutGroupTable() {
   const deleteMutation = useTtkDeletePunch()
   const canEdit = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canDelete = canDeletePunch(hasPermission, user?.isSystemAdmin)
-  const showActions = !meLoading
+  const showActions = !meLoading && !user?.isCompanyTypeCompany
 
   const getEmployeeId = useCallback((row: TtkListRow) => Number(row.usuario?.id ?? 0), [])
 
