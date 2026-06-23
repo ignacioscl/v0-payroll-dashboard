@@ -2,8 +2,10 @@
 
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, HelpCircle, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useTranslation } from '@/lib/i18n/locale-context'
 
 export type KPICardVariant =
   | 'default'
@@ -34,6 +36,8 @@ interface KPICardProps {
   compact?: boolean
   /** Estilo FullKpiCard del design system (Punch Report filters). */
   filterCard?: boolean
+  /** Si está presente, muestra un icono de ayuda (?) que abre un popover con la descripción del KPI. */
+  help?: ReactNode
   className?: string
 }
 
@@ -50,8 +54,10 @@ export function KPICard({
   loading = false,
   compact = false,
   filterCard = false,
+  help,
   className,
 }: KPICardProps) {
+  const { t } = useTranslation()
   const variantConfig = {
     default: {
       bg: 'bg-gradient-to-br from-white to-blue-50/60',
@@ -177,18 +183,42 @@ export function KPICard({
 
       <div className="relative flex items-start justify-between gap-2">
         <div className={cn('min-w-0 flex-1', filterCard ? 'space-y-1.5' : 'space-y-2')}>
-          <p
-            className={cn(
-              'font-semibold uppercase tracking-wider leading-snug text-muted-foreground',
-              filterCard
-                ? 'text-[11px] whitespace-normal'
-                : compact
-                  ? 'text-[11px] whitespace-normal font-medium'
-                  : 'text-xs truncate font-medium',
-            )}
-          >
-            {title}
-          </p>
+          <div className="flex items-center gap-1">
+            <p
+              className={cn(
+                'font-semibold uppercase tracking-wider leading-snug text-muted-foreground',
+                filterCard
+                  ? 'text-[11px] whitespace-normal'
+                  : compact
+                    ? 'text-[11px] whitespace-normal font-medium'
+                    : 'text-xs truncate font-medium',
+              )}
+            >
+              {title}
+            </p>
+            {help ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={t('common.kpiHelpAria')}
+                    className="shrink-0 text-muted-foreground/50 transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-72 text-xs leading-relaxed text-muted-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p className="mb-1 text-sm font-semibold text-foreground">{title}</p>
+                  {help}
+                </PopoverContent>
+              </Popover>
+            ) : null}
+          </div>
 
           <div className="flex items-baseline gap-2">
             {loading ? (

@@ -7,6 +7,7 @@ import { IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
 import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
+import { PageHeading } from '@/components/layout/page-heading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
@@ -199,32 +200,34 @@ export default function IssuesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('punch.report')}</h1>
-          <p className="mt-1 text-muted-foreground">{t('punch.reportSubtitle')}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {!meLoading && canAdd && (
-            <Button
-              size="sm"
-              className="gap-1.5 cursor-pointer"
-              onClick={handleAddPunchClick}
-            >
-              <PlusCircle className="h-4 w-4" />
-              {t('punch.add')}
-            </Button>
-          )}
-          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
-            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-            <span className="font-medium tabular-nums">
-              {loading
-                ? '…'
-                : t('punch.withErrorsCount', { count: totalPending })}
-            </span>
-          </Badge>
-        </div>
-      </div>
+      <PageHeading
+        title={t('punch.report')}
+        subtitle={t('punch.reportSubtitle')}
+        icon={<AlertTriangle />}
+        variant="warning"
+        actions={
+          <>
+            {!meLoading && canAdd && (
+              <Button
+                size="sm"
+                className="gap-1.5 cursor-pointer"
+                onClick={handleAddPunchClick}
+              >
+                <PlusCircle className="h-4 w-4" />
+                {t('punch.add')}
+              </Button>
+            )}
+            <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+              <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+              <span className="font-medium tabular-nums">
+                {loading
+                  ? '…'
+                  : t('punch.withErrorsCount', { count: totalPending })}
+              </span>
+            </Badge>
+          </>
+        }
+      />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>

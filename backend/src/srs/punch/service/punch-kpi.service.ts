@@ -3,17 +3,18 @@ import { Inject, Injectable } from '@nestjs/common'
 import { PunchKpiRepository } from '../repository/punch-kpi.repository'
 import { PunchKpiDto } from '../dto/punch-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 
-/** Lógica de KPIs de calidad de ponchadas. Resuelve el tenant y delega al repo. */
 @Injectable()
 export class PunchKpiService {
   constructor(@Inject(PunchKpiRepository) private readonly repository: PunchKpiRepository) {}
 
-  async getPunchKpis(ctx: SrsContext, fechaDesde: string, fechaHasta: string): Promise<PunchKpiDto> {
-    return this.repository.getPunchKpis(ctx.idDealerProvider, fechaDesde, fechaHasta)
+  async getPunchKpis(ctx: SrsContext, query: SrsKpiQueryDto): Promise<PunchKpiDto> {
+    return this.repository.getPunchKpis(buildSrsKpiFilter(ctx, query))
   }
 
-  async getOffenders(ctx: SrsContext, fechaDesde: string, fechaHasta: string) {
-    return this.repository.getOffenders(ctx.idDealerProvider, ctx.idUsuario, fechaDesde, fechaHasta)
+  async getOffenders(ctx: SrsContext, query: SrsKpiQueryDto) {
+    return this.repository.getOffenders(buildSrsKpiFilter(ctx, query))
   }
 }

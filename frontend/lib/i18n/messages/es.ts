@@ -95,6 +95,7 @@ export const es: Messages = {
     pickDate: 'Elegir fecha',
     pageOf: 'Página {page} de {total}',
     showing: 'Mostrando {from}–{to} de {total}',
+    kpiHelpAria: 'Qué muestra este KPI',
   },
   dealer: {
     label: 'Sucursal',
@@ -661,6 +662,54 @@ export const es: Messages = {
       holiday: 'Festivo',
       sickDay: 'Día de enfermedad',
     },
+  },
+  businessKpisHelp: {
+    prodValue:
+      'Suma de cuatro fuentes de producción (igual que el reporte de producción). Cada dealer suele registrar producción por un solo canal: precios en líneas de la orden de trabajo, reportes diarios (dealers por hora), totales de estados de cuenta de control horario, o líneas de estados de cuenta genéricos. Las órdenes de trabajo y los reportes diarios usan las fechas del header (fecha de terminación si “Filtrar por fecha de terminación” está activo, si no fecha de creación). Los estados de cuenta usan su período propio — no se suman encima de los precios de las mismas órdenes.',
+    woCompleted:
+      'Órdenes de trabajo marcadas como terminadas en el rango de fechas seleccionado.',
+    avgCycle: 'Horas promedio desde la creación de la orden de trabajo hasta que se marca como terminada.',
+    onTime:
+      'Porcentaje de órdenes terminadas en o antes de la fecha prometida. Solo incluye órdenes con fecha prometida.',
+    backlog:
+      'Órdenes de trabajo aún abiertas (en espera, en proceso, en tránsito o pausadas). Instantánea actual — no depende del período. El subtítulo muestra las abiertas hace más de 7 días.',
+    pendingApproval:
+      'Órdenes de trabajo pendientes de aprobación. El subtítulo muestra las horas promedio desde la creación hasta la aprobación.',
+    inspectionFail:
+      'Porcentaje de inspecciones fallidas sobre todas las inspeccionadas en el período.',
+    invoiced:
+      'Total facturado en el período, después de descuentos e impuestos, según el período de cada estado de cuenta.',
+    statements:
+      'Cantidad de estados de cuenta emitidos en el período. El subtítulo muestra el valor promedio por estado de cuenta.',
+    unbilled:
+      'Órdenes terminadas que aún no están totalmente facturadas. El subtítulo muestra el valor pendiente de facturar.',
+    doneToInvoiced: 'Días promedio entre completar la orden de trabajo y facturarla.',
+    sent: 'Porcentaje de estados de cuenta enviados al cliente. El subtítulo muestra cuántos nunca se enviaron.',
+    outstandingAr:
+      'Total facturado que aún no se ha cobrado. Instantánea actual. El subtítulo muestra estados de cuenta abiertos.',
+    dso: 'Días promedio desde la emisión del estado de cuenta hasta recibir el pago.',
+    collected: 'Total de pagos recibidos en el período.',
+    collectionRate: 'Porcentaje cobrado sobre lo facturado en el período.',
+    arOver60: 'Porcentaje de cuentas por cobrar con más de 60 días de vencimiento.',
+    punchError:
+      'Porcentaje de ponchadas con error (salida faltante, descanso incompleto o turno inusualmente largo). El subtítulo muestra el total de ponchadas.',
+    missingOut:
+      'Ponchadas sin hora de salida. El subtítulo muestra ponchadas con descanso incompleto.',
+    manual: 'Ponchadas cargadas manualmente en lugar de marcadas en el reloj.',
+    adminCorrections: 'Ponchadas corregidas por un administrador.',
+    correctionDelay: 'Días promedio desde la ponchada hasta su corrección.',
+    deleted: 'Ponchadas eliminadas en el período.',
+    totalPayroll:
+      'Costo total de nómina de la semana seleccionada. (Provisional: falta el cálculo semanal con división regular/extra.)',
+    overtime: 'Costo de horas extra. El subtítulo muestra el porcentaje sobre la nómina total. (Provisional.)',
+    laborCost: 'Costo de nómina como porcentaje del valor de producción.',
+    costPerWo: 'Costo de nómina por orden de trabajo completada.',
+    activeEmployees:
+      'Empleados activos con ponchadas en el período. El subtítulo muestra la tarifa horaria promedio.',
+    revenuePerEmployee: 'Valor de producción dividido por empleados activos.',
+  },
+  businessKpis: {
+    filterDateDone: 'Filtrar por fecha de terminación',
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

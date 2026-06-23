@@ -95,6 +95,7 @@ export const en: Messages = {
     pickDate: 'Pick a date',
     pageOf: 'Page {page} of {total}',
     showing: 'Showing {from}–{to} of {total}',
+    kpiHelpAria: 'What this KPI shows',
   },
   dealer: {
     label: 'Dealer',
@@ -661,6 +662,54 @@ export const en: Messages = {
       holiday: 'Holiday',
       sickDay: 'Sick Day',
     },
+  },
+  businessKpisHelp: {
+    prodValue:
+      'Sum of four production channels (same as the production report). Each dealer usually records production through one channel only: service prices on work orders, daily reports (hourly dealers), time-tracking statement totals, or generic statement lines. Work orders and daily reports use the header date range (completion date when the switch is on, otherwise creation date). Statements use their own statement period — they are not added on top of the same work order prices.',
+    woCompleted:
+      'Work orders marked complete in the selected date range.',
+    avgCycle: 'Average hours from work order creation until it is marked complete.',
+    onTime:
+      'Share of completed work orders finished on or before the promised date. Only includes orders with a promised date.',
+    backlog:
+      'Work orders still open (waiting, in process, in transit, or paused). Current snapshot — not limited to the date range. Subtitle shows orders open more than 7 days.',
+    pendingApproval:
+      'Work orders waiting for approval. Subtitle shows average hours from creation to approval.',
+    inspectionFail:
+      'Share of inspections that failed among all inspected work orders in the period.',
+    invoiced:
+      'Total invoiced in the period, after discounts and taxes, based on each statement’s period.',
+    statements:
+      'Number of statements issued in the period. Subtitle shows average value per statement.',
+    unbilled:
+      'Completed work orders not yet fully billed. Subtitle shows the dollar value still unbilled.',
+    doneToInvoiced: 'Average days from work order completion to billing.',
+    sent: 'Share of statements sent to the customer. Subtitle shows how many were never sent.',
+    outstandingAr:
+      'Total billed amount not yet collected. Current snapshot. Subtitle shows open statements.',
+    dso: 'Average days from issuing a statement to receiving payment.',
+    collected: 'Total payments received in the period.',
+    collectionRate: 'Payments collected as a percentage of amount invoiced in the period.',
+    arOver60: 'Share of receivables overdue more than 60 days.',
+    punchError:
+      'Share of time punches with errors (missing clock-out, incomplete break, or unusually long shift). Subtitle shows total punches.',
+    missingOut:
+      'Punches missing a clock-out. Subtitle shows punches with an incomplete break.',
+    manual: 'Punches entered manually instead of from the clock.',
+    adminCorrections: 'Punches corrected by an administrator.',
+    correctionDelay: 'Average days from punch to correction.',
+    deleted: 'Punches deleted in the period.',
+    totalPayroll:
+      'Total payroll cost for the selected week. (Provisional: weekly regular/overtime split still pending.)',
+    overtime: 'Overtime cost. Subtitle shows percentage of total payroll. (Provisional.)',
+    laborCost: 'Payroll cost as a percentage of production value.',
+    costPerWo: 'Payroll cost per completed work order.',
+    activeEmployees:
+      'Active employees with punches in the period. Subtitle shows average hourly rate.',
+    revenuePerEmployee: 'Production value divided by active employees.',
+  },
+  businessKpis: {
+    filterDateDone: 'Filter by completion date',
   },
   mockPayrollReport: {
     title: 'Payroll Report',

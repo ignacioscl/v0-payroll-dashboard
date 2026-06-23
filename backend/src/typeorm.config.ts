@@ -2,6 +2,7 @@
 import 'dotenv/config'
 
 import { DataSource, DataSourceOptions } from 'typeorm'
+import { resolveTypeOrmLogging } from './db-logging'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 export const dataSourceOptions: DataSourceOptions = {
@@ -29,7 +30,7 @@ export const dataSourceOptions: DataSourceOptions = {
     dateStrings: true,
     timezone: 'Z',
   },
-  logging: process.env.DB_LOGGING == 'true',
+  logging: resolveTypeOrmLogging(),
   logger: 'advanced-console',
 }
 

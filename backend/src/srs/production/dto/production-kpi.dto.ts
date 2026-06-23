@@ -20,10 +20,6 @@ export class ProductionKpiDto {
   @ApiProperty({ example: 258280 }) productionValue!: number
   @ApiProperty({ example: 26.4 }) avgCycleHours!: number
   @ApiProperty({ example: 91.2 }) onTimePct!: number
-  @ApiProperty({ example: 437 }) openBacklog!: number
-  @ApiProperty({ example: 58 }) backlogOver7d!: number
-  @ApiProperty({ example: 64 }) pendingApproval!: number
-  @ApiProperty({ example: 9.8 }) avgApprovalHours!: number
   @ApiProperty({ example: 3.4 }) inspectionFailPct!: number
 }
 

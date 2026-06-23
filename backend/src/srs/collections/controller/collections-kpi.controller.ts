@@ -2,9 +2,10 @@ import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { CollectionsKpiService } from '../service/collections-kpi.service'
-import { ArAgingBucketDto, CollectionsKpiDto, CollectionsKpiQueryDto } from '../dto/collections-kpi.dto'
+import { ArAgingBucketDto, CollectionsKpiDto } from '../dto/collections-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/collections')
@@ -17,14 +18,17 @@ export class CollectionsKpiController {
   @ApiOkResponse({ type: CollectionsKpiDto })
   async getCollectionsKpis(
     @Req() request: any,
-    @Query() query: CollectionsKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<CollectionsKpiDto> {
-    return this.service.getCollectionsKpis(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getCollectionsKpis(request.srsContext, query)
   }
 
   @Get('/ar-aging')
   @ApiOkResponse({ type: [ArAgingBucketDto] })
-  async getArAging(@Req() request: any): Promise<ArAgingBucketDto[]> {
-    return this.service.getArAging(request.srsContext)
+  async getArAging(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<ArAgingBucketDto[]> {
+    return this.service.getArAging(request.srsContext, query)
   }
 }

@@ -5,10 +5,6 @@ export interface ProductionKpi {
   productionValue: number
   avgCycleHours: number
   onTimePct: number
-  openBacklog: number
-  backlogOver7d: number
-  pendingApproval: number
-  avgApprovalHours: number
   inspectionFailPct: number
 }
 
@@ -53,17 +49,37 @@ export interface PayrollKpi {
   avgHourlyRate: number
 }
 
-async function getKpi<T>(vertical: string, fechaDesde: string, fechaHasta: string): Promise<T> {
-  const qs = `?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`
-  const res = await fetch(`/api/srs-kpis/kpis/${vertical}${qs}`, { cache: 'no-store' })
+export interface KpiQueryParams {
+  fechaDesde: string
+  fechaHasta: string
+  idDealer: string
+  filterDateDone?: boolean
+}
+
+function buildKpiQuery(params: KpiQueryParams): string {
+  const qs = new URLSearchParams({
+    fechaDesde: params.fechaDesde,
+    fechaHasta: params.fechaHasta,
+    idDealer: params.idDealer,
+  })
+  if (params.filterDateDone !== undefined) {
+    qs.set('filterDateDone', params.filterDateDone ? 'true' : 'false')
+  }
+  return `?${qs.toString()}`
+}
+
+async function getKpi<T>(vertical: string, params: KpiQueryParams): Promise<T> {
+  const res = await fetch(`/api/srs-kpis/kpis/${vertical}${buildKpiQuery(params)}`, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`KPI ${vertical} (${res.status})`)
   }
   return res.json() as Promise<T>
 }
 
-export const fetchProductionKpi = (d: string, h: string) => getKpi<ProductionKpi>('production', d, h)
-export const fetchBillingKpi = (d: string, h: string) => getKpi<BillingKpi>('billing', d, h)
-export const fetchCollectionsKpi = (d: string, h: string) => getKpi<CollectionsKpi>('collections', d, h)
-export const fetchPunchKpi = (d: string, h: string) => getKpi<PunchKpi>('punch', d, h)
-export const fetchPayrollKpi = (d: string, h: string) => getKpi<PayrollKpi>('payroll', d, h)
+export const fetchProductionKpi = (params: KpiQueryParams) =>
+  getKpi<ProductionKpi>('production', params)
+export const fetchBillingKpi = (params: KpiQueryParams) => getKpi<BillingKpi>('billing', params)
+export const fetchCollectionsKpi = (params: KpiQueryParams) =>
+  getKpi<CollectionsKpi>('collections', params)
+export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)
+export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)

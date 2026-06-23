@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { enUS, es } from 'date-fns/locale'
 import { Calendar } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
 import { enUS as enUSDayPicker, es as esDayPicker } from 'react-day-picker/locale'
@@ -41,7 +40,6 @@ export function DateRangePicker({
   presets,
 }: DateRangePickerProps) {
   const { t, locale } = useTranslation()
-  const dateFnsLocale = locale === 'es' ? es : enUS
   const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
   const resolvedPresets = presets ?? getDateRangePresets(t)
   const resolvedPlaceholder = placeholder ?? t('filters.selectDates')
@@ -92,13 +90,12 @@ export function DateRangePicker({
           <Calendar className="h-4 w-4 text-muted-foreground" />
           {mounted && value?.from ? (
             value.to ? (
-              <span className="text-foreground">
-                {format(value.from, 'MMM dd', { locale: dateFnsLocale })} -{' '}
-                {format(value.to, 'MMM dd', { locale: dateFnsLocale })}
+              <span className="text-foreground tabular-nums">
+                {format(value.from, 'MM/dd/yyyy')} – {format(value.to, 'MM/dd/yyyy')}
               </span>
             ) : (
-              <span className="text-foreground">
-                {format(value.from, 'MMM dd, yyyy', { locale: dateFnsLocale })}
+              <span className="text-foreground tabular-nums">
+                {format(value.from, 'MM/dd/yyyy')}
               </span>
             )
           ) : (

@@ -3,6 +3,8 @@ import 'dotenv/config'
 
 import { DataSource, DataSourceOptions } from 'typeorm'
 
+import { resolveTypeOrmLogging } from '../db-logging'
+
 /**
  * DataSource hacia la base LEGACY de SRS (MariaDB), compartida con el monolito PHP.
  *
@@ -35,7 +37,7 @@ export const srsDataSourceOptions: DataSourceOptions = {
     timezone: 'Z',
     connectionLimit: parseInt(process.env.DB_POOL ?? '5'),
   },
-  logging: process.env.DB_LOGGING == 'true',
+  logging: resolveTypeOrmLogging(),
   logger: 'advanced-console',
 }
 

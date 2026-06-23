@@ -94,6 +94,7 @@ export interface Messages {
     pickDate: string
     pageOf: string
     showing: string
+    kpiHelpAria: string
   }
   dealer: {
     label: string
@@ -660,6 +661,40 @@ export interface Messages {
       holiday: string
       sickDay: string
     }
+  }
+  businessKpisHelp: {
+    prodValue: string
+    woCompleted: string
+    avgCycle: string
+    onTime: string
+    backlog: string
+    pendingApproval: string
+    inspectionFail: string
+    invoiced: string
+    statements: string
+    unbilled: string
+    doneToInvoiced: string
+    sent: string
+    outstandingAr: string
+    dso: string
+    collected: string
+    collectionRate: string
+    arOver60: string
+    punchError: string
+    missingOut: string
+    manual: string
+    adminCorrections: string
+    correctionDelay: string
+    deleted: string
+    totalPayroll: string
+    overtime: string
+    laborCost: string
+    costPerWo: string
+    activeEmployees: string
+    revenuePerEmployee: string
+  }
+  businessKpis: {
+    filterDateDone: string
   }
   mockPayrollReport: {
     title: string

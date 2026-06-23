@@ -14,6 +14,7 @@ import {
   DollarSign,
   Hand,
   Hash,
+  LayoutDashboard,
   LogOut,
   Percent,
   Trash2,
@@ -33,6 +34,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { PageHeading } from '@/components/layout/page-heading'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { TodayStatusSection } from '@/components/dashboard/today-status-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -262,8 +264,12 @@ export default function DashboardPage() {
   return (
     <motion.div className="space-y-8" variants={container} initial="hidden" animate="show">
       <motion.div variants={item}>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('dashboard.title')}</h1>
-        <p className="mt-1 text-muted-foreground">{t('dashboard.subtitle')}</p>
+        <PageHeading
+          title={t('dashboard.title')}
+          subtitle={t('dashboard.subtitle')}
+          icon={<LayoutDashboard />}
+          variant="default"
+        />
       </motion.div>
 
       <motion.div variants={item}>

@@ -2,20 +2,15 @@ import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { ProductionKpiService } from '../service/production-kpi.service'
 import {
   DealerProductionRowDto,
   ProductionKpiDto,
-  ProductionKpiQueryDto,
   WoStatusSliceDto,
 } from '../dto/production-kpi.dto'
 
-/**
- * KPIs de producción (SRS legacy, solo lectura).
- * SOLO HTTP: valida el JWT (SrsJwtGuard) y delega. El contexto del usuario
- * (provider + dealers + restricciones) sale de request.srsContext, nunca del cliente.
- */
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/production')
 @ApiTags('SRS KPIs - Production')
@@ -27,23 +22,26 @@ export class ProductionKpiController {
   @ApiOkResponse({ type: ProductionKpiDto })
   async getProductionKpis(
     @Req() request: any,
-    @Query() query: ProductionKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<ProductionKpiDto> {
-    return this.service.getProductionKpis(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getProductionKpis(request.srsContext, query)
   }
 
   @Get('/pipeline')
   @ApiOkResponse({ type: [WoStatusSliceDto] })
-  async getOpenPipeline(@Req() request: any): Promise<WoStatusSliceDto[]> {
-    return this.service.getOpenPipeline(request.srsContext)
+  async getOpenPipeline(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<WoStatusSliceDto[]> {
+    return this.service.getOpenPipeline(request.srsContext, query)
   }
 
   @Get('/by-dealer')
   @ApiOkResponse({ type: [DealerProductionRowDto] })
   async getDealerProduction(
     @Req() request: any,
-    @Query() query: ProductionKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<DealerProductionRowDto[]> {
-    return this.service.getDealerProduction(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getDealerProduction(request.srsContext, query)
   }
 }

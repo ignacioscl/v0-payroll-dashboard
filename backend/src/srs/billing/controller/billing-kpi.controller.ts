@@ -2,9 +2,10 @@ import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { BillingKpiService } from '../service/billing-kpi.service'
-import { BillingKpiDto, BillingKpiQueryDto, UnbilledAgingBucketDto } from '../dto/billing-kpi.dto'
+import { BillingKpiDto, UnbilledAgingBucketDto } from '../dto/billing-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/billing')
@@ -17,14 +18,17 @@ export class BillingKpiController {
   @ApiOkResponse({ type: BillingKpiDto })
   async getBillingKpis(
     @Req() request: any,
-    @Query() query: BillingKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<BillingKpiDto> {
-    return this.service.getBillingKpis(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getBillingKpis(request.srsContext, query)
   }
 
   @Get('/unbilled-aging')
   @ApiOkResponse({ type: [UnbilledAgingBucketDto] })
-  async getUnbilledAging(@Req() request: any): Promise<UnbilledAgingBucketDto[]> {
-    return this.service.getUnbilledAging(request.srsContext)
+  async getUnbilledAging(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<UnbilledAgingBucketDto[]> {
+    return this.service.getUnbilledAging(request.srsContext, query)
   }
 }

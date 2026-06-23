@@ -2,9 +2,10 @@ import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { PayrollKpiService } from '../service/payroll-kpi.service'
-import { PayrollByTypeRowDto, PayrollKpiDto, PayrollKpiQueryDto } from '../dto/payroll-kpi.dto'
+import { PayrollByTypeRowDto, PayrollKpiDto } from '../dto/payroll-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/payroll')
@@ -17,17 +18,17 @@ export class PayrollKpiController {
   @ApiOkResponse({ type: PayrollKpiDto })
   async getPayrollKpis(
     @Req() request: any,
-    @Query() query: PayrollKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<PayrollKpiDto> {
-    return this.service.getPayrollKpis(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getPayrollKpis(request.srsContext, query)
   }
 
   @Get('/by-type')
   @ApiOkResponse({ type: [PayrollByTypeRowDto] })
   async getPayrollByType(
     @Req() request: any,
-    @Query() query: PayrollKpiQueryDto,
+    @Query() query: SrsKpiQueryDto,
   ): Promise<PayrollByTypeRowDto[]> {
-    return this.service.getPayrollByType(request.srsContext, query.fechaDesde, query.fechaHasta)
+    return this.service.getPayrollByType(request.srsContext, query)
   }
 }
