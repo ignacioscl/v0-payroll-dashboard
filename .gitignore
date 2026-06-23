@@ -1,16 +1,17 @@
-# v0 sandbox internal files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-.snowflake/
-.v0-trash/
-.vercel/
+# --- Raíz del monorepo SRS Suite ---
+# Cada subproyecto (frontend/, backend/) tiene su propio .gitignore.
+# Acá solo va lo del nivel raíz: orquestación docker, env del compose y junk de OS.
 
-# Environment variables
-.env*.local
-
-# Common ignores
-node_modules
-.next/
+# OS / editor
 .DS_Store
-*.tsbuildinfo
+Thumbs.db
+*.swp
+
+# Override local del compose (no se commitea; usar docker-compose.override.example.yml)
+docker-compose.override.yml
+
+# .env del compose (solo define PAYROLL_ENV_FILE / BACKEND_ENV_FILE en el server)
+.env
+
+# Logs sueltos
+*.log

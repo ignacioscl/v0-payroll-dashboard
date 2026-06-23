@@ -1,0 +1,28 @@
+# --- Backend SRS Suite (NestJS) ---
+
+# Dependencias
+/node_modules
+
+# Build
+/dist
+/build
+
+# Entorno (credenciales DB, secretos) — nunca al repo
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# Test / coverage
+/coverage
+.nyc_output
+
+# OS / IDE
+.DS_Store
+.idea/
+*.swp
