@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { WorkflowStatus } from '../../production/entity/workflow.srsentity'
+import { WO_STATEMENT_TYPES, statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
 import { BillingKpiDto } from '../dto/billing-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -66,10 +67,23 @@ export class BillingKpiRepository {
       [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
     )
 
+    const partialOverlap = await this.srs.query(
+      `SELECT COUNT(*) AS partialOverlapWoStatements
+       FROM INVOICE_STATEMENT s
+       ${stmt.join}
+       WHERE s.estado = 1 AND s.id_dealer_provider = ?
+         ${stmt.and}
+         AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
+         AND s.fecha_desde <= ? AND s.fecha_hasta >= ?
+         AND (s.fecha_desde < ? OR s.fecha_hasta > ?)`,
+      [idDealerProvider, ...stmt.params, fechaHasta, fechaDesde, fechaDesde, fechaHasta],
+    )
+
     const i = invoiced[0] ?? {}
     const u = unbilled[0] ?? {}
     const l = lag[0] ?? {}
     const s = sent[0] ?? {}
+    const po = partialOverlap[0] ?? {}
 
     return {
       invoicedValue: Number(i.invoicedValue ?? 0),
@@ -80,6 +94,7 @@ export class BillingKpiRepository {
       avgDoneToInvoicedDays: Number(l.avgDoneToInvoicedDays ?? 0),
       sentPct: Number(s.sentPct ?? 0),
       unsentStatements: Number(s.unsentStatements ?? 0),
+      partialOverlapWoStatements: Number(po.partialOverlapWoStatements ?? 0),
     }
   }
 

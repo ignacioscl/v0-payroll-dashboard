@@ -566,6 +566,7 @@ export const en: Messages = {
     doneNotInvoiced: 'Done, Not Invoiced',
     woDoneToInvoiced: 'WO Done → Invoiced',
     statementsSent: 'Statements Sent',
+    partialOverlapWoStatements: 'WO Statements Outside Period',
     billingCoverage: 'Billing Coverage',
     avgPerStatement: 'avg {amount} / statement',
     unbilledRevenue: '{amount} unbilled revenue',
@@ -685,6 +686,8 @@ export const en: Messages = {
       'Completed work orders not yet fully billed. Subtitle shows the dollar value still unbilled.',
     doneToInvoiced: 'Average days from work order completion to billing.',
     sent: 'Share of statements sent to the customer. Subtitle shows how many were never sent.',
+    partialOverlapWo:
+      'Work-order statements whose billing period overlaps the selected dates but are excluded from Invoiced and Statements Issued because the period starts before or ends after the range (same rule as the billing list).',
     outstandingAr:
       'Total billed amount not yet collected. Current snapshot. Subtitle shows open statements.',
     dso: 'Average days from issuing a statement to receiving payment.',

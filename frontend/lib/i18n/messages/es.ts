@@ -566,6 +566,7 @@ export const es: Messages = {
     doneNotInvoiced: 'Terminado, sin facturar',
     woDoneToInvoiced: 'OT terminada → facturada',
     statementsSent: 'Estados de cuenta enviados',
+    partialOverlapWoStatements: 'Estados WO fuera del período',
     billingCoverage: 'Cobertura de facturación',
     avgPerStatement: 'prom. {amount} / estado de cuenta',
     unbilledRevenue: '{amount} ingresos sin facturar',
@@ -685,6 +686,8 @@ export const es: Messages = {
       'Órdenes terminadas que aún no están totalmente facturadas. El subtítulo muestra el valor pendiente de facturar.',
     doneToInvoiced: 'Días promedio entre completar la orden de trabajo y facturarla.',
     sent: 'Porcentaje de estados de cuenta enviados al cliente. El subtítulo muestra cuántos nunca se enviaron.',
+    partialOverlapWo:
+      'Estados de cuenta de órdenes de trabajo cuyo período se superpone con las fechas seleccionadas pero no entran en Facturado ni en Estados emitidos porque empiezan antes o terminan después del rango (misma regla que el listado de billing).',
     outstandingAr:
       'Total facturado que aún no se ha cobrado. Instantánea actual. El subtítulo muestra estados de cuenta abiertos.',
     dso: 'Días promedio desde la emisión del estado de cuenta hasta recibir el pago.',

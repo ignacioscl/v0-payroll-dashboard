@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
+import { StatementType } from '../../billing/entity/invoice-statement.srsentity'
 import { OPEN_WORKFLOW_STATUSES, WorkflowStatus } from '../entity/workflow.srsentity'
 import { ProductionKpiDto, ProductionWeekRowDto, DealerProductionRowDto, WoStatusSliceDto } from '../dto/production-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
@@ -142,7 +143,7 @@ export class ProductionKpiRepository {
         `SELECT IFNULL(SUM(GET_TOTAL_BY_STATEMENT(invs.id, invs.discount, NULL, invs.discount_type, NULL)), 0) AS value
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 5 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
         stmtPeriodParams,
@@ -155,7 +156,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 6 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
         stmtPeriodParams,
@@ -241,7 +242,7 @@ export class ProductionKpiRepository {
                 IFNULL(SUM(GET_TOTAL_BY_STATEMENT(invs.id, invs.discount, NULL, invs.discount_type, NULL)), 0) AS value
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 5 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY c.id`,
@@ -257,7 +258,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 6 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY c.id`,
@@ -371,7 +372,7 @@ export class ProductionKpiRepository {
                 IFNULL(SUM(GET_TOTAL_BY_STATEMENT(invs.id, invs.discount, NULL, invs.discount_type, NULL)), 0) AS value
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 5 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY weekStart
@@ -387,7 +388,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
-         WHERE invs.estado = 1 AND invs.statement_type = 6 AND invs.id_dealer_provider = ?
+         WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtRestriction}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY weekStart

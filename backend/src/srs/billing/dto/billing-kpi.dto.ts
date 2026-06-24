@@ -22,6 +22,8 @@ export class BillingKpiDto {
   @ApiProperty({ example: 4.6 }) avgDoneToInvoicedDays!: number
   @ApiProperty({ example: 93.6 }) sentPct!: number
   @ApiProperty({ example: 20 }) unsentStatements!: number
+  /** WO statements (types 1–4) overlapping the header range but not fully contained in it. */
+  @ApiProperty({ example: 7 }) partialOverlapWoStatements!: number
 }
 
 /** Aging de WOs Done sin facturar (por bucket de antigüedad). */

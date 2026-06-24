@@ -31,6 +31,7 @@ export interface BillingKpi {
   avgDoneToInvoicedDays: number
   sentPct: number
   unsentStatements: number
+  partialOverlapWoStatements: number
 }
 
 export interface CollectionsKpi {

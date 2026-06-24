@@ -565,6 +565,7 @@ export interface Messages {
     doneNotInvoiced: string
     woDoneToInvoiced: string
     statementsSent: string
+    partialOverlapWoStatements: string
     billingCoverage: string
     avgPerStatement: string
     unbilledRevenue: string
@@ -675,6 +676,7 @@ export interface Messages {
     unbilled: string
     doneToInvoiced: string
     sent: string
+    partialOverlapWo: string
     outstandingAr: string
     dso: string
     collected: string
