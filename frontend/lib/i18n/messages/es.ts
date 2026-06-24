@@ -592,13 +592,13 @@ export const es: Messages = {
     tableOpenStatements: 'Estados de cuenta abiertos',
     missingPunchOut: 'Salida faltante',
     manualPunches: 'Ponchadas manuales',
-    adminCorrections: 'Correcciones de admin',
+    adminCorrections: 'Correcciones de ponchada',
     correctionDelay: 'Retraso de corrección',
     deletedPunches: 'Ponchadas eliminadas',
     errorRateOfPunches: '{trend}pp vs anterior — de {count} ponchadas',
     missingBreakEndSuffix: '+ {count} fin de descanso faltante',
     createdByHand: 'creadas manualmente',
-    fixedByAdmins: 'ponchadas corregidas por admins',
+    fixedByAdmins: 'ponchadas corregidas tras edición',
     punchDateToFixed: 'fecha de ponchada → corregida',
     fromAuditLog: 'del registro de auditoría de ponchadas',
     tableMissingOut: 'Salida faltante',
@@ -696,7 +696,8 @@ export const es: Messages = {
     missingOut:
       'Ponchadas sin hora de salida. El subtítulo muestra ponchadas con descanso incompleto.',
     manual: 'Ponchadas cargadas manualmente en lugar de marcadas en el reloj.',
-    adminCorrections: 'Ponchadas corregidas por un administrador.',
+    adminCorrections:
+      'Ponchadas corregidas tras edición (cualquier usuario con permiso de agregar/editar ponchada).',
     correctionDelay: 'Días promedio desde la ponchada hasta su corrección.',
     deleted: 'Ponchadas eliminadas en el período.',
     totalPayroll:

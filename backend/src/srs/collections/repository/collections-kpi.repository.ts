@@ -26,7 +26,7 @@ export class CollectionsKpiRepository {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta } = filter
     const bill = buildDealerFilterSql('billing', idUsuario, dealerIds)
     const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds)
-
+    console.log('pasa qrys collections kpis')
     const [collected, dso, ar, invoiced] = await Promise.all([
       this.srs.query(
         `SELECT IFNULL(SUM(b.amount), 0) AS collectedValue

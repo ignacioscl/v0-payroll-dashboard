@@ -592,13 +592,13 @@ export const en: Messages = {
     tableOpenStatements: 'Open Statements',
     missingPunchOut: 'Missing Punch-Out',
     manualPunches: 'Manual Punches',
-    adminCorrections: 'Admin Corrections',
+    adminCorrections: 'Punch Corrections',
     correctionDelay: 'Correction Delay',
     deletedPunches: 'Deleted Punches',
     errorRateOfPunches: '{trend}pp vs prev — of {count} punches',
     missingBreakEndSuffix: '+ {count} missing break end',
     createdByHand: 'created by hand',
-    fixedByAdmins: 'punches fixed by admins',
+    fixedByAdmins: 'punches corrected after edit',
     punchDateToFixed: 'punch date → fixed',
     fromAuditLog: 'from punch audit log',
     tableMissingOut: 'Missing Out',
@@ -696,7 +696,8 @@ export const en: Messages = {
     missingOut:
       'Punches missing a clock-out. Subtitle shows punches with an incomplete break.',
     manual: 'Punches entered manually instead of from the clock.',
-    adminCorrections: 'Punches corrected by an administrator.',
+    adminCorrections:
+      'Punches corrected after edit (any user with add/edit punch permission).',
     correctionDelay: 'Average days from punch to correction.',
     deleted: 'Punches deleted in the period.',
     totalPayroll:
