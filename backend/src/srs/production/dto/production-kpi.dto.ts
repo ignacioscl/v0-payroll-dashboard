@@ -29,9 +29,21 @@ export class WoStatusSliceDto {
   @ApiProperty({ example: 174 }) count!: number
 }
 
-/** Producción por dealer (tabla). */
+/** Producción por dealer (tabla Production vs Goal). */
 export class DealerProductionRowDto {
   @ApiProperty({ example: 'Toyota Miami' }) dealer!: string
   @ApiProperty({ example: 2218 }) wos!: number
   @ApiProperty({ example: 118400 }) value!: number
+  @ApiProperty({ example: 110000 }) goal!: number
+  @ApiProperty({ example: 107.6 }) attainmentPct!: number
+}
+
+/** Punto de la serie semanal (gráfico Completed WOs & Production Value). */
+export class ProductionWeekRowDto {
+  @ApiProperty({ example: '2026-06-02', description: 'Monday of the ISO week (YYYY-MM-DD)' })
+  weekStart!: string
+
+  @ApiProperty({ example: 1263 }) woCompleted!: number
+
+  @ApiProperty({ example: 66150 }) productionValue!: number
 }

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import { ProductionKpiRepository } from '../repository/production-kpi.repository'
-import { ProductionKpiDto, WoStatusSliceDto } from '../dto/production-kpi.dto'
+import { ProductionKpiDto, ProductionWeekRowDto, WoStatusSliceDto } from '../dto/production-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
@@ -22,5 +22,12 @@ export class ProductionKpiService {
 
   async getDealerProduction(ctx: SrsContext, query: SrsKpiQueryDto) {
     return this.repository.getDealerProduction(buildSrsKpiFilter(ctx, query))
+  }
+
+  async getProductionByWeek(
+    ctx: SrsContext,
+    query: SrsKpiQueryDto,
+  ): Promise<ProductionWeekRowDto[]> {
+    return this.repository.getProductionByWeek(buildSrsKpiFilter(ctx, query))
   }
 }

@@ -67,9 +67,28 @@ export function woPeriodColumn(filterDateDone: boolean): string {
   return filterDateDone ? 'DATE(i.date_last_chg_workflow)' : 'DATE(i.fecha_alta)'
 }
 
+/** Monday of the calendar week for a SQL date expression (MySQL WEEKDAY: Mon=0). */
+export function mysqlWeekStartExpr(dateExpr: string): string {
+  return `DATE(DATE_SUB(${dateExpr}, INTERVAL WEEKDAY(${dateExpr}) DAY))`
+}
+
+/**
+ * Week bucket for KPI charts: ISO Monday, but never before filter fechaDesde
+ * (avoids "Apr 27" label when the range starts May 1).
+ * Bind `?` = fechaDesde.
+ */
+export function mysqlWeekBucketStartExpr(dateExpr: string): string {
+  return `GREATEST(${mysqlWeekStartExpr(dateExpr)}, ?)`
+}
+
 /** Period filter for completed-WO metrics (legacy: date_last_chg_workflow when Filter Date DONE). */
 export function woCompletedPeriodColumn(filterDateDone: boolean): string {
   return woPeriodColumn(filterDateDone)
+}
+
+/** When Filter Date DONE: only WOs in Done workflow; otherwise any active workflow. */
+export function woStatusFilterSql(filterDateDone: boolean, doneWorkflowId: number): string {
+  return filterDateDone ? ` AND i.id_workflow = ${doneWorkflowId}` : ''
 }
 
 /**

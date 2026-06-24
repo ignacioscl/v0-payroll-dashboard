@@ -8,6 +8,7 @@ import { ProductionKpiService } from '../service/production-kpi.service'
 import {
   DealerProductionRowDto,
   ProductionKpiDto,
+  ProductionWeekRowDto,
   WoStatusSliceDto,
 } from '../dto/production-kpi.dto'
 
@@ -43,5 +44,14 @@ export class ProductionKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<DealerProductionRowDto[]> {
     return this.service.getDealerProduction(request.srsContext, query)
+  }
+
+  @Get('/by-week')
+  @ApiOkResponse({ type: [ProductionWeekRowDto] })
+  async getProductionByWeek(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<ProductionWeekRowDto[]> {
+    return this.service.getProductionByWeek(request.srsContext, query)
   }
 }

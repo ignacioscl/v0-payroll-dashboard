@@ -7,7 +7,6 @@ import {
   TrendingUp,
   Trophy,
   DollarSign,
-  FileSpreadsheet,
   Gauge,
   Blocks,
   FileBarChart,
@@ -35,21 +34,13 @@ export const ALL_NAVIGATION: NavItemDef[] = [
   { nameKey: 'nav.trends', href: '/trends', icon: TrendingUp },
   { nameKey: 'nav.employeeRanking', href: '/ranking', icon: Trophy },
   { nameKey: 'nav.costsByDealer', href: '/costs', icon: DollarSign },
-  {
-    nameKey: 'nav.businessKpis',
-    href: '/kpis',
-    icon: Gauge,
-    children: [
-      { nameKey: 'nav.payrollReport', href: '/kpis/payroll-report', icon: FileSpreadsheet },
-    ],
-  },
+  { nameKey: 'nav.businessKpis', href: '/kpis', icon: Gauge },
   {
     nameKey: 'nav.reports',
     href: '/reports/business-kpis',
     icon: FileBarChart,
     children: [
       { nameKey: 'nav.businessKpis', href: '/reports/business-kpis', icon: Gauge },
-      { nameKey: 'nav.payrollReport', href: '/reports/payroll-report', icon: FileSpreadsheet },
     ],
   },
   { nameKey: 'nav.components', href: '/components', icon: Blocks },
@@ -59,7 +50,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
 export const PROD_NAV_HREFS = ['/', '/issues'] as const
 
 /** KPI routes allowed in production for Admin General only. */
-export const PROD_KPI_HREFS = ['/kpis', '/kpis/payroll-report'] as const
+export const PROD_KPI_HREFS = ['/kpis'] as const
 
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
@@ -68,7 +59,7 @@ export function isDevEnvironment() {
 export function isProdAllowedPath(pathname: string, canAccessProdKpis = false) {
   if (pathname === '/' || pathname === '/issues') return true
   if (!canAccessProdKpis) return false
-  return pathname === '/kpis' || pathname.startsWith('/kpis/')
+  return pathname === '/kpis'
 }
 
 function localizeNavItem(item: NavItemDef, t: (key: MessageKey) => string): NavItem {

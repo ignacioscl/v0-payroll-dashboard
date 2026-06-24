@@ -8,6 +8,20 @@ export interface ProductionKpi {
   inspectionFailPct: number
 }
 
+export interface ProductionWeekPoint {
+  weekStart: string
+  woCompleted: number
+  productionValue: number
+}
+
+export interface ProductionDealerRow {
+  dealer: string
+  wos: number
+  value: number
+  goal: number
+  attainmentPct: number
+}
+
 export interface BillingKpi {
   invoicedValue: number
   statementsIssued: number
@@ -78,6 +92,12 @@ async function getKpi<T>(vertical: string, params: KpiQueryParams): Promise<T> {
 
 export const fetchProductionKpi = (params: KpiQueryParams) =>
   getKpi<ProductionKpi>('production', params)
+
+export const fetchProductionByWeek = (params: KpiQueryParams) =>
+  getKpi<ProductionWeekPoint[]>('production/by-week', params)
+
+export const fetchProductionByDealer = (params: KpiQueryParams) =>
+  getKpi<ProductionDealerRow[]>('production/by-dealer', params)
 export const fetchBillingKpi = (params: KpiQueryParams) => getKpi<BillingKpi>('billing', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>
   getKpi<CollectionsKpi>('collections', params)

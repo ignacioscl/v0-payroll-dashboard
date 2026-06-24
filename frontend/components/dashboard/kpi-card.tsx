@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Check, HelpCircle, Loader2 } from 'lucide-react'
@@ -38,6 +39,8 @@ interface KPICardProps {
   filterCard?: boolean
   /** Si está presente, muestra un icono de ayuda (?) que abre un popover con la descripción del KPI. */
   help?: ReactNode
+  /** Valor completo al hacer click cuando `value` está abreviado (p. ej. $40.2k → $40,162). */
+  valueFull?: string
   className?: string
 }
 
@@ -55,9 +58,18 @@ export function KPICard({
   compact = false,
   filterCard = false,
   help,
+  valueFull,
   className,
 }: KPICardProps) {
   const { t } = useTranslation()
+  const [valueExpanded, setValueExpanded] = useState(false)
+
+  useEffect(() => {
+    setValueExpanded(false)
+  }, [value, valueFull])
+
+  const canExpandValue = Boolean(valueFull && valueFull !== value && value !== '—')
+  const displayedValue = valueExpanded && valueFull ? valueFull : value
   const variantConfig = {
     default: {
       bg: 'bg-gradient-to-br from-white to-blue-50/60',
@@ -203,7 +215,7 @@ export function KPICard({
                     type="button"
                     onClick={(e) => e.stopPropagation()}
                     aria-label={t('common.kpiHelpAria')}
-                    className="shrink-0 text-muted-foreground/50 transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+                    className="shrink-0 cursor-pointer text-muted-foreground/50 transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
                   >
                     <HelpCircle className="h-3.5 w-3.5" />
                   </button>
@@ -228,6 +240,29 @@ export function KPICard({
                   filterCard ? 'h-7 w-7' : compact ? 'h-6 w-6' : 'h-8 w-8',
                 )}
               />
+            ) : canExpandValue ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setValueExpanded((prev) => !prev)
+                }}
+                aria-expanded={valueExpanded}
+                title={valueFull}
+                className={cn(
+                  'cursor-pointer rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                  filterCard ? 'text-[34px] leading-none' : compact ? 'text-3xl' : 'text-4xl',
+                  'font-bold text-foreground tracking-tight tabular-nums',
+                )}
+              >
+                <motion.span
+                  key={String(displayedValue)}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  {displayedValue}
+                </motion.span>
+              </button>
             ) : (
               <motion.span
                 key={String(value)}
