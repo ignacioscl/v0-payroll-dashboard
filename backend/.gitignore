@@ -12,9 +12,9 @@
 .env.local
 .env.*.local
 
-# Logs
+# Logs (solo carpeta en raíz del backend, no src/commons/logs/)
+/logs/
 *.log
-logs/
 npm-debug.log*
 pnpm-debug.log*
 
