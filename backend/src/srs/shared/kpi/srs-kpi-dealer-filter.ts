@@ -12,51 +12,77 @@ export interface SrsKpiDealerFilterSql {
   params: number[]
 }
 
+/** Legacy usuarios.id_rol — Admin General / Admin Company skip RESTRICTION_DEALER_V2 (PHP reports). */
+export const SRS_ROL_ADMIN_GENERAL = 1
+export const SRS_ROL_ADMIN_COMPANY = 2
+
+export function skipDealerRestrictionForRol(idRol: number): boolean {
+  return idRol === SRS_ROL_ADMIN_GENERAL || idRol === SRS_ROL_ADMIN_COMPANY
+}
+
+/** WHERE fragment for dealer scope (header combo + optional RESTRICTION_DEALER_V2). */
+export function buildDealerRestrictionClause(
+  idUsuario: number,
+  dealerIds: number[],
+  skipDealerRestriction = false,
+): Pick<SrsKpiDealerFilterSql, 'and' | 'params'> {
+  if (dealerIds.length === 0) {
+    throw new Error('At least one dealer id is required')
+  }
+  const placeholders = dealerIds.map(() => '?').join(',')
+  if (skipDealerRestriction) {
+    return {
+      and: ` AND c.id IN (${placeholders})`,
+      params: [...dealerIds],
+    }
+  }
+  return {
+    and: ` AND RESTRICTION_DEALER_V2(?, c.id) = 1 AND c.id IN (${placeholders})`,
+    params: [idUsuario, ...dealerIds],
+  }
+}
+
 /**
  * Dealer scope from header combo: RESTRICTION_DEALER_V2 + explicit IN list.
- * Mirrors PHP ProductionReportFilter::idsDealer + RESTRICTION_DEALER_V2.
+ * Admin General / Admin Company: only IN list (mirrors PHP ProductionReportService).
  */
 export function buildDealerFilterSql(
   kind: SrsKpiDealerJoin,
   idUsuario: number,
   dealerIds: number[],
+  skipDealerRestriction = false,
 ): SrsKpiDealerFilterSql {
-  if (dealerIds.length === 0) {
-    throw new Error('At least one dealer id is required')
-  }
-  const placeholders = dealerIds.map(() => '?').join(',')
-  const restriction = ` AND RESTRICTION_DEALER_V2(?, c.id) = 1 AND c.id IN (${placeholders})`
-  const params = [idUsuario, ...dealerIds]
+  const { and, params } = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
 
   switch (kind) {
     case 'invoice':
       return {
         join: ' JOIN DEPARTMENT d ON d.id = i.id_department JOIN CONTRATISTA c ON c.id = d.id_dealer',
-        and: restriction,
+        and,
         params,
       }
     case 'ttk':
       return {
         join: ' JOIN CONTRATISTA c ON c.id = tew.id_dealer',
-        and: restriction,
+        and,
         params,
       }
     case 'statement':
       return {
         join: ' JOIN CONTRATISTA c ON c.id = s.id_dealer',
-        and: restriction,
+        and,
         params,
       }
     case 'billing':
       return {
         join: ' JOIN CONTRATISTA c ON c.id = b.id_dealer',
-        and: restriction,
+        and,
         params,
       }
     case 'dailyReport':
       return {
         join: ' JOIN CONTRATISTA c ON c.id = ldr.id_dealer',
-        and: restriction,
+        and,
         params,
       }
   }

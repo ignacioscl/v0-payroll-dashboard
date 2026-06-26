@@ -18,10 +18,11 @@ export class BillingKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getBillingKpis(filter: SrsKpiFilter): Promise<BillingKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta } = filter
-    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds)
-    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds)
-    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
+      filter
+    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
     const stmtPeriodParams = [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta]
     const invPeriodParams = [idDealerProvider, ...inv.params, fechaDesde, fechaHasta]
     const ttkPeriodParams = [idDealerProvider, ...ttk.params, fechaDesde, fechaHasta]
@@ -209,7 +210,7 @@ export class BillingKpiRepository {
   }
 
   async getUnbilledAging(filter: SrsKpiFilter): Promise<{ bucket: string; wos: number; value: number }[]> {
-    const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds)
+    const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const doneSub = `
       SELECT lw.id_work_order, MAX(lw.fecha) done_at
       FROM LOG_WO_WORKFLOW_CHANGE lw

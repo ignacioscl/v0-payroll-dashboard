@@ -24,9 +24,10 @@ export class PayrollKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getPayrollKpis(filter: SrsKpiFilter): Promise<PayrollKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta } = filter
-    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds)
-    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
+      filter
+    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
 
     const payroll = await this.srs.query(
       `SELECT IFNULL(SUM(TTK_CALCULATE_PAYMENT_JSON(tew.id, NULL)), 0) AS totalPayroll,
@@ -74,7 +75,7 @@ export class PayrollKpiRepository {
   }
 
   async getPayrollByType(filter: SrsKpiFilter): Promise<{ type: string; value: number }[]> {
-    const ttk = buildDealerFilterSql('ttk', filter.idUsuario, filter.dealerIds)
+    const ttk = buildDealerFilterSql('ttk', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const rows = await this.srs.query(
       `SELECT tew.type_payment                                  AS typePayment,
               IFNULL(SUM(TTK_CALCULATE_PAYMENT_JSON(tew.id, NULL)), 0) AS value

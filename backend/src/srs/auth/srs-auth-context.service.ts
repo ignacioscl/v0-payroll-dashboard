@@ -8,6 +8,8 @@ import { SRS_CONNECTION } from '../srs.datasource'
 export interface SrsContext {
   idUsuario: number
   idUsuarioRolrel: number | null
+  /** Legacy usuarios.id_rol (1 = Admin General, 2 = Admin Company). */
+  idRol: number
   /** Provider (CONTRATISTA) — tenant para filtrar queries KPI; mismo id que PHP `getCompany()->getId()`. */
   idDealerProvider: number
   /** El usuario es de tipo dealer (define cómo aplica RESTRICTION_DEALER_V2). */
@@ -28,6 +30,12 @@ export class SrsAuthContextService {
     idUsuarioRolrel: number | null,
     fallbackIdDealerProvider?: number | null,
   ): Promise<SrsContext> {
+    const rolRows = await this.srs.query(
+      `SELECT u.id_rol AS idRol FROM usuarios u WHERE u.id_usuario = ? LIMIT 1`,
+      [idUsuario],
+    )
+    const idRol = Number(rolRows[0]?.idRol ?? 0)
+
     // Mirror PHP Usuario::getCompany() → contratistaOwner.id (payroll/me.php idDealerProvider).
     const ownerRows = await this.srs.query(
       `SELECT c.id AS idDealerProvider
@@ -55,11 +63,6 @@ export class SrsAuthContextService {
 
     // Admin General / Admin Company have no id_contratista_owner; PHP sets provider from session empresa.
     if (!idDealerProvider && fallbackIdDealerProvider && fallbackIdDealerProvider > 0) {
-      const adminRows = await this.srs.query(
-        `SELECT u.id_rol AS idRol FROM usuarios u WHERE u.id_usuario = ? LIMIT 1`,
-        [idUsuario],
-      )
-      const idRol = Number(adminRows[0]?.idRol ?? 0)
       const isAdminScope = idRol === 1 || idRol === 2
       if (isAdminScope) {
         idDealerProvider = fallbackIdDealerProvider
@@ -70,6 +73,6 @@ export class SrsAuthContextService {
     const dealerRows = await this.srs.query(`SELECT IS_USER_DEALER(?) AS isDealer`, [idUsuario])
     const isUserDealer = Number(dealerRows[0]?.isDealer ?? 0) === 1
 
-    return { idUsuario, idUsuarioRolrel, idDealerProvider, isUserDealer }
+    return { idUsuario, idUsuarioRolrel, idRol, idDealerProvider, isUserDealer }
   }
 }

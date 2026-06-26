@@ -23,9 +23,10 @@ export class CollectionsKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta } = filter
-    const bill = buildDealerFilterSql('billing', idUsuario, dealerIds)
-    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
+      filter
+    const bill = buildDealerFilterSql('billing', idUsuario, dealerIds, skipDealerRestriction)
+    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
     console.log('pasa qrys collections kpis')
     const [collected, dso, ar, invoiced] = await Promise.all([
       this.srs.query(
@@ -97,7 +98,7 @@ export class CollectionsKpiRepository {
   }
 
   async getArAging(filter: SrsKpiFilter): Promise<{ bucket: string; statements: number; value: number }[]> {
-    const stmt = buildDealerFilterSql('statement', filter.idUsuario, filter.dealerIds)
+    const stmt = buildDealerFilterSql('statement', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const rows = await this.srs.query(
       `SELECT CASE WHEN t.ageDays <= 30 THEN '0-30 days'
                    WHEN t.ageDays <= 60 THEN '31-60 days'

@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { SrsKpiQueryDto } from './srs-kpi-query.dto'
-import { parseDealerIds, parseFilterDateDone } from './srs-kpi-dealer-filter'
+import { parseDealerIds, parseFilterDateDone, skipDealerRestrictionForRol } from './srs-kpi-dealer-filter'
 
 export interface SrsKpiFilter {
   idDealerProvider: number
@@ -12,6 +12,8 @@ export interface SrsKpiFilter {
   fechaHasta: string
   /** Production WO metrics only; default true (Filter Date DONE). */
   filterDateDone: boolean
+  /** Admin General / Admin Company: skip RESTRICTION_DEALER_V2 (PHP ProductionReportService). */
+  skipDealerRestriction: boolean
 }
 
 export function buildSrsKpiFilter(ctx: SrsContext, query: SrsKpiQueryDto): SrsKpiFilter {
@@ -26,5 +28,6 @@ export function buildSrsKpiFilter(ctx: SrsContext, query: SrsKpiQueryDto): SrsKp
     fechaDesde: query.fechaDesde,
     fechaHasta: query.fechaHasta,
     filterDateDone: parseFilterDateDone(query.filterDateDone),
+    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
   }
 }

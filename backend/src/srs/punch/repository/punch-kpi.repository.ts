@@ -5,15 +5,16 @@ import { DataSource } from 'typeorm'
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { PunchKpiDto } from '../dto/punch-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
+import { buildDealerFilterSql, buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
 
 @Injectable()
 export class PunchKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getPunchKpis(filter: SrsKpiFilter): Promise<PunchKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta } = filter
-    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
+      filter
+    const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
 
     const totals = await this.srs.query(
       `SELECT COUNT(*)                                  AS totalPunches,
@@ -71,6 +72,11 @@ export class PunchKpiRepository {
   }
 
   async getOffenders(filter: SrsKpiFilter): Promise<any[]> {
+    const dealerScope = buildDealerRestrictionClause(
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+    )
     const rows = await this.srs.query(
       `SELECT CONCAT(u.nombre, ' ', u.apellido)                         AS employee,
               c.razon_social                                            AS dealer,
@@ -84,8 +90,7 @@ export class PunchKpiRepository {
        JOIN usuarios u    ON u.id = tew.id_author
        JOIN CONTRATISTA c ON c.id = tew.id_dealer
        WHERE tew.estado = 1 AND tew.id_dealer_provider = ?
-         AND RESTRICTION_DEALER_V2(?, c.id) = 1
-         AND c.id IN (${filter.dealerIds.map(() => '?').join(',')})
+         ${dealerScope.and}
          AND tew.fecha BETWEEN ? AND ?
        GROUP BY u.id, employee, dealer
        HAVING total > 0
@@ -93,8 +98,7 @@ export class PunchKpiRepository {
        LIMIT 10`,
       [
         filter.idDealerProvider,
-        filter.idUsuario,
-        ...filter.dealerIds,
+        ...dealerScope.params,
         filter.fechaDesde,
         filter.fechaHasta,
       ],

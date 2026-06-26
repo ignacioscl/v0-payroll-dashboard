@@ -9,6 +9,7 @@ import { ProductionKpiDto, ProductionWeekRowDto, DealerProductionRowDto, WoStatu
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
+  buildDealerRestrictionClause,
   mysqlWeekBucketStartExpr,
   woCompletedPeriodColumn,
   woDoneAtJoinScoped,
@@ -21,9 +22,10 @@ export class ProductionKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getProductionKpis(filter: SrsKpiFilter): Promise<ProductionKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone } = filter
-    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds)
-    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
+      filter
+    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woDate = woPeriodColumn(filterDateDone)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
@@ -73,6 +75,7 @@ export class ProductionKpiRepository {
         woDate,
         fechaDesde,
         fechaHasta,
+        skipDealerRestriction,
       ),
       this.srs.query(
         `SELECT ROUND(100 * SUM(i.inspected = 0) / NULLIF(SUM(i.inspected IN (0, 1)), 0), 1) AS inspectionFailPct
@@ -108,14 +111,13 @@ export class ProductionKpiRepository {
     woDate: string,
     fechaDesde: string,
     fechaHasta: string,
+    skipDealerRestriction: boolean,
   ): Promise<number> {
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
-    const dealerPlaceholders = dealerIds.map(() => '?').join(',')
-    const stmtRestriction = ` AND RESTRICTION_DEALER_V2(?, c.id) = 1 AND c.id IN (${dealerPlaceholders})`
-    const stmtParams = [idUsuario, ...dealerIds]
+    const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
     const invoicePeriodParams = [idDealerProvider, ...dealer.params, fechaDesde, fechaHasta]
     const drParams = [idDealerProvider, ...drDealer.params, fechaDesde, fechaHasta]
-    const stmtPeriodParams = [idDealerProvider, ...stmtParams, fechaDesde, fechaHasta]
+    const stmtPeriodParams = [idDealerProvider, ...stmtScope.params, fechaDesde, fechaHasta]
 
     const [woRows, drRows, ttkRows, genRows] = await Promise.all([
       this.srs.query(
@@ -144,7 +146,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
         stmtPeriodParams,
       ),
@@ -157,7 +159,7 @@ export class ProductionKpiRepository {
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
         stmtPeriodParams,
       ),
@@ -176,7 +178,12 @@ export class ProductionKpiRepository {
   }
 
   async getOpenPipeline(filter: SrsKpiFilter): Promise<WoStatusSliceDto[]> {
-    const dealer = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds)
+    const dealer = buildDealerFilterSql(
+      'invoice',
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+    )
     const rows = await this.srs.query(
       `SELECT w.descripcion AS status, COUNT(*) AS count
        FROM INVOICE i
@@ -194,17 +201,17 @@ export class ProductionKpiRepository {
   }
 
   async getDealerProduction(filter: SrsKpiFilter): Promise<DealerProductionRowDto[]> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone } = filter
-    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds)
-    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
+      filter
+    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
-    const dealerPlaceholders = dealerIds.map(() => '?').join(',')
-    const stmtRestriction = ` AND RESTRICTION_DEALER_V2(?, c.id) = 1 AND c.id IN (${dealerPlaceholders})`
-    const stmtParams = [idUsuario, ...dealerIds]
+    const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
     const invoicePeriodParams = [idDealerProvider, ...dealer.params, fechaDesde, fechaHasta]
     const drParams = [idDealerProvider, ...drDealer.params, fechaDesde, fechaHasta]
-    const stmtPeriodParams = [idDealerProvider, ...stmtParams, fechaDesde, fechaHasta]
+    const stmtPeriodParams = [idDealerProvider, ...stmtScope.params, fechaDesde, fechaHasta]
+    const goalParams = [idDealerProvider, fechaHasta, fechaDesde, idDealerProvider, ...stmtScope.params]
 
     const [woRows, drRows, ttkRows, genRows, goalRows] = await Promise.all([
       this.srs.query(
@@ -243,7 +250,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY c.id`,
         [idDealerProvider, ...stmtPeriodParams],
@@ -259,7 +266,7 @@ export class ProductionKpiRepository {
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY c.id`,
         [idDealerProvider, ...stmtPeriodParams],
@@ -273,9 +280,8 @@ export class ProductionKpiRepository {
          WHERE dr.estado = 1
            AND dr.fecha_end IS NULL
            AND dr.id_dealer_provider = ?
-           AND RESTRICTION_DEALER_V2(?, c.id) = 1
-           AND c.id IN (${dealerPlaceholders})`,
-        [idDealerProvider, fechaHasta, fechaDesde, idDealerProvider, idUsuario, ...dealerIds],
+           ${stmtScope.and}`,
+        goalParams,
       ),
     ])
 
@@ -323,20 +329,19 @@ export class ProductionKpiRepository {
   }
 
   async getProductionByWeek(filter: SrsKpiFilter): Promise<ProductionWeekRowDto[]> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone } = filter
-    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds)
-    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds)
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
+      filter
+    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
     const woWeekStart = mysqlWeekBucketStartExpr(woPeriod)
     const drWeekStart = mysqlWeekBucketStartExpr('DATE(ldr.fecha_desde)')
     const stmtWeekStart = mysqlWeekBucketStartExpr('DATE(invs.fecha_desde)')
-    const dealerPlaceholders = dealerIds.map(() => '?').join(',')
-    const stmtRestriction = ` AND RESTRICTION_DEALER_V2(?, c.id) = 1 AND c.id IN (${dealerPlaceholders})`
-    const stmtParams = [idUsuario, ...dealerIds]
+    const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
     const invoicePeriodParams = [fechaDesde, idDealerProvider, ...dealer.params, fechaDesde, fechaHasta]
     const drParams = [fechaDesde, idDealerProvider, ...drDealer.params, fechaDesde, fechaHasta]
-    const stmtPeriodParams = [fechaDesde, idDealerProvider, ...stmtParams, fechaDesde, fechaHasta]
+    const stmtPeriodParams = [fechaDesde, idDealerProvider, ...stmtScope.params, fechaDesde, fechaHasta]
 
     const [woRows, drRows, ttkRows, genRows] = await Promise.all([
       this.srs.query(
@@ -373,7 +378,7 @@ export class ProductionKpiRepository {
          FROM INVOICE_STATEMENT invs
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY weekStart
          ORDER BY weekStart`,
@@ -389,7 +394,7 @@ export class ProductionKpiRepository {
          JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = invs.id
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
-           ${stmtRestriction}
+           ${stmtScope.and}
            AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
          GROUP BY weekStart
          ORDER BY weekStart`,
