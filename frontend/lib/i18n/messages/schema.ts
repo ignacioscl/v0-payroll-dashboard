@@ -705,6 +705,8 @@ export interface Messages {
   }
   businessKpis: {
     filterDateDone: string
+    betaBadge: string
+    betaDisclaimer: string
   }
   mockPayrollReport: {
     title: string

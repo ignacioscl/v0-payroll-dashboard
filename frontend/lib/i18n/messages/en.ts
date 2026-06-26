@@ -725,6 +725,9 @@ export const en: Messages = {
   },
   businessKpis: {
     filterDateDone: 'Filter by completion date',
+    betaBadge: 'Beta',
+    betaDisclaimer:
+      'These KPIs are in beta. Values should be verified against legacy SRS reports before making business decisions.',
   },
   mockPayrollReport: {
     title: 'Payroll Report',
