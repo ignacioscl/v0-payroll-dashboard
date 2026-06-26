@@ -49,8 +49,8 @@ export const ALL_NAVIGATION: NavItemDef[] = [
 
 export const PROD_NAV_HREFS = ['/', '/issues'] as const
 
-/** KPI routes allowed in production for Admin General only. */
-export const PROD_KPI_HREFS = ['/kpis'] as const
+/** Real KPI report routes for Admin General in production (not /kpis mock). */
+export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
@@ -59,7 +59,9 @@ export function isDevEnvironment() {
 export function isProdAllowedPath(pathname: string, canAccessProdKpis = false) {
   if (pathname === '/' || pathname === '/issues') return true
   if (!canAccessProdKpis) return false
-  return pathname === '/kpis'
+  return PROD_KPI_HREFS.some(
+    (href) => pathname === href || pathname.startsWith(`${href}/`),
+  )
 }
 
 function localizeNavItem(item: NavItemDef, t: (key: MessageKey) => string): NavItem {
