@@ -26,6 +26,9 @@ services:
       - "host.docker.internal:host-gateway"
       # Permite SRS_API_URL=http://srs.com (mismo Host que el vhost Apache).
       - "srs.com:host-gateway"
+      # Prod: evita EAI_AGAIN cuando el contenedor resuelve main.srssuite.com por DNS.
+      # Apache SSL del vhost legacy escucha en la IP pública del server, no en host-gateway.
+      - "main.srssuite.com:192.249.114.194"
     # El front llega al back server-side por la red interna: http://srs-backend:3020
     depends_on:
       - srs-backend
