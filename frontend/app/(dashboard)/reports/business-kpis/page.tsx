@@ -46,7 +46,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
-import { useTranslation } from '@/lib/i18n/locale-context'
+import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
 import { PAYROLL_WEEKS } from '@/lib/payroll-report-mock-data'
 import { cn } from '@/lib/utils'
 import {
@@ -57,6 +57,7 @@ import {
   fetchProductionByWeek,
   fetchProductionByDealer,
   fetchPunchKpi,
+  type BillingKpi,
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
 
@@ -71,6 +72,22 @@ function kpiMoneyProps(n: number | undefined): { value: string; valueFull?: stri
   const full = fmtMoney(n)
   if (n >= 1000) return { value: fmtMoneyK(n), valueFull: full }
   return { value: full }
+}
+
+function billingSplitSubtitle(
+  b: BillingKpi | undefined,
+  inRange: number | undefined,
+  outside: number | undefined,
+  t: TranslateFn,
+): string {
+  if (!b || inRange === undefined) return ''
+  if (!outside || outside <= 0) {
+    return t('mockKpis.billingAllInRange', { inRange: fmtMoneyK(inRange) })
+  }
+  return t('mockKpis.billingInRangeOutside', {
+    inRange: fmtMoneyK(inRange),
+    outside: fmtMoneyK(outside),
+  })
 }
 
 function formatUsDate(date: Date): string {
@@ -269,6 +286,9 @@ export default function BusinessKpisPage() {
             <KPICard compact help={t('businessKpisHelp.unbilled')} loading={bill.isLoading} title={t('mockKpis.doneNotInvoiced')} value={b ? b.unbilledWos : '—'} icon={<Hourglass className="h-5 w-5" />} variant="danger" subtitle={b ? fmtMoney(b.unbilledValue) : ''} />
             <KPICard compact help={t('businessKpisHelp.doneToInvoiced')} loading={bill.isLoading} title={t('mockKpis.woDoneToInvoiced')} value={b ? `${b.avgDoneToInvoicedDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="warning" />
             <KPICard compact help={t('businessKpisHelp.sent')} loading={bill.isLoading} title={t('mockKpis.statementsSent')} value={b ? `${b.sentPct}%` : '—'} icon={<Send className="h-5 w-5" />} variant="info" subtitle={b ? t('mockKpis.neverSent', { count: b.unsentStatements }) : ''} />
+            <KPICard compact help={t('businessKpisHelp.woInvoiced')} loading={bill.isLoading} title={t('mockKpis.woInvoiced')} {...kpiMoneyProps(b?.woInvoicedValue)} icon={<Wrench className="h-5 w-5" />} variant="success" subtitle={billingSplitSubtitle(b, b?.woInvoicedInRangeValue, b?.woInvoicedOutsideRangeValue, t)} />
+            <KPICard compact help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} {...kpiMoneyProps(b?.ttkInvoicedValue)} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedInRangeValue, b?.ttkInvoicedOutsideRangeValue, t)} />
+            <KPICard compact help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} {...kpiMoneyProps(b?.genericInvoicedValue)} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedInRangeValue, b?.genericInvoicedOutsideRangeValue, t)} />
             <KPICard compact help={t('businessKpisHelp.partialOverlapWo')} loading={bill.isLoading} title={t('mockKpis.partialOverlapWoStatements')} value={b ? b.partialOverlapWoStatements.toLocaleString() : '—'} icon={<CalendarRange className="h-5 w-5" />} variant="default" />
           </div>
         </TabsContent>

@@ -24,6 +24,18 @@ export class BillingKpiDto {
   @ApiProperty({ example: 20 }) unsentStatements!: number
   /** WO statements (types 1–4) overlapping the header range but not fully contained in it. */
   @ApiProperty({ example: 7 }) partialOverlapWoStatements!: number
+  /** WO service lines on statements; filtered by WO done date (General Report). */
+  @ApiProperty({ example: 182400 }) woInvoicedValue!: number
+  @ApiProperty({ example: 120000 }) woInvoicedInRangeValue!: number
+  @ApiProperty({ example: 62400 }) woInvoicedOutsideRangeValue!: number
+  /** TTK punch amounts on statements; filtered by punch_in (General Report). */
+  @ApiProperty({ example: 42100 }) ttkInvoicedValue!: number
+  @ApiProperty({ example: 28000 }) ttkInvoicedInRangeValue!: number
+  @ApiProperty({ example: 14100 }) ttkInvoicedOutsideRangeValue!: number
+  /** Generic statement lines prorated to the header range (General Report). */
+  @ApiProperty({ example: 30200 }) genericInvoicedValue!: number
+  @ApiProperty({ example: 5000 }) genericInvoicedInRangeValue!: number
+  @ApiProperty({ example: 25200 }) genericInvoicedOutsideRangeValue!: number
 }
 
 /** Aging de WOs Done sin facturar (por bucket de antigüedad). */

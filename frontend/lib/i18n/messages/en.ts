@@ -567,6 +567,11 @@ export const en: Messages = {
     woDoneToInvoiced: 'WO Done → Invoiced',
     statementsSent: 'Statements Sent',
     partialOverlapWoStatements: 'WO Statements Outside Period',
+    woInvoiced: 'WO Invoiced',
+    ttkInvoiced: 'TTK Invoiced',
+    genericInvoiced: 'Generic Invoiced',
+    billingInRangeOutside: '{inRange} in included statements · {outside} outside',
+    billingAllInRange: '{inRange} in included statements',
     billingCoverage: 'Billing Coverage',
     avgPerStatement: 'avg {amount} / statement',
     unbilledRevenue: '{amount} unbilled revenue',
@@ -679,7 +684,7 @@ export const en: Messages = {
     inspectionFail:
       'Share of inspections that failed among all inspected work orders in the period.',
     invoiced:
-      'Total invoiced in the period, after discounts and taxes, based on each statement’s period.',
+      'Total billed from work-order, time-tracking, and generic statements whose billing period falls entirely within the selected dates (start and end both inside the range). Includes statement discounts and taxes. Only fully included statements count — partially overlapping ones are excluded.',
     statements:
       'Number of statements issued in the period. Subtitle shows average value per statement.',
     unbilled:
@@ -688,6 +693,12 @@ export const en: Messages = {
     sent: 'Share of statements sent to the customer. Subtitle shows how many were never sent.',
     partialOverlapWo:
       'Work-order statements whose billing period overlaps the selected dates but are excluded from Invoiced and Statements Issued because the period starts before or ends after the range (same rule as the billing list).',
+    woInvoiced:
+      'How much was billed from work orders completed in these dates? Adds WO line amounts when the work order was marked done in your selected range. It does not use the statement period, so it will not match Invoiced.',
+    ttkInvoiced:
+      'How much was billed from time punches in these dates? Adds punch amounts on TTK statements when the punch falls in your selected range. It does not use the statement period, so it will not match Invoiced.',
+    genericInvoiced:
+      'How much generic billing applies to these days (even if the statement spans longer)? If the statement covers more days than your range, only the portion within your dates is counted. It will not match Invoiced.',
     outstandingAr:
       'Total billed amount not yet collected. Current snapshot. Subtitle shows open statements.',
     dso: 'Average days from issuing a statement to receiving payment.',

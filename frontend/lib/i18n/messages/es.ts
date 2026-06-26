@@ -567,6 +567,11 @@ export const es: Messages = {
     woDoneToInvoiced: 'OT terminada → facturada',
     statementsSent: 'Estados de cuenta enviados',
     partialOverlapWoStatements: 'Estados WO fuera del período',
+    woInvoiced: 'Facturado WO',
+    ttkInvoiced: 'Facturado TTK',
+    genericInvoiced: 'Facturado genérico',
+    billingInRangeOutside: '{inRange} en estados del rango · {outside} fuera',
+    billingAllInRange: '{inRange} en estados del rango',
     billingCoverage: 'Cobertura de facturación',
     avgPerStatement: 'prom. {amount} / estado de cuenta',
     unbilledRevenue: '{amount} ingresos sin facturar',
@@ -679,7 +684,7 @@ export const es: Messages = {
     inspectionFail:
       'Porcentaje de inspecciones fallidas sobre todas las inspeccionadas en el período.',
     invoiced:
-      'Total facturado en el período, después de descuentos e impuestos, según el período de cada estado de cuenta.',
+      'Total facturado de estados WO, TTK y genéricos cuyo período cae enteramente dentro de las fechas seleccionadas (inicio y fin dentro del rango). Incluye descuentos e impuestos del estado. Solo entran estados incluidos por completo — los que se superponen parcialmente quedan fuera.',
     statements:
       'Cantidad de estados de cuenta emitidos en el período. El subtítulo muestra el valor promedio por estado de cuenta.',
     unbilled:
@@ -688,6 +693,12 @@ export const es: Messages = {
     sent: 'Porcentaje de estados de cuenta enviados al cliente. El subtítulo muestra cuántos nunca se enviaron.',
     partialOverlapWo:
       'Estados de cuenta de órdenes de trabajo cuyo período se superpone con las fechas seleccionadas pero no entran en Facturado ni en Estados emitidos porque empiezan antes o terminan después del rango (misma regla que el listado de billing).',
+    woInvoiced:
+      '¿Cuánto facturé por OT terminadas en estas fechas? Suma los montos de servicios WO cuando la OT se marcó terminada en el rango seleccionado. No usa el período del estado de cuenta; por eso no coincide con Facturado.',
+    ttkInvoiced:
+      '¿Cuánto facturé por ponchadas en estas fechas? Suma los montos de ponchadas en estados TTK cuando la ponchada cae en el rango seleccionado. No usa el período del estado de cuenta; por eso no coincide con Facturado.',
+    genericInvoiced:
+      '¿Cuánto de lo genérico corresponde a estos días (aunque el statement sea más largo)? Si el estado cubre más días que el rango, solo cuenta la parte que cae dentro de tus fechas. No coincide con Facturado.',
     outstandingAr:
       'Total facturado que aún no se ha cobrado. Instantánea actual. El subtítulo muestra estados de cuenta abiertos.',
     dso: 'Días promedio desde la emisión del estado de cuenta hasta recibir el pago.',

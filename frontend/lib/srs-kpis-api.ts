@@ -32,6 +32,15 @@ export interface BillingKpi {
   sentPct: number
   unsentStatements: number
   partialOverlapWoStatements: number
+  woInvoicedValue: number
+  woInvoicedInRangeValue: number
+  woInvoicedOutsideRangeValue: number
+  ttkInvoicedValue: number
+  ttkInvoicedInRangeValue: number
+  ttkInvoicedOutsideRangeValue: number
+  genericInvoicedValue: number
+  genericInvoicedInRangeValue: number
+  genericInvoicedOutsideRangeValue: number
 }
 
 export interface CollectionsKpi {
