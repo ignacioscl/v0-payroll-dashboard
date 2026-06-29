@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/sheet'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
-import { isAdminGeneralUser } from '@/lib/auth/payroll-access'
+import { canAccessBusinessKpis } from '@/lib/auth/payroll-access'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 import { getAppTitle } from '@/lib/branding'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -100,7 +100,7 @@ function SidebarInner({
   const navigation = getVisibleNavigation({
     isDev: isDevEnvironment(),
     canAccessTtk,
-    canAccessProdKpis: isAdminGeneralUser(user),
+    canAccessProdKpis: canAccessBusinessKpis(user, hasPermission),
     t,
   })
 

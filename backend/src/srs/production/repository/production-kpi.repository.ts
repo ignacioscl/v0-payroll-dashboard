@@ -16,6 +16,7 @@ import {
   woPeriodColumn,
   woStatusFilterSql,
 } from '../../shared/kpi/srs-kpi-dealer-filter'
+import { fillWeeklyGaps } from '../../shared/kpi/srs-kpi-week'
 
 @Injectable()
 export class ProductionKpiRepository {
@@ -427,62 +428,10 @@ export class ProductionKpiRepository {
     mergeValue(ttkRows, false)
     mergeValue(genRows, false)
 
-    return this.fillWeeklyGaps(Array.from(byWeek.values()), fechaDesde, fechaHasta)
-  }
-
-  private fillWeeklyGaps(
-    rows: ProductionWeekRowDto[],
-    fechaDesde: string,
-    fechaHasta: string,
-  ): ProductionWeekRowDto[] {
-    const byStart = new Map(rows.map((r) => [r.weekStart, r]))
-    const rangeStart = this.parseDateOnly(fechaDesde)
-    const rangeEnd = this.parseDateOnly(fechaHasta)
-    const isoRangeStart = this.startOfIsoWeek(rangeStart)
-    const firstBucket =
-      isoRangeStart.getTime() < rangeStart.getTime() ? new Date(rangeStart) : isoRangeStart
-    const endBucket = this.startOfIsoWeek(rangeEnd)
-    const filled: ProductionWeekRowDto[] = []
-    let cursor = new Date(firstBucket)
-    let isFirstPartialWeek =
-      firstBucket.getTime() === rangeStart.getTime() && firstBucket.getTime() > isoRangeStart.getTime()
-
-    while (cursor <= endBucket) {
-      const weekStart = this.formatDateOnly(cursor)
-      filled.push(
-        byStart.get(weekStart) ?? {
-          weekStart,
-          woCompleted: 0,
-          productionValue: 0,
-        },
-      )
-
-      if (isFirstPartialWeek) {
-        cursor = new Date(isoRangeStart)
-        cursor.setUTCDate(isoRangeStart.getUTCDate() + 7)
-        isFirstPartialWeek = false
-      } else {
-        cursor.setUTCDate(cursor.getUTCDate() + 7)
-      }
-    }
-
-    return filled
-  }
-
-  private parseDateOnly(value: string): Date {
-    const [y, m, d] = value.split('-').map(Number)
-    return new Date(Date.UTC(y, m - 1, d))
-  }
-
-  private formatDateOnly(date: Date): string {
-    return date.toISOString().slice(0, 10)
-  }
-
-  private startOfIsoWeek(date: Date): Date {
-    const day = date.getUTCDay()
-    const diff = day === 0 ? -6 : 1 - day
-    const weekStart = new Date(date)
-    weekStart.setUTCDate(date.getUTCDate() + diff)
-    return weekStart
+    return fillWeeklyGaps(Array.from(byWeek.values()), fechaDesde, fechaHasta, (weekStart) => ({
+      weekStart,
+      woCompleted: 0,
+      productionValue: 0,
+    }))
   }
 }

@@ -34,6 +34,9 @@ import {
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ProductionWeekChart } from '@/components/dashboard/production-week-chart'
 import { ProductionDealerTable } from '@/components/dashboard/production-dealer-table'
+import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
+import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
+import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
 import {
   Select,
@@ -53,12 +56,15 @@ import { PAYROLL_WEEKS } from '@/lib/payroll-report-mock-data'
 import { cn } from '@/lib/utils'
 import {
   fetchBillingKpi,
+  fetchBillingByWeek,
   fetchCollectionsKpi,
   fetchPayrollKpi,
   fetchProductionKpi,
   fetchProductionByWeek,
   fetchProductionByDealer,
   fetchPunchKpi,
+  fetchUnbilledAging,
+  fetchUnbilledByDealer,
   type BillingKpi,
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
@@ -177,6 +183,21 @@ export default function BusinessKpisPage() {
   const bill = useQuery({
     queryKey: ['srs-kpi', 'billing', headerKpiParams],
     queryFn: () => fetchBillingKpi(headerKpiParams!),
+    enabled: Boolean(headerKpiParams),
+  })
+  const billWeek = useQuery({
+    queryKey: ['srs-kpi', 'billing-by-week', headerKpiParams],
+    queryFn: () => fetchBillingByWeek(headerKpiParams!),
+    enabled: Boolean(headerKpiParams),
+  })
+  const unbilledAging = useQuery({
+    queryKey: ['srs-kpi', 'unbilled-aging', headerKpiParams],
+    queryFn: () => fetchUnbilledAging(headerKpiParams!),
+    enabled: Boolean(headerKpiParams),
+  })
+  const unbilledByDealer = useQuery({
+    queryKey: ['srs-kpi', 'unbilled-by-dealer', headerKpiParams],
+    queryFn: () => fetchUnbilledByDealer(headerKpiParams!),
     enabled: Boolean(headerKpiParams),
   })
   const coll = useQuery({
@@ -308,6 +329,22 @@ export default function BusinessKpisPage() {
             <KPICard compact help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} {...kpiMoneyProps(b?.ttkInvoicedValue)} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedInRangeValue, b?.ttkInvoicedOutsideRangeValue, t)} />
             <KPICard compact help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} {...kpiMoneyProps(b?.genericInvoicedValue)} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedInRangeValue, b?.genericInvoicedOutsideRangeValue, t)} />
             <KPICard compact help={t('businessKpisHelp.partialOverlapWo')} loading={bill.isLoading} title={t('mockKpis.partialOverlapWoStatements')} value={b ? b.partialOverlapWoStatements.toLocaleString() : '—'} icon={<CalendarRange className="h-5 w-5" />} variant="default" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-3 lg:col-span-2">
+              <KpiErrorBanner q={billWeek} />
+              <BillingWeekChart data={billWeek.data} loading={billWeek.isLoading} />
+            </div>
+            <div className="space-y-3">
+              <KpiErrorBanner q={unbilledAging} />
+              <UnbilledAgingChart data={unbilledAging.data} loading={unbilledAging.isLoading} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <KpiErrorBanner q={unbilledByDealer} />
+            <UnbilledByDealerTable data={unbilledByDealer.data} loading={unbilledByDealer.isLoading} />
           </div>
         </TabsContent>
 

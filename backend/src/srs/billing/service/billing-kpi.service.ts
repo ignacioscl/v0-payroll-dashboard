@@ -17,4 +17,12 @@ export class BillingKpiService {
   async getUnbilledAging(ctx: SrsContext, query: SrsKpiQueryDto) {
     return this.repository.getUnbilledAging(buildSrsKpiFilter(ctx, query))
   }
+
+  async getBillingByWeek(ctx: SrsContext, query: SrsKpiQueryDto) {
+    return this.repository.getBillingByWeek(buildSrsKpiFilter(ctx, query))
+  }
+
+  async getUnbilledByDealer(ctx: SrsContext, query: SrsKpiQueryDto) {
+    return this.repository.getUnbilledByDealer(buildSrsKpiFilter(ctx, query))
+  }
 }

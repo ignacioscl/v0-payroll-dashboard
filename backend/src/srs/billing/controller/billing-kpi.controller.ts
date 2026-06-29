@@ -5,7 +5,12 @@ import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { BillingKpiService } from '../service/billing-kpi.service'
-import { BillingKpiDto, UnbilledAgingBucketDto } from '../dto/billing-kpi.dto'
+import {
+  BillingKpiDto,
+  BillingWeekRowDto,
+  UnbilledAgingBucketDto,
+  UnbilledDealerRowDto,
+} from '../dto/billing-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/billing')
@@ -30,5 +35,23 @@ export class BillingKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<UnbilledAgingBucketDto[]> {
     return this.service.getUnbilledAging(request.srsContext, query)
+  }
+
+  @Get('/by-week')
+  @ApiOkResponse({ type: [BillingWeekRowDto] })
+  async getBillingByWeek(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<BillingWeekRowDto[]> {
+    return this.service.getBillingByWeek(request.srsContext, query)
+  }
+
+  @Get('/unbilled-by-dealer')
+  @ApiOkResponse({ type: [UnbilledDealerRowDto] })
+  async getUnbilledByDealer(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<UnbilledDealerRowDto[]> {
+    return this.service.getUnbilledByDealer(request.srsContext, query)
   }
 }

@@ -1,4 +1,6 @@
 /** Legacy ROL_ACCION ids (ttk_main / rolMaganer.userHavePermission). */
+/** Same gate as legacy production.php / ProductionReportService. */
+export const ROL_ACCION_PRODUCTION_REPORT = 47
 /** Same gate as legacy Time Tracking menu (show-rol-action-65 / Daily Punch). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 export const ROL_ACCION_ADD_EDIT_PUNCH = 67

@@ -49,7 +49,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
 
 export const PROD_NAV_HREFS = ['/', '/issues'] as const
 
-/** Real KPI report routes for Admin General in production (not /kpis mock). */
+/** Real KPI report routes in production (Admin General/Company or production report perm; not /kpis mock). */
 export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 
 export function isDevEnvironment() {

@@ -9,9 +9,21 @@ import {
   WO_STATEMENT_TYPES,
   statementTypesSqlIn,
 } from '../entity/invoice-statement.srsentity'
-import { BillingKpiDto } from '../dto/billing-kpi.dto'
+import {
+  BillingKpiDto,
+  BillingWeekRowDto,
+  UnbilledAgingBucketDto,
+  UnbilledDealerRowDto,
+} from '../dto/billing-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  buildDealerFilterSql,
+  mysqlWeekBucketStartExpr,
+} from '../../shared/kpi/srs-kpi-dealer-filter'
+import { fillWeeklyGaps } from '../../shared/kpi/srs-kpi-week'
+
+/** Ventana hacia atrás para WOs Done sin facturar (aging / por dealer). */
+export const UNBILLED_LOOKBACK_MONTHS = 6
 
 @Injectable()
 export class BillingKpiRepository {
@@ -209,33 +221,93 @@ export class BillingKpiRepository {
     return Math.round(Math.max(0, total - inRange) * 100) / 100
   }
 
-  async getUnbilledAging(filter: SrsKpiFilter): Promise<{ bucket: string; wos: number; value: number }[]> {
+  async getUnbilledAging(filter: SrsKpiFilter): Promise<UnbilledAgingBucketDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
-    const doneSub = `
-      SELECT lw.id_work_order, MAX(lw.fecha) done_at
-      FROM LOG_WO_WORKFLOW_CHANGE lw
-      WHERE lw.id_workflow = ${WorkflowStatus.DONE}
-      GROUP BY lw.id_work_order`
+    // WO en workflow DONE → i.date_last_chg_workflow ES la fecha de paso a Done (sin LOG).
+    // Solo backlog de los últimos N meses + NOT EXISTS (filtra a las no facturadas antes
+    // de traer las service lines; evita materializar el join sobre las WO ya facturadas).
     const rows = await this.srs.query(
-      `SELECT CASE WHEN DATEDIFF(NOW(), done.done_at) <= 7  THEN '0-7 days'
-                   WHEN DATEDIFF(NOW(), done.done_at) <= 14 THEN '8-14 days'
-                   WHEN DATEDIFF(NOW(), done.done_at) <= 30 THEN '15-30 days'
+      `SELECT CASE WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 7  THEN '0-7 days'
+                   WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 14 THEN '8-14 days'
+                   WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 30 THEN '15-30 days'
                    ELSE '31+ days' END                              AS bucket,
               COUNT(DISTINCT i.id)                                  AS wos,
               IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)        AS value
        FROM INVOICE i
-       JOIN (${doneSub}) done ON done.id_work_order = i.id
        ${inv.join}
        LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
-       LEFT JOIN INVOICE_STATEMENT_INV_REL stl ON stl.id_invoice = i.id
-       LEFT JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
-         AND st.id IS NULL
+         AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
+         AND NOT EXISTS (
+           SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
+           JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
+           WHERE stl.id_invoice = i.id
+         )
        GROUP BY bucket`,
       [filter.idDealerProvider, ...inv.params],
     )
     return rows.map((r: any) => ({ bucket: r.bucket, wos: Number(r.wos), value: Number(r.value) }))
+  }
+
+  async getBillingByWeek(filter: SrsKpiFilter): Promise<BillingWeekRowDto[]> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
+      filter
+    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
+    const weekStart = mysqlWeekBucketStartExpr('DATE(s.fecha_desde)')
+    const rows = await this.srs.query(
+      `SELECT ${weekStart} AS weekStart,
+              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS invoicedValue
+       FROM INVOICE_STATEMENT s
+       ${stmt.join}
+       WHERE s.estado = 1 AND s.id_dealer_provider = ?
+         ${stmt.and}
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?
+       GROUP BY weekStart
+       ORDER BY weekStart`,
+      [fechaDesde, idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
+    )
+    const mapped: BillingWeekRowDto[] = rows.map((r: any) => ({
+      weekStart: String(r.weekStart).slice(0, 10),
+      invoicedValue: Number(r.invoicedValue ?? 0),
+    }))
+    return fillWeeklyGaps(mapped, fechaDesde, fechaHasta, (weekStart) => ({
+      weekStart,
+      invoicedValue: 0,
+    }))
+  }
+
+  async getUnbilledByDealer(filter: SrsKpiFilter): Promise<UnbilledDealerRowDto[]> {
+    const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    // Igual que el aging: WO en DONE → date_last_chg_workflow es la fecha de Done (sin LOG),
+    // backlog de los últimos N meses, anti-join con NOT EXISTS.
+    const rows = await this.srs.query(
+      `SELECT GET_DEALER_NAME_BY_PROVIDER(?, c.id)                  AS dealer,
+              COUNT(DISTINCT i.id)                                  AS wos,
+              IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)        AS value,
+              MAX(DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)))  AS oldestDays
+       FROM INVOICE i
+       ${inv.join}
+       LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+       WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
+         AND i.id_dealer_provider = ?
+         ${inv.and}
+         AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
+         AND NOT EXISTS (
+           SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
+           JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
+           WHERE stl.id_invoice = i.id
+         )
+       GROUP BY c.id
+       ORDER BY value DESC`,
+      [filter.idDealerProvider, filter.idDealerProvider, ...inv.params],
+    )
+    return rows.map((r: any) => ({
+      dealer: r.dealer,
+      wos: Number(r.wos),
+      value: Number(r.value),
+      oldestDays: Number(r.oldestDays ?? 0),
+    }))
   }
 }

@@ -43,6 +43,27 @@ export interface BillingKpi {
   genericInvoicedOutsideRangeValue: number
 }
 
+/** Ventana hacia atrás del backlog de WOs Done sin facturar (espeja UNBILLED_LOOKBACK_MONTHS del backend). */
+export const UNBILLED_LOOKBACK_MONTHS = 6
+
+export interface BillingWeekPoint {
+  weekStart: string
+  invoicedValue: number
+}
+
+export interface UnbilledAgingBucket {
+  bucket: string
+  wos: number
+  value: number
+}
+
+export interface UnbilledDealerRow {
+  dealer: string
+  wos: number
+  value: number
+  oldestDays: number
+}
+
 export interface CollectionsKpi {
   outstandingAr: number
   dsoDays: number
@@ -109,6 +130,12 @@ export const fetchProductionByWeek = (params: KpiQueryParams) =>
 export const fetchProductionByDealer = (params: KpiQueryParams) =>
   getKpi<ProductionDealerRow[]>('production/by-dealer', params)
 export const fetchBillingKpi = (params: KpiQueryParams) => getKpi<BillingKpi>('billing', params)
+export const fetchBillingByWeek = (params: KpiQueryParams) =>
+  getKpi<BillingWeekPoint[]>('billing/by-week', params)
+export const fetchUnbilledAging = (params: KpiQueryParams) =>
+  getKpi<UnbilledAgingBucket[]>('billing/unbilled-aging', params)
+export const fetchUnbilledByDealer = (params: KpiQueryParams) =>
+  getKpi<UnbilledDealerRow[]>('billing/unbilled-by-dealer', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>
   getKpi<CollectionsKpi>('collections', params)
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)

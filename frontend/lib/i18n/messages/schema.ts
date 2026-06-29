@@ -545,7 +545,9 @@ export interface Messages {
     chartOpenWoPipeline: string
     chartProductionVsGoal: string
     chartInvoicedVsProduction: string
+    chartInvoicedByWeek: string
     chartUnbilledAging: string
+    unbilledLookbackNote: string
     chartUnbilledByDealer: string
     chartArAging: string
     chartCollectedVsInvoiced: string

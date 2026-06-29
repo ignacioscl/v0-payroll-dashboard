@@ -44,3 +44,20 @@ export class UnbilledAgingBucketDto {
   @ApiProperty({ example: 214 }) wos!: number
   @ApiProperty({ example: 11180 }) value!: number
 }
+
+/** Punto de la serie semanal del gráfico Invoiced by Week. */
+export class BillingWeekRowDto {
+  @ApiProperty({ example: '2026-06-02', description: 'Monday of the ISO week (YYYY-MM-DD)' })
+  weekStart!: string
+
+  @ApiProperty({ example: 61500 }) invoicedValue!: number
+}
+
+/** WOs Done sin facturar agrupadas por dealer (tabla Unbilled Work by Dealer). */
+export class UnbilledDealerRowDto {
+  @ApiProperty({ example: 'Ford Hollywood' }) dealer!: string
+  @ApiProperty({ example: 84 }) wos!: number
+  @ApiProperty({ example: 4690 }) value!: number
+  @ApiProperty({ example: 38, description: 'Días desde el Done más antiguo sin facturar' })
+  oldestDays!: number
+}
