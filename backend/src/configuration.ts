@@ -1,0 +1,18 @@
+export default () => ({
+  port: parseInt(process.env.PORT!, 10) ?? 8100,
+  nodeEnv: process.env.NODE_ENV,
+  sentryDSN: process.env.SENTRY_DSN,
+  jwtSecret: process.env.JWT_SECRET,
+  tokenExpiresIn: process.env.TOKEN_EXPIRES_IN,
+  refreshExpiresIn: process.env.REFRESH_EXPIRES_IN,
+  initAdmin: process.env.INIT_ADMIN,
+  initAdminPassword: process.env.INIT_ADMIN_PASSWORD,
+  apiEndpoint: process.env.API_ENDPOINT,
+  emailHost: process.env.EMAIL_HOST,
+  emailPort: process.env.EMAIL_PORT,
+  emailSecure: process.env.EMAIL_SECURE,
+  emailUser: process.env.EMAIL_USER,
+  emailPass: process.env.EMAIL_PASS,
+  emailFrom: process.env.EMAIL_FROM,
+  frontendUrl: process.env.FRONTEND_URL,
+})

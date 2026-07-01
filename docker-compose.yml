@@ -1,10 +1,11 @@
-# v0 payroll dashboard — único servicio dockerizado en el servidor.
-# PHP, face API, etc. siguen en PM2 en el host.
+# SRS Suite — orquestador. Levanta frontend (Next) + backend (NestJS) juntos.
+# PHP legacy, face API, etc. siguen en PM2/Apache en el host.
+# Un `docker compose up -d --build` deja los dos servicios en producción.
 
 services:
   payroll-dashboard:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     image: srs-payroll-dashboard:latest
     container_name: srs-payroll-dashboard
@@ -25,6 +26,12 @@ services:
       - "host.docker.internal:host-gateway"
       # Permite SRS_API_URL=http://srs.com (mismo Host que el vhost Apache).
       - "srs.com:host-gateway"
+      # Prod: evita EAI_AGAIN cuando el contenedor resuelve main.srssuite.com por DNS.
+      # Apache SSL del vhost legacy escucha en la IP pública del server, no en host-gateway.
+      - "main.srssuite.com:192.249.114.194"
+    # El front llega al back server-side por la red interna: http://srs-backend:3020
+    depends_on:
+      - srs-backend
     # Siempre activo: reinicio si el proceso cae, si el contenedor sale con error, y tras reboot del servidor.
     restart: always
     healthcheck:
@@ -34,6 +41,42 @@ services:
           "wget",
           "-qO-",
           "http://127.0.0.1:3010/login",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend SRS Suite (NestJS). Conecta a MariaDB del host vía host.docker.internal:3306.
+  # OJO PROD: requiere regla CSF para la subnet 172.20.0.0/16 al puerto 3306 y GRANT
+  # de MariaDB que acepte conexiones desde esa subnet (ver docker_prod.md).
+  srs-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: srs-suite-backend:latest
+    container_name: srs-suite-backend
+    ports:
+      # Publicado en localhost del server; el browser solo lo alcanza si Apache lo proxea.
+      - "3020:3020"
+    environment:
+      NODE_ENV: production
+      PORT: "3020"
+    env_file:
+      # Credenciales de DB y secretos, fuera del repo. Sobrescribir con BACKEND_ENV_FILE.
+      - ${BACKEND_ENV_FILE:-/opt/srs/srs-backend.env}
+    extra_hosts:
+      # Para alcanzar MariaDB y demás servicios en el host.
+      - "host.docker.internal:host-gateway"
+      - "srs.com:host-gateway"
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-qO-",
+          "http://127.0.0.1:3020/api/health",
         ]
       interval: 30s
       timeout: 10s
