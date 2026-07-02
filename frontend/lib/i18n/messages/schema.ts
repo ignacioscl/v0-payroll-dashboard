@@ -9,6 +9,7 @@ export interface Messages {
     employeeRanking: string
     costsByDealer: string
     businessKpis: string
+    productionVsGoal: string
     payrollReport: string
     reports: string
     components: string
@@ -589,6 +590,9 @@ export interface Messages {
     arOver60: string
     cashGap: string
     openStatements: string
+    outstandingArSubtitle: string
+    unpaidInPeriod: string
+    unpaidInPeriodStatements: string
     dsoVsPrevCheck: string
     collectedOverInvoiced: string
     ofTotalOutstanding: string
@@ -688,6 +692,7 @@ export interface Messages {
     ttkInvoiced: string
     genericInvoiced: string
     outstandingAr: string
+    unpaidInPeriod: string
     dso: string
     collected: string
     collectionRate: string
@@ -707,6 +712,7 @@ export interface Messages {
   }
   businessKpis: {
     filterDateDone: string
+    includeZero: string
     betaBadge: string
     betaDisclaimer: string
   }

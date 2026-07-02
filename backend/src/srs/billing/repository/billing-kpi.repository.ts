@@ -21,6 +21,14 @@ import {
   mysqlWeekBucketStartExpr,
 } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { fillWeeklyGaps } from '../../shared/kpi/srs-kpi-week'
+import {
+  applyZeroFilter,
+  genericLinePositiveSql,
+  statementHasPositiveTotalSql,
+  ttkAmountPositiveSql,
+  woHasPositiveTotalSql,
+  woServiceLinePositiveSql,
+} from '../../shared/kpi/srs-kpi-zero-filter'
 
 /** Ventana hacia atrás para WOs Done sin facturar (aging / por dealer). */
 export const UNBILLED_LOOKBACK_MONTHS = 6
@@ -30,8 +38,20 @@ export class BillingKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getBillingKpis(filter: SrsKpiFilter): Promise<BillingKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
+    const woLineZero = applyZeroFilter(includeZero, woServiceLinePositiveSql())
+    const ttkZero = applyZeroFilter(includeZero, ttkAmountPositiveSql())
+    const genericZero = applyZeroFilter(includeZero, genericLinePositiveSql())
     const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
     const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
     const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
@@ -57,7 +77,7 @@ export class BillingKpiRepository {
        ${stmt.join}
        WHERE s.estado = 1 AND s.id_dealer_provider = ?
          ${stmt.and}
-         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?`,
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
         stmtPeriodParams,
       ),
       this.srs.query(
@@ -70,7 +90,7 @@ export class BillingKpiRepository {
          AND i.id_dealer_provider = ?
          ${inv.and}
          AND DATE(i.date_last_chg_workflow) BETWEEN ? AND ?
-         AND WO_IS_FULL_INVOICED(i.id) = 0`,
+         AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}`,
         invPeriodParams,
       ),
       this.srs.query(
@@ -81,7 +101,7 @@ export class BillingKpiRepository {
        JOIN INVOICE i ON i.id = r.id_invoice
        WHERE s.estado = 1 AND s.id_dealer_provider = ?
          ${stmt.and}
-         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?`,
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
         stmtPeriodParams,
       ),
       this.srs.query(
@@ -91,7 +111,7 @@ export class BillingKpiRepository {
        ${stmt.join}
        WHERE s.estado = 1 AND s.id_dealer_provider = ?
          ${stmt.and}
-         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?`,
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
         stmtPeriodParams,
       ),
       this.srs.query(
@@ -102,7 +122,7 @@ export class BillingKpiRepository {
          ${stmt.and}
          AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
          AND s.fecha_desde <= ? AND s.fecha_hasta >= ?
-         AND (s.fecha_desde < ? OR s.fecha_hasta > ?)`,
+         AND (s.fecha_desde < ? OR s.fecha_hasta > ?)${stmtZero}`,
         [idDealerProvider, ...stmt.params, fechaHasta, fechaDesde, fechaDesde, fechaHasta],
       ),
       this.srs.query(
@@ -121,7 +141,7 @@ export class BillingKpiRepository {
            AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
          WHERE i.estado = 1 AND i.id_dealer_provider = ?
            ${inv.and}
-           AND DATE(i.date_last_chg_workflow) BETWEEN ? AND ?`,
+           AND DATE(i.date_last_chg_workflow) BETWEEN ? AND ?${woLineZero}`,
         [fechaDesde, fechaHasta, ...invPeriodParams],
       ),
       this.srs.query(
@@ -138,7 +158,7 @@ export class BillingKpiRepository {
            AND s.statement_type = ${StatementType.TTK}
          WHERE tew.estado = 1 AND tew.id_dealer_provider = ?
            ${ttk.and}
-           AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)`,
+           AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)${ttkZero}`,
         [fechaDesde, fechaHasta, ...ttkPeriodParams],
       ),
       this.srs.query(
@@ -161,7 +181,7 @@ export class BillingKpiRepository {
              ? BETWEEN s.fecha_desde AND s.fecha_hasta
              OR ? BETWEEN s.fecha_desde AND s.fecha_hasta
              OR (s.fecha_desde >= ? AND s.fecha_hasta <= DATE_ADD(?, INTERVAL 1 DAY))
-           )`,
+           )${genericZero}`,
         [
           fechaDesde,
           fechaHasta,
@@ -223,6 +243,7 @@ export class BillingKpiRepository {
 
   async getUnbilledAging(filter: SrsKpiFilter): Promise<UnbilledAgingBucketDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
     // WO en workflow DONE → i.date_last_chg_workflow ES la fecha de paso a Done (sin LOG).
     // Solo backlog de los últimos N meses + NOT EXISTS (filtra a las no facturadas antes
     // de traer las service lines; evita materializar el join sobre las WO ya facturadas).
@@ -244,7 +265,7 @@ export class BillingKpiRepository {
            SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
            JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
            WHERE stl.id_invoice = i.id
-         )
+         )${woZero}
        GROUP BY bucket`,
       [filter.idDealerProvider, ...inv.params],
     )
@@ -252,8 +273,16 @@ export class BillingKpiRepository {
   }
 
   async getBillingByWeek(filter: SrsKpiFilter): Promise<BillingWeekRowDto[]> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
     const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
     const weekStart = mysqlWeekBucketStartExpr('DATE(s.fecha_desde)')
     const rows = await this.srs.query(
@@ -263,7 +292,7 @@ export class BillingKpiRepository {
        ${stmt.join}
        WHERE s.estado = 1 AND s.id_dealer_provider = ?
          ${stmt.and}
-         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}
        GROUP BY weekStart
        ORDER BY weekStart`,
       [fechaDesde, idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
@@ -280,6 +309,7 @@ export class BillingKpiRepository {
 
   async getUnbilledByDealer(filter: SrsKpiFilter): Promise<UnbilledDealerRowDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
     // Igual que el aging: WO en DONE → date_last_chg_workflow es la fecha de Done (sin LOG),
     // backlog de los últimos N meses, anti-join con NOT EXISTS.
     const rows = await this.srs.query(
@@ -298,7 +328,7 @@ export class BillingKpiRepository {
            SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
            JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
            WHERE stl.id_invoice = i.id
-         )
+         )${woZero}
        GROUP BY c.id
        ORDER BY value DESC`,
       [filter.idDealerProvider, filter.idDealerProvider, ...inv.params],

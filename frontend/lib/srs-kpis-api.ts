@@ -71,6 +71,8 @@ export interface CollectionsKpi {
   collectionRatePct: number
   arOver60Pct: number
   openStatements: number
+  unpaidInPeriodValue: number
+  unpaidInPeriodStatements: number
 }
 
 export interface PunchKpi {
@@ -99,6 +101,8 @@ export interface KpiQueryParams {
   fechaHasta: string
   idDealer: string
   filterDateDone?: boolean
+  /** When true, include zero-value WO/invoice rows (default false, legacy exclude zeros). */
+  includeZero?: boolean
 }
 
 function buildKpiQuery(params: KpiQueryParams): string {
@@ -109,6 +113,9 @@ function buildKpiQuery(params: KpiQueryParams): string {
   })
   if (params.filterDateDone !== undefined) {
     qs.set('filterDateDone', params.filterDateDone ? 'true' : 'false')
+  }
+  if (params.includeZero !== undefined) {
+    qs.set('includeZero', params.includeZero ? 'true' : 'false')
   }
   return `?${qs.toString()}`
 }

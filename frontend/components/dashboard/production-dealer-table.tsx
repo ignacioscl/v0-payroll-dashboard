@@ -134,9 +134,9 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
       columnPinning={{ left: ['dealer'] }}
       defaultPageSize={25}
       includeAllPageSize
+      enableGlobalFilter={false}
       enableExport
       exportFileName="kpi-production-by-dealer"
-      globalFilterPlaceholder={t('dealer.label')}
       toolbarLeading={
         <span className="text-base font-semibold">{t('mockKpis.chartProductionVsGoal')}</span>
       }

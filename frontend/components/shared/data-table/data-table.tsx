@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils'
 
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
-import type { ColumnFilterConfig } from './data-table-helpers'
+import { DATA_TABLE_PAGE_SIZE_ALL, type ColumnFilterConfig } from './data-table-helpers'
 import { scrollElementBelowNav } from '@/lib/scroll/scroll-table-to-viewport'
 
 /* -------------------------------------------------------------------------- */
@@ -519,6 +519,10 @@ export function DataTable<TData, TValue = unknown>({
     ? { pageIndex: pagination!.pageIndex, pageSize: pagination!.pageSize }
     : localPagination
 
+  // TanStack slices with `rows.slice(start, end)`; pageSize -1 becomes end=-1 and drops
+  // the last row. Skip the pagination row model when "All" is selected.
+  const isAllPageSize = paginationState.pageSize === DATA_TABLE_PAGE_SIZE_ALL
+
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const next =
       typeof updater === 'function'
@@ -607,7 +611,8 @@ export function DataTable<TData, TValue = unknown>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
-    getPaginationRowModel: isServerPagination ? undefined : getPaginationRowModel(),
+    getPaginationRowModel:
+      isServerPagination || isAllPageSize ? undefined : getPaginationRowModel(),
   })
 
   const visibleColCount = table.getVisibleLeafColumns().length

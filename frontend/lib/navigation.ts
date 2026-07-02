@@ -10,6 +10,7 @@ import {
   Gauge,
   Blocks,
   FileBarChart,
+  Target,
   Table as TableIcon,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -41,6 +42,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     icon: FileBarChart,
     children: [
       { nameKey: 'nav.businessKpis', href: '/reports/business-kpis', icon: Gauge },
+      { nameKey: 'nav.productionVsGoal', href: '/reports/production-vs-goal', icon: Target },
     ],
   },
   { nameKey: 'nav.components', href: '/components', icon: Blocks },
@@ -50,7 +52,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
 export const PROD_NAV_HREFS = ['/', '/issues'] as const
 
 /** Real KPI report routes in production (Admin General/Company or production report perm; not /kpis mock). */
-export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
+export const PROD_KPI_HREFS = ['/reports/business-kpis', '/reports/production-vs-goal'] as const
 
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'

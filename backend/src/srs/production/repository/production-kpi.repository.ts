@@ -17,14 +17,31 @@ import {
   woStatusFilterSql,
 } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { fillWeeklyGaps } from '../../shared/kpi/srs-kpi-week'
+import {
+  applyZeroFilter,
+  dailyReportPositiveSql,
+  genericLinePositiveSql,
+  statementHasPositiveTotalSql,
+  woHasPositiveTotalSql,
+  woServiceLinePositiveSql,
+} from '../../shared/kpi/srs-kpi-zero-filter'
 
 @Injectable()
 export class ProductionKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getProductionKpis(filter: SrsKpiFilter): Promise<ProductionKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      filterDateDone,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
     const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
     const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woDate = woPeriodColumn(filterDateDone)
@@ -63,7 +80,7 @@ export class ProductionKpiRepository {
            ${woStatus}
            AND i.id_dealer_provider = ?
            ${dealer.and}
-           AND ${woPeriod} BETWEEN ? AND ?`,
+           AND ${woPeriod} BETWEEN ? AND ?${woZero}`,
         completedParams,
       ),
       this.loadProductionValueParts(
@@ -73,6 +90,7 @@ export class ProductionKpiRepository {
         dealer,
         drDealer,
         filterDateDone,
+        includeZero,
         woDate,
         fechaDesde,
         fechaHasta,
@@ -109,6 +127,7 @@ export class ProductionKpiRepository {
     dealer: ReturnType<typeof buildDealerFilterSql>,
     drDealer: ReturnType<typeof buildDealerFilterSql>,
     filterDateDone: boolean,
+    includeZero: boolean,
     woDate: string,
     fechaDesde: string,
     fechaHasta: string,
@@ -116,6 +135,10 @@ export class ProductionKpiRepository {
   ): Promise<number> {
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
     const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+    const woLineZero = applyZeroFilter(includeZero, woServiceLinePositiveSql())
+    const drZero = applyZeroFilter(includeZero, dailyReportPositiveSql())
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('invs'))
+    const genericZero = applyZeroFilter(includeZero, genericLinePositiveSql())
     const invoicePeriodParams = [idDealerProvider, ...dealer.params, fechaDesde, fechaHasta]
     const drParams = [idDealerProvider, ...drDealer.params, fechaDesde, fechaHasta]
     const stmtPeriodParams = [idDealerProvider, ...stmtScope.params, fechaDesde, fechaHasta]
@@ -130,7 +153,7 @@ export class ProductionKpiRepository {
            ${woStatus}
            AND i.id_dealer_provider = ?
            ${dealer.and}
-           AND ${woDate} BETWEEN ? AND ?`,
+           AND ${woDate} BETWEEN ? AND ?${woLineZero}`,
         invoicePeriodParams,
       ),
       this.srs.query(
@@ -139,7 +162,7 @@ export class ProductionKpiRepository {
          ${drDealer.join}
          WHERE ldr.id_dealer_provider = ?
            ${drDealer.and}
-           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?`,
+           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?${drZero}`,
         drParams,
       ),
       this.srs.query(
@@ -148,7 +171,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${stmtZero}`,
         stmtPeriodParams,
       ),
       this.srs.query(
@@ -161,7 +184,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?`,
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${genericZero}`,
         stmtPeriodParams,
       ),
     ])
@@ -202,8 +225,21 @@ export class ProductionKpiRepository {
   }
 
   async getDealerProduction(filter: SrsKpiFilter): Promise<DealerProductionRowDto[]> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      filterDateDone,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
+    const woLineZero = applyZeroFilter(includeZero, woServiceLinePositiveSql())
+    const drZero = applyZeroFilter(includeZero, dailyReportPositiveSql())
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('invs'))
+    const genericZero = applyZeroFilter(includeZero, genericLinePositiveSql())
     const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
     const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
@@ -227,7 +263,7 @@ export class ProductionKpiRepository {
            ${woStatus}
            AND i.id_dealer_provider = ?
            ${dealer.and}
-           AND ${woPeriod} BETWEEN ? AND ?
+           AND ${woPeriod} BETWEEN ? AND ?${woZero}${woLineZero}
          GROUP BY c.id
          ORDER BY value DESC`,
         [idDealerProvider, ...invoicePeriodParams],
@@ -240,7 +276,7 @@ export class ProductionKpiRepository {
          ${drDealer.join}
          WHERE ldr.id_dealer_provider = ?
            ${drDealer.and}
-           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?
+           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?${drZero}
          GROUP BY c.id`,
         [idDealerProvider, ...drParams],
       ),
@@ -252,7 +288,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${stmtZero}
          GROUP BY c.id`,
         [idDealerProvider, ...stmtPeriodParams],
       ),
@@ -268,7 +304,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${genericZero}
          GROUP BY c.id`,
         [idDealerProvider, ...stmtPeriodParams],
       ),
@@ -330,8 +366,21 @@ export class ProductionKpiRepository {
   }
 
   async getProductionByWeek(filter: SrsKpiFilter): Promise<ProductionWeekRowDto[]> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, filterDateDone, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      filterDateDone,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
+    const woLineZero = applyZeroFilter(includeZero, woServiceLinePositiveSql())
+    const drZero = applyZeroFilter(includeZero, dailyReportPositiveSql())
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('invs'))
+    const genericZero = applyZeroFilter(includeZero, genericLinePositiveSql())
     const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
     const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
@@ -356,7 +405,7 @@ export class ProductionKpiRepository {
            ${woStatus}
            AND i.id_dealer_provider = ?
            ${dealer.and}
-           AND ${woPeriod} BETWEEN ? AND ?
+           AND ${woPeriod} BETWEEN ? AND ?${woZero}${woLineZero}
          GROUP BY weekStart
          ORDER BY weekStart`,
         invoicePeriodParams,
@@ -368,7 +417,7 @@ export class ProductionKpiRepository {
          ${drDealer.join}
          WHERE ldr.id_dealer_provider = ?
            ${drDealer.and}
-           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?
+           AND DATE(ldr.fecha_desde) BETWEEN ? AND ?${drZero}
          GROUP BY weekStart
          ORDER BY weekStart`,
         drParams,
@@ -380,7 +429,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.TTK} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${stmtZero}
          GROUP BY weekStart
          ORDER BY weekStart`,
         stmtPeriodParams,
@@ -396,7 +445,7 @@ export class ProductionKpiRepository {
          JOIN CONTRATISTA c ON c.id = invs.id_dealer
          WHERE invs.estado = 1 AND invs.statement_type = ${StatementType.GENERIC} AND invs.id_dealer_provider = ?
            ${stmtScope.and}
-           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?
+           AND invs.fecha_desde >= ? AND invs.fecha_hasta <= ?${genericZero}
          GROUP BY weekStart
          ORDER BY weekStart`,
         stmtPeriodParams,

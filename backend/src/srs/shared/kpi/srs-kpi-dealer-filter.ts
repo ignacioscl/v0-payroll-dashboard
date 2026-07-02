@@ -159,7 +159,14 @@ export function parseDealerIds(raw?: string): number[] {
 }
 
 export function parseFilterDateDone(raw?: string | boolean): boolean {
-  if (raw === undefined || raw === null || raw === '') return true
+  if (raw === undefined || raw === null || raw === '') return false
+  if (typeof raw === 'boolean') return raw
+  return raw === '1' || raw.toLowerCase() === 'true'
+}
+
+/** Default false — legacy excludes zero-value WO/invoice rows unless explicitly included. */
+export function parseIncludeZero(raw?: string | boolean): boolean {
+  if (raw === undefined || raw === null || raw === '') return false
   if (typeof raw === 'boolean') return raw
   return raw === '1' || raw.toLowerCase() === 'true'
 }

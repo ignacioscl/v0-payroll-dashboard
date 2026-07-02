@@ -37,10 +37,38 @@ function RowCheckbox({ checked }: { checked: boolean }) {
   )
 }
 
+function sortDealersCheckedFirst(
+  dealers: DealerOption[],
+  selectedIds: string[],
+): DealerOption[] {
+  if (
+    selectedIds.length === 0 ||
+    dealers.length === 0 ||
+    selectedIds.length === dealers.length
+  ) {
+    return dealers
+  }
+  const selected = new Set(selectedIds)
+  return [...dealers].sort((a, b) => {
+    const aChecked = selected.has(a.id)
+    const bChecked = selected.has(b.id)
+    if (aChecked === bChecked) return 0
+    return aChecked ? -1 : 1
+  })
+}
+
+function dealerSelectionEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const setB = new Set(b)
+  return a.every((id) => setB.has(id))
+}
+
 interface DealerMultiSelectProps {
   dealers: DealerOption[]
   value: string[]
   onChange: (value: string[]) => void
+  /** When true (default), onChange runs only when the popover closes. */
+  commitOnClose?: boolean
   placeholder?: string
   allSelectedLabel?: string
   emptyLabel?: string
@@ -54,6 +82,7 @@ export function DealerMultiSelect({
   dealers,
   value,
   onChange,
+  commitOnClose = true,
   placeholder,
   allSelectedLabel,
   emptyLabel,
@@ -69,6 +98,10 @@ export function DealerMultiSelect({
 
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  /** Order frozen when the popover opens — avoids rows jumping while toggling. */
+  const [dealersOnOpen, setDealersOnOpen] = useState<DealerOption[] | null>(null)
+  /** Draft selection while the popover is open (committed on close). */
+  const [draftValue, setDraftValue] = useState<string[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -92,17 +125,52 @@ export function DealerMultiSelect({
     return t('dealer.manySelected', { count: value.length })
   }, [allSelected, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value])
 
-  const toggleDealer = (id: string) => {
-    if (value.includes(id)) {
-      onChange(value.filter((v) => v !== id))
-    } else {
-      onChange([...value, id])
+  const handleOpenChange = (next: boolean) => {
+    if (isDisabled) return
+    if (next) {
+      setDraftValue([...value])
+      setDealersOnOpen(sortDealersCheckedFirst(dealers, value))
+      setOpen(true)
+      return
+    }
+
+    setDealersOnOpen(null)
+    setOpen(false)
+    if (commitOnClose) {
+      if (!dealerSelectionEqual(draftValue, value)) {
+        onChange(draftValue)
+      }
     }
   }
 
-  const toggleAll = () => {
-    onChange(allSelected ? [] : [...allIds])
+  const toggleDealer = (id: string) => {
+    const apply = (prev: string[]) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
+
+    if (commitOnClose && open) {
+      setDraftValue(apply)
+      return
+    }
+    onChange(apply(value))
   }
+
+  const toggleAll = () => {
+    const apply = (prev: string[]) => {
+      const allCurrently =
+        dealers.length > 0 && allIds.every((id) => prev.includes(id))
+      return allCurrently ? [] : [...allIds]
+    }
+
+    if (commitOnClose && open) {
+      setDraftValue(apply)
+      return
+    }
+    onChange(apply(value))
+  }
+
+  const popoverSelection = commitOnClose && open ? draftValue : value
+  const allSelectedInPopover =
+    dealers.length > 0 && allIds.every((id) => popoverSelection.includes(id))
 
   const handleRowMouseDown = (action: () => void) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -111,7 +179,7 @@ export function DealerMultiSelect({
   }
 
   return (
-    <Popover open={open} onOpenChange={(next) => !isDisabled && setOpen(next)}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -145,14 +213,14 @@ export function DealerMultiSelect({
                 onMouseDown={handleRowMouseDown(toggleAll)}
                 className="cursor-pointer data-[selected=true]:text-foreground"
               >
-                <RowCheckbox checked={allSelected} />
+                <RowCheckbox checked={allSelectedInPopover} />
                 <span className="font-medium">{resolvedAllLabel}</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup>
-              {dealers.map((dealer) => {
-                const checked = value.includes(dealer.id)
+              {(dealersOnOpen ?? dealers).map((dealer) => {
+                const checked = popoverSelection.includes(dealer.id)
                 return (
                   <CommandItem
                     key={dealer.id}

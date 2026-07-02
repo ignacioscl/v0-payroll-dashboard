@@ -6,6 +6,10 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { CollectionsKpiDto } from '../dto/collections-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  applyZeroFilter,
+  statementHasPositiveTotalSql,
+} from '../../shared/kpi/srs-kpi-zero-filter'
 
 /** BILLING_WO_REL → statement id without OR + correlated IN (full-table killer). */
 const BILLING_STATEMENT_LINK = `
@@ -23,12 +27,19 @@ export class CollectionsKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
-      filter
+    const {
+      idDealerProvider,
+      idUsuario,
+      dealerIds,
+      fechaDesde,
+      fechaHasta,
+      includeZero,
+      skipDealerRestriction,
+    } = filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
     const bill = buildDealerFilterSql('billing', idUsuario, dealerIds, skipDealerRestriction)
     const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
-    console.log('pasa qrys collections kpis')
-    const [collected, dso, ar, invoiced] = await Promise.all([
+    const [collected, dso, ar, unpaidInPeriod, invoiced] = await Promise.all([
       this.srs.query(
         `SELECT IFNULL(SUM(b.amount), 0) AS collectedValue
          FROM BILLING b
@@ -53,7 +64,7 @@ export class CollectionsKpiRepository {
          ) pay ON pay.id_statement = s.id
          WHERE s.estado = 1 AND s.id_dealer_provider = ?
            ${stmt.and}
-           AND IS_STATEMENT_BILLED(s.id) = 1`,
+           AND IS_STATEMENT_BILLED(s.id) = 1${stmtZero}`,
         [idDealerProvider, fechaDesde, fechaHasta, idDealerProvider, ...stmt.params],
       ),
       this.srs.query(
@@ -68,9 +79,23 @@ export class CollectionsKpiRepository {
            ${stmt.join}
            WHERE s.estado = 1 AND s.id_dealer_provider = ?
              ${stmt.and}
-             AND IS_STATEMENT_BILLED(s.id) = 0
+             AND IS_STATEMENT_BILLED(s.id) = 0${stmtZero}
          ) t`,
         [idDealerProvider, ...stmt.params],
+      ),
+      this.srs.query(
+        `SELECT COUNT(*)                                              AS unpaidInPeriodStatements,
+                ROUND(IFNULL(SUM(t.notBilled), 0), 2)                AS unpaidInPeriodValue
+         FROM (
+           SELECT GET_TOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.discount, NULL, s.discount_type, s.statement_type, NULL) notBilled
+           FROM INVOICE_STATEMENT s
+           ${stmt.join}
+           WHERE s.estado = 1 AND s.id_dealer_provider = ?
+             ${stmt.and}
+             AND IS_STATEMENT_BILLED(s.id) = 0
+             AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}
+         ) t`,
+        [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
       ),
       this.srs.query(
         `SELECT ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS invoicedValue
@@ -78,7 +103,7 @@ export class CollectionsKpiRepository {
          ${stmt.join}
          WHERE s.estado = 1 AND s.id_dealer_provider = ?
            ${stmt.and}
-           AND s.fecha_desde >= ? AND s.fecha_hasta <= ?`,
+           AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
         [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
       ),
     ])
@@ -86,6 +111,7 @@ export class CollectionsKpiRepository {
     const collectedValue = Number(collected[0]?.collectedValue ?? 0)
     const invoicedValue = Number(invoiced[0]?.invoicedValue ?? 0)
     const a = ar[0] ?? {}
+    const u = unpaidInPeriod[0] ?? {}
 
     return {
       outstandingAr: Number(a.outstandingAr ?? 0),
@@ -94,11 +120,14 @@ export class CollectionsKpiRepository {
       collectionRatePct: invoicedValue > 0 ? Math.round((collectedValue / invoicedValue) * 1000) / 10 : 0,
       arOver60Pct: Number(a.arOver60Pct ?? 0),
       openStatements: Number(a.openStatements ?? 0),
+      unpaidInPeriodValue: Number(u.unpaidInPeriodValue ?? 0),
+      unpaidInPeriodStatements: Number(u.unpaidInPeriodStatements ?? 0),
     }
   }
 
   async getArAging(filter: SrsKpiFilter): Promise<{ bucket: string; statements: number; value: number }[]> {
     const stmt = buildDealerFilterSql('statement', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const stmtZero = applyZeroFilter(filter.includeZero, statementHasPositiveTotalSql('s'))
     const rows = await this.srs.query(
       `SELECT CASE WHEN t.ageDays <= 30 THEN '0-30 days'
                    WHEN t.ageDays <= 60 THEN '31-60 days'
@@ -113,7 +142,7 @@ export class CollectionsKpiRepository {
          ${stmt.join}
          WHERE s.estado = 1 AND s.id_dealer_provider = ?
            ${stmt.and}
-           AND IS_STATEMENT_BILLED(s.id) = 0
+           AND IS_STATEMENT_BILLED(s.id) = 0${stmtZero}
        ) t
        GROUP BY bucket
        ORDER BY MIN(t.ageDays)`,

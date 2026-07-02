@@ -33,7 +33,6 @@ import {
 } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ProductionWeekChart } from '@/components/dashboard/production-week-chart'
-import { ProductionDealerTable } from '@/components/dashboard/production-dealer-table'
 import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
 import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
@@ -61,7 +60,6 @@ import {
   fetchPayrollKpi,
   fetchProductionKpi,
   fetchProductionByWeek,
-  fetchProductionByDealer,
   fetchPunchKpi,
   fetchUnbilledAging,
   fetchUnbilledByDealer,
@@ -119,7 +117,8 @@ export default function BusinessKpisPage() {
   const { t } = useTranslation()
   const { dateRange, selectedDealers, filtersHydrated } = useFilters()
   const [payrollWeek, setPayrollWeek] = useState(PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1].value)
-  const [filterDateDone, setFilterDateDone] = useState(true)
+  const [filterDateDone, setFilterDateDone] = useState(false)
+  const [includeZero, setIncludeZero] = useState(false)
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -148,8 +147,9 @@ export default function BusinessKpisPage() {
       fechaDesde: headerRange.fechaDesde,
       fechaHasta: headerRange.fechaHasta,
       idDealer,
+      includeZero,
     }
-  }, [rangeReady, headerRange, idDealer])
+  }, [rangeReady, headerRange, idDealer, includeZero])
 
   const productionKpiParams = useMemo((): KpiQueryParams | null => {
     if (!headerKpiParams) return null
@@ -173,11 +173,6 @@ export default function BusinessKpisPage() {
   const prodWeek = useQuery({
     queryKey: ['srs-kpi', 'production-by-week', productionKpiParams],
     queryFn: () => fetchProductionByWeek(productionKpiParams!),
-    enabled: Boolean(productionKpiParams),
-  })
-  const prodDealer = useQuery({
-    queryKey: ['srs-kpi', 'production-by-dealer', productionKpiParams],
-    queryFn: () => fetchProductionByDealer(productionKpiParams!),
     enabled: Boolean(productionKpiParams),
   })
   const bill = useQuery({
@@ -257,6 +252,20 @@ export default function BusinessKpisPage() {
         <p className="text-sm text-muted-foreground">{t('filters.selectDates')}</p>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="include-zero"
+            checked={includeZero}
+            onCheckedChange={setIncludeZero}
+            disabled={!rangeReady}
+          />
+          <Label htmlFor="include-zero" className="cursor-pointer text-sm font-normal">
+            {t('businessKpis.includeZero')}
+          </Label>
+        </div>
+      </div>
+
       <Tabs defaultValue="production" className="gap-5">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border/60 bg-muted/25 p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5">
           <KpiTabTrigger
@@ -313,8 +322,6 @@ export default function BusinessKpisPage() {
           </div>
           <KpiErrorBanner q={prodWeek} />
           <ProductionWeekChart data={prodWeek.data} loading={prodWeek.isLoading} />
-          <KpiErrorBanner q={prodDealer} />
-          <ProductionDealerTable data={prodDealer.data} loading={prodDealer.isLoading} />
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-6">
@@ -351,7 +358,8 @@ export default function BusinessKpisPage() {
         <TabsContent value="collections" className="space-y-6">
           <KpiErrorBanner q={coll} />
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard compact help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} {...kpiMoneyProps(c?.outstandingAr)} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? t('mockKpis.openStatements', { count: c.openStatements }) : ''} />
+            <KPICard compact help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} {...kpiMoneyProps(c?.outstandingAr)} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements }) : ''} />
+            <KPICard compact help={t('businessKpisHelp.unpaidInPeriod')} loading={coll.isLoading} title={t('mockKpis.unpaidInPeriod')} {...kpiMoneyProps(c?.unpaidInPeriodValue)} icon={<Receipt className="h-5 w-5" />} variant="danger" subtitle={c ? t('mockKpis.unpaidInPeriodStatements', { count: c.unpaidInPeriodStatements }) : ''} />
             <KPICard compact help={t('businessKpisHelp.dso')} loading={coll.isLoading} title={t('mockKpis.dsoDaysToCollect')} value={c ? `${c.dsoDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="danger" />
             <KPICard compact help={t('businessKpisHelp.collected')} loading={coll.isLoading} title={t('mockKpis.collected')} {...kpiMoneyProps(c?.collectedValue)} icon={<DollarSign className="h-5 w-5" />} variant="success" />
             <KPICard compact help={t('businessKpisHelp.collectionRate')} loading={coll.isLoading} title={t('mockKpis.collectionRate')} value={c ? `${c.collectionRatePct}%` : '—'} icon={<Percent className="h-5 w-5" />} variant="info" />

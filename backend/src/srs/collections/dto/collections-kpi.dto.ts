@@ -20,6 +20,8 @@ export class CollectionsKpiDto {
   @ApiProperty({ example: 94.5 }) collectionRatePct!: number
   @ApiProperty({ example: 19.5 }) arOver60Pct!: number
   @ApiProperty({ example: 96 }) openStatements!: number
+  @ApiProperty({ example: 12400 }) unpaidInPeriodValue!: number
+  @ApiProperty({ example: 18 }) unpaidInPeriodStatements!: number
 }
 
 /** AR aging por bucket de antigüedad. */
