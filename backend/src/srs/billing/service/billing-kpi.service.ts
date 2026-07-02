@@ -25,4 +25,8 @@ export class BillingKpiService {
   async getUnbilledByDealer(ctx: SrsContext, query: SrsKpiQueryDto) {
     return this.repository.getUnbilledByDealer(buildSrsKpiFilter(ctx, query))
   }
+
+  async getPeriodCollectionKpis(ctx: SrsContext, query: SrsKpiQueryDto) {
+    return this.repository.getPeriodCollectionKpis(buildSrsKpiFilter(ctx, query))
+  }
 }

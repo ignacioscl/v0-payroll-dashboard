@@ -530,7 +530,7 @@ export const es: Messages = {
     laborCostRevenue: 'Costo laboral / ingresos',
     tabProduction: 'Producción OT',
     tabBilling: 'Facturación',
-    tabCollections: 'Cobranza',
+    tabCollections: 'CxC abierta',
     tabPunch: 'Calidad de ponchadas',
     tabPayroll: 'Gasto de nómina',
     avgCycleTime: 'Tiempo de ciclo prom.',
@@ -708,10 +708,11 @@ export const es: Messages = {
     outstandingAr:
       'Total facturado que aún no se ha cobrado en todas las facturas abiertas. Instantánea actual — no depende del rango de fechas del header. El subtítulo indica sin fecha y AR completo.',
     unpaidInPeriod:
-      'Monto sin cobrar de facturas cuyo período cae enteramente dentro de las fechas seleccionadas (misma regla de inclusión que Facturado). Solo facturas no cobradas por completo.',
+      'Saldo pendiente de facturas cuyo período cae enteramente dentro de las fechas seleccionadas (misma regla que Facturado).',
     dso: 'Días promedio desde la emisión de la factura hasta recibir el pago.',
-    collected: 'Total de pagos recibidos en el período.',
-    collectionRate: 'Porcentaje cobrado sobre lo facturado en el período.',
+    collected:
+      'Monto cobrado de esas facturas del período (facturado menos lo que sigue impago). No importa en qué fecha se recibió el pago.',
+    collectionRate: 'Porcentaje del total facturado en el período que ya se cobró.',
     arOver60: 'Porcentaje de cuentas por cobrar con más de 60 días de vencimiento.',
     punchError:
       'Porcentaje de ponchadas con error (salida faltante, descanso incompleto o turno inusualmente largo). El subtítulo muestra el total de ponchadas.',
@@ -737,6 +738,9 @@ export const es: Messages = {
     betaBadge: 'Beta',
     betaDisclaimer:
       'Estos KPIs están en versión beta. Los valores deben corroborarse con los reportes legacy de SRS antes de tomar decisiones.',
+    billingPeriodSummary: 'Facturado vs cobrado (mismas facturas del período)',
+    collectionsSnapshotNote:
+      'Snapshot de CxC abierta — no limitado al rango de fechas del encabezado.',
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

@@ -11,6 +11,7 @@ import {
 } from '../entity/invoice-statement.srsentity'
 import {
   BillingKpiDto,
+  BillingPeriodCollectionKpiDto,
   BillingWeekRowDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
@@ -332,5 +333,43 @@ export class BillingKpiRepository {
       value: Number(r.value),
       oldestDays: Number(r.oldestDays ?? 0),
     }))
+  }
+
+  async getPeriodCollectionKpis(filter: SrsKpiFilter): Promise<BillingPeriodCollectionKpiDto> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, skipDealerRestriction } =
+      filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
+    const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
+    const periodParams = [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta]
+
+    const [row] = await this.srs.query(
+      `SELECT COUNT(*)                                                                                    AS statementsIssued,
+              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS invoicedValue,
+              ROUND(IFNULL(AVG(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0))    AS avgInvoiceValue,
+              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.discount, NULL, s.discount_type, s.statement_type, NULL)), 0), 2) AS unpaidInPeriodValue,
+              SUM(CASE WHEN IS_STATEMENT_BILLED(s.id) = 0 THEN 1 ELSE 0 END)                               AS unpaidInPeriodStatements
+       FROM INVOICE_STATEMENT s
+       ${stmt.join}
+       WHERE s.estado = 1 AND s.id_dealer_provider = ?
+         ${stmt.and}
+         AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
+      periodParams,
+    )
+
+    const invoicedValue = Number(row?.invoicedValue ?? 0)
+    const unpaidInPeriodValue = Number(row?.unpaidInPeriodValue ?? 0)
+    const collectedValue = Math.round((invoicedValue - unpaidInPeriodValue) * 100) / 100
+    const collectionRatePct =
+      invoicedValue > 0 ? Math.round((collectedValue / invoicedValue) * 1000) / 10 : 0
+
+    return {
+      invoicedValue,
+      statementsIssued: Number(row?.statementsIssued ?? 0),
+      avgInvoiceValue: Number(row?.avgInvoiceValue ?? 0),
+      collectedValue,
+      collectionRatePct,
+      unpaidInPeriodValue,
+      unpaidInPeriodStatements: Number(row?.unpaidInPeriodStatements ?? 0),
+    }
   }
 }

@@ -37,19 +37,8 @@ export class CollectionsKpiRepository {
       skipDealerRestriction,
     } = filter
     const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
-    const bill = buildDealerFilterSql('billing', idUsuario, dealerIds, skipDealerRestriction)
     const stmt = buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction)
-    const [collected, dso, ar, unpaidInPeriod, invoiced] = await Promise.all([
-      this.srs.query(
-        `SELECT IFNULL(SUM(b.amount), 0) AS collectedValue
-         FROM BILLING b
-         ${bill.join}
-         WHERE b.estado = 1 AND b.id_dealer_provider = ?
-           ${bill.and}
-           AND b.fecha >= ? AND b.fecha < DATE_ADD(?, INTERVAL 1 DAY)`,
-        [idDealerProvider, ...bill.params, fechaDesde, fechaHasta],
-      ),
-      // DSO: scope by provider/dealer first; last payment in period via HAVING (not global paySub).
+    const [dso, ar] = await Promise.all([
       this.srs.query(
         `SELECT ROUND(AVG(DATEDIFF(pay.paid_at, s.fecha_create)), 1) AS dsoDays
          FROM INVOICE_STATEMENT s
@@ -83,45 +72,15 @@ export class CollectionsKpiRepository {
          ) t`,
         [idDealerProvider, ...stmt.params],
       ),
-      this.srs.query(
-        `SELECT COUNT(*)                                              AS unpaidInPeriodStatements,
-                ROUND(IFNULL(SUM(t.notBilled), 0), 2)                AS unpaidInPeriodValue
-         FROM (
-           SELECT GET_TOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.discount, NULL, s.discount_type, s.statement_type, NULL) notBilled
-           FROM INVOICE_STATEMENT s
-           ${stmt.join}
-           WHERE s.estado = 1 AND s.id_dealer_provider = ?
-             ${stmt.and}
-             AND IS_STATEMENT_BILLED(s.id) = 0
-             AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}
-         ) t`,
-        [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
-      ),
-      this.srs.query(
-        `SELECT ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS invoicedValue
-         FROM INVOICE_STATEMENT s
-         ${stmt.join}
-         WHERE s.estado = 1 AND s.id_dealer_provider = ?
-           ${stmt.and}
-           AND s.fecha_desde >= ? AND s.fecha_hasta <= ?${stmtZero}`,
-        [idDealerProvider, ...stmt.params, fechaDesde, fechaHasta],
-      ),
     ])
 
-    const collectedValue = Number(collected[0]?.collectedValue ?? 0)
-    const invoicedValue = Number(invoiced[0]?.invoicedValue ?? 0)
     const a = ar[0] ?? {}
-    const u = unpaidInPeriod[0] ?? {}
 
     return {
       outstandingAr: Number(a.outstandingAr ?? 0),
       dsoDays: Number(dso[0]?.dsoDays ?? 0),
-      collectedValue,
-      collectionRatePct: invoicedValue > 0 ? Math.round((collectedValue / invoicedValue) * 1000) / 10 : 0,
       arOver60Pct: Number(a.arOver60Pct ?? 0),
       openStatements: Number(a.openStatements ?? 0),
-      unpaidInPeriodValue: Number(u.unpaidInPeriodValue ?? 0),
-      unpaidInPeriodStatements: Number(u.unpaidInPeriodStatements ?? 0),
     }
   }
 

@@ -65,15 +65,21 @@ export interface UnbilledDealerRow {
   oldestDays: number
 }
 
+export interface BillingPeriodCollectionKpi {
+  invoicedValue: number
+  statementsIssued: number
+  avgInvoiceValue: number
+  collectedValue: number
+  collectionRatePct: number
+  unpaidInPeriodValue: number
+  unpaidInPeriodStatements: number
+}
+
 export interface CollectionsKpi {
   outstandingAr: number
   dsoDays: number
-  collectedValue: number
-  collectionRatePct: number
   arOver60Pct: number
   openStatements: number
-  unpaidInPeriodValue: number
-  unpaidInPeriodStatements: number
 }
 
 export interface PunchKpi {
@@ -144,6 +150,8 @@ export const fetchUnbilledAging = (params: KpiQueryParams) =>
   getKpi<UnbilledAgingBucket[]>('billing/unbilled-aging', params)
 export const fetchUnbilledByDealer = (params: KpiQueryParams) =>
   getKpi<UnbilledDealerRow[]>('billing/unbilled-by-dealer', params)
+export const fetchBillingPeriodCollection = (params: KpiQueryParams) =>
+  getKpi<BillingPeriodCollectionKpi>('billing/period-collection', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>
   getKpi<CollectionsKpi>('collections', params)
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)

@@ -715,6 +715,8 @@ export interface Messages {
     includeZero: string
     betaBadge: string
     betaDisclaimer: string
+    billingPeriodSummary: string
+    collectionsSnapshotNote: string
   }
   mockPayrollReport: {
     title: string

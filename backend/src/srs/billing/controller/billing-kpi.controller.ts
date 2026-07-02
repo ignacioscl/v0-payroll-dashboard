@@ -7,6 +7,7 @@ import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { BillingKpiService } from '../service/billing-kpi.service'
 import {
   BillingKpiDto,
+  BillingPeriodCollectionKpiDto,
   BillingWeekRowDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
@@ -53,5 +54,14 @@ export class BillingKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<UnbilledDealerRowDto[]> {
     return this.service.getUnbilledByDealer(request.srsContext, query)
+  }
+
+  @Get('/period-collection')
+  @ApiOkResponse({ type: BillingPeriodCollectionKpiDto })
+  async getPeriodCollectionKpis(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<BillingPeriodCollectionKpiDto> {
+    return this.service.getPeriodCollectionKpis(request.srsContext, query)
   }
 }

@@ -56,6 +56,7 @@ import { cn } from '@/lib/utils'
 import {
   fetchBillingKpi,
   fetchBillingByWeek,
+  fetchBillingPeriodCollection,
   fetchCollectionsKpi,
   fetchPayrollKpi,
   fetchProductionKpi,
@@ -119,6 +120,7 @@ export default function BusinessKpisPage() {
   const [payrollWeek, setPayrollWeek] = useState(PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1].value)
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [includeZero, setIncludeZero] = useState(false)
+  const [activeTab, setActiveTab] = useState('production')
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -168,51 +170,57 @@ export default function BusinessKpisPage() {
   const prod = useQuery({
     queryKey: ['srs-kpi', 'production', productionKpiParams],
     queryFn: () => fetchProductionKpi(productionKpiParams!),
-    enabled: Boolean(productionKpiParams),
+    enabled: Boolean(productionKpiParams) && activeTab === 'production',
   })
   const prodWeek = useQuery({
     queryKey: ['srs-kpi', 'production-by-week', productionKpiParams],
     queryFn: () => fetchProductionByWeek(productionKpiParams!),
-    enabled: Boolean(productionKpiParams),
+    enabled: Boolean(productionKpiParams) && activeTab === 'production',
   })
   const bill = useQuery({
     queryKey: ['srs-kpi', 'billing', headerKpiParams],
     queryFn: () => fetchBillingKpi(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'billing',
   })
   const billWeek = useQuery({
     queryKey: ['srs-kpi', 'billing-by-week', headerKpiParams],
     queryFn: () => fetchBillingByWeek(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'billing',
   })
   const unbilledAging = useQuery({
     queryKey: ['srs-kpi', 'unbilled-aging', headerKpiParams],
     queryFn: () => fetchUnbilledAging(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'billing',
   })
   const unbilledByDealer = useQuery({
     queryKey: ['srs-kpi', 'unbilled-by-dealer', headerKpiParams],
     queryFn: () => fetchUnbilledByDealer(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'billing',
+  })
+  const periodColl = useQuery({
+    queryKey: ['srs-kpi', 'billing-period-collection', headerKpiParams],
+    queryFn: () => fetchBillingPeriodCollection(headerKpiParams!),
+    enabled: Boolean(headerKpiParams) && activeTab === 'billing',
   })
   const coll = useQuery({
     queryKey: ['srs-kpi', 'collections', headerKpiParams],
     queryFn: () => fetchCollectionsKpi(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'collections',
   })
   const punch = useQuery({
     queryKey: ['srs-kpi', 'punch', headerKpiParams],
     queryFn: () => fetchPunchKpi(headerKpiParams!),
-    enabled: Boolean(headerKpiParams),
+    enabled: Boolean(headerKpiParams) && activeTab === 'punch',
   })
   const pay = useQuery({
     queryKey: ['srs-kpi', 'payroll', payrollKpiParams],
     queryFn: () => fetchPayrollKpi(payrollKpiParams!),
-    enabled: Boolean(payrollKpiParams),
+    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll',
   })
 
   const p = prod.data
   const b = bill.data
+  const pc = periodColl.data
   const c = coll.data
   const k = punch.data
   const y = pay.data
@@ -266,7 +274,7 @@ export default function BusinessKpisPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="production" className="gap-5">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-5">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border/60 bg-muted/25 p-1.5 shadow-sm sm:grid-cols-3 lg:grid-cols-5">
           <KpiTabTrigger
             value="production"
@@ -331,8 +339,61 @@ export default function BusinessKpisPage() {
 
         <TabsContent value="billing" className="space-y-6">
           <KpiErrorBanner q={bill} />
+          <KpiErrorBanner q={periodColl} />
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">
+              {t('businessKpis.billingPeriodSummary')}
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <KPICard
+                compact
+                help={t('businessKpisHelp.invoiced')}
+                loading={periodColl.isLoading}
+                title={t('mockKpis.invoiced')}
+                {...kpiMoneyProps(pc?.invoicedValue)}
+                icon={<Receipt className="h-5 w-5" />}
+                variant="success"
+                subtitle={
+                  pc
+                    ? t('mockKpis.avgPerStatement', { amount: fmtMoney(pc.avgInvoiceValue) })
+                    : ''
+                }
+              />
+              <KPICard
+                compact
+                help={t('businessKpisHelp.collected')}
+                loading={periodColl.isLoading}
+                title={t('mockKpis.collected')}
+                {...kpiMoneyProps(pc?.collectedValue)}
+                icon={<DollarSign className="h-5 w-5" />}
+                variant="info"
+                subtitle={
+                  pc
+                    ? t('mockKpis.collectionRate') + ': ' + pc.collectionRatePct + '%'
+                    : ''
+                }
+              />
+              <KPICard
+                compact
+                help={t('businessKpisHelp.unpaidInPeriod')}
+                loading={periodColl.isLoading}
+                title={t('mockKpis.unpaidInPeriod')}
+                {...kpiMoneyProps(pc?.unpaidInPeriodValue)}
+                icon={<Banknote className="h-5 w-5" />}
+                variant="danger"
+                subtitle={
+                  pc
+                    ? t('mockKpis.unpaidInPeriodStatements', {
+                        count: pc.unpaidInPeriodStatements,
+                      })
+                    : ''
+                }
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard compact help={t('businessKpisHelp.invoiced')} loading={bill.isLoading} title={t('mockKpis.invoiced')} {...kpiMoneyProps(b?.invoicedValue)} icon={<Receipt className="h-5 w-5" />} variant="success" />
             <KPICard compact help={t('businessKpisHelp.statements')} loading={bill.isLoading} title={t('mockKpis.statementsIssued')} value={b ? b.statementsIssued.toLocaleString() : '—'} icon={<Receipt className="h-5 w-5" />} variant="default" subtitle={b ? t('mockKpis.avgPerStatement', { amount: fmtMoney(b.avgInvoiceValue) }) : ''} />
             <KPICard compact help={t('businessKpisHelp.unbilled')} loading={bill.isLoading} title={t('mockKpis.doneNotInvoiced')} value={b ? b.unbilledWos : '—'} icon={<Hourglass className="h-5 w-5" />} variant="danger" subtitle={b ? fmtMoney(b.unbilledValue) : ''} />
             <KPICard compact help={t('businessKpisHelp.doneToInvoiced')} loading={bill.isLoading} title={t('mockKpis.woDoneToInvoiced')} value={b ? `${b.avgDoneToInvoicedDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="warning" />
@@ -357,12 +418,10 @@ export default function BusinessKpisPage() {
 
         <TabsContent value="collections" className="space-y-6">
           <KpiErrorBanner q={coll} />
+          <p className="text-sm text-muted-foreground">{t('businessKpis.collectionsSnapshotNote')}</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KPICard compact help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} {...kpiMoneyProps(c?.outstandingAr)} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements }) : ''} />
-            <KPICard compact help={t('businessKpisHelp.unpaidInPeriod')} loading={coll.isLoading} title={t('mockKpis.unpaidInPeriod')} {...kpiMoneyProps(c?.unpaidInPeriodValue)} icon={<Receipt className="h-5 w-5" />} variant="danger" subtitle={c ? t('mockKpis.unpaidInPeriodStatements', { count: c.unpaidInPeriodStatements }) : ''} />
             <KPICard compact help={t('businessKpisHelp.dso')} loading={coll.isLoading} title={t('mockKpis.dsoDaysToCollect')} value={c ? `${c.dsoDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="danger" />
-            <KPICard compact help={t('businessKpisHelp.collected')} loading={coll.isLoading} title={t('mockKpis.collected')} {...kpiMoneyProps(c?.collectedValue)} icon={<DollarSign className="h-5 w-5" />} variant="success" />
-            <KPICard compact help={t('businessKpisHelp.collectionRate')} loading={coll.isLoading} title={t('mockKpis.collectionRate')} value={c ? `${c.collectionRatePct}%` : '—'} icon={<Percent className="h-5 w-5" />} variant="info" />
             <KPICard compact help={t('businessKpisHelp.arOver60')} loading={coll.isLoading} title={t('mockKpis.arOver60')} value={c ? `${c.arOver60Pct}%` : '—'} icon={<AlertTriangle className="h-5 w-5" />} variant="violet" />
           </div>
         </TabsContent>

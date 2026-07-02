@@ -62,3 +62,14 @@ export class UnbilledDealerRowDto {
   @ApiProperty({ example: 38, description: 'Días desde el Done más antiguo sin facturar' })
   oldestDays!: number
 }
+
+/** Facturado / cobrado / impago para facturas cuyo período cae en el rango (cohorte única). */
+export class BillingPeriodCollectionKpiDto {
+  @ApiProperty({ example: 254700 }) invoicedValue!: number
+  @ApiProperty({ example: 312 }) statementsIssued!: number
+  @ApiProperty({ example: 816 }) avgInvoiceValue!: number
+  @ApiProperty({ example: 198300 }) collectedValue!: number
+  @ApiProperty({ example: 77.9 }) collectionRatePct!: number
+  @ApiProperty({ example: 56400 }) unpaidInPeriodValue!: number
+  @ApiProperty({ example: 48 }) unpaidInPeriodStatements!: number
+}

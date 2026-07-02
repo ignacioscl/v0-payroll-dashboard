@@ -530,7 +530,7 @@ export const en: Messages = {
     laborCostRevenue: 'Labor Cost / Revenue',
     tabProduction: 'WO Production',
     tabBilling: 'Billing',
-    tabCollections: 'Collections',
+    tabCollections: 'Open AR',
     tabPunch: 'Punch Quality',
     tabPayroll: 'Payroll Spend',
     avgCycleTime: 'Avg Cycle Time',
@@ -708,10 +708,11 @@ export const en: Messages = {
     outstandingAr:
       'Total billed amount not yet collected across all open invoices. Current snapshot — not limited to the date range in the header. Subtitle indicates no date filter and complete open AR.',
     unpaidInPeriod:
-      'Unpaid amount from invoices whose billing period falls entirely within the selected dates (same inclusion rule as Invoiced). Only invoices not fully collected.',
+      'Remaining balance on invoices whose billing period falls entirely within the selected dates (same rule as Invoiced).',
     dso: 'Average days from issuing an invoice to receiving payment.',
-    collected: 'Total payments received in the period.',
-    collectionRate: 'Payments collected as a percentage of amount invoiced in the period.',
+    collected:
+      'Amount collected on those period invoices (invoiced minus still unpaid). When the payment was received does not matter.',
+    collectionRate: 'Share of the period invoice total that has been collected.',
     arOver60: 'Share of receivables overdue more than 60 days.',
     punchError:
       'Share of time punches with errors (missing clock-out, incomplete break, or unusually long shift). Subtitle shows total punches.',
@@ -737,6 +738,9 @@ export const en: Messages = {
     betaBadge: 'Beta',
     betaDisclaimer:
       'These KPIs are in beta. Values should be verified against legacy SRS reports before making business decisions.',
+    billingPeriodSummary: 'Invoiced vs collected (same invoice cohort)',
+    collectionsSnapshotNote:
+      'Open receivables snapshot — not limited to the header date range.',
   },
   mockPayrollReport: {
     title: 'Payroll Report',
