@@ -635,6 +635,9 @@ export const en: Messages = {
     chartProductionDollar: 'Production $',
     chartInvoicedDollar: 'Invoiced $',
     chartCollectedDollar: 'Collected $',
+    chartInvoicedVsCollectedByMonth: 'Invoiced vs collected by month',
+    chartStatementsIssued: 'statements',
+    chartStatementsCollected: 'fully collected',
     chartOutstandingDollar: 'Outstanding $',
     chartValueDollar: 'Value $',
     chartWos: 'WOs',
@@ -731,6 +734,8 @@ export const en: Messages = {
     activeEmployees:
       'Active employees with punches in the period. Subtitle shows average hourly rate.',
     revenuePerEmployee: 'Production value divided by active employees.',
+    collectionsByMonth:
+      'Each month groups statements by their fecha desde (billing period start). Collected amounts apply only to those same statements — a payment received in January on a December statement does not count in January. A statement may cover a period that extends beyond the month it is counted in. The collected count includes only fully paid statements; the amount includes partial payments.',
   },
   businessKpis: {
     filterDateDone: 'Filter by completion date',
@@ -741,6 +746,10 @@ export const en: Messages = {
     billingPeriodSummary: 'Invoiced vs collected (same invoice cohort)',
     collectionsSnapshotNote:
       'Open receivables snapshot — not limited to the header date range.',
+    collectionsHistoryMonths: 'History',
+    collectionsHistoryMonthsOption: '{count} months',
+    collectionsByMonthNote:
+      'Cohort by fecha desde month — collected is from those same statements, not payments on other months’ invoices.',
   },
   mockPayrollReport: {
     title: 'Payroll Report',

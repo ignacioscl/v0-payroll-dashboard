@@ -634,6 +634,9 @@ export interface Messages {
     chartProductionDollar: string
     chartInvoicedDollar: string
     chartCollectedDollar: string
+    chartInvoicedVsCollectedByMonth: string
+    chartStatementsIssued: string
+    chartStatementsCollected: string
     chartOutstandingDollar: string
     chartValueDollar: string
     chartWos: string
@@ -709,6 +712,7 @@ export interface Messages {
     costPerWo: string
     activeEmployees: string
     revenuePerEmployee: string
+    collectionsByMonth: string
   }
   businessKpis: {
     filterDateDone: string
@@ -717,6 +721,9 @@ export interface Messages {
     betaDisclaimer: string
     billingPeriodSummary: string
     collectionsSnapshotNote: string
+    collectionsHistoryMonths: string
+    collectionsHistoryMonthsOption: string
+    collectionsByMonthNote: string
   }
   mockPayrollReport: {
     title: string

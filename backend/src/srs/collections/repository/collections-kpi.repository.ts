@@ -3,9 +3,15 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
+import { CollectionsByMonthRowDto } from '../dto/collections-by-month.dto'
 import { CollectionsKpiDto } from '../dto/collections-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  buildMonthWindow,
+  fillMonthlyGaps,
+  parseHistoryMonths,
+} from '../../shared/kpi/srs-kpi-month'
 import {
   applyZeroFilter,
   statementHasPositiveTotalSql,
@@ -82,6 +88,66 @@ export class CollectionsKpiRepository {
       arOver60Pct: Number(a.arOver60Pct ?? 0),
       openStatements: Number(a.openStatements ?? 0),
     }
+  }
+
+  async getCollectionsByMonth(
+    filter: SrsKpiFilter,
+    historyMonthsRaw?: string | number,
+  ): Promise<CollectionsByMonthRowDto[]> {
+    const historyMonths = parseHistoryMonths(historyMonthsRaw)
+    const { rangeStart, rangeEnd, monthStarts } = buildMonthWindow(filter.fechaHasta, historyMonths)
+    const stmtZero = applyZeroFilter(filter.includeZero, statementHasPositiveTotalSql('s'))
+    const stmt = buildDealerFilterSql(
+      'statement',
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+    )
+    const params = [filter.idDealerProvider, ...stmt.params, rangeStart, rangeEnd]
+
+    const rows = await this.srs.query(
+      `SELECT DATE_FORMAT(s.fecha_desde, '%Y-%m-01')                    AS monthStart,
+              COUNT(*)                                                  AS statementsIssued,
+              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS invoicedValue,
+              SUM(CASE WHEN IS_STATEMENT_BILLED(s.id) = 1 THEN 1 ELSE 0 END) AS collectedStatements,
+              ROUND(IFNULL(SUM(
+                GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)
+                - GET_TOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.discount, NULL, s.discount_type, s.statement_type, NULL)
+              ), 0), 2) AS collectedValue
+       FROM INVOICE_STATEMENT s
+       ${stmt.join}
+       WHERE s.estado = 1 AND s.id_dealer_provider = ?
+         ${stmt.and}
+         AND DATE(s.fecha_desde) >= ?
+         AND DATE(s.fecha_desde) <= ?${stmtZero}
+       GROUP BY monthStart
+       ORDER BY monthStart`,
+      params,
+    )
+
+    const mapped: CollectionsByMonthRowDto[] = rows.map((r: any) => {
+      const invoicedValue = Number(r.invoicedValue ?? 0)
+      const collectedValue = Number(r.collectedValue ?? 0)
+      const collectionRatePct =
+        invoicedValue > 0 ? Math.round((collectedValue / invoicedValue) * 1000) / 10 : 0
+      return {
+        monthStart: String(r.monthStart).slice(0, 10),
+        statementsIssued: Number(r.statementsIssued ?? 0),
+        invoicedValue,
+        collectedStatements: Number(r.collectedStatements ?? 0),
+        collectedValue,
+        collectionRatePct,
+      }
+    })
+
+    return fillMonthlyGaps(mapped, monthStarts, (monthStart) => ({
+      monthStart,
+      statementsIssued: 0,
+      invoicedValue: 0,
+      collectedStatements: 0,
+      collectedValue: 0,
+      collectionRatePct: 0,
+    }))
   }
 
   async getArAging(filter: SrsKpiFilter): Promise<{ bucket: string; statements: number; value: number }[]> {

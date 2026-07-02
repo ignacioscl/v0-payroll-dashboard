@@ -635,6 +635,9 @@ export const es: Messages = {
     chartProductionDollar: 'Producción $',
     chartInvoicedDollar: 'Facturado $',
     chartCollectedDollar: 'Cobrado $',
+    chartInvoicedVsCollectedByMonth: 'Facturado vs cobrado por mes',
+    chartStatementsIssued: 'facturas',
+    chartStatementsCollected: 'cobradas al 100%',
     chartOutstandingDollar: 'Pendiente $',
     chartValueDollar: 'Valor $',
     chartWos: 'OT',
@@ -731,6 +734,8 @@ export const es: Messages = {
     activeEmployees:
       'Empleados activos con ponchadas en el período. El subtítulo muestra la tarifa horaria promedio.',
     revenuePerEmployee: 'Valor de producción dividido por empleados activos.',
+    collectionsByMonth:
+      'Por cada mes se agrupan las facturas según su fecha desde (inicio del período de facturación). El cobrado es solo de esas mismas facturas — un pago recibido en enero sobre una factura de diciembre no entra en enero. Una factura puede cubrir un período que se extiende más allá del mes donde se contabiliza. La cantidad cobrada cuenta solo facturas pagadas al 100%; el monto incluye pagos parciales.',
   },
   businessKpis: {
     filterDateDone: 'Filtrar por fecha de terminación',
@@ -741,6 +746,10 @@ export const es: Messages = {
     billingPeriodSummary: 'Facturado vs cobrado (mismas facturas del período)',
     collectionsSnapshotNote:
       'Snapshot de CxC abierta — no limitado al rango de fechas del encabezado.',
+    collectionsHistoryMonths: 'Historial',
+    collectionsHistoryMonthsOption: '{count} meses',
+    collectionsByMonthNote:
+      'Cohorte por mes de fecha desde — el cobrado es de esas mismas facturas, no de pagos de otros meses.',
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

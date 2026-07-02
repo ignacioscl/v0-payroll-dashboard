@@ -34,6 +34,7 @@ import {
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ProductionWeekChart } from '@/components/dashboard/production-week-chart'
 import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
+import { InvoiceCollectionMonthChart } from '@/components/dashboard/invoice-collection-month-chart'
 import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
@@ -58,6 +59,7 @@ import {
   fetchBillingByWeek,
   fetchBillingPeriodCollection,
   fetchCollectionsKpi,
+  fetchCollectionsByMonth,
   fetchPayrollKpi,
   fetchProductionKpi,
   fetchProductionByWeek,
@@ -65,6 +67,8 @@ import {
   fetchUnbilledAging,
   fetchUnbilledByDealer,
   type BillingKpi,
+  COLLECTIONS_HISTORY_MONTHS,
+  type CollectionsHistoryMonths,
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
 
@@ -120,6 +124,7 @@ export default function BusinessKpisPage() {
   const [payrollWeek, setPayrollWeek] = useState(PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1].value)
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [includeZero, setIncludeZero] = useState(false)
+  const [collectionsHistoryMonths, setCollectionsHistoryMonths] = useState<CollectionsHistoryMonths>(4)
   const [activeTab, setActiveTab] = useState('production')
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
@@ -206,6 +211,15 @@ export default function BusinessKpisPage() {
     queryKey: ['srs-kpi', 'collections', headerKpiParams],
     queryFn: () => fetchCollectionsKpi(headerKpiParams!),
     enabled: Boolean(headerKpiParams) && activeTab === 'collections',
+  })
+  const collByMonthParams = useMemo((): KpiQueryParams | null => {
+    if (!headerKpiParams) return null
+    return { ...headerKpiParams, historyMonths: collectionsHistoryMonths }
+  }, [headerKpiParams, collectionsHistoryMonths])
+  const collByMonth = useQuery({
+    queryKey: ['srs-kpi', 'collections-by-month', collByMonthParams],
+    queryFn: () => fetchCollectionsByMonth(collByMonthParams!),
+    enabled: Boolean(collByMonthParams) && activeTab === 'collections',
   })
   const punch = useQuery({
     queryKey: ['srs-kpi', 'punch', headerKpiParams],
@@ -424,6 +438,31 @@ export default function BusinessKpisPage() {
             <KPICard compact help={t('businessKpisHelp.dso')} loading={coll.isLoading} title={t('mockKpis.dsoDaysToCollect')} value={c ? `${c.dsoDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="danger" />
             <KPICard compact help={t('businessKpisHelp.arOver60')} loading={coll.isLoading} title={t('mockKpis.arOver60')} value={c ? `${c.arOver60Pct}%` : '—'} icon={<AlertTriangle className="h-5 w-5" />} variant="violet" />
           </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Label htmlFor="collections-history-months" className="text-sm font-normal text-muted-foreground">
+              {t('businessKpis.collectionsHistoryMonths')}
+            </Label>
+            <Select
+              value={String(collectionsHistoryMonths)}
+              onValueChange={(value) => setCollectionsHistoryMonths(Number(value) as CollectionsHistoryMonths)}
+              disabled={!rangeReady}
+            >
+              <SelectTrigger id="collections-history-months" className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLLECTIONS_HISTORY_MONTHS.map((months) => (
+                  <SelectItem key={months} value={String(months)}>
+                    {t('businessKpis.collectionsHistoryMonthsOption', { count: months })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <KpiErrorBanner q={collByMonth} />
+          <InvoiceCollectionMonthChart data={collByMonth.data} loading={collByMonth.isLoading} />
         </TabsContent>
 
         <TabsContent value="punch" className="space-y-6">

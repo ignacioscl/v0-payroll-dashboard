@@ -82,6 +82,18 @@ export interface CollectionsKpi {
   openStatements: number
 }
 
+export interface CollectionsByMonthPoint {
+  monthStart: string
+  statementsIssued: number
+  invoicedValue: number
+  collectedStatements: number
+  collectedValue: number
+  collectionRatePct: number
+}
+
+export const COLLECTIONS_HISTORY_MONTHS = [4, 6, 8, 10, 12] as const
+export type CollectionsHistoryMonths = (typeof COLLECTIONS_HISTORY_MONTHS)[number]
+
 export interface PunchKpi {
   totalPunches: number
   errorRatePct: number
@@ -110,6 +122,7 @@ export interface KpiQueryParams {
   filterDateDone?: boolean
   /** When true, include zero-value WO/invoice rows (default false, legacy exclude zeros). */
   includeZero?: boolean
+  historyMonths?: CollectionsHistoryMonths
 }
 
 function buildKpiQuery(params: KpiQueryParams): string {
@@ -123,6 +136,9 @@ function buildKpiQuery(params: KpiQueryParams): string {
   }
   if (params.includeZero !== undefined) {
     qs.set('includeZero', params.includeZero ? 'true' : 'false')
+  }
+  if (params.historyMonths !== undefined) {
+    qs.set('historyMonths', String(params.historyMonths))
   }
   return `?${qs.toString()}`
 }
@@ -154,5 +170,7 @@ export const fetchBillingPeriodCollection = (params: KpiQueryParams) =>
   getKpi<BillingPeriodCollectionKpi>('billing/period-collection', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>
   getKpi<CollectionsKpi>('collections', params)
+export const fetchCollectionsByMonth = (params: KpiQueryParams) =>
+  getKpi<CollectionsByMonthPoint[]>('collections/by-month', params)
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)
 export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)
