@@ -50,6 +50,11 @@ interface DataTableToolbarProps<TData> {
   /** Slot rendered at the very start of the toolbar (before the records counter). */
   leading?: React.ReactNode
 
+  /** When set, overrides the toolbar records counter (e.g. total WOs on grouped tables). */
+  recordsCount?: number
+  /** Label after the records counter when `recordsCount` is set. */
+  recordsCountLabel?: string
+
   /** Scroll the table card below the fixed nav so it fills the viewport. */
   enableTableFocus?: boolean
   onFocusTable?: () => void
@@ -69,6 +74,8 @@ export function DataTableToolbar<TData>({
   includeAllPageSize = false,
   trailing,
   leading,
+  recordsCount,
+  recordsCountLabel,
   enableTableFocus = false,
   onFocusTable,
 }: DataTableToolbarProps<TData>) {
@@ -129,7 +136,11 @@ export function DataTableToolbar<TData>({
   }
 
   // Fallback: when server-side total isn't provided, use filtered row count.
-  const total = totalRows ?? table.getFilteredRowModel().rows.length
+  const rowTotal = totalRows ?? table.getFilteredRowModel().rows.length
+  const displayTotal = recordsCount ?? rowTotal
+  const displayLabel =
+    recordsCountLabel ??
+    (displayTotal === 1 ? t('common.record') : t('common.records'))
   const searchPlaceholder = globalFilterPlaceholder ?? t('common.searchPlaceholder')
 
   return (
@@ -143,10 +154,10 @@ export function DataTableToolbar<TData>({
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <span className="font-semibold tabular-nums text-foreground">
-              {total.toLocaleString()}
+              {displayTotal.toLocaleString()}
             </span>
           )}
-          <span>{total === 1 ? t('common.record') : t('common.records')}</span>
+          <span>{displayLabel}</span>
         </div>
 
         {enableGlobalFilter && (

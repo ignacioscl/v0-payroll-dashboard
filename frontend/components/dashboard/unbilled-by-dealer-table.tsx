@@ -21,6 +21,7 @@ type UnbilledByDealerTableProps = {
 export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTableProps) {
   const { t } = useTranslation()
   const rows = data ?? []
+  const totalWos = React.useMemo(() => rows.reduce((sum, row) => sum + row.wos, 0), [rows])
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'value', desc: true }])
 
   const columns = React.useMemo<ColumnDef<UnbilledDealerRow>[]>(
@@ -97,16 +98,18 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
       tableId="kpi-unbilled-by-dealer"
       columns={columns}
       data={rows}
-      getRowId={(row) => row.dealer}
+      getRowId={(row) => String(row.dealerId)}
       isLoading={loading}
       sorting={sorting}
       onSortingChange={setSorting}
       columnPinning={{ left: ['dealer'] }}
       defaultPageSize={25}
       includeAllPageSize
+      enableGlobalFilter={false}
+      recordsCount={totalWos}
+      recordsCountLabel={t('mockKpis.tableUnbilledWos')}
       enableExport
       exportFileName="kpi-unbilled-by-dealer"
-      globalFilterPlaceholder={t('dealer.label')}
       toolbarLeading={
         <div className="flex flex-col">
           <span className="text-base font-semibold">{t('mockKpis.chartUnbilledByDealer')}</span>

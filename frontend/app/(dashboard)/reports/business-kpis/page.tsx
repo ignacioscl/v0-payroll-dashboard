@@ -322,6 +322,11 @@ export default function BusinessKpisPage() {
           </div>
           <KpiErrorBanner q={prodWeek} />
           <ProductionWeekChart data={prodWeek.data} loading={prodWeek.isLoading} />
+
+          <div className="space-y-3">
+            <KpiErrorBanner q={unbilledByDealer} />
+            <UnbilledByDealerTable data={unbilledByDealer.data} loading={unbilledByDealer.isLoading} />
+          </div>
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-6">
@@ -347,11 +352,6 @@ export default function BusinessKpisPage() {
               <KpiErrorBanner q={unbilledAging} />
               <UnbilledAgingChart data={unbilledAging.data} loading={unbilledAging.isLoading} />
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <KpiErrorBanner q={unbilledByDealer} />
-            <UnbilledByDealerTable data={unbilledByDealer.data} loading={unbilledByDealer.isLoading} />
           </div>
         </TabsContent>
 

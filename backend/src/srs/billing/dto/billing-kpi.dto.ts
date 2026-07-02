@@ -55,6 +55,7 @@ export class BillingWeekRowDto {
 
 /** WOs Done sin facturar agrupadas por dealer (tabla Unbilled Work by Dealer). */
 export class UnbilledDealerRowDto {
+  @ApiProperty({ example: 42 }) dealerId!: number
   @ApiProperty({ example: 'Ford Hollywood' }) dealer!: string
   @ApiProperty({ example: 84 }) wos!: number
   @ApiProperty({ example: 4690 }) value!: number

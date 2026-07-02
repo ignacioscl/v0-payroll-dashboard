@@ -374,6 +374,10 @@ export interface DataTableProps<TData, TValue = unknown> {
   fetchAllRowsForExport?: () => Promise<TData[]>
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
+  /** When set, overrides the toolbar records counter (e.g. total WOs on grouped tables). */
+  recordsCount?: number
+  /** Label after the records counter when `recordsCount` is set (defaults to common.records). */
+  recordsCountLabel?: string
 
   /** Show a toolbar button that scrolls the table below the fixed nav. */
   enableTableFocus?: boolean
@@ -431,6 +435,8 @@ export function DataTable<TData, TValue = unknown>({
   fetchAllRowsForExport,
   toolbarLeading,
   toolbarTrailing,
+  recordsCount,
+  recordsCountLabel,
   enableTableFocus = false,
   className,
   density = 'compact',
@@ -805,6 +811,8 @@ export function DataTable<TData, TValue = unknown>({
         includeAllPageSize={includeAllPageSize}
         leading={toolbarLeading}
         trailing={toolbarTrailing}
+        recordsCount={recordsCount}
+        recordsCountLabel={recordsCountLabel}
         enableTableFocus={enableTableFocus}
         onFocusTable={handleFocusTable}
       />

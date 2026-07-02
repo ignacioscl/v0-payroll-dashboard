@@ -58,6 +58,7 @@ export interface UnbilledAgingBucket {
 }
 
 export interface UnbilledDealerRow {
+  dealerId: number
   dealer: string
   wos: number
   value: number

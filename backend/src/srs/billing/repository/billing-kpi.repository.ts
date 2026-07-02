@@ -245,27 +245,22 @@ export class BillingKpiRepository {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
     // WO en workflow DONE → i.date_last_chg_workflow ES la fecha de paso a Done (sin LOG).
-    // Solo backlog de los últimos N meses + NOT EXISTS (filtra a las no facturadas antes
-    // de traer las service lines; evita materializar el join sobre las WO ya facturadas).
+    // Solo backlog de los últimos N meses; WO_IS_FULL_INVOICED alinea con billing legacy.
     const rows = await this.srs.query(
       `SELECT CASE WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 7  THEN '0-7 days'
                    WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 14 THEN '8-14 days'
                    WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 30 THEN '15-30 days'
                    ELSE '31+ days' END                              AS bucket,
-              COUNT(DISTINCT i.id)                                  AS wos,
-              IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)        AS value
+              COUNT(*)                                              AS wos,
+              ROUND(IFNULL(SUM((SELECT IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)
+                                FROM INVOICE_SERVICE_REL isr WHERE isr.id_invoice = i.id)), 0), 2) AS value
        FROM INVOICE i
        ${inv.join}
-       LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
          AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
-         AND NOT EXISTS (
-           SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
-           JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
-           WHERE stl.id_invoice = i.id
-         )${woZero}
+         AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
        GROUP BY bucket`,
       [filter.idDealerProvider, ...inv.params],
     )
@@ -310,30 +305,28 @@ export class BillingKpiRepository {
   async getUnbilledByDealer(filter: SrsKpiFilter): Promise<UnbilledDealerRowDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
-    // Igual que el aging: WO en DONE → date_last_chg_workflow es la fecha de Done (sin LOG),
-    // backlog de los últimos N meses, anti-join con NOT EXISTS.
+    // Igual que aging: WO en DONE → date_last_chg_workflow es la fecha de Done (sin LOG),
+    // backlog de los últimos N meses, WO_IS_FULL_INVOICED alinea con billing legacy.
     const rows = await this.srs.query(
-      `SELECT GET_DEALER_NAME_BY_PROVIDER(?, c.id)                  AS dealer,
-              COUNT(DISTINCT i.id)                                  AS wos,
-              IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)        AS value,
+      `SELECT c.id                                                  AS dealerId,
+              GET_DEALER_NAME_BY_PROVIDER(?, c.id)                  AS dealer,
+              COUNT(*)                                              AS wos,
+              ROUND(IFNULL(SUM((SELECT IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)
+                                FROM INVOICE_SERVICE_REL isr WHERE isr.id_invoice = i.id)), 0), 2) AS value,
               MAX(DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)))  AS oldestDays
        FROM INVOICE i
        ${inv.join}
-       LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
          AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
-         AND NOT EXISTS (
-           SELECT 1 FROM INVOICE_STATEMENT_INV_REL stl
-           JOIN INVOICE_STATEMENT st ON st.id = stl.id_statement AND st.estado = 1
-           WHERE stl.id_invoice = i.id
-         )${woZero}
+         AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
        GROUP BY c.id
        ORDER BY value DESC`,
       [filter.idDealerProvider, filter.idDealerProvider, ...inv.params],
     )
     return rows.map((r: any) => ({
+      dealerId: Number(r.dealerId),
       dealer: r.dealer,
       wos: Number(r.wos),
       value: Number(r.value),
