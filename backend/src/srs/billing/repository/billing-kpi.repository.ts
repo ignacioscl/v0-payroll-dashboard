@@ -82,6 +82,8 @@ export class BillingKpiRepository {
         stmtPeriodParams,
       ),
       this.srs.query(
+      // Filtro por i.fecha_alta (mismo criterio que el listado de billing legacy,
+      // InvoiceDao / api.datatable.php sin filtro Done: fechaAltaDesde/Hasta).
       `SELECT COUNT(*) AS unbilledWos,
               ROUND(IFNULL(SUM((SELECT IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)
                                 FROM INVOICE_SERVICE_REL isr WHERE isr.id_invoice = i.id)), 0), 2) AS unbilledValue
@@ -90,7 +92,7 @@ export class BillingKpiRepository {
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
-         AND DATE(i.date_last_chg_workflow) BETWEEN ? AND ?
+         AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
          AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}`,
         invPeriodParams,
       ),
@@ -127,6 +129,7 @@ export class BillingKpiRepository {
         [idDealerProvider, ...stmt.params, fechaHasta, fechaDesde, fechaDesde, fechaHasta],
       ),
       this.srs.query(
+        // Filtro por i.fecha_alta (mismo criterio que el listado de billing legacy).
         `SELECT ROUND(IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0), 2) AS woInvoicedValue,
                 ROUND(IFNULL(SUM(
                   CASE WHEN s.fecha_desde >= ? AND s.fecha_hasta <= ?
@@ -142,7 +145,7 @@ export class BillingKpiRepository {
            AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
          WHERE i.estado = 1 AND i.id_dealer_provider = ?
            ${inv.and}
-           AND DATE(i.date_last_chg_workflow) BETWEEN ? AND ?${woLineZero}`,
+           AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)${woLineZero}`,
         [fechaDesde, fechaHasta, ...invPeriodParams],
       ),
       this.srs.query(
@@ -245,12 +248,13 @@ export class BillingKpiRepository {
   async getUnbilledAging(filter: SrsKpiFilter): Promise<UnbilledAgingBucketDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
-    // WO en workflow DONE → i.date_last_chg_workflow ES la fecha de paso a Done (sin LOG).
-    // Solo backlog de los últimos N meses; WO_IS_FULL_INVOICED alinea con billing legacy.
+    // Backlog snapshot: WOs en DONE creadas en los últimos N meses todavía sin facturar.
+    // Aging y lookback usan i.fecha_alta para alinear con el listado de billing legacy
+    // (Invoice::getAge también parte de fechaAlta cuando la WO está Done).
     const rows = await this.srs.query(
-      `SELECT CASE WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 7  THEN '0-7 days'
-                   WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 14 THEN '8-14 days'
-                   WHEN DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)) <= 30 THEN '15-30 days'
+      `SELECT CASE WHEN DATEDIFF(NOW(), DATE(i.fecha_alta)) <= 7  THEN '0-7 days'
+                   WHEN DATEDIFF(NOW(), DATE(i.fecha_alta)) <= 14 THEN '8-14 days'
+                   WHEN DATEDIFF(NOW(), DATE(i.fecha_alta)) <= 30 THEN '15-30 days'
                    ELSE '31+ days' END                              AS bucket,
               COUNT(*)                                              AS wos,
               ROUND(IFNULL(SUM((SELECT IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)
@@ -260,7 +264,7 @@ export class BillingKpiRepository {
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
-         AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
+         AND i.fecha_alta >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
          AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
        GROUP BY bucket`,
       [filter.idDealerProvider, ...inv.params],
@@ -306,21 +310,20 @@ export class BillingKpiRepository {
   async getUnbilledByDealer(filter: SrsKpiFilter): Promise<UnbilledDealerRowDto[]> {
     const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
-    // Igual que aging: WO en DONE → date_last_chg_workflow es la fecha de Done (sin LOG),
-    // backlog de los últimos N meses, WO_IS_FULL_INVOICED alinea con billing legacy.
+    // Igual que aging: aging y lookback por i.fecha_alta para alinear con billing legacy.
     const rows = await this.srs.query(
       `SELECT c.id                                                  AS dealerId,
               GET_DEALER_NAME_BY_PROVIDER(?, c.id)                  AS dealer,
               COUNT(*)                                              AS wos,
               ROUND(IFNULL(SUM((SELECT IFNULL(SUM(isr.price * IFNULL(isr.qty, 1)), 0)
                                 FROM INVOICE_SERVICE_REL isr WHERE isr.id_invoice = i.id)), 0), 2) AS value,
-              MAX(DATEDIFF(NOW(), DATE(i.date_last_chg_workflow)))  AS oldestDays
+              MAX(DATEDIFF(NOW(), DATE(i.fecha_alta)))              AS oldestDays
        FROM INVOICE i
        ${inv.join}
        WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
          AND i.id_dealer_provider = ?
          ${inv.and}
-         AND DATE(i.date_last_chg_workflow) >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
+         AND i.fecha_alta >= DATE_SUB(CURDATE(), INTERVAL ${UNBILLED_LOOKBACK_MONTHS} MONTH)
          AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
        GROUP BY c.id
        ORDER BY value DESC`,

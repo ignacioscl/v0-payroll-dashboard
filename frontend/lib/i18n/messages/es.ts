@@ -697,13 +697,13 @@ export const es: Messages = {
     statements:
       'Cantidad de facturas emitidas en el período. El subtítulo muestra el valor promedio por factura.',
     unbilled:
-      'Órdenes terminadas que aún no están totalmente facturadas. El subtítulo muestra el valor pendiente de facturar.',
+      'Órdenes creadas en el rango de fechas seleccionado que están en estado terminado y aún no están totalmente facturadas. Filtra por fecha de creación (mismo criterio que el listado de billing para OT). El subtítulo muestra el valor pendiente de facturar.',
     doneToInvoiced: 'Días promedio entre completar la orden de trabajo y facturarla.',
     sent: 'Porcentaje de facturas enviadas al cliente. El subtítulo muestra cuántas nunca se enviaron.',
     partialOverlapWo:
       'Facturas de órdenes de trabajo cuyo período se superpone con las fechas seleccionadas pero no entran en Facturado ni en Facturas emitidas porque empiezan antes o terminan después del rango (misma regla que el listado de billing).',
     woInvoiced:
-      '¿Cuánto facturé por OT terminadas en estas fechas? Suma los montos de servicios WO cuando la OT se marcó terminada en el rango seleccionado. No usa el período de la factura; por eso no coincide con Facturado.',
+      '¿Cuánto facturé por OT creadas en estas fechas? Suma los montos de servicios WO cuando la fecha de creación de la OT cae en el rango seleccionado (mismo criterio que el listado de billing para OT). No usa el período de la factura; por eso no coincide con Facturado.',
     ttkInvoiced:
       '¿Cuánto facturé por ponchadas en estas fechas? Suma los montos de ponchadas en facturas TTK cuando la ponchada cae en el rango seleccionado. No usa el período de la factura; por eso no coincide con Facturado.',
     genericInvoiced:
@@ -749,7 +749,7 @@ export const es: Messages = {
     collectionsHistoryMonths: 'Historial',
     collectionsHistoryMonthsOption: '{count} meses',
     collectionsByMonthNote:
-      'Cohorte por mes de fecha desde — el cobrado es de esas mismas facturas, no de pagos de otros meses.',
+      'Agrupado por mes de inicio del período de facturación — el cobrado es solo de esas mismas facturas, no de pagos recibidos en el mes sobre facturas de otros meses.',
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

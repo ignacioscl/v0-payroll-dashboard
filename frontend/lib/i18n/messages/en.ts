@@ -697,13 +697,13 @@ export const en: Messages = {
     statements:
       'Number of invoices issued in the period. Subtitle shows average value per invoice.',
     unbilled:
-      'Completed work orders not yet fully billed. Subtitle shows the dollar value still unbilled.',
+      'Work orders created in the selected date range that are in Done status and not yet fully billed. Filters by creation date (same rule as the billing list for WOs). Subtitle shows the dollar value still unbilled.',
     doneToInvoiced: 'Average days from work order completion to billing.',
     sent: 'Share of invoices sent to the customer. Subtitle shows how many were never sent.',
     partialOverlapWo:
       'Work-order invoices whose billing period overlaps the selected dates but are excluded from Invoiced and Invoices Issued because the period starts before or ends after the range (same rule as the billing list).',
     woInvoiced:
-      'How much was billed from work orders completed in these dates? Adds WO line amounts when the work order was marked done in your selected range. It does not use the invoice period, so it will not match Invoiced.',
+      'How much was billed from work orders created in these dates? Adds WO line amounts when the work order creation date falls in your selected range (same rule as the billing list for WOs). It does not use the invoice period, so it will not match Invoiced.',
     ttkInvoiced:
       'How much was billed from time punches in these dates? Adds punch amounts on TTK invoices when the punch falls in your selected range. It does not use the invoice period, so it will not match Invoiced.',
     genericInvoiced:
@@ -749,7 +749,7 @@ export const en: Messages = {
     collectionsHistoryMonths: 'History',
     collectionsHistoryMonthsOption: '{count} months',
     collectionsByMonthNote:
-      'Cohort by fecha desde month — collected is from those same statements, not payments on other months’ invoices.',
+      'Grouped by invoice billing-period start month — collected reflects only those same invoices, not any payments received in the month on invoices from other months.',
   },
   mockPayrollReport: {
     title: 'Payroll Report',
