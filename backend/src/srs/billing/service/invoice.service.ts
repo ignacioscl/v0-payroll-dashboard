@@ -28,7 +28,7 @@ export class InvoiceService {
       page: filter.page,
       pageSize: filter.pageSize,
       total,
-      hasMore: filter.page * filter.pageSize < total,
+      hasMore: filter.pageSize === -1 ? false : filter.page * filter.pageSize < total,
       summary,
     }
   }

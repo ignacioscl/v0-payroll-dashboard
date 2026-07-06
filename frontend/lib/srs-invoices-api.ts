@@ -14,6 +14,7 @@ export interface InvoiceRow {
   invoiceServiceSelRel?: string
   invoiceNote?: string
   author?: string
+  dealer?: string
   fechaCreate: string
   fechaDesde?: string
   fechaHasta?: string

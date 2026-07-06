@@ -44,6 +44,7 @@ export default function InvoicesPage() {
   const [sended, setSended] = useState<TriState>('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(searchInput.trim()), 350)
@@ -80,7 +81,7 @@ export default function InvoicesPage() {
     }
   }, [ready, headerRange, idDealer, types, search, payed, sended])
 
-  const query = useInvoiceList(input)
+  const query = useInvoiceList(input, pageSize)
   const summary = query.data?.pages[0]?.summary
   const showSummary = ready
 
@@ -124,6 +125,9 @@ export default function InvoicesPage() {
         hydrated={filtersHydrated}
         hasDealer={hasDealer}
         hasDates={hasDates}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        showDealerSubline={selectedDealers.length > 1}
       />
     </div>
   )

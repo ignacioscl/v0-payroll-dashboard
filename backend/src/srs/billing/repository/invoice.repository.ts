@@ -57,8 +57,10 @@ export class InvoiceRepository {
   /** Página de statements (una fila por statement). */
   async listPage(f: InvoiceListFilter): Promise<InvoiceRowDto[]> {
     const { join, where, params } = this.buildWhere(f)
-    const limit = Math.trunc(f.pageSize)
-    const offset = Math.trunc((f.page - 1) * f.pageSize)
+    const limitClause =
+      f.pageSize === -1
+        ? ''
+        : ` LIMIT ${Math.trunc(f.pageSize)} OFFSET ${Math.trunc((f.page - 1) * f.pageSize)}`
 
     const rows = await this.srs.query(
       `SELECT s.id, s.full_nro, s.statement_type, s.estado, s.sended,
@@ -68,6 +70,7 @@ export class InvoiceRepository {
               d.nombre        AS department,
               inv_serv.nombre AS invoice_service,
               u.nombre        AS author,
+              c.razon_social  AS dealer,
               GET_NRO_WO_FROM_INVOICE(s.id)                                         AS wo,
               GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)                                 AS sub_total,
               GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total,
@@ -90,8 +93,7 @@ export class InvoiceRepository {
        ) lb ON lb.id_statement = s.id
        LEFT JOIN BILLING b ON b.id = lb.id_billing
        ${where}
-       ORDER BY s.fecha_desde DESC, s.fecha_create
-       LIMIT ${limit} OFFSET ${offset}`,
+       ORDER BY s.fecha_desde DESC, s.fecha_create${limitClause}`,
       params,
     )
 
@@ -106,6 +108,7 @@ export class InvoiceRepository {
       invoiceServiceSelRel: r.invoice_service_sel_rel ?? undefined,
       invoiceNote: r.invoice_note ?? undefined,
       author: r.author ?? undefined,
+      dealer: r.dealer ?? undefined,
       fechaCreate: r.fecha_create,
       fechaDesde: r.fecha_desde ?? undefined,
       fechaHasta: r.fecha_hasta ?? undefined,

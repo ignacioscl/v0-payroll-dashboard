@@ -193,8 +193,8 @@ function DetailSection({
 
 function DetailTable({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-md border border-border/60 bg-card/80">
-      <table className="w-full text-xs">{children}</table>
+    <div className="inline-block overflow-hidden rounded-md border border-border/60 bg-card/80">
+      <table className="w-auto text-xs">{children}</table>
     </div>
   )
 }
@@ -362,12 +362,19 @@ export function InvoiceListTable({
   hydrated,
   hasDealer,
   hasDates,
+  pageSize,
+  onPageSizeChange,
+  showDealerSubline,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
   hydrated: boolean
   hasDealer: boolean
   hasDates: boolean
+  pageSize: number
+  onPageSizeChange: (pageSize: number) => void
+  /** Legacy: debajo del nro de invoice cuando hay multi-dealer en el header. */
+  showDealerSubline?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -439,9 +446,9 @@ export function InvoiceListTable({
           return (
             <div className="flex flex-col">
               <span className="font-semibold text-foreground">{r.fullNro || `#${r.id}`}</span>
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                {fmtDate(r.fechaCreate)}
-              </span>
+              {showDealerSubline && r.dealer ? (
+                <span className="text-[11px] text-muted-foreground">{r.dealer}</span>
+              ) : null}
             </div>
           )
         },
@@ -454,8 +461,9 @@ export function InvoiceListTable({
       {
         id: 'type',
         accessorFn: (row) => typeMeta(row.statementType, t).label,
-        size: 130,
-        minSize: 110,
+        size: 112,
+        minSize: 100,
+        maxSize: 130,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colType')} />
@@ -476,8 +484,9 @@ export function InvoiceListTable({
       {
         id: 'period',
         accessorFn: (row) => fmtPeriod(row.fechaDesde, row.fechaHasta),
-        size: 170,
-        minSize: 140,
+        size: 148,
+        minSize: 128,
+        maxSize: 168,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colPeriod')} />
@@ -495,8 +504,9 @@ export function InvoiceListTable({
       {
         id: 'detail',
         accessorFn: (row) => rowDetailText(row),
-        size: 320,
-        minSize: 200,
+        size: 160,
+        minSize: 100,
+        enableResizing: false,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colDetail')} />
@@ -504,21 +514,23 @@ export function InvoiceListTable({
         cell: ({ row }) => {
           const text = rowDetailText(row.original)
           return (
-            <span className="block truncate text-foreground" title={text}>
+            <span className="block text-[11px] leading-snug break-words text-foreground">
               {text}
             </span>
           )
         },
         meta: {
           label: t('invoices.colDetail'),
+          cellClassName: 'whitespace-normal',
           exportValue: (r) => rowDetailText(r),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
         id: 'subtotal',
         accessorFn: (row) => row.subtotal,
-        size: 120,
-        minSize: 100,
+        size: 84,
+        minSize: 72,
+        maxSize: 88,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colSubtotal')} />
@@ -535,8 +547,9 @@ export function InvoiceListTable({
       {
         id: 'discount',
         accessorFn: (row) => row.discount ?? 0,
-        size: 110,
-        minSize: 90,
+        size: 80,
+        minSize: 68,
+        maxSize: 84,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colDiscount')} />
@@ -558,8 +571,9 @@ export function InvoiceListTable({
       {
         id: 'total',
         accessorFn: (row) => row.total,
-        size: 120,
-        minSize: 100,
+        size: 84,
+        minSize: 72,
+        maxSize: 88,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colTotal')} />
@@ -576,8 +590,9 @@ export function InvoiceListTable({
       {
         id: 'paid',
         accessorFn: (row) => paidMeta(row, t).label,
-        size: 140,
-        minSize: 120,
+        size: 118,
+        minSize: 104,
+        maxSize: 140,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colPaid')} />
@@ -603,7 +618,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t],
+    [t, showDealerSubline],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -657,14 +672,11 @@ export function InvoiceListTable({
         enableGlobalFilter={false}
         recordsCount={gateReady ? total : 0}
         recordsCountLabel={t('nav.invoices')}
-        renderSubComponent={(row) => {
-          const rail = TYPE_RAIL[typeTokenOf(row.original.statementType)]
-          return (
-            <div className={cn('border-l-[3px] bg-muted/20 px-4 py-3', rail)}>
-              <InvoiceDetailBody row={row.original} />
-            </div>
-          )
-        }}
+        pageSize={pageSize}
+        onPageSizeChange={onPageSizeChange}
+        showPageSizeInInfiniteScroll
+        pageSizeOptions={[25, 50, 100]}
+        includeAllPageSize
         infiniteScroll={{
           hasNextPage: gateReady ? (hasNextPage ?? false) : false,
           isFetchingNextPage,
@@ -675,7 +687,14 @@ export function InvoiceListTable({
               {t('invoices.loadingMore')}
             </>
           ),
-          endLabel: <span className="uppercase tracking-wide">{t('invoices.endOfList')}</span>,
+        }}
+        renderSubComponent={(row) => {
+          const rail = TYPE_RAIL[typeTokenOf(row.original.statementType)]
+          return (
+            <div className={cn('border-l-[3px] bg-muted/20 px-4 py-3', rail)}>
+              <InvoiceDetailBody row={row.original} />
+            </div>
+          )
         }}
         footer={
           showFooter && summary ? (
@@ -692,6 +711,7 @@ export function InvoiceListTable({
         exportFileName="invoices"
         fetchAllRowsForExport={fetchAllRowsForExport}
         tableScrollHeight="calc(100dvh - 22rem)"
+        flexColumnId="detail"
         enableTableFocus
       />
   )

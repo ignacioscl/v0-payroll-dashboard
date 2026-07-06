@@ -8,7 +8,8 @@ export const DASHBOARD_NAV_HEIGHT = 64
 export function scrollElementBelowNav(
   element: HTMLElement,
   navHeight = DASHBOARD_NAV_HEIGHT,
+  behavior: ScrollBehavior = 'smooth',
 ): void {
   const top = element.getBoundingClientRect().top + window.scrollY - navHeight
-  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  window.scrollTo({ top: Math.max(0, top), behavior })
 }

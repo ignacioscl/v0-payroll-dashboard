@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils'
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
 import { DATA_TABLE_PAGE_SIZE_ALL, type ColumnFilterConfig } from './data-table-helpers'
-import { scrollElementBelowNav } from '@/lib/scroll/scroll-table-to-viewport'
+import { scrollElementBelowNav, DASHBOARD_NAV_HEIGHT } from '@/lib/scroll/scroll-table-to-viewport'
 
 /* -------------------------------------------------------------------------- */
 /* Paginated server-side contract                                              */
@@ -102,6 +102,17 @@ const ROW_HEIGHT_COMPACT = 37
 const ROW_HEIGHT_COMFORTABLE = 45
 /** Fallback scroll region when virtualizing without an explicit `tableScrollHeight`. */
 const DEFAULT_VIRTUAL_SCROLL_MAX = 'min(70vh, calc(100dvh - 16rem))'
+
+function colUsesFixedWidth(
+  columnId: string,
+  pin: PinSide,
+  opts: { fitContent: boolean; flexColumnId?: string },
+): boolean {
+  if (opts.fitContent) return true
+  if (pin) return true
+  if (opts.flexColumnId) return columnId !== opts.flexColumnId
+  return false
+}
 
 function readPersistedVisibility(tableId: string | undefined): VisibilityState {
   if (!tableId || typeof window === 'undefined') return {}
@@ -433,9 +444,28 @@ export interface DataTableProps<TData, TValue = unknown> {
    * Example: `"calc(100dvh - 24rem)"`
    */
   tableScrollHeight?: string
+  /**
+   * `fill` (default): table stretches to the container width.
+   * `content`: table is only as wide as its columns (no dead space on the right).
+   */
+  tableWidth?: 'fill' | 'content'
+  /**
+   * In `fill` mode: this column absorbs all leftover horizontal space; every other
+   * column keeps its declared width. Use for a single flexible text column (e.g. Detail).
+   */
+  flexColumnId?: string
   /** Virtualize body rows when count >= threshold (default on, threshold 50). */
   enableVirtualization?: boolean
   virtualizeThreshold?: number
+
+  /**
+   * Infinite-scroll: keep the rows-per-page selector visible (batch size per fetch).
+   * Requires `pageSize` + `onPageSizeChange` from the parent.
+   */
+  showPageSizeInInfiniteScroll?: boolean
+  /** Controlled batch size when using infinite scroll + rows selector. */
+  pageSize?: number
+  onPageSizeChange?: (pageSize: number) => void
 }
 
 export function DataTable<TData, TValue = unknown>({
@@ -485,8 +515,13 @@ export function DataTable<TData, TValue = unknown>({
   stickyHeader = true,
   zebraRows = true,
   tableScrollHeight,
+  tableWidth = 'fill',
+  flexColumnId,
   enableVirtualization = true,
   virtualizeThreshold = DEFAULT_VIRTUALIZE_THRESHOLD,
+  showPageSizeInInfiniteScroll = false,
+  pageSize: controlledPageSize,
+  onPageSizeChange,
 }: DataTableProps<TData, TValue>) {
   /* ---------- Persisted visibility ----------
    * Same SSR/hydration rule as column sizing below: start empty so the server
@@ -556,6 +591,7 @@ export function DataTable<TData, TValue = unknown>({
   const [expanded, setExpanded] = React.useState<ExpandedState>({})
 
   /* ---------- Pagination state ---------- */
+  const isInfiniteMode = !!infiniteScroll
   const isServerPagination = !!pagination
   const [localPagination, setLocalPagination] = React.useState<PaginationState>(() => ({
     pageIndex: 0,
@@ -564,7 +600,10 @@ export function DataTable<TData, TValue = unknown>({
 
   const paginationState: PaginationState = isServerPagination
     ? { pageIndex: pagination!.pageIndex, pageSize: pagination!.pageSize }
-    : localPagination
+    : {
+        pageIndex: localPagination.pageIndex,
+        pageSize: controlledPageSize ?? localPagination.pageSize,
+      }
 
   // TanStack slices with `rows.slice(start, end)`; pageSize -1 becomes end=-1 and drops
   // the last row. Skip the pagination row model when "All" is selected.
@@ -576,6 +615,13 @@ export function DataTable<TData, TValue = unknown>({
         ? (updater as (s: PaginationState) => PaginationState)(paginationState)
         : updater
     persistPageSize(tableId, next.pageSize)
+    if (isInfinite && onPageSizeChange) {
+      onPageSizeChange(next.pageSize)
+      if (controlledPageSize === undefined) {
+        setLocalPagination(next)
+      }
+      return
+    }
     if (isServerPagination) {
       pagination!.onPaginationChange(next)
     } else {
@@ -665,7 +711,9 @@ export function DataTable<TData, TValue = unknown>({
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
     getExpandedRowModel: renderSubComponent ? getExpandedRowModel() : undefined,
     getPaginationRowModel:
-      isServerPagination || isAllPageSize ? undefined : getPaginationRowModel(),
+      isServerPagination || isAllPageSize || isInfiniteMode
+        ? undefined
+        : getPaginationRowModel(),
   })
 
   const visibleColCount = table.getVisibleLeafColumns().length
@@ -691,10 +739,46 @@ export function DataTable<TData, TValue = unknown>({
   const topScrollRef = React.useRef<HTMLDivElement>(null)
   const cardRef = React.useRef<HTMLDivElement>(null)
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = React.useState(false)
+  const [isTableFocused, setIsTableFocused] = React.useState(false)
+  const [focusScrollHeight, setFocusScrollHeight] = React.useState<string | null>(null)
+
+  const computeFocusedScrollHeight = React.useCallback((): string | undefined => {
+    const card = cardRef.current
+    const scroll = mainScrollRef.current
+    if (!card || !scroll) return undefined
+    const scrollTop = scroll.getBoundingClientRect().top
+    const chromeBelow =
+      card.getBoundingClientRect().bottom - scroll.getBoundingClientRect().bottom
+    const h = window.innerHeight - scrollTop - chromeBelow - 8
+    return h > 120 ? `${Math.floor(h)}px` : undefined
+  }, [])
 
   const handleFocusTable = React.useCallback(() => {
-    if (cardRef.current) scrollElementBelowNav(cardRef.current)
-  }, [])
+    if (!cardRef.current) return
+    if (isTableFocused) {
+      setIsTableFocused(false)
+      setFocusScrollHeight(null)
+      return
+    }
+    scrollElementBelowNav(cardRef.current, DASHBOARD_NAV_HEIGHT, 'auto')
+    requestAnimationFrame(() => {
+      const h = computeFocusedScrollHeight()
+      if (h) {
+        setFocusScrollHeight(h)
+        setIsTableFocused(true)
+      }
+    })
+  }, [computeFocusedScrollHeight, isTableFocused])
+
+  React.useEffect(() => {
+    if (!isTableFocused) return
+    const onResize = () => {
+      const h = computeFocusedScrollHeight()
+      if (h) setFocusScrollHeight(h)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [computeFocusedScrollHeight, isTableFocused])
 
   const onTopScroll = React.useCallback(() => {
     const top = topScrollRef.current
@@ -728,14 +812,20 @@ export function DataTable<TData, TValue = unknown>({
   // their widths and sticky offsets can never desync.
   const geo = buildColumnGeometry(table)
   const totalTableWidth = geo.total
-  // Fill the panel when there is extra space (e.g. sidebar collapsed). When
-  // columns are wider than the viewport, `minWidth` enables horizontal scroll.
-  // Pinned columns keep fixed widths via `<col>` + locked `<th>`/`<td>`; only
-  // center columns absorb extra space so sticky offsets stay aligned.
-  const tableWidthStyle: React.CSSProperties = {
-    width: '100%',
-    minWidth: totalTableWidth,
-  }
+  const fitContent = tableWidth === 'content'
+  const layoutOpts = { fitContent, flexColumnId }
+  const lockedTableWidth = geo.ordered
+    .filter((c) => colUsesFixedWidth(c.id, c.pin, layoutOpts))
+    .reduce((sum, c) => sum + c.size, 0)
+  const flexColumnMin =
+    flexColumnId && !fitContent
+      ? (table.getColumn(flexColumnId)?.columnDef.minSize ?? 120)
+      : 0
+  const tableWidthStyle: React.CSSProperties = fitContent
+    ? { width: totalTableWidth }
+    : flexColumnId
+      ? { width: '100%', minWidth: lockedTableWidth + flexColumnMin }
+      : { width: '100%', minWidth: totalTableWidth }
 
   const bodyRows = table.getRowModel().rows
   const shouldVirtualize =
@@ -765,9 +855,10 @@ export function DataTable<TData, TValue = unknown>({
     mainScrollRef.current?.scrollTo({ top: 0 })
   }, [paginationState.pageIndex, shouldVirtualize])
 
-  const isInfinite = !!infiniteScroll
-  const scrollContainerStyle: React.CSSProperties = tableScrollHeight
-    ? { maxHeight: tableScrollHeight, overflow: 'auto' }
+  const isInfinite = isInfiniteMode
+  const effectiveTableScrollHeight = focusScrollHeight ?? tableScrollHeight
+  const scrollContainerStyle: React.CSSProperties = effectiveTableScrollHeight
+    ? { maxHeight: effectiveTableScrollHeight, overflow: 'auto' }
     : shouldVirtualize || isInfinite
       ? { maxHeight: DEFAULT_VIRTUAL_SCROLL_MAX, overflow: 'auto' }
       : { overflowX: 'auto' }
@@ -828,7 +919,8 @@ export function DataTable<TData, TValue = unknown>({
           const isFirstRightPinned =
             pin === 'right' && cell.column.getIsFirstColumn('right')
           const size = geo.size.get(cell.column.id) ?? cell.column.getSize()
-          const sizingStyle = pin
+          const lockColumnWidth = colUsesFixedWidth(cell.column.id, pin, layoutOpts)
+          const sizingStyle = lockColumnWidth
             ? { width: size, minWidth: size, maxWidth: size }
             : undefined
           const cellPinStyles = getBodyCellStyle(pin, geo, cell.column.id)
@@ -863,8 +955,11 @@ export function DataTable<TData, TValue = unknown>({
       </TableRow>
       {renderSubComponent && isExpanded ? (
         <TableRow className="border-b border-border/50 hover:bg-transparent">
-          <TableCell colSpan={visibleColCount} className="bg-muted/20 p-0">
-            {renderSubComponent(row)}
+          <TableCell colSpan={visibleColCount} className="overflow-visible bg-muted/20 p-0">
+            {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally. */}
+            <div className="sticky left-0 z-[2] w-max max-w-[min(100vw-3rem,56rem)]">
+              {renderSubComponent(row)}
+            </div>
           </TableCell>
         </TableRow>
       ) : null}
@@ -900,12 +995,13 @@ export function DataTable<TData, TValue = unknown>({
         fetchAllRowsForExport={fetchAllRowsForExport}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}
-        showPageSize={!isInfinite}
+        showPageSize={showPageSizeInInfiniteScroll || !isInfinite}
         leading={toolbarLeading}
         trailing={toolbarTrailing}
         recordsCount={recordsCount}
         recordsCountLabel={recordsCountLabel}
         enableTableFocus={enableTableFocus}
+        isTableFocused={isTableFocused}
         onFocusTable={handleFocusTable}
       />
 
@@ -947,7 +1043,7 @@ export function DataTable<TData, TValue = unknown>({
           // `table-layout: fixed` makes the column widths set on `<th>` the
           // single source of truth — required for column resizing and for the
           // sticky offsets used by pinned columns to match the visual layout.
-          className="w-full caption-bottom text-sm"
+          className={cn(!fitContent && 'w-full', 'caption-bottom text-sm')}
           style={{
             tableLayout: 'fixed',
             ...tableWidthStyle,
@@ -959,9 +1055,9 @@ export function DataTable<TData, TValue = unknown>({
             {geo.ordered.map((c) => (
               <col
                 key={c.id}
-                // Pinned: fixed width for sticky offsets. Center: no width →
-                // grows to fill remaining space when the table is `width: 100%`.
-                style={c.pin ? { width: c.size } : undefined}
+                style={
+                  colUsesFixedWidth(c.id, c.pin, layoutOpts) ? { width: c.size } : undefined
+                }
               />
             ))}
           </colgroup>
@@ -996,7 +1092,8 @@ export function DataTable<TData, TValue = unknown>({
                   // Pinned cells lock width (from the shared geometry) so the
                   // sticky offset matches the rendered column exactly.
                   const size = geo.size.get(header.column.id) ?? header.getSize()
-                  const sizingStyle = pin
+                  const lockColumnWidth = colUsesFixedWidth(header.column.id, pin, layoutOpts)
+                  const sizingStyle = lockColumnWidth
                     ? { width: size, minWidth: size, maxWidth: size }
                     : undefined
                   const canResize = header.column.getCanResize()

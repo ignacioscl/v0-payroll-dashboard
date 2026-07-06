@@ -59,6 +59,7 @@ interface DataTableToolbarProps<TData> {
 
   /** Scroll the table card below the fixed nav so it fills the viewport. */
   enableTableFocus?: boolean
+  isTableFocused?: boolean
   onFocusTable?: () => void
 }
 
@@ -80,6 +81,7 @@ export function DataTableToolbar<TData>({
   recordsCount,
   recordsCountLabel,
   enableTableFocus = false,
+  isTableFocused = false,
   onFocusTable,
 }: DataTableToolbarProps<TData>) {
   const { t } = useTranslation()
@@ -240,10 +242,11 @@ export function DataTableToolbar<TData>({
           <>
             <Button
               type="button"
-              variant="outline"
+              variant={isTableFocused ? 'secondary' : 'outline'}
               size="sm"
               className="h-7 gap-1.5 px-2 text-[11px] cursor-pointer"
               onClick={onFocusTable}
+              aria-pressed={isTableFocused}
               aria-label={t('common.fullScreen')}
               title={t('common.fullScreen')}
             >

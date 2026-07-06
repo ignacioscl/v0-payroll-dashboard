@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
@@ -33,12 +33,14 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @Min(1)
   page?: number
 
-  @ApiPropertyOptional({ example: 25, default: INVOICE_LIST_DEFAULT_PAGE_SIZE })
+  @ApiPropertyOptional({
+    example: 25,
+    default: INVOICE_LIST_DEFAULT_PAGE_SIZE,
+    description: 'Filas por página; -1 = todas (sin LIMIT)',
+  })
   @IsOptional()
   @Transform(toOptionalInt)
   @IsInt()
-  @Min(1)
-  @Max(INVOICE_LIST_MAX_PAGE_SIZE)
   pageSize?: number
 
   @ApiPropertyOptional({
@@ -105,9 +107,11 @@ export function buildInvoiceListFilter(
   const dealerIds = parseDealerIds(query.idDealer)
   const page = query.page && query.page > 0 ? query.page : 1
   const pageSize =
-    query.pageSize && query.pageSize > 0
-      ? Math.min(query.pageSize, INVOICE_LIST_MAX_PAGE_SIZE)
-      : INVOICE_LIST_DEFAULT_PAGE_SIZE
+    query.pageSize === -1
+      ? -1
+      : query.pageSize && query.pageSize > 0
+        ? Math.min(query.pageSize, INVOICE_LIST_MAX_PAGE_SIZE)
+        : INVOICE_LIST_DEFAULT_PAGE_SIZE
   return {
     idDealerProvider: ctx.idDealerProvider,
     idUsuario: ctx.idUsuario,
@@ -139,6 +143,7 @@ export class InvoiceRowDto {
   @ApiProperty({ nullable: true }) invoiceServiceSelRel?: string
   @ApiProperty({ nullable: true }) invoiceNote?: string
   @ApiProperty({ nullable: true }) author?: string
+  @ApiProperty({ nullable: true, description: 'Dealer (CONTRATISTA.razon_social)' }) dealer?: string
   @ApiProperty() fechaCreate!: string
   @ApiProperty({ nullable: true }) fechaDesde?: string
   @ApiProperty({ nullable: true }) fechaHasta?: string
