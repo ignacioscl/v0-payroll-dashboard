@@ -12,8 +12,74 @@ export interface Messages {
     productionVsGoal: string
     payrollReport: string
     reports: string
+    billing: string
+    invoices: string
     components: string
     dataTable: string
+  }
+  invoices: {
+    title: string
+    subtitle: string
+    searchPlaceholder: string
+    typesLabel: string
+    typeWo: string
+    typeTtk: string
+    typeGeneric: string
+    paymentLabel: string
+    paymentAll: string
+    paymentPaid: string
+    paymentUnpaid: string
+    sentLabel: string
+    sentAll: string
+    sentYes: string
+    sentNo: string
+    colInvoice: string
+    colType: string
+    colPeriod: string
+    colDetail: string
+    colSubtotal: string
+    colDiscount: string
+    colTotal: string
+    colPaid: string
+    statusPaid: string
+    statusUnpaid: string
+    statusPartial: string
+    sentBadge: string
+    notSentBadge: string
+    selectDealerTitle: string
+    selectDealerHint: string
+    selectDatesTitle: string
+    noResultsTitle: string
+    noResultsHint: string
+    loadErrorTitle: string
+    loadErrorHint: string
+    totalsLabel: string
+    totalsCount: string
+    summaryStatements: string
+    summaryFilteredTotal: string
+    totalsShowing: string
+    totalsSubtotal: string
+    totalsDiscount: string
+    totalsTotal: string
+    loadingMore: string
+    endOfList: string
+    detailLoading: string
+    detailEmpty: string
+    detailError: string
+    detailWoTitle: string
+    detailGenericTitle: string
+    detailTtkTitle: string
+    colWo: string
+    colVehicle: string
+    colDepartment: string
+    colService: string
+    colQty: string
+    colPrice: string
+    colDescription: string
+    colEmployee: string
+    colRole: string
+    viewDetail: string
+    detailHeading: string
   }
   sidebar: {
     appSubtitle: string

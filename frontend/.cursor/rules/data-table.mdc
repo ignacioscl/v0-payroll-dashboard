@@ -375,6 +375,65 @@ const query = useQuery({
 />
 ```
 
+## Scroll infinito (`infiniteScroll`)
+
+Modo alternativo a la paginación por páginas: en lugar del footer numerado, un
+sentinel al fondo de la región scrolleable pide la próxima página vía
+`IntersectionObserver` a medida que el usuario se acerca al final.
+
+```tsx
+const query = useInfiniteQuery({ /* ... getNextPageParam ... */ })
+const rows = query.data?.pages.flatMap((p) => p.results) ?? []
+
+<DataTable<Row>
+  tableId="invoices"
+  columns={columns}
+  data={rows}                       // TODAS las filas acumuladas
+  isLoading={query.isFetching && rows.length === 0}
+  recordsCount={query.data?.pages[0]?.total}   // total real en el contador
+  infiniteScroll={{
+    hasNextPage: query.hasNextPage ?? false,
+    isFetchingNextPage: query.isFetchingNextPage,
+    onLoadMore: () => query.fetchNextPage(),    // debe ser estable (useCallback)
+    loadingLabel: <>{t('...loadingMore')}</>,   // opcional
+    endLabel: t('...endOfList'),                // opcional
+  }}
+  footer={<TotalsBar .../>}          // slot de footer (barra de totales, etc.)
+  tableScrollHeight="calc(100dvh - 22rem)"
+/>
+```
+
+- Es **mutuamente excluyente** con `pagination`. No pases ambos.
+- Oculta el selector de "Rows" y el footer de paginación.
+- Requiere una región scrolleable acotada; si no pasás `tableScrollHeight`, cae
+  a un `max-height` por defecto para que el sticky header + el sentinel funcionen.
+- El export sigue andando: pasá `fetchAllRowsForExport` (paginá el backend).
+
+## `footer`
+
+Slot opcional renderizado debajo del body (y por encima/―en lugar de― la
+paginación). Úsalo para barras de totales, resúmenes o acciones de tabla.
+
+## Sub-filas / drilldown (`renderSubComponent`)
+
+Para expandir una fila y mostrar detalle inline (sub-tabla), pasá
+`renderSubComponent`. El toggle se dispara desde una celda con
+`row.toggleExpanded()` (columna "expander" con un chevron).
+
+```tsx
+<DataTable<Row>
+  columns={columns}                 // incluí una columna id:'expander'
+  renderSubComponent={(row) => <Detail row={row.original} />}
+  getRowCanExpand={() => true}       // opcional (default: todas)
+  getRowId={(r) => String(r.id)}     // recomendado para conservar el estado
+/>
+```
+
+- La sub-fila se renderiza como un `<td colSpan>` full-width debajo de la fila.
+- **La virtualización se desactiva** mientras `renderSubComponent` está seteado
+  (las sub-filas manuales no entran en el conteo del virtualizer). Combínalo con
+  `tableScrollHeight` para acotar la región scrolleable.
+
 ## Export
 
 ### Client-side (default)

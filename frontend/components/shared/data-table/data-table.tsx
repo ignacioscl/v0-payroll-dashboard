@@ -4,6 +4,7 @@ import * as React from 'react'
 import {
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
@@ -13,6 +14,7 @@ import {
   type ColumnFiltersState,
   type ColumnPinningState,
   type ColumnSizingState,
+  type ExpandedState,
   type PaginationState,
   type Row,
   type SortingState,
@@ -367,6 +369,40 @@ export interface DataTableProps<TData, TValue = unknown> {
   // ---------- Interactivity ----------
   onRowClick?: (row: TData) => void
 
+  // ---------- Row expansion (sub-table / drilldown) ----------
+  /**
+   * When provided, expandable rows render this content in a full-width row
+   * right below the expanded row. Toggle expansion from a cell with
+   * `row.toggleExpanded()`. Virtualization is disabled while this is set (the
+   * manually-rendered sub-rows are not part of the virtualizer's row count).
+   */
+  renderSubComponent?: (row: Row<TData>) => React.ReactNode
+  /** Gate which rows can expand. Defaults to all rows when `renderSubComponent` is set. */
+  getRowCanExpand?: (row: Row<TData>) => boolean
+
+  // ---------- Infinite scroll ----------
+  /**
+   * Enables infinite-scroll mode. When set:
+   * - the paginated footer is hidden and the rows-per-page selector disappears,
+   * - a sentinel at the bottom of the (bounded) scroll region calls `onLoadMore`
+   *   via IntersectionObserver as the user nears the end,
+   * - `data` must be the full accumulated list of loaded rows.
+   *
+   * Mutually exclusive with `pagination`. Falls back to a bounded scroll region
+   * (so the sticky header + sentinel work) when `tableScrollHeight` isn't set.
+   */
+  infiniteScroll?: {
+    hasNextPage: boolean
+    isFetchingNextPage: boolean
+    onLoadMore: () => void
+    /** Strip shown while the next page loads (defaults to a spinner). */
+    loadingLabel?: React.ReactNode
+    /** Strip shown when every row is loaded. */
+    endLabel?: React.ReactNode
+  }
+  /** Content rendered as a footer below the table body (e.g. a totals bar). */
+  footer?: React.ReactNode
+
   // ---------- Toolbar ----------
   enableViewOptions?: boolean
   enableExport?: boolean
@@ -429,6 +465,10 @@ export function DataTable<TData, TValue = unknown>({
   onRowSelectionChange,
   getRowId,
   onRowClick,
+  renderSubComponent,
+  getRowCanExpand,
+  infiniteScroll,
+  footer,
   enableViewOptions = true,
   enableExport = true,
   exportFileName,
@@ -513,6 +553,7 @@ export function DataTable<TData, TValue = unknown>({
   const [localGlobalFilter, setLocalGlobalFilter] = React.useState('')
   const [localColumnFilters, setLocalColumnFilters] = React.useState<ColumnFiltersState>([])
   const [localSelection, setLocalSelection] = React.useState<Record<string, boolean>>({})
+  const [expanded, setExpanded] = React.useState<ExpandedState>({})
 
   /* ---------- Pagination state ---------- */
   const isServerPagination = !!pagination
@@ -556,6 +597,7 @@ export function DataTable<TData, TValue = unknown>({
       columnFilters: columnFilters ?? localColumnFilters,
       globalFilter: globalFilter ?? localGlobalFilter,
       rowSelection: rowSelection ?? localSelection,
+      expanded,
       pagination: paginationState,
       columnPinning: internalPinning,
       columnSizing,
@@ -609,6 +651,10 @@ export function DataTable<TData, TValue = unknown>({
 
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setInternalPinning,
+    onExpandedChange: setExpanded,
+    getRowCanExpand: renderSubComponent
+      ? (getRowCanExpand ?? (() => true))
+      : undefined,
 
     manualPagination: isServerPagination,
     pageCount: isServerPagination ? pagination!.pageCount : undefined,
@@ -617,6 +663,7 @@ export function DataTable<TData, TValue = unknown>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
+    getExpandedRowModel: renderSubComponent ? getExpandedRowModel() : undefined,
     getPaginationRowModel:
       isServerPagination || isAllPageSize ? undefined : getPaginationRowModel(),
   })
@@ -692,7 +739,9 @@ export function DataTable<TData, TValue = unknown>({
 
   const bodyRows = table.getRowModel().rows
   const shouldVirtualize =
-    enableVirtualization && bodyRows.length >= virtualizeThreshold
+    enableVirtualization &&
+    !renderSubComponent &&
+    bodyRows.length >= virtualizeThreshold
   const estimatedRowHeight =
     density === 'compact' ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE
 
@@ -716,22 +765,56 @@ export function DataTable<TData, TValue = unknown>({
     mainScrollRef.current?.scrollTo({ top: 0 })
   }, [paginationState.pageIndex, shouldVirtualize])
 
+  const isInfinite = !!infiniteScroll
   const scrollContainerStyle: React.CSSProperties = tableScrollHeight
     ? { maxHeight: tableScrollHeight, overflow: 'auto' }
-    : shouldVirtualize
+    : shouldVirtualize || isInfinite
       ? { maxHeight: DEFAULT_VIRTUAL_SCROLL_MAX, overflow: 'auto' }
       : { overflowX: 'auto' }
 
+  /* ---------- Infinite scroll sentinel ----------
+   * A 1px sentinel lives at the very bottom of the scroll region; when it
+   * enters the viewport (with a 300px head start) we ask the parent for the
+   * next page. The latest callbacks are read from a ref so the observer never
+   * closes over stale `hasNextPage` / `isFetchingNextPage`. Re-created whenever
+   * the loaded row count changes so a list shorter than the viewport keeps
+   * paging until it fills or ends. */
+  const loadMoreRef = React.useRef<HTMLDivElement>(null)
+  const infiniteRef = React.useRef(infiniteScroll)
+  infiniteRef.current = infiniteScroll
+  React.useEffect(() => {
+    if (!isInfinite) return
+    const sentinel = loadMoreRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const inf = infiniteRef.current
+        if (
+          entries[0]?.isIntersecting &&
+          inf?.hasNextPage &&
+          !inf.isFetchingNextPage
+        ) {
+          inf.onLoadMore()
+        }
+      },
+      { root: mainScrollRef.current ?? null, rootMargin: '300px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [isInfinite, bodyRows.length])
+
   const renderBodyRow = (row: Row<TData>, index: number) => {
     const baseBg = rowBg(index)
+    const isExpanded = renderSubComponent ? row.getIsExpanded() : false
     return (
+      <React.Fragment key={row.id}>
       <TableRow
-        key={row.id}
         data-state={row.getIsSelected() ? 'selected' : undefined}
         onClick={onRowClick ? () => onRowClick(row.original) : undefined}
         className={cn(
           'border-b border-border/50 transition-colors',
           baseBg,
+          isExpanded && 'bg-accent/30',
           onRowClick && 'cursor-pointer hover:bg-accent/40',
         )}
       >
@@ -778,6 +861,14 @@ export function DataTable<TData, TValue = unknown>({
           )
         })}
       </TableRow>
+      {renderSubComponent && isExpanded ? (
+        <TableRow className="border-b border-border/50 hover:bg-transparent">
+          <TableCell colSpan={visibleColCount} className="bg-muted/20 p-0">
+            {renderSubComponent(row)}
+          </TableCell>
+        </TableRow>
+      ) : null}
+      </React.Fragment>
     )
   }
 
@@ -809,6 +900,7 @@ export function DataTable<TData, TValue = unknown>({
         fetchAllRowsForExport={fetchAllRowsForExport}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}
+        showPageSize={!isInfinite}
         leading={toolbarLeading}
         trailing={toolbarTrailing}
         recordsCount={recordsCount}
@@ -1040,7 +1132,26 @@ export function DataTable<TData, TValue = unknown>({
             )}
           </TableBody>
         </table>
+        {isInfinite ? (
+          <div ref={loadMoreRef} aria-hidden className="h-px w-full" />
+        ) : null}
         </div>
+
+        {isInfinite &&
+          data.length > 0 &&
+          (infiniteScroll!.isFetchingNextPage ||
+            (!infiniteScroll!.hasNextPage && infiniteScroll!.endLabel != null)) && (
+            <div className="flex items-center justify-center gap-2 border-t border-border/60 bg-muted/10 py-3 text-xs text-muted-foreground">
+              {infiniteScroll!.isFetchingNextPage
+                ? (infiniteScroll!.loadingLabel ?? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Loading more…
+                    </>
+                  ))
+                : (infiniteScroll!.endLabel ?? null)}
+            </div>
+          )}
 
         {isLoading && data.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-muted-foreground">
@@ -1058,7 +1169,11 @@ export function DataTable<TData, TValue = unknown>({
         )}
       </div>
 
-      <DataTablePagination table={table} totalRows={pagination?.totalRows} />
+      {footer ? <div className="border-t border-border">{footer}</div> : null}
+
+      {!isInfinite && (
+        <DataTablePagination table={table} totalRows={pagination?.totalRows} />
+      )}
     </Card>
     </div>
   )

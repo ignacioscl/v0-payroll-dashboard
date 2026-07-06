@@ -9,11 +9,14 @@ import { InvoiceStatementInvRel } from './entity/invoice-statement-inv-rel.srsen
 import { BillingKpiController } from './controller/billing-kpi.controller'
 import { BillingKpiService } from './service/billing-kpi.service'
 import { BillingKpiRepository } from './repository/billing-kpi.repository'
+import { InvoiceController } from './controller/invoice.controller'
+import { InvoiceService } from './service/invoice.service'
+import { InvoiceRepository } from './repository/invoice.repository'
 
 @Module({
   imports: [SrsAuthModule, TypeOrmModule.forFeature([InvoiceStatement, InvoiceStatementInvRel], SRS_CONNECTION)],
-  providers: [BillingKpiRepository, BillingKpiService],
-  controllers: [BillingKpiController],
-  exports: [BillingKpiService],
+  providers: [BillingKpiRepository, BillingKpiService, InvoiceRepository, InvoiceService],
+  controllers: [BillingKpiController, InvoiceController],
+  exports: [BillingKpiService, InvoiceService],
 })
 export class SrsBillingModule {}

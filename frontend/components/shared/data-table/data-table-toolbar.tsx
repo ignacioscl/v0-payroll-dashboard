@@ -44,6 +44,8 @@ interface DataTableToolbarProps<TData> {
   pageSizeOptions?: number[]
   /** Adds an "All" option (server-side: `length: -1`). */
   includeAllPageSize?: boolean
+  /** Hide the rows-per-page selector (e.g. infinite-scroll tables). Defaults to true. */
+  showPageSize?: boolean
 
   /** Slot rendered between the records counter and the right-side actions. */
   trailing?: React.ReactNode
@@ -72,6 +74,7 @@ export function DataTableToolbar<TData>({
   fetchAllRowsForExport,
   pageSizeOptions = [10, 25, 50, 100],
   includeAllPageSize = false,
+  showPageSize = true,
   trailing,
   leading,
   recordsCount,
@@ -253,40 +256,44 @@ export function DataTableToolbar<TData>({
 
         {trailing}
 
-        <div className="flex items-center gap-1">
-          <span className="whitespace-nowrap text-[11px] text-muted-foreground">{t('common.rows')}</span>
-          <Select
-            value={
-              pageSize === DATA_TABLE_PAGE_SIZE_ALL ? 'all' : String(pageSize)
-            }
-            onValueChange={(value) => {
-              const nextPageSize =
-                value === 'all' ? DATA_TABLE_PAGE_SIZE_ALL : Number(value)
-              // Single update — separate setPageSize + setPageIndex reverts pageSize
-              // when pagination is controlled (second call reads stale state).
-              table.setPagination({ pageIndex: 0, pageSize: nextPageSize })
-            }}
-          >
-            <SelectTrigger
-              size="sm"
-              className="h-7 min-w-[58px] px-2 text-[11px]"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {pageSizeOptions.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-              {includeAllPageSize ? (
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
-        </div>
+        {showPageSize && (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="whitespace-nowrap text-[11px] text-muted-foreground">{t('common.rows')}</span>
+              <Select
+                value={
+                  pageSize === DATA_TABLE_PAGE_SIZE_ALL ? 'all' : String(pageSize)
+                }
+                onValueChange={(value) => {
+                  const nextPageSize =
+                    value === 'all' ? DATA_TABLE_PAGE_SIZE_ALL : Number(value)
+                  // Single update — separate setPageSize + setPageIndex reverts pageSize
+                  // when pagination is controlled (second call reads stale state).
+                  table.setPagination({ pageIndex: 0, pageSize: nextPageSize })
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="h-7 min-w-[58px] px-2 text-[11px]"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                  {includeAllPageSize ? (
+                    <SelectItem value="all">{t('common.all')}</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <Separator orientation="vertical" className="mx-0.5 h-4" />
+            <Separator orientation="vertical" className="mx-0.5 h-4" />
+          </>
+        )}
 
         {enableViewOptions && <DataTableViewOptions table={table} />}
 

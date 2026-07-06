@@ -1,0 +1,176 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator'
+
+import { SrsContext } from '../../auth/srs-auth-context.service'
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+import {
+  parseDealerIds,
+  skipDealerRestrictionForRol,
+} from '../../shared/kpi/srs-kpi-dealer-filter'
+import { StatementType, WO_STATEMENT_TYPES } from '../entity/invoice-statement.srsentity'
+
+const toOptionalInt = ({ value }: { value: unknown }) => {
+  if (value === undefined || value === null || value === '') return undefined
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.trunc(n) : undefined
+}
+
+/** Máximo de filas por página del listado de invoices (protege la DB de LIMITs enormes). */
+export const INVOICE_LIST_MAX_PAGE_SIZE = 200
+export const INVOICE_LIST_DEFAULT_PAGE_SIZE = 25
+
+/**
+ * Query de GET /srs/billing/invoices. Extiende la query KPI compartida
+ * (fechaDesde/fechaHasta/idDealer requeridos) y agrega paginación + filtros
+ * propios de la solapa Invoice (tipos, búsqueda, pago, envío).
+ */
+export class InvoiceListQueryDto extends SrsKpiQueryDto {
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @ApiPropertyOptional({ example: 25, default: INVOICE_LIST_DEFAULT_PAGE_SIZE })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  @Min(1)
+  @Max(INVOICE_LIST_MAX_PAGE_SIZE)
+  pageSize?: number
+
+  @ApiPropertyOptional({
+    description: "csv de 'wo' | 'ttk' | 'generic' (vacío = todos)",
+    example: 'wo,ttk,generic',
+  })
+  @IsOptional()
+  @IsString()
+  types?: string
+
+  @ApiPropertyOptional({ description: 'Busca en INVOICE_STATEMENT.full_nro', example: 'A1042' })
+  @IsOptional()
+  @IsString()
+  search?: string
+
+  @ApiPropertyOptional({ description: 'Filtro por IS_STATEMENT_BILLED', enum: ['0', '1'] })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  payed?: string
+
+  @ApiPropertyOptional({ description: 'Filtro por flag sended', enum: ['0', '1'] })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  sended?: string
+}
+
+/** Filtro resuelto (contexto + query) que consume el repositorio. */
+export interface InvoiceListFilter {
+  idDealerProvider: number
+  idUsuario: number
+  dealerIds: number[]
+  fechaDesde: string
+  fechaHasta: string
+  /** [] = sin filtro de tipo (todos). */
+  statementTypes: StatementType[]
+  search?: string
+  payed?: '0' | '1'
+  sended?: '0' | '1'
+  page: number
+  pageSize: number
+  skipDealerRestriction: boolean
+}
+
+const TYPE_TOKENS: Record<string, StatementType[]> = {
+  wo: [...WO_STATEMENT_TYPES],
+  ttk: [StatementType.TTK],
+  generic: [StatementType.GENERIC],
+}
+
+/** csv de tokens (wo/ttk/generic) → lista de statement_type, deduplicada. */
+export function parseStatementTypes(raw?: string): StatementType[] {
+  if (!raw?.trim()) return []
+  const set = new Set<StatementType>()
+  for (const token of raw.split(',').map((t) => t.trim().toLowerCase())) {
+    for (const type of TYPE_TOKENS[token] ?? []) set.add(type)
+  }
+  return [...set]
+}
+
+export function buildInvoiceListFilter(
+  ctx: SrsContext,
+  query: InvoiceListQueryDto,
+): InvoiceListFilter {
+  const dealerIds = parseDealerIds(query.idDealer)
+  const page = query.page && query.page > 0 ? query.page : 1
+  const pageSize =
+    query.pageSize && query.pageSize > 0
+      ? Math.min(query.pageSize, INVOICE_LIST_MAX_PAGE_SIZE)
+      : INVOICE_LIST_DEFAULT_PAGE_SIZE
+  return {
+    idDealerProvider: ctx.idDealerProvider,
+    idUsuario: ctx.idUsuario,
+    dealerIds,
+    fechaDesde: query.fechaDesde,
+    fechaHasta: query.fechaHasta,
+    statementTypes: parseStatementTypes(query.types),
+    search: query.search?.trim() || undefined,
+    payed: query.payed as '0' | '1' | undefined,
+    sended: query.sended as '0' | '1' | undefined,
+    page,
+    pageSize,
+    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Response DTOs                                                               */
+/* -------------------------------------------------------------------------- */
+
+export class InvoiceRowDto {
+  @ApiProperty() id!: number
+  @ApiProperty() fullNro!: string
+  @ApiProperty({ description: 'statement_type (1-4 WO, 5 TTK, 6 Generic)' }) statementType!: number
+  @ApiProperty() estado!: number
+  @ApiProperty({ nullable: true }) wo?: string
+  @ApiProperty({ nullable: true }) department?: string
+  @ApiProperty({ nullable: true }) invoiceService?: string
+  @ApiProperty({ nullable: true }) invoiceServiceSelRel?: string
+  @ApiProperty({ nullable: true }) invoiceNote?: string
+  @ApiProperty({ nullable: true }) author?: string
+  @ApiProperty() fechaCreate!: string
+  @ApiProperty({ nullable: true }) fechaDesde?: string
+  @ApiProperty({ nullable: true }) fechaHasta?: string
+  @ApiProperty() subtotal!: number
+  @ApiProperty({ nullable: true }) discount?: number
+  @ApiProperty({ nullable: true }) discountType?: number
+  @ApiProperty() total!: number
+  @ApiProperty() tax!: number
+  @ApiProperty({ nullable: true }) po?: string
+  @ApiProperty({ nullable: true }) ro?: string
+  @ApiProperty() sended!: number
+  @ApiProperty() isBilled!: number
+  @ApiProperty() isPartialBilled!: number
+  @ApiProperty({ nullable: true }) idBilling?: number
+  @ApiProperty({ nullable: true }) fechaPago?: string
+  @ApiProperty({ nullable: true }) checkNumber?: string
+  @ApiProperty({ nullable: true }) amount?: number
+}
+
+export class InvoiceSummaryDto {
+  @ApiProperty() count!: number
+  @ApiProperty() subtotal!: number
+  @ApiProperty() discount!: number
+  @ApiProperty() total!: number
+}
+
+export class InvoiceListResponseDto {
+  @ApiProperty({ type: [InvoiceRowDto] }) results!: InvoiceRowDto[]
+  @ApiProperty({ description: '1-based' }) page!: number
+  @ApiProperty() pageSize!: number
+  @ApiProperty({ description: 'Total de statements que matchean el filtro' }) total!: number
+  @ApiProperty() hasMore!: boolean
+  @ApiProperty({ type: InvoiceSummaryDto, description: 'Totales sobre TODO el filtro (no solo la página)' })
+  summary!: InvoiceSummaryDto
+}
