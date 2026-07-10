@@ -3,13 +3,21 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
-import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
-import { statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
+import { buildDealerFilterSql, buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  applyZeroFilter,
+  statementHasPositiveTotalSql,
+} from '../../shared/kpi/srs-kpi-zero-filter'
+import { StatementType, statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
 import {
   InvoiceListFilter,
   InvoiceRowDto,
   InvoiceSummaryDto,
 } from '../dto/invoice-list.dto'
+import { sqlInInts } from '../dto/invoice-filter-parsers'
+import {
+  InvoiceLookupOptionDto,
+} from '../dto/invoice-lookup.dto'
 import {
   InvoiceDetailGenericRowDto,
   InvoiceDetailWoRowDto,
@@ -31,10 +39,11 @@ export class InvoiceRepository {
    */
   private buildWhere(f: InvoiceListFilter): { join: string; where: string; params: any[] } {
     const stmt = buildDealerFilterSql('statement', f.idUsuario, f.dealerIds, f.skipDealerRestriction)
-    let where = ` WHERE s.estado = 1 AND s.id_dealer_provider = ?${stmt.and}`
-    // Solapamiento del período del statement con el rango del header.
-    where += ' AND s.fecha_desde <= ? AND s.fecha_hasta >= ?'
-    const params: any[] = [f.idDealerProvider, ...stmt.params, f.fechaHasta, f.fechaDesde]
+    const estado = f.showDeleted ? 0 : 1
+    let where = ` WHERE s.estado = ${estado} AND s.id_dealer_provider = ?${stmt.and}`
+    // Legacy billing list: statement period fully inside [fechaDesde, fechaHasta].
+    where += ' AND s.fecha_desde >= ? AND s.fecha_hasta <= ?'
+    const params: any[] = [f.idDealerProvider, ...stmt.params, f.fechaDesde, f.fechaHasta]
 
     if (f.statementTypes.length) {
       // Valores de enum whitelisteados → inline seguro (mismo patrón que billing-kpi).
@@ -50,6 +59,107 @@ export class InvoiceRepository {
     }
     if (f.payed === '0') where += ' AND IS_STATEMENT_BILLED(s.id) = 0'
     else if (f.payed === '1') where += ' AND IS_STATEMENT_BILLED(s.id) = 1'
+
+    if (f.idAuthor) {
+      where += ' AND s.id_author = ?'
+      params.push(f.idAuthor)
+    }
+
+    if (f.departmentIds.length) {
+      const ids = sqlInInts(f.departmentIds)
+      where += ` AND (EXISTS (
+        SELECT issr.id FROM INVOICE_STATEMENT_SEL_SER_REL issr
+        INNER JOIN INVOICE_SERVICE _lis ON _lis.id = issr.id_inv_service
+        WHERE issr.id_statement = s.id AND _lis.id_department IN (${ids})
+      ) OR s.id_department IN (${ids}))`
+    }
+
+    if (f.invoiceServiceIds.length) {
+      const ids = sqlInInts(f.invoiceServiceIds)
+      const serviceMatch = `(s.id_invoice_service IN (${ids}) OR EXISTS (
+          SELECT isir.id FROM INVOICE_STATEMENT_INV_REL isir
+          INNER JOIN INVOICE i ON i.id = isir.id_invoice AND i.estado = 1
+          WHERE isir.id_statement = s.id AND isir.id_invoice_service IN (${ids})
+        ) OR EXISTS (
+          SELECT issr.id FROM INVOICE_STATEMENT_SEL_SER_REL issr
+          WHERE issr.id_statement = s.id AND issr.id_inv_service IN (${ids})
+        ))`
+      // Legacy: OR statement_type only for TTK/Generic toggles — never WO types (1–4),
+      // or the service filter is bypassed when all type pills are active.
+      const ttkGenericTypes = f.statementTypes.filter(
+        (t) => t === StatementType.TTK || t === StatementType.GENERIC,
+      )
+      if (ttkGenericTypes.length) {
+        where += ` AND (${serviceMatch} OR s.statement_type IN (${statementTypesSqlIn(ttkGenericTypes)}))`
+      } else {
+        where += ` AND ${serviceMatch}`
+      }
+    }
+
+    if (f.dueOn) {
+      where += ` AND IS_STATEMENT_BILLED(s.id) = 0
+        AND EXISTS (
+          SELECT dr.id FROM DEALER_REL dr
+          WHERE dr.id_dealer_customer = s.id_dealer
+            AND dr.id_dealer_provider = s.id_dealer_provider
+            AND dr.fecha_end IS NULL
+            AND dr.due_on IS NOT NULL
+            AND dr.due_on > 0
+            AND DATEDIFF(CURDATE(), s.fecha_hasta) > dr.due_on
+        )`
+    }
+
+    if (f.checkDate || f.checkNumber) {
+      const billingParts: string[] = []
+      if (f.checkDate) {
+        billingParts.push('b.fecha = ?')
+        params.push(f.checkDate)
+      }
+      if (f.checkNumber) {
+        billingParts.push('b.check_number LIKE ?')
+        params.push(`%${f.checkNumber}%`)
+      }
+      where += ` AND EXISTS (
+        SELECT 1 FROM BILLING_WO_REL bwr
+        INNER JOIN BILLING b ON b.id = bwr.id_billing AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
+        WHERE (bwr.id_statement = s.id
+          OR bwr.id_statement_inv_rel IN (
+            SELECT isir.id FROM INVOICE_STATEMENT_INV_REL isir WHERE isir.id_statement = s.id
+          ))
+        AND ${billingParts.join(' AND ')}
+      )`
+    }
+
+    const lineSubParts: string[] = []
+    const lineParams: any[] = []
+    if (f.woNumbers.length) {
+      const woOr = f.woNumbers.map(() => 'i.wo_nro = ?').join(' OR ')
+      lineSubParts.push(`(${woOr})`)
+      lineParams.push(...f.woNumbers)
+    }
+    if (f.roPo) {
+      lineSubParts.push('(i.ro = ? OR i.po = ?)')
+      lineParams.push(f.roPo, f.roPo)
+    }
+    if (f.stock) {
+      lineSubParts.push('(i.stock_number LIKE ? OR c.vin = ? OR c.vin LIKE ?)')
+      const like = `%${f.stock}%`
+      lineParams.push(like, f.stock, like)
+    }
+    if (lineSubParts.length) {
+      where += ` AND EXISTS (
+        SELECT isir.id
+        FROM INVOICE_STATEMENT_INV_REL isir
+        INNER JOIN INVOICE_SERVICE_REL isr
+          ON isr.id_invoice = isir.id_invoice AND isr.id_service_invoice = isir.id_invoice_service
+        INNER JOIN INVOICE i ON i.id = isir.id_invoice AND i.estado = 1
+        INNER JOIN CAR c ON c.id = i.id_car
+        WHERE isir.id_statement = s.id AND ${lineSubParts.join(' AND ')}
+      )`
+      params.push(...lineParams)
+    }
+
+    where += applyZeroFilter(f.includeZero, statementHasPositiveTotalSql('s'))
 
     return { join: stmt.join, where, params }
   }
@@ -67,6 +177,7 @@ export class InvoiceRepository {
               s.fecha_create, s.fecha_desde, s.fecha_hasta,
               s.po, s.ro, s.discount, s.discount_type, ROUND(s.tax, 2) AS tax,
               s.invoice_service_sel_rel, s.invoice_note,
+              s.id_invoice_statement_schedule,
               d.nombre        AS department,
               inv_serv.nombre AS invoice_service,
               u.nombre        AS author,
@@ -108,6 +219,7 @@ export class InvoiceRepository {
       invoiceServiceSelRel: r.invoice_service_sel_rel ?? undefined,
       invoiceNote: r.invoice_note ?? undefined,
       author: r.author ?? undefined,
+      createdBySchedule: Number(r.id_invoice_statement_schedule ?? 0) > 0,
       dealer: r.dealer ?? undefined,
       fechaCreate: r.fecha_create,
       fechaDesde: r.fecha_desde ?? undefined,
@@ -329,6 +441,90 @@ export class InvoiceRepository {
       rolName: r.rol_name ?? undefined,
       departmentName: r.dpto_name ?? undefined,
       onlyTimecard: Number(r.only_timecard ?? 0),
+    }))
+  }
+
+  async lookupDepartments(f: {
+    idDealerProvider: number
+    idUsuario: number
+    dealerIds: number[]
+    skipDealerRestriction: boolean
+    search?: string
+    limit: number
+  }): Promise<InvoiceLookupOptionDto[]> {
+    if (f.dealerIds.length === 0) return []
+    const restrict = buildDealerRestrictionClause(
+      f.idUsuario,
+      f.dealerIds,
+      f.skipDealerRestriction,
+    )
+    const params: any[] = [f.idDealerProvider, ...restrict.params]
+    let searchSql = ''
+    if (f.search) {
+      searchSql = ' AND d.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    const rows = await this.srs.query(
+      `SELECT d.id, d.nombre AS label, c.razon_social AS sublabel
+       FROM DEPARTMENT d
+       INNER JOIN CONTRATISTA c ON c.id = d.id_dealer
+       WHERE d.estado = 1
+         AND d.id_dealer_provider = ?
+         ${restrict.and}
+         ${searchSql}
+       ORDER BY c.razon_social, d.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+      sublabel: r.sublabel ? String(r.sublabel) : undefined,
+    }))
+  }
+
+  async lookupServices(f: {
+    idDealerProvider: number
+    idUsuario: number
+    dealerIds: number[]
+    departmentIds: number[]
+    skipDealerRestriction: boolean
+    search?: string
+    limit: number
+  }): Promise<InvoiceLookupOptionDto[]> {
+    if (f.dealerIds.length === 0) return []
+    const restrict = buildDealerRestrictionClause(
+      f.idUsuario,
+      f.dealerIds,
+      f.skipDealerRestriction,
+    )
+    const params: any[] = [f.idDealerProvider, ...restrict.params]
+    let extra = ''
+    if (f.departmentIds.length) {
+      extra += ` AND d.id IN (${sqlInInts(f.departmentIds)})`
+    }
+    if (f.search) {
+      extra += ' AND ins.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    const rows = await this.srs.query(
+      `SELECT ins.id, ins.nombre AS label,
+              CONCAT(c.razon_social, ' · ', d.nombre) AS sublabel
+       FROM INVOICE_SERVICE ins
+       INNER JOIN DEPARTMENT d ON d.id = ins.id_department
+       INNER JOIN CONTRATISTA c ON c.id = d.id_dealer
+       WHERE ins.estado = 1
+         AND d.id_dealer_provider = ?
+         ${restrict.and}
+         ${extra}
+       ORDER BY c.razon_social, d.nombre, ins.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+      sublabel: r.sublabel ? String(r.sublabel) : undefined,
     }))
   }
 }

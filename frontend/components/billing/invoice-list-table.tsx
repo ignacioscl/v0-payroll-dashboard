@@ -104,6 +104,12 @@ function paidMeta(row: InvoiceRow, t: TranslateFn): { label: string; className: 
   }
 }
 
+function authorDisplay(row: InvoiceRow, t: TranslateFn): string {
+  if (row.createdBySchedule) return t('invoices.authorCreatedBySchedule')
+  const name = row.author?.trim()
+  return name || '—'
+}
+
 function rowDetailText(row: InvoiceRow): string {
   const parts = [row.wo, row.department, row.invoiceService, row.invoiceServiceSelRel].filter(
     (p): p is string => Boolean(p && p.trim()),
@@ -499,6 +505,33 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colPeriod'),
           exportValue: (r) => fmtPeriod(r.fechaDesde, r.fechaHasta),
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
+      {
+        id: 'author',
+        accessorFn: (row) => row.author ?? '',
+        size: 120,
+        minSize: 96,
+        maxSize: 160,
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('invoices.colAuthor')} />
+        ),
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              'text-[11px]',
+              row.original.createdBySchedule
+                ? 'italic text-muted-foreground'
+                : 'text-muted-foreground',
+            )}
+          >
+            {authorDisplay(row.original, t)}
+          </span>
+        ),
+        meta: {
+          label: t('invoices.colAuthor'),
+          exportValue: (r) => authorDisplay(r, t),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {

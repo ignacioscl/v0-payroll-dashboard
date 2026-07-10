@@ -8,6 +8,8 @@ import { SrsPhpPath } from '@/types/enum-url'
 export type TtkEmployeeOption = {
   id: number
   nombre: string
+  role?: string
+  department?: string
 }
 
 type TtkEmployeesResponse = {

@@ -75,6 +75,7 @@ export function buildTtkListFilterExtra(input: {
   selectedDealers: string[]
   dateRange: DateRange | undefined
   selectedType: string
+  selectedEmployeeId?: number | null
   punchMinHours?: number | null
   punchMaxHours?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
@@ -91,8 +92,13 @@ export function buildTtkListFilterExtra(input: {
     withoutSalary = 0
   }
 
+  const employeeId =
+    input.selectedEmployeeId != null && input.selectedEmployeeId > 0
+      ? input.selectedEmployeeId
+      : null
+
   const params: Record<string, string | number> = {
-    'search[value]': input.search.trim(),
+    'search[value]': employeeId != null ? '' : input.search.trim(),
     fecha_desde: formatDateParam(input.dateRange?.from),
     fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
     only_error: flags.only_error,
@@ -107,6 +113,9 @@ export function buildTtkListFilterExtra(input: {
   }
 
   appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
+  if (employeeId != null) {
+    params.id_employee = employeeId
+  }
   if (input.punchMinHours != null && input.punchMinHours > 0) {
     params.punch_min_hours = input.punchMinHours
   }
@@ -147,15 +156,24 @@ export function buildTtkScopeParams(input: {
   search: string
   selectedDealers: string[]
   dateRange: DateRange | undefined
+  selectedEmployeeId?: number | null
   scopeUser?: PayrollScopeUser | null
 }): Record<string, string | number> {
+  const employeeId =
+    input.selectedEmployeeId != null && input.selectedEmployeeId > 0
+      ? input.selectedEmployeeId
+      : null
+
   const params: Record<string, string | number> = {
-    'search[value]': input.search.trim(),
+    'search[value]': employeeId != null ? '' : input.search.trim(),
     fecha_desde: formatDateParam(input.dateRange?.from),
     fecha_hasta: formatDateParam(input.dateRange?.to ?? input.dateRange?.from),
   }
 
   appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
+  if (employeeId != null) {
+    params.id_employee = employeeId
+  }
 
   return params
 }

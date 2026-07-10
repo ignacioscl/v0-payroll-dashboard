@@ -9,6 +9,11 @@ import { InvoiceFilterDeck } from '@/components/billing/invoice-filter-deck'
 import { InvoiceSummaryStrip } from '@/components/billing/invoice-summary-strip'
 import { InvoiceListTable } from '@/components/billing/invoice-list-table'
 import { typesToCsv, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
+import {
+  EMPTY_ADVANCED_FILTERS,
+  idsToCsv,
+  type InvoiceAdvancedFilterState,
+} from '@/lib/invoice-advanced-filters'
 import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -37,13 +42,18 @@ function formatUsDateRange(from: Date | undefined, to: Date | undefined): string
 
 export default function InvoicesPage() {
   const { t } = useTranslation()
-  const { dateRange, selectedDealers, filtersHydrated } = useFilters()
+  const { invoiceDateFrom, invoiceDateTo, selectedDealers, filtersHydrated } = useFilters()
 
   const [types, setTypes] = useState<InvoiceTypeState>(ALL_TYPES)
-  const [payed, setPayed] = useState<TriState>('all')
+  const [payed, setPayed] = useState<TriState>('0')
   const [sended, setSended] = useState<TriState>('all')
+  const [hideZero, setHideZero] = useState(true)
+  const [advanced, setAdvanced] = useState<InvoiceAdvancedFilterState>(EMPTY_ADVANCED_FILTERS)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const [roPo, setRoPo] = useState('')
+  const [stock, setStock] = useState('')
+  const [checkNumber, setCheckNumber] = useState('')
   const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
@@ -51,21 +61,42 @@ export default function InvoicesPage() {
     return () => clearTimeout(id)
   }, [searchInput])
 
+  useEffect(() => {
+    const id = setTimeout(() => setRoPo(advanced.roPo.trim()), 350)
+    return () => clearTimeout(id)
+  }, [advanced.roPo])
+
+  useEffect(() => {
+    const id = setTimeout(() => setStock(advanced.stock.trim()), 350)
+    return () => clearTimeout(id)
+  }, [advanced.stock])
+
+  useEffect(() => {
+    const id = setTimeout(() => setCheckNumber(advanced.checkNumber.trim()), 350)
+    return () => clearTimeout(id)
+  }, [advanced.checkNumber])
+
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
+  const primaryDealerId = useMemo(() => {
+    const first = selectedDealers[0]
+    if (!first) return null
+    const n = Number(first)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [selectedDealers])
   const headerRange = useMemo(
     () => ({
-      fechaDesde: formatDateParam(dateRange?.from),
-      fechaHasta: formatDateParam(dateRange?.to ?? dateRange?.from),
+      fechaDesde: formatDateParam(invoiceDateFrom),
+      fechaHasta: formatDateParam(invoiceDateTo),
     }),
-    [dateRange],
+    [invoiceDateFrom, invoiceDateTo],
   )
   const headerRangeLabel = useMemo(
-    () => formatUsDateRange(dateRange?.from, dateRange?.to),
-    [dateRange],
+    () => formatUsDateRange(invoiceDateFrom, invoiceDateTo),
+    [invoiceDateFrom, invoiceDateTo],
   )
 
   const hasDealer = selectedDealers.length > 0
-  const hasDates = Boolean(headerRange.fechaDesde)
+  const hasDates = Boolean(headerRange.fechaDesde && headerRange.fechaHasta)
   const ready = filtersHydrated && hasDealer && hasDates
 
   const input = useMemo<InvoiceListInput | null>(() => {
@@ -78,8 +109,38 @@ export default function InvoicesPage() {
       search: search || undefined,
       payed: payed === 'all' ? undefined : payed,
       sended: sended === 'all' ? undefined : sended,
+      includeZero: !hideZero,
+      idDepartment: idsToCsv(advanced.departmentIds),
+      idInvoiceService: idsToCsv(advanced.serviceIds),
+      wo: advanced.woNumbers.length ? advanced.woNumbers.join(',') : undefined,
+      roPo: roPo || undefined,
+      stock: stock || undefined,
+      checkDate: advanced.checkDate ? formatDateParam(advanced.checkDate) : undefined,
+      checkNumber: checkNumber || undefined,
+      idAuthor: advanced.employeeId ?? undefined,
+      dueOn: advanced.overdue || undefined,
+      showDeleted: advanced.showDeleted || undefined,
     }
-  }, [ready, headerRange, idDealer, types, search, payed, sended])
+  }, [
+    ready,
+    headerRange,
+    idDealer,
+    types,
+    search,
+    payed,
+    sended,
+    hideZero,
+    advanced.departmentIds,
+    advanced.serviceIds,
+    advanced.woNumbers,
+    advanced.checkDate,
+    advanced.employeeId,
+    advanced.overdue,
+    advanced.showDeleted,
+    roPo,
+    stock,
+    checkNumber,
+  ])
 
   const query = useInvoiceList(input, pageSize)
   const summary = query.data?.pages[0]?.summary
@@ -109,6 +170,12 @@ export default function InvoicesPage() {
         onPayedChange={setPayed}
         sended={sended}
         onSendedChange={setSended}
+        hideZero={hideZero}
+        onHideZeroChange={setHideZero}
+        advanced={advanced}
+        onAdvancedChange={setAdvanced}
+        idDealer={idDealer}
+        primaryDealerId={primaryDealerId}
         disabled={!ready}
       />
 

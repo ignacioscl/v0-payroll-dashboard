@@ -36,6 +36,8 @@ export interface Messages {
     colInvoice: string
     colType: string
     colPeriod: string
+    colAuthor: string
+    authorCreatedBySchedule: string
     colDetail: string
     colSubtotal: string
     colDiscount: string
@@ -80,6 +82,45 @@ export interface Messages {
     colRole: string
     viewDetail: string
     detailHeading: string
+    filterPanelTitle: string
+    filtersActive: string
+    hideZeroInvoices: string
+    includeZeroInvoices: string
+    advancedFiltersTitle: string
+    advancedFiltersHint: string
+    filterLaneWorkOrder: string
+    filterLaneOrganization: string
+    filterLaneStatus: string
+    filterWoLabel: string
+    filterWoPlaceholder: string
+    filterWoMulti: string
+    filterWoMultiTitle: string
+    filterWoMultiHint: string
+    filterWoChip: string
+    filterRoPoLabel: string
+    filterRoPoPlaceholder: string
+    filterRoPoChip: string
+    filterStockLabel: string
+    filterStockPlaceholder: string
+    filterStockChip: string
+    filterDepartmentLabel: string
+    filterDepartmentPlaceholder: string
+    filterDepartmentChip: string
+    filterServiceLabel: string
+    filterServicePlaceholder: string
+    filterServiceChip: string
+    filterEmployeeLabel: string
+    filterEmployeePlaceholder: string
+    filterCheckDateLabel: string
+    filterCheckDatePlaceholder: string
+    filterCheckDateChip: string
+    filterCheckNumberLabel: string
+    filterCheckNumberPlaceholder: string
+    filterCheckNumberChip: string
+    filterOverdueLabel: string
+    filterShowDeletedLabel: string
+    filterOneSelected: string
+    filterManySelected: string
   }
   sidebar: {
     appSubtitle: string
@@ -295,6 +336,7 @@ export interface Messages {
     clickCardToFilter: string
     withErrorsCount: string
     searchChip: string
+    employeeChip: string
     moreThanHours: string
     lessThanHours: string
     paymentTypeChip: string
@@ -324,6 +366,9 @@ export interface Messages {
   }
   filters: {
     selectDates: string
+    selectDate: string
+    dateFrom: string
+    dateTo: string
     last7Days: string
     last15Days: string
     last30Days: string
@@ -337,6 +382,7 @@ export interface Messages {
     justified: string
     systemConfig: string
     searchEmployeeDealer: string
+    searchEmployee: string
   }
   liveStatus: {
     all: string

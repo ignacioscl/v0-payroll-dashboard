@@ -116,6 +116,8 @@ export function PunchReportFilterPanel({
   const {
     search,
     setSearch,
+    selectedEmployee,
+    setSelectedEmployee,
     selectedDealers,
     selectedType,
     setSelectedType,
@@ -165,6 +167,14 @@ export function PunchReportFilterPanel({
         key: 'search',
         label: t('punch.searchChip', { query: search.trim() }),
         onRemove: () => setSearch(''),
+      })
+    }
+
+    if (selectedEmployee) {
+      list.push({
+        key: 'employee',
+        label: t('punch.employeeChip', { name: selectedEmployee.nombre }),
+        onRemove: () => setSelectedEmployee(null),
       })
     }
 
@@ -223,6 +233,7 @@ export function PunchReportFilterPanel({
     dateRange,
     isDefaultDateRange,
     search,
+    selectedEmployee,
     selectedDealers.length,
     selectedType,
     selectedTodayLiveStatus,
@@ -231,6 +242,7 @@ export function PunchReportFilterPanel({
     paymentTypeLabel,
     setDateRange,
     setSearch,
+    setSelectedEmployee,
     setSelectedType,
     setSelectedTodayLiveStatus,
     onPunchMinHoursChange,

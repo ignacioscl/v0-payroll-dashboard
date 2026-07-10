@@ -5,6 +5,7 @@ import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 
 import { InvoiceService } from '../service/invoice.service'
 import { InvoiceListQueryDto, InvoiceListResponseDto } from '../dto/invoice-list.dto'
+import { InvoiceLookupQueryDto, InvoiceLookupResponseDto } from '../dto/invoice-lookup.dto'
 import { InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
 
 @UseGuards(SrsJwtGuard)
@@ -21,6 +22,24 @@ export class InvoiceController {
     @Query() query: InvoiceListQueryDto,
   ): Promise<InvoiceListResponseDto> {
     return this.service.list(request.srsContext, query)
+  }
+
+  @Get('/invoices/lookups/departments')
+  @ApiOkResponse({ type: InvoiceLookupResponseDto })
+  async lookupDepartments(
+    @Req() request: any,
+    @Query() query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    return this.service.lookupDepartments(request.srsContext, query)
+  }
+
+  @Get('/invoices/lookups/services')
+  @ApiOkResponse({ type: InvoiceLookupResponseDto })
+  async lookupServices(
+    @Req() request: any,
+    @Query() query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    return this.service.lookupServices(request.srsContext, query)
   }
 
   @Get('/invoices/:id/detail')

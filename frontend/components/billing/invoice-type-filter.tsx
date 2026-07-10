@@ -38,10 +38,11 @@ const TYPE_ACTIVE: Record<
   },
 }
 
+/** csv for API; empty when all types active (= no type restriction, legacy parity). */
 export function typesToCsv(state: InvoiceTypeState): string {
-  return OPTIONS.filter((o) => state[o.token])
-    .map((o) => o.token)
-    .join(',')
+  const active = OPTIONS.filter((o) => state[o.token])
+  if (active.length === OPTIONS.length) return ''
+  return active.map((o) => o.token).join(',')
 }
 
 /**

@@ -11,10 +11,13 @@ import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
 } from '@/lib/ttk/today-live-status'
+import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 
 interface FilterContextType {
   search: string
   setSearch: (value: string) => void
+  selectedEmployee: TtkEmployeeOption | null
+  setSelectedEmployee: (value: TtkEmployeeOption | null) => void
   /** @deprecated use selectedDealers */
   selectedDealer: string
   setSelectedDealer: (value: string) => void
@@ -29,6 +32,11 @@ interface FilterContextType {
   setSelectedTodayLiveStatus: (value: TodayLiveStatusFilter) => void
   dateRange: DateRange | undefined
   setDateRange: (value: DateRange | undefined) => void
+  /** Invoice list: legacy-style period bounds (fecha_desde / fecha_hasta on statement). */
+  invoiceDateFrom: Date | undefined
+  invoiceDateTo: Date | undefined
+  setInvoiceDateFrom: (value: Date | undefined) => void
+  setInvoiceDateTo: (value: Date | undefined) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
   filtersHydrated: boolean
   clearFilters: () => void
@@ -38,6 +46,7 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined)
 
 export function FilterProvider({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
   const [selectedDealers, setSelectedDealersState] = useState<string[]>([])
   const [selectedDealer, setSelectedDealer] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
@@ -45,6 +54,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
     useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
   const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
+  const [invoiceDateFrom, setInvoiceDateFrom] = useState<Date | undefined>(undefined)
+  const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const setDateRange = useCallback((value: DateRange | undefined) => {
@@ -72,24 +83,33 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    setDateRange(getDefaultDateRange())
+    const def = getDefaultDateRange()
+    setDateRange(def)
+    setInvoiceDateFrom(def.from)
+    setInvoiceDateTo(def.to)
   }, [setDateRange])
 
   const clearFilters = () => {
     setSearch('')
+    setSelectedEmployee(null)
     writeSelectedDealersCookie([])
     setSelectedDealersState([])
     setSelectedDealer('all')
     setSelectedType('all')
     setSelectedStatus('all')
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
-    setDateRange(getDefaultDateRange())
+    const def = getDefaultDateRange()
+    setDateRange(def)
+    setInvoiceDateFrom(def.from)
+    setInvoiceDateTo(def.to)
   }
 
   return (
     <FilterContext.Provider value={{
       search,
       setSearch,
+      selectedEmployee,
+      setSelectedEmployee,
       selectedDealer,
       setSelectedDealer,
       selectedDealers,
@@ -102,6 +122,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setSelectedTodayLiveStatus,
       dateRange,
       setDateRange,
+      invoiceDateFrom,
+      invoiceDateTo,
+      setInvoiceDateFrom,
+      setInvoiceDateTo,
       filtersHydrated,
       clearFilters
     }}>

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Menu, Search, Settings2, SlidersHorizontal } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Menu, Settings2, SlidersHorizontal } from 'lucide-react'
+import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
 import {
   Select,
   SelectContent,
@@ -14,6 +14,7 @@ import {
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
+import { DatePicker } from '@/components/filters/date-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
@@ -38,14 +39,16 @@ export function Header() {
   const showSystemConfig = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const { dealers: dealerOptions, loading: dealersLoading } = useSrsDealers()
   const {
-    search,
-    setSearch,
     selectedDealers,
     setSelectedDealers,
     selectedStatus,
     setSelectedStatus,
     dateRange,
     setDateRange,
+    invoiceDateFrom,
+    invoiceDateTo,
+    setInvoiceDateFrom,
+    setInvoiceDateTo,
   } = useFilters()
   const didSanitizeDealers = useRef(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -62,11 +65,16 @@ export function Header() {
   }, [dealerOptions, setSelectedDealers])
 
   const showStatusFilter = pathname === '/schedule'
+  const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
 
   // Count active filters for mobile badge
   const activeFilterCount =
     (selectedDealers.length > 0 ? 1 : 0) +
-    (dateRange?.from ? 1 : 0) +
+    (isInvoicesPage
+      ? (invoiceDateFrom ? 1 : 0) + (invoiceDateTo ? 1 : 0)
+      : dateRange?.from
+        ? 1
+        : 0) +
     (showStatusFilter && selectedStatus && selectedStatus !== 'all' ? 1 : 0)
 
   return (
@@ -90,15 +98,7 @@ export function Header() {
 
         {/* Desktop filters */}
         <div className="hidden md:flex min-w-0 flex-1 items-center gap-2">
-          <div className="relative w-56 shrink-0 lg:w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t('filters.searchEmployeeDealer')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 border-border bg-background/50 pl-10 focus:bg-background"
-            />
-          </div>
+          <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" />
 
           <DealerMultiSelect
             dealers={dealerOptions}
@@ -122,7 +122,24 @@ export function Header() {
             </Select>
           )}
 
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          {isInvoicesPage ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <DatePicker
+                value={invoiceDateFrom}
+                onChange={setInvoiceDateFrom}
+                placeholder={t('filters.dateFrom')}
+                toDate={invoiceDateTo}
+              />
+              <DatePicker
+                value={invoiceDateTo}
+                onChange={setInvoiceDateTo}
+                placeholder={t('filters.dateTo')}
+                fromDate={invoiceDateFrom}
+              />
+            </div>
+          ) : (
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+          )}
         </div>
 
         {/* Right side */}
@@ -167,15 +184,7 @@ export function Header() {
             {/* Search */}
             <div className="flex flex-col gap-1.5">
               <span className="text-sm font-medium text-muted-foreground">{t('common.search')}</span>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder={t('filters.searchEmployeeDealer')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-10 pl-10"
-                />
-              </div>
+              <EmployeeSearchInput className="w-full" />
             </div>
 
             {/* Dealers */}
@@ -208,11 +217,36 @@ export function Header() {
               </div>
             )}
 
-            {/* Date range */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
-            </div>
+            {/* Date range / invoice period */}
+            {isInvoicesPage ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateFrom')}</span>
+                  <DatePicker
+                    value={invoiceDateFrom}
+                    onChange={setInvoiceDateFrom}
+                    placeholder={t('filters.dateFrom')}
+                    toDate={invoiceDateTo}
+                    className="w-full min-w-0"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateTo')}</span>
+                  <DatePicker
+                    value={invoiceDateTo}
+                    onChange={setInvoiceDateTo}
+                    placeholder={t('filters.dateTo')}
+                    fromDate={invoiceDateFrom}
+                    className="w-full min-w-0"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
+                <DateRangePicker value={dateRange} onChange={setDateRange} />
+              </div>
+            )}
 
             <Button
               className="mt-2 w-full"

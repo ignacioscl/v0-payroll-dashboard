@@ -18,6 +18,7 @@ export type UseTtkIssueCountsArgs = {
   search: string
   selectedDealers: string[]
   dateRange: DateRange | undefined
+  selectedEmployeeId?: number | null
   filtersHydrated?: boolean
   enabled?: boolean
 }
@@ -26,10 +27,12 @@ export function ttkIssueCountsQueryKey(args: {
   search: string
   selectedDealers: string[]
   dateRange: DateRange | undefined
+  selectedEmployeeId?: number | null
 }) {
   return [
     'ttk-issue-counts',
     args.search,
+    args.selectedEmployeeId ?? null,
     args.selectedDealers.slice().sort().join(','),
     args.dateRange?.from?.toISOString(),
     args.dateRange?.to?.toISOString(),
@@ -50,6 +53,7 @@ export function useTtkIssueCounts(args: UseTtkIssueCountsArgs) {
     search: debouncedSearch,
     selectedDealers: debouncedDealers,
     dateRange: args.dateRange,
+    selectedEmployeeId: args.selectedEmployeeId ?? null,
   }
 
   const params = buildTtkScopeParams({ ...queryArgs, scopeUser })

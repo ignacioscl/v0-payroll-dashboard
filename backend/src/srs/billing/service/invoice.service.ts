@@ -8,6 +8,12 @@ import {
   InvoiceListResponseDto,
   buildInvoiceListFilter,
 } from '../dto/invoice-list.dto'
+import {
+  InvoiceLookupQueryDto,
+  InvoiceLookupResponseDto,
+  buildDepartmentLookupFilter,
+  buildServiceLookupFilter,
+} from '../dto/invoice-lookup.dto'
 import { InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
 
 @Injectable()
@@ -58,5 +64,44 @@ export class InvoiceService {
         : this.repository.detailGenericRows(idStatement, idDealerProvider),
     ])
     return { idStatement, statementType, woRows, genericRows }
+  }
+
+  async lookupDepartments(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    const { dealerIds, search, limit } = buildDepartmentLookupFilter(query)
+    if (dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer')
+    }
+    const results = await this.repository.lookupDepartments({
+      idDealerProvider: ctx.idDealerProvider,
+      idUsuario: ctx.idUsuario,
+      dealerIds,
+      skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
+  }
+
+  async lookupServices(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    const { dealerIds, departmentIds, search, limit } = buildServiceLookupFilter(query)
+    if (dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer')
+    }
+    const results = await this.repository.lookupServices({
+      idDealerProvider: ctx.idDealerProvider,
+      idUsuario: ctx.idUsuario,
+      dealerIds,
+      departmentIds,
+      skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
   }
 }

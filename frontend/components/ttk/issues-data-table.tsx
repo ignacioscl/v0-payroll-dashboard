@@ -175,6 +175,7 @@ export function IssuesDataTable({
 
   const {
     search,
+    selectedEmployee,
     selectedDealers,
     selectedType,
     setSelectedType,
@@ -295,6 +296,7 @@ export function IssuesDataTable({
         selectedDealers: debouncedDealers,
         dateRange: effectiveDateRange,
         selectedType: effectiveSelectedType,
+        selectedEmployeeId: selectedEmployee?.id ?? null,
         punchMinHours,
         punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
@@ -309,6 +311,7 @@ export function IssuesDataTable({
       debouncedDealers,
       effectiveDateRange,
       effectiveSelectedType,
+      selectedEmployee?.id,
       punchMinHours,
       punchMaxHours,
       effectivePaymentTypeFilter,

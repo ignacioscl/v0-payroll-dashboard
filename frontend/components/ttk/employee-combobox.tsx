@@ -4,6 +4,11 @@ import * as React from 'react'
 import { ChevronsUpDown, User, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SearchableCombobox } from '@/components/shared/searchable-combobox'
+import {
+  formatEmployeeRoleLabel,
+  getEmployeeAvatarTone,
+  getEmployeeInitials,
+} from '@/components/filters/employee-search-row'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -20,32 +25,18 @@ interface EmployeeComboboxProps {
   className?: string
   /** When false, the dropdown shows a "pick a dealer first" prerequisite gate. */
   dealerSelected?: boolean
+  /** Dense trigger aligned with h-8 filter controls. */
+  compact?: boolean
 }
 
 /** Uppercase initials from a "First Last" style name. */
 function getInitials(name: string): string {
-  const tokens = name
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean)
-  if (tokens.length === 0) return '?'
-  if (tokens.length === 1) return tokens[0]!.slice(0, 2).toUpperCase()
-  return (tokens[0]![0]! + tokens[tokens.length - 1]![0]!).toUpperCase()
+  return getEmployeeInitials(name)
 }
 
 /** Stable gradient palette for the avatar so each employee keeps the same color. */
 function getAvatarTone(id: number): string {
-  const tones = [
-    'from-blue-500 to-indigo-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-fuchsia-500 to-pink-500',
-    'from-cyan-500 to-sky-500',
-    'from-violet-500 to-purple-500',
-    'from-rose-500 to-red-500',
-    'from-lime-500 to-emerald-500',
-  ]
-  return tones[Math.abs(id) % tones.length]!
+  return getEmployeeAvatarTone(id)
 }
 
 function EmployeeAvatar({
@@ -55,9 +46,14 @@ function EmployeeAvatar({
 }: {
   id: number
   name: string
-  size?: 'sm' | 'md'
+  size?: 'xs' | 'sm' | 'md'
 }) {
-  const dims = size === 'sm' ? 'size-7 text-[10px]' : 'size-8 text-xs'
+  const dims =
+    size === 'xs'
+      ? 'size-6 text-[9px]'
+      : size === 'sm'
+        ? 'size-7 text-[10px]'
+        : 'size-8 text-xs'
   return (
     <span
       className={cn(
@@ -90,8 +86,10 @@ export function EmployeeCombobox({
   minSearchChars = 2,
   className,
   dealerSelected = true,
+  compact = false,
 }: EmployeeComboboxProps) {
   const { t } = useTranslation()
+  const avatarSize = compact ? ('xs' as const) : ('md' as const)
 
   return (
     <SearchableCombobox<TtkEmployeeOption>
@@ -105,6 +103,7 @@ export function EmployeeCombobox({
       isLoading={isLoading}
       disabled={disabled}
       minSearchChars={minSearchChars}
+      compact={compact}
       placeholder={placeholder ?? t('employeeSearch.select')}
       searchPlaceholder={t('employeeSearch.typeMinChars')}
       preSearchTitle={t('employeeSearch.startTyping')}
@@ -135,13 +134,19 @@ export function EmployeeCombobox({
       className={className}
       renderSelectedTrigger={({ item, clear }) => (
         <>
-          <EmployeeAvatar id={item.id} name={item.nombre} />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate font-medium text-foreground">{item.nombre}</span>
-            <span className="truncate text-[11px] text-muted-foreground">
-              {t('employeeSearch.clickToChange')}
+          <EmployeeAvatar id={item.id} name={item.nombre} size={avatarSize} />
+          {compact ? (
+            <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+              {item.nombre}
             </span>
-          </span>
+          ) : (
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate font-medium text-foreground">{item.nombre}</span>
+              <span className="truncate text-[11px] text-muted-foreground">
+                {t('employeeSearch.clickToChange')}
+              </span>
+            </span>
+          )}
           <span
             role="button"
             tabIndex={0}
@@ -150,24 +155,43 @@ export function EmployeeCombobox({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') clear(e)
             }}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={cn(
+              'flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+              compact ? 'size-5' : 'size-6',
+            )}
           >
-            <X className="size-3.5" />
+            <X className={compact ? 'size-3' : 'size-3.5'} />
           </span>
         </>
       )}
       renderEmptyTrigger={({ placeholder: p }) => (
         <>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <User className="size-4" />
+          <span
+            className={cn(
+              'flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground',
+              compact ? 'size-6' : 'size-8',
+            )}
+          >
+            <User className={compact ? 'size-3.5' : 'size-4'} />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate font-medium text-muted-foreground">{p}</span>
-            <span className="truncate text-[11px] text-muted-foreground/80">
-              {t('employeeSearch.searchByName')}
+          <span className={cn('min-w-0 flex-1', compact ? 'truncate' : 'flex flex-col')}>
+            <span
+              className={cn(
+                'truncate font-medium text-muted-foreground',
+                compact && 'text-xs',
+              )}
+            >
+              {p}
             </span>
+            {!compact ? (
+              <span className="truncate text-[11px] text-muted-foreground/80">
+                {t('employeeSearch.searchByName')}
+              </span>
+            ) : null}
           </span>
-          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+          <ChevronsUpDown
+            className={cn('shrink-0 text-muted-foreground', compact ? 'size-3.5' : 'size-4')}
+          />
         </>
       )}
       renderItem={({ item }) => (
@@ -177,9 +201,11 @@ export function EmployeeCombobox({
             <span className="truncate text-sm font-medium text-foreground">
               {item.nombre}
             </span>
-            <span className="truncate text-[11px] text-muted-foreground">
-              ID #{item.id}
-            </span>
+            {formatEmployeeRoleLabel(item) ? (
+              <span className="truncate text-[11px] text-muted-foreground">
+                {formatEmployeeRoleLabel(item)}
+              </span>
+            ) : null}
           </span>
         </>
       )}

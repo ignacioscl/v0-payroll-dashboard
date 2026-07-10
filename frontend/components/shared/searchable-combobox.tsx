@@ -168,6 +168,8 @@ export interface SearchableComboboxProps<T> {
   // ---------- Style ----------
   /** Extra classes for the trigger. */
   className?: string
+  /** Dense trigger for filter bars (h-8, text-xs, overflow clipped). */
+  compact?: boolean
   /** Popover content width — defaults to `w-(--radix-popover-trigger-width)`. */
   popoverWidth?: string
   /** Popover alignment. */
@@ -209,6 +211,7 @@ export function SearchableCombobox<T>({
   loadingMoreLabel,
   prerequisite,
   className,
+  compact = false,
   popoverWidth = 'w-(--radix-popover-trigger-width)',
   popoverAlign = 'start',
   listMaxHeight = 'max-h-[280px]',
@@ -310,7 +313,10 @@ export function SearchableCombobox<T>({
           aria-haspopup="listbox"
           disabled={disabled}
           className={cn(
-            'group relative flex w-full items-center gap-3 rounded-lg border bg-background px-3 py-2.5 text-left text-sm shadow-xs transition-all',
+            'group relative flex w-full items-center text-left shadow-xs transition-all',
+            compact
+              ? 'h-8 gap-2 overflow-hidden rounded-md border bg-background px-2.5 text-xs'
+              : 'gap-3 rounded-lg border bg-background px-3 py-2.5 text-sm',
             'border-input hover:border-primary/40 hover:bg-accent/5',
             'focus-visible:border-primary focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/30',
             open && 'border-primary ring-[3px] ring-ring/30',

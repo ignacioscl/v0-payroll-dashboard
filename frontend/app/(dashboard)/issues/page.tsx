@@ -82,6 +82,7 @@ export default function IssuesPage() {
     useState<PaymentTypeFilterValue>(PAYMENT_TYPE_FILTER_ALL)
   const {
     search,
+    selectedEmployee,
     selectedDealers,
     dateRange,
     selectedType,
@@ -146,6 +147,7 @@ export default function IssuesPage() {
     search,
     selectedDealers,
     dateRange,
+    selectedEmployeeId: selectedEmployee?.id ?? null,
     filtersHydrated,
   })
 
