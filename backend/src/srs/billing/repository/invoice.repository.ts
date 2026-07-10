@@ -174,6 +174,7 @@ export class InvoiceRepository {
 
     const rows = await this.srs.query(
       `SELECT s.id, s.full_nro, s.statement_type, s.estado, s.sended,
+              s.emails_sended, s.last_sended,
               s.fecha_create, s.fecha_desde, s.fecha_hasta,
               s.po, s.ro, s.discount, s.discount_type, ROUND(s.tax, 2) AS tax,
               s.invoice_service_sel_rel, s.invoice_note,
@@ -232,6 +233,8 @@ export class InvoiceRepository {
       po: r.po ?? undefined,
       ro: r.ro ?? undefined,
       sended: Number(r.sended ?? 0),
+      emailsSended: r.emails_sended ?? undefined,
+      lastSended: r.last_sended ?? undefined,
       isBilled: Number(r.is_billed ?? 0),
       isPartialBilled: Number(r.is_partial_billed ?? 0),
       idBilling: r.id_billing ? Number(r.id_billing) : undefined,

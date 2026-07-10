@@ -6,8 +6,12 @@ import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
 import { SrsPhpPath } from '@/types/enum-url'
 
-const DEFAULT_EMAIL_MESSAGE =
-  'Your current billing statements are linked below.  Please let us know if you have any questions.'
+import { DEFAULT_INVOICE_EMAIL_FILE_NAME } from '@/lib/billing/invoice-email-ui'
+import {
+  DEFAULT_INVOICE_EMAIL_MESSAGE,
+  loadInvoiceEmailPrefs,
+  persistInvoiceEmailPrefsAfterSend,
+} from '@/lib/billing/invoice-email-prefs'
 
 export type SendInvoiceEmailPayload = {
   idsInvoice: string
@@ -17,6 +21,7 @@ export type SendInvoiceEmailPayload = {
   subject?: string
   message?: string
   replyto?: string
+  fileName?: string
 }
 
 type SendInvoiceEmailBody = {
@@ -27,6 +32,7 @@ type SendInvoiceEmailBody = {
   subject: string
   message: string
   replyto: string
+  file_name: string
 }
 
 export function useSendInvoiceEmail() {
@@ -45,8 +51,9 @@ export function useSendInvoiceEmail() {
         emailto: payload.emailto,
         payed: payload.payed ?? '',
         subject: payload.subject ?? '',
-        message: payload.message ?? DEFAULT_EMAIL_MESSAGE,
+        message: payload.message ?? DEFAULT_INVOICE_EMAIL_MESSAGE,
         replyto: payload.replyto ?? '',
+        file_name: payload.fileName?.trim() || DEFAULT_INVOICE_EMAIL_FILE_NAME,
       })
       assertSrsSuccess<{ sent?: boolean }>(raw, 'Failed to send invoice email')
     },

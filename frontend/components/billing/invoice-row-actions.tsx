@@ -163,6 +163,9 @@ export function InvoiceRowActions({
         invoiceLabel={label}
         idDealer={idDealer}
         payedFilter={payedFilter}
+        sended={row.sended}
+        emailsSended={row.emailsSended}
+        lastSended={row.lastSended}
       />
     </>
   )

@@ -241,6 +241,10 @@ export class InvoiceRowDto {
   @ApiProperty({ nullable: true }) po?: string
   @ApiProperty({ nullable: true }) ro?: string
   @ApiProperty() sended!: number
+  @ApiProperty({ nullable: true, description: 'Comma-separated recipients from last sends' })
+  emailsSended?: string
+  @ApiProperty({ nullable: true, description: 'Last email send datetime' })
+  lastSended?: string
   @ApiProperty() isBilled!: number
   @ApiProperty() isPartialBilled!: number
   @ApiProperty({ nullable: true }) idBilling?: number

@@ -28,6 +28,8 @@ export interface InvoiceRow {
   po?: string
   ro?: string
   sended: number
+  emailsSended?: string
+  lastSended?: string
   isBilled: number
   isPartialBilled: number
   idBilling?: number

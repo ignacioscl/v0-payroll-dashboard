@@ -53,10 +53,30 @@ export interface Messages {
     actionEmailTitle: string
     actionEmailSent: string
     actionEmailTo: string
+    actionEmailToPlaceholder: string
     actionEmailToHint: string
+    actionEmailLastAccount: string
+    actionEmailLastAccountPlaceholder: string
+    actionEmailPriorSentTo: string
+    actionEmailPriorLastDate: string
+    actionEmailFileName: string
+    actionEmailFileNamePlaceholder: string
+    actionEmailFileNameHint: string
+    actionEmailAuditTitle: string
+    actionEmailAuditEmpty: string
+    actionEmailAuditError: string
+    actionEmailAuditAuthor: string
+    actionEmailAuditTo: string
+    actionEmailAuditSent: string
+    actionEmailAuditRead: string
     actionEmailSubject: string
+    actionEmailSubjectPlaceholder: string
+    actionEmailSubjectDefaultHint: string
     actionEmailMessage: string
+    actionEmailMessagePlaceholder: string
     actionEmailReply: string
+    actionEmailReplyPlaceholder: string
+    actionEmailProviderFallback: string
     actionEmailSend: string
     actionEmailSuccess: string
     actionEmailError: string
