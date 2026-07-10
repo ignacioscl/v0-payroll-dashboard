@@ -195,6 +195,12 @@ export default function InvoicesPage() {
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
         showDealerSubline={selectedDealers.length > 1}
+        idDealer={
+          primaryDealerId != null
+            ? String(primaryDealerId)
+            : (idDealer.split(',')[0] ?? '')
+        }
+        payedFilter={payed === 'all' ? undefined : payed}
       />
     </div>
   )

@@ -43,6 +43,24 @@ export interface Messages {
     colDiscount: string
     colTotal: string
     colPaid: string
+    colActions: string
+    actionLogTitle: string
+    actionLogEmpty: string
+    actionLogError: string
+    actionPrintTitle: string
+    actionPrintError: string
+    actionSessionExpired: string
+    actionEmailTitle: string
+    actionEmailSent: string
+    actionEmailTo: string
+    actionEmailToHint: string
+    actionEmailSubject: string
+    actionEmailMessage: string
+    actionEmailReply: string
+    actionEmailSend: string
+    actionEmailSuccess: string
+    actionEmailError: string
+    actionEmailInvalid: string
     statusPaid: string
     statusUnpaid: string
     statusPartial: string

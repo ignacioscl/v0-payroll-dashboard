@@ -6,6 +6,7 @@ import { PaginationDto } from '@/types/pagination-dto';
 import urlFetch from '@/types/get-url';
 import CustomError from '@/types/custom-error';
 import { UrlEnum } from '@/types/enum-url';
+import { isSrsLoginHtml } from '@/lib/srs/parse-srs-response';
 
 export type PaginationState = {
   pageIndex?: number | undefined;
@@ -19,6 +20,7 @@ interface UseApiRequest<T, Q, R> {
   getOne: (id: number) => Promise<R>;
   downloadFile: (id: number | string) => Promise<Blob>;
   downloadFileCustom: (customUrl?: string, body?: Record<string, any>) => Promise<Blob>;
+  postBlob: (payload: T) => Promise<Blob>;
   getOneCustom: (queryString: Q) => Promise<T>;
   post: (payload: T) => Promise<R>;
   update: (id: number, payload: T) => Promise<void>;
@@ -270,6 +272,58 @@ export function useApiRequest<T, Q = undefined, R = T>(
     }
   };
 
+  const postBlob = async (payload: T): Promise<Blob> => {
+    try {
+      const { data } = await axios.post(`${url}`, payload, {
+        responseType: 'blob',
+        validateStatus: (status) => status >= 200 && status < 300,
+      });
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        const message = isSrsLoginHtml(text)
+          ? 'Session expired — sign in again and retry.'
+          : text.trim().startsWith('{')
+            ? (() => {
+                try {
+                  const json = JSON.parse(text) as { error?: { message?: string } };
+                  return json.error?.message || 'Failed to download file';
+                } catch {
+                  return 'Failed to download file';
+                }
+              })()
+            : text.replace(/\s+/g, ' ').slice(0, 200) || 'Failed to download file';
+        setError(error);
+        setErrorDetail({
+          message,
+          status: error.response?.status ?? 0,
+          validationErrors: [],
+        });
+        throw new CustomError({
+          message,
+          status: error.response?.status ?? 0,
+          validationErrors: [],
+        });
+      }
+      setError(error);
+      setErrorDetail({
+        message: error?.response?.data?.message,
+        status: error?.response?.status,
+        validationErrors: error?.response?.data?.validationErrors,
+        i18nKey: error?.response?.data.i18nKey,
+        replacements: error?.response?.data.replacements,
+      });
+      throw new CustomError({
+        message: error?.response?.data?.message,
+        status: error?.response?.status,
+        validationErrors: error?.response?.data?.validationErrors,
+        i18nKey: error?.response?.data.i18nKey,
+        replacements: error?.response?.data.replacements,
+      });
+    }
+  };
+
   const post = async (payload: T): Promise<R> => {
     try {
       const { data } = await axios.post(`${url}`, payload);
@@ -407,6 +461,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
     getOne,
     downloadFile,
     downloadFileCustom,
+    postBlob,
     getOneCustom,
     post,
     update,

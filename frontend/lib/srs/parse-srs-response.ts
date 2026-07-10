@@ -6,12 +6,28 @@ export type SrsEnvelope<T> = {
   data?: T | null
 }
 
+const SESSION_EXPIRED_MESSAGE = 'Session expired — sign in again and retry.'
+
+/** Detects legacy SRS login HTML mistakenly returned as an API response. */
+export function isSrsLoginHtml(text: string): boolean {
+  const sample = text.slice(0, 4000)
+  return (
+    sample.includes('SRS Suite - Login') ||
+    sample.includes('Secure Sign In') ||
+    sample.includes('id="js-login"')
+  )
+}
+
 function parseEnvelope<T>(raw: unknown): SrsEnvelope<T> {
   if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (isSrsLoginHtml(trimmed) || trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+      throw new Error(SESSION_EXPIRED_MESSAGE)
+    }
     try {
       return JSON.parse(raw) as SrsEnvelope<T>
     } catch {
-      throw new Error(raw.trim() || 'Invalid response from server')
+      throw new Error(trimmed.slice(0, 200) || 'Invalid response from server')
     }
   }
   if (raw && typeof raw === 'object') {
@@ -59,4 +75,39 @@ export function getSrsErrorMessage(error: unknown, fallback: string): string {
     return error.message
   }
   return fallback
+}
+
+/** Validates a blob response is a PDF; throws a readable error for login HTML or JSON errors. */
+export async function assertPdfBlob(blob: Blob, fallbackMessage: string): Promise<Blob> {
+  const header = await blob.slice(0, 5).text()
+  if (header.startsWith('%PDF')) {
+    return blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' })
+  }
+
+  const text = await blob.text()
+  if (isSrsLoginHtml(text)) {
+    throw new Error(SESSION_EXPIRED_MESSAGE)
+  }
+  if (text.trim().startsWith('{')) {
+    try {
+      const json = JSON.parse(text) as { error?: { message?: string } }
+      throw new Error(json.error?.message || fallbackMessage)
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.message !== fallbackMessage) {
+        throw parseErr
+      }
+    }
+  }
+  throw new Error(fallbackMessage)
+}
+
+/** Opens a PDF blob in a new browser tab. */
+export function openPdfBlobInNewTab(blob: Blob): void {
+  const url = URL.createObjectURL(blob)
+  const opened = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!opened) {
+    URL.revokeObjectURL(url)
+    throw new Error('Pop-up blocked — allow pop-ups for this site to view the PDF')
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
 }

@@ -12,6 +12,7 @@ import {
   Wallet,
 } from 'lucide-react'
 
+import { InvoiceRowActions } from '@/components/billing/invoice-row-actions'
 import {
   DataTable,
   DataTableColumnHeader,
@@ -371,6 +372,8 @@ export function InvoiceListTable({
   pageSize,
   onPageSizeChange,
   showDealerSubline,
+  idDealer,
+  payedFilter,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
@@ -381,6 +384,8 @@ export function InvoiceListTable({
   onPageSizeChange: (pageSize: number) => void
   /** Legacy: debajo del nro de invoice cuando hay multi-dealer en el header. */
   showDealerSubline?: boolean
+  idDealer: string
+  payedFilter?: string
 }) {
   const { t } = useTranslation()
 
@@ -650,8 +655,30 @@ export function InvoiceListTable({
           exportValue: (r) => paidMeta(r, t).label,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
+      {
+        id: 'actions',
+        size: 96,
+        minSize: 88,
+        maxSize: 110,
+        enableSorting: false,
+        enableHiding: false,
+        header: () => (
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('invoices.colActions')}
+          </span>
+        ),
+        cell: ({ row }) => (
+          <InvoiceRowActions row={row.original} idDealer={idDealer} payedFilter={payedFilter} />
+        ),
+        meta: {
+          label: t('invoices.colActions'),
+          pin: 'right',
+          headerClassName: 'px-2',
+          cellClassName: 'px-2',
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
     ],
-    [t, showDealerSubline],
+    [t, showDealerSubline, idDealer, payedFilter],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
