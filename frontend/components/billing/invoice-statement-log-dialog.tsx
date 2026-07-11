@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { useInvoiceStatementLog } from '@/hooks/use-invoice-statement-log'
 import type { InvoiceStatementLogEntry } from '@/hooks/use-invoice-statement-log'
+import { InvoiceStatementLogSnapshotView } from '@/lib/billing/invoice-statement-log-snapshot'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 
@@ -28,25 +29,6 @@ function formatLogDate(value?: string): string {
   })
 }
 
-function LogSnapshot({ descJson }: { descJson?: string | Record<string, unknown> }) {
-  if (!descJson) return null
-  try {
-    const parsed =
-      typeof descJson === 'string' ? (JSON.parse(descJson) as Record<string, unknown>) : descJson
-    return (
-      <pre className="mt-2 max-h-40 overflow-auto rounded-md border border-border/60 bg-muted/40 p-2 text-[10px] leading-snug text-muted-foreground">
-        {JSON.stringify(parsed, null, 2)}
-      </pre>
-    )
-  } catch {
-    return (
-      <pre className="mt-2 max-h-40 overflow-auto rounded-md border border-border/60 bg-muted/40 p-2 text-[10px] leading-snug text-muted-foreground">
-        {String(descJson)}
-      </pre>
-    )
-  }
-}
-
 function LogCard({ entry }: { entry: InvoiceStatementLogEntry }) {
   const author = entry.autor?.nombre?.trim()
   return (
@@ -55,9 +37,7 @@ function LogCard({ entry }: { entry: InvoiceStatementLogEntry }) {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">{entry.descCambio || '—'}</p>
           {author ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {entry.descCambio ? `By ${author}` : author}
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">By {author}</p>
           ) : null}
         </div>
         <div className="text-right text-xs text-muted-foreground">
@@ -70,7 +50,7 @@ function LogCard({ entry }: { entry: InvoiceStatementLogEntry }) {
           {entry.age ? <div className="mt-1 text-[10px]">{entry.age}</div> : null}
         </div>
       </div>
-      <LogSnapshot descJson={entry.descJson} />
+      <InvoiceStatementLogSnapshotView descJson={entry.descJson} />
     </div>
   )
 }
@@ -92,7 +72,7 @@ export function InvoiceStatementLogDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-2xl">
         <DialogHeader className="border-b border-border pb-3">
           <DialogTitle className="text-base">{t('invoices.actionLogTitle')}</DialogTitle>
           <DialogDescription className="text-xs tabular-nums">{invoiceLabel}</DialogDescription>
