@@ -662,10 +662,12 @@ export function InvoiceListTable({
         maxSize: 110,
         enableSorting: false,
         enableHiding: false,
-        header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {t('invoices.colActions')}
-          </span>
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('invoices.colActions')}
+            className="w-full justify-end"
+          />
         ),
         cell: ({ row }) => (
           <InvoiceRowActions row={row.original} idDealer={idDealer} payedFilter={payedFilter} />
@@ -673,6 +675,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colActions'),
           pin: 'right',
+          numeric: true,
           headerClassName: 'px-2',
           cellClassName: 'px-2',
         } satisfies DataTableColumnMeta<InvoiceRow>,
