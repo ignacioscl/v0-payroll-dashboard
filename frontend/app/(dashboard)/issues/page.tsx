@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
+import { GroupedIssuesDataTable } from '@/components/ttk/grouped-issues-table'
 import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
 import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
@@ -29,6 +30,8 @@ import {
   PlusCircle,
   CheckCheck,
   Coffee,
+  LayoutList,
+  Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -42,6 +45,8 @@ type IssueType =
   | 'only_deletes'
   | 'without_salary'
   | 'only_fixed'
+
+type IssuesViewMode = 'individual' | 'grouped'
 
 interface IssueCardConfig {
   type: IssueType
@@ -75,6 +80,7 @@ const ISSUE_CARD_META: Record<
 
 export default function IssuesPage() {
   const { t } = useTranslation()
+  const [viewMode, setViewMode] = useState<IssuesViewMode>('individual')
   const [addPunchOpen, setAddPunchOpen] = useState(false)
   const [punchMinHoursRaw, setPunchMinHoursRaw] = useState('')
   const [punchMaxHoursRaw, setPunchMaxHoursRaw] = useState('')
@@ -265,13 +271,47 @@ export default function IssuesPage() {
         }
       />
 
-      <IssuesDataTable
-        punchMinHoursRaw={punchMinHoursRaw}
-        punchMaxHoursRaw={punchMaxHoursRaw}
-        paymentTypeFilter={paymentTypeFilter}
-        onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
-        showToolbarFilters={false}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">{t('punch.filterPanelTitle')}</span>
+        <div className="inline-flex rounded-md border border-border p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'individual' ? 'default' : 'ghost'}
+            className="h-7 gap-1.5 px-2.5"
+            onClick={() => setViewMode('individual')}
+          >
+            <LayoutList className="h-3.5 w-3.5" />
+            {t('punch.viewIndividual')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'grouped' ? 'default' : 'ghost'}
+            className="h-7 gap-1.5 px-2.5"
+            onClick={() => setViewMode('grouped')}
+          >
+            <Users className="h-3.5 w-3.5" />
+            {t('punch.viewGrouped')}
+          </Button>
+        </div>
+      </div>
+
+      {viewMode === 'individual' ? (
+        <IssuesDataTable
+          punchMinHoursRaw={punchMinHoursRaw}
+          punchMaxHoursRaw={punchMaxHoursRaw}
+          paymentTypeFilter={paymentTypeFilter}
+          onPaymentTypeFilterChange={handlePaymentTypeFilterChange}
+          showToolbarFilters={false}
+        />
+      ) : (
+        <GroupedIssuesDataTable
+          punchMinHoursRaw={punchMinHoursRaw}
+          punchMaxHoursRaw={punchMaxHoursRaw}
+          paymentTypeFilter={paymentTypeFilter}
+        />
+      )}
 
       {canAdd && (
         <AddPunchDialog

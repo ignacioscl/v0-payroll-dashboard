@@ -378,6 +378,13 @@ export interface Messages {
     moreThanHours: string
     lessThanHours: string
     paymentTypeChip: string
+    viewIndividual: string
+    viewGrouped: string
+    groupedHoursHint: string
+    totalHours: string
+    expandPunches: string
+    collapsePunches: string
+    punchesForEmployee: string
   }
   dashboard: {
     title: string

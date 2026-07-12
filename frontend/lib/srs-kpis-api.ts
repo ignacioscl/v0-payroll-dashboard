@@ -1,5 +1,11 @@
 // Tipos = DTOs del backend NestJS (src/srs/*/dto). Datos REALES (no mock).
 
+import type { PunchGroupedResponse } from '@/lib/ttk/punch-grouped-types'
+import {
+  punchGroupedParamsToSearchParams,
+  type PunchGroupedQueryParams,
+} from '@/lib/ttk/punch-grouped-filters'
+
 export interface ProductionKpi {
   woCompleted: number
   productionValue: number
@@ -174,3 +180,14 @@ export const fetchCollectionsByMonth = (params: KpiQueryParams) =>
   getKpi<CollectionsByMonthPoint[]>('collections/by-month', params)
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)
 export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)
+
+export async function fetchPunchGrouped(
+  params: PunchGroupedQueryParams,
+): Promise<PunchGroupedResponse> {
+  const qs = punchGroupedParamsToSearchParams(params)
+  const res = await fetch(`/api/srs-kpis/punch/grouped?${qs.toString()}`, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`punch/grouped (${res.status})`)
+  }
+  return res.json() as Promise<PunchGroupedResponse>
+}

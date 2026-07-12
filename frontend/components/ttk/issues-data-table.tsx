@@ -88,6 +88,8 @@ export type IssuesDataTableProps = {
   issueTypeOverride?: string
   /** When true, ignores header search text. */
   ignoreSearch?: boolean
+  /** When set, filters punches to this employee (e.g. grouped row expand). */
+  employeeIdOverride?: number
   tableId?: string
   defaultPageSize?: number
   exportFileName?: string
@@ -134,6 +136,7 @@ export function IssuesDataTable({
   dateRangeOverride,
   issueTypeOverride,
   ignoreSearch = false,
+  employeeIdOverride,
   tableId = 'issues-punches',
   defaultPageSize = 25,
   exportFileName = 'punch-issues',
@@ -296,7 +299,7 @@ export function IssuesDataTable({
         selectedDealers: debouncedDealers,
         dateRange: effectiveDateRange,
         selectedType: effectiveSelectedType,
-        selectedEmployeeId: selectedEmployee?.id ?? null,
+        selectedEmployeeId: employeeIdOverride ?? selectedEmployee?.id ?? null,
         punchMinHours,
         punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
@@ -312,6 +315,7 @@ export function IssuesDataTable({
       effectiveDateRange,
       effectiveSelectedType,
       selectedEmployee?.id,
+      employeeIdOverride,
       punchMinHours,
       punchMaxHours,
       effectivePaymentTypeFilter,
@@ -742,6 +746,8 @@ export function IssuesDataTable({
     punchMinHours,
     punchMaxHours,
     selectedTodayLiveStatus,
+    employeeIdOverride,
+    selectedEmployee?.id,
   ])
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
@@ -787,6 +793,8 @@ export function IssuesDataTable({
       effectiveSelectedType,
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
+      employeeIdOverride,
+      selectedEmployee?.id,
     ],
     queryFn: async (params) => {
       const data = await apiRequest.getCustom('', undefined, params)

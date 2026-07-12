@@ -379,6 +379,14 @@ export const es: Messages = {
     moreThanHours: 'Más de {hours}h',
     lessThanHours: 'Menos de {hours}h',
     paymentTypeChip: 'Tipo de pago #{id}',
+    viewIndividual: 'Individual',
+    viewGrouped: 'Agrupado',
+    groupedHoursHint:
+      'Los filtros de horas aplican al total por empleado en el período, no por ponchada.',
+    totalHours: 'Horas totales',
+    expandPunches: 'Ver ponchadas',
+    collapsePunches: 'Ocultar ponchadas',
+    punchesForEmployee: 'Ponchadas de {name}',
   },
   dashboard: {
     title: 'Panel',

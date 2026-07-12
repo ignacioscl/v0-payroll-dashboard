@@ -8,11 +8,14 @@ import { TtkEmployeeWork } from '../payroll/entity/ttk-employee-work.srsentity'
 import { PunchKpiController } from './controller/punch-kpi.controller'
 import { PunchKpiService } from './service/punch-kpi.service'
 import { PunchKpiRepository } from './repository/punch-kpi.repository'
+import { GroupedPunchController } from './controller/punch-grouped.controller'
+import { GroupedPunchService } from './service/punch-grouped.service'
+import { GroupedPunchRepository } from './repository/punch-grouped.repository'
 
 @Module({
   imports: [SrsAuthModule, TypeOrmModule.forFeature([TtkEmployeeWork], SRS_CONNECTION)],
-  providers: [PunchKpiRepository, PunchKpiService],
-  controllers: [PunchKpiController],
-  exports: [PunchKpiService],
+  providers: [PunchKpiRepository, PunchKpiService, GroupedPunchRepository, GroupedPunchService],
+  controllers: [PunchKpiController, GroupedPunchController],
+  exports: [PunchKpiService, GroupedPunchService],
 })
 export class SrsPunchModule {}

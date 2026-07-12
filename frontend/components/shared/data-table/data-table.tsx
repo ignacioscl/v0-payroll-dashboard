@@ -390,6 +390,11 @@ export interface DataTableProps<TData, TValue = unknown> {
   renderSubComponent?: (row: Row<TData>) => React.ReactNode
   /** Gate which rows can expand. Defaults to all rows when `renderSubComponent` is set. */
   getRowCanExpand?: (row: Row<TData>) => boolean
+  /**
+   * `content` (default): shrink-wrap drilldown (e.g. invoice detail rail).
+   * `full`: stretch sub-component to the full table width (e.g. nested DataTable).
+   */
+  subComponentLayout?: 'content' | 'full'
 
   // ---------- Infinite scroll ----------
   /**
@@ -497,6 +502,7 @@ export function DataTable<TData, TValue = unknown>({
   onRowClick,
   renderSubComponent,
   getRowCanExpand,
+  subComponentLayout = 'content',
   infiniteScroll,
   footer,
   enableViewOptions = true,
@@ -957,7 +963,14 @@ export function DataTable<TData, TValue = unknown>({
         <TableRow className="border-b border-border/50 hover:bg-transparent">
           <TableCell colSpan={visibleColCount} className="overflow-visible bg-muted/20 p-0">
             {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally. */}
-            <div className="sticky left-0 z-[2] w-max max-w-[min(100vw-3rem,56rem)]">
+            <div
+              className={cn(
+                'sticky left-0 z-[2]',
+                subComponentLayout === 'full'
+                  ? 'w-full min-w-0'
+                  : 'w-max max-w-[min(100vw-3rem,56rem)]',
+              )}
+            >
               {renderSubComponent(row)}
             </div>
           </TableCell>

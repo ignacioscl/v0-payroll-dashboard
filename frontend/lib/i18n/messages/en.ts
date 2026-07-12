@@ -379,6 +379,14 @@ export const en: Messages = {
     moreThanHours: 'More than {hours}h',
     lessThanHours: 'Less than {hours}h',
     paymentTypeChip: 'Payment type #{id}',
+    viewIndividual: 'Individual',
+    viewGrouped: 'Grouped',
+    groupedHoursHint:
+      'Hour filters apply to each employee’s total hours in the period, not per punch.',
+    totalHours: 'Total hours',
+    expandPunches: 'Show punches',
+    collapsePunches: 'Hide punches',
+    punchesForEmployee: 'Punches for {name}',
   },
   dashboard: {
     title: 'Dashboard',
