@@ -101,6 +101,12 @@ export class PunchGroupedRowDto {
   @ApiProperty({ example: true })
   hasError!: boolean
 
+  @ApiPropertyOptional({
+    example: 'Clock out is not set<br/>Break is not set',
+    description: 'Distinct punch error messages for this employee in the period',
+  })
+  errorSummary?: string | null
+
   @ApiProperty({ type: [PunchGroupedPaymentTypeRowDto] })
   byPaymentType!: PunchGroupedPaymentTypeRowDto[]
 }

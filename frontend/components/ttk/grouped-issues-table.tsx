@@ -14,10 +14,18 @@ import { useFilters } from '@/lib/filter-context'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
+import { buildTtkListFilterExtra, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
+import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
+import { GroupedPunchExportButton } from '@/components/ttk/grouped-punch-export-button'
+import type { PunchGroupedExportLabels } from '@/lib/ttk/punch-grouped-export'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
@@ -25,6 +33,11 @@ const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
 function formatHoursDecimal(value: number): string {
   if (!Number.isFinite(value)) return '—'
   return `${value.toFixed(2)}h`
+}
+
+function paymentTypeHours(row: PunchGroupedRow, label: string): number | null {
+  const match = row.byPaymentType.find((pt) => pt.label === label)
+  return match ? match.hoursNumber : null
 }
 
 function GroupedPunchDetail({ row }: { row: PunchGroupedRow }) {
@@ -53,6 +66,7 @@ function GroupedPunchDetail({ row }: { row: PunchGroupedRow }) {
         exportFileName={`punch-detail-${employeeId}`}
         queryKeySuffix={`grouped-${employeeId}`}
         tableScrollHeight={false}
+        enableExport={false}
       />
     </div>
   )
@@ -75,15 +89,20 @@ export function GroupedIssuesDataTable({
     selectedEmployee,
     selectedDealers,
     selectedType,
+    selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
   } = useFilters()
+
+  const { user, hasPermission } = useSrsMe()
+  const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
 
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'hoursNumber', desc: true },
   ])
+  const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
 
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -138,8 +157,105 @@ export function GroupedIssuesDataTable({
     Boolean(listExtra.fechaDesde) &&
     Boolean(listExtra.fechaHasta)
 
+  const groupedParamsBase = React.useMemo(() => {
+    const { page: _p, pageSize: _s, ...rest } = listExtra
+    void _p
+    void _s
+    return rest
+  }, [listExtra])
+
+  const ttkListExtra = React.useMemo(
+    () =>
+      buildTtkListFilterExtra({
+        search: '',
+        selectedDealers: debouncedDealers,
+        dateRange,
+        selectedType,
+        selectedEmployeeId: null,
+        scopeUser: toPayrollScopeUser(user),
+        todayLiveStatus:
+          selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
+            ? selectedTodayLiveStatus
+            : undefined,
+      }),
+    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus, user],
+  )
+
+  const buildExportLabels = React.useCallback((): PunchGroupedExportLabels => {
+    return {
+      employee: t('common.employee'),
+      roleDept: t('punch.roleDept'),
+      date: t('common.date'),
+      punchIn: t('punch.punchIn'),
+      breakStart: t('punch.breakStart'),
+      breakEnd: t('punch.breakEnd'),
+      punchOut: t('punch.punchOut'),
+      timeWork: t('punch.timeWork'),
+      timeBreak: t('punch.timeBreak'),
+      paymentType: t('punch.paymentType'),
+      dealer: t('profile.dealer'),
+      hasError: t('punch.withErrors'),
+      yes: t('punch.exportYes'),
+      no: t('punch.exportNo'),
+      groupedSheet: t('punch.exportGroupedSheetName'),
+      totalHours: t('punch.totalHours'),
+      exportingProgress: t('punch.exportGroupedGenerating'),
+      exportSheetSubtitle: t('punch.exportSheetSubtitle'),
+      exportDetailSheetTitle: t('punch.exportDetailSheetTitle'),
+    }
+  }, [t])
+
+  React.useEffect(() => {
+    setPageIndex(0)
+    setRowSelection({})
+  }, [
+    debouncedSearch,
+    debouncedDealers,
+    selectedType,
+    dateRange,
+    minHoursTotal,
+    maxHoursTotal,
+    paymentTypeFilter,
+    selectedEmployee?.id,
+  ])
+
   const columns = React.useMemo<ColumnDef<PunchGroupedRow>[]>(
     () => [
+      {
+        id: 'select',
+        size: 40,
+        minSize: 40,
+        maxSize: 44,
+        enableSorting: false,
+        enableHiding: false,
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? 'indeterminate'
+                  : false
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t('punch.selectAllOnPage')}
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t('punch.selectEmployee')}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+        meta: {
+          label: t('punch.selectEmployee'),
+          pin: 'left',
+          headerClassName: 'w-[40px] px-2',
+          cellClassName: 'px-2',
+        } satisfies DataTableColumnMeta<PunchGroupedRow>,
+      },
       {
         id: 'expand',
         size: 40,
@@ -183,19 +299,27 @@ export function GroupedIssuesDataTable({
         cell: ({ row }) => {
           const r = row.original
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                row.toggleExpanded()
-              }}
-              className="flex min-w-0 items-center gap-1.5 text-left hover:underline"
-            >
-              <span className="truncate font-medium">{r.nombreEmployee}</span>
-              {r.hasError ? (
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+            <div className="flex min-w-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  row.toggleExpanded()
+                }}
+                className="min-w-0 truncate text-left font-medium hover:underline"
+              >
+                {r.nombreEmployee}
+              </button>
+              {r.errorSummary ? (
+                <span
+                  className="shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <PunchErrorIndicator errorText={r.errorSummary} />
+                </span>
               ) : null}
-            </button>
+            </div>
           )
         },
         meta: {
@@ -241,47 +365,34 @@ export function GroupedIssuesDataTable({
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
-        id: 'byPaymentType',
-        accessorFn: (row) => row.byPaymentType.map((p) => p.label).join(', '),
+        id: 'hasError',
+        accessorFn: (row) => row.hasError,
         enableSorting: false,
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t('punch.paymentType')} />
+          <DataTableColumnHeader column={column} title={t('punch.withErrors')} />
         ),
-        cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
-            {row.original.byPaymentType.length === 0 ? (
-              <span className="text-xs text-muted-foreground">—</span>
-            ) : (
-              row.original.byPaymentType.map((pt) => (
-                <Badge key={`${pt.idPaymentType}-${pt.label}`} variant="secondary" className="text-[10px]">
-                  {pt.label}: {formatHoursDecimal(pt.hoursNumber)}
-                </Badge>
-              ))
-            )}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const r = row.original
+          if (!r.hasError) {
+            return <span className="text-xs text-muted-foreground">{t('punch.exportNo')}</span>
+          }
+          if (r.errorSummary) {
+            return (
+              <span onClick={(e) => e.stopPropagation()}>
+                <PunchErrorIndicator errorText={r.errorSummary} />
+              </span>
+            )
+          }
+          return <span className="text-xs">{t('punch.exportYes')}</span>
+        },
         meta: {
-          label: t('punch.paymentType'),
-          exportValue: (r) =>
-            r.byPaymentType.map((p) => `${p.label} ${p.hoursNumber}`).join('; '),
+          label: t('punch.withErrors'),
+          exportValue: (r) => (r.hasError ? t('punch.exportYes') : t('punch.exportNo')),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
     ],
     [t],
   )
-
-  React.useEffect(() => {
-    setPageIndex(0)
-  }, [
-    debouncedSearch,
-    debouncedDealers,
-    selectedType,
-    dateRange,
-    minHoursTotal,
-    maxHoursTotal,
-    paymentTypeFilter,
-    selectedEmployee?.id,
-  ])
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: groupedAdapter,
@@ -311,6 +422,42 @@ export function GroupedIssuesDataTable({
     extra: {},
   })
 
+  const paymentTypeLabels = React.useMemo(() => {
+    const labels = new Set<string>()
+    for (const row of rows) {
+      for (const pt of row.byPaymentType) {
+        labels.add(pt.label)
+      }
+    }
+    return Array.from(labels).sort((a, b) => a.localeCompare(b))
+  }, [rows])
+
+  const columnsWithPaymentTypes = React.useMemo<ColumnDef<PunchGroupedRow>[]>(() => {
+    const paymentCols: ColumnDef<PunchGroupedRow>[] = paymentTypeLabels.map((label) => ({
+      id: `pt-${label}`,
+      accessorFn: (row) => paymentTypeHours(row, label),
+      enableSorting: false,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={label} />,
+      cell: ({ row }) => {
+        const hours = paymentTypeHours(row.original, label)
+        return (
+          <span className="font-mono tabular-nums text-xs">
+            {hours != null ? formatHoursDecimal(hours) : '—'}
+          </span>
+        )
+      },
+      meta: {
+        label,
+        mono: true,
+        exportValue: (r) => {
+          const h = paymentTypeHours(r, label)
+          return h != null ? String(h) : ''
+        },
+      } satisfies DataTableColumnMeta<PunchGroupedRow>,
+    }))
+    return [...columns, ...paymentCols]
+  }, [columns, paymentTypeLabels])
+
   const emptyState = !filtersHydrated ? (
     <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
   ) : selectedDealers.length === 0 ? (
@@ -320,6 +467,15 @@ export function GroupedIssuesDataTable({
       <AlertTriangle className="h-8 w-8 opacity-20" />
       <span className="text-xs">{t('punch.noRecordsForFilters')}</span>
     </div>
+  )
+
+  const selectedEmployeeIds = React.useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, selected]) => selected)
+        .map(([id]) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0),
+    [rowSelection],
   )
 
   const renderSubComponent = React.useCallback(
@@ -343,14 +499,16 @@ export function GroupedIssuesDataTable({
 
       <DataTable<PunchGroupedRow>
         tableId="issues-grouped"
-        columns={columns}
+        columns={columnsWithPaymentTypes}
         data={rows}
         getRowId={(row) => String(row.idUsuario)}
         isLoading={isFetching}
         emptyState={emptyState}
         enableGlobalFilter={false}
-        enableExport
-        exportFileName="punch-grouped"
+        enableExport={false}
+        enableRowSelection
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
         manualSorting
         sorting={sorting}
         onSortingChange={(next) => {
@@ -367,6 +525,24 @@ export function GroupedIssuesDataTable({
             setPageSize(next.pageSize)
           },
         }}
+        toolbarLeading={
+          selectedEmployeeIds.length > 0 ? (
+            <Badge variant="secondary" className="h-6 text-[10px] font-medium">
+              {t('punch.exportSelectedCount', { count: selectedEmployeeIds.length })}
+            </Badge>
+          ) : null
+        }
+        toolbarTrailing={
+          <GroupedPunchExportButton
+            disabled={!queryEnabled || rows.length === 0}
+            fileName="punch-grouped"
+            groupedParamsBase={groupedParamsBase}
+            ttkListExtra={ttkListExtra}
+            includePaymentType={canViewPayment}
+            buildLabels={buildExportLabels}
+            selectedEmployeeIds={selectedEmployeeIds}
+          />
+        }
         renderSubComponent={renderSubComponent}
         subComponentLayout="full"
       />

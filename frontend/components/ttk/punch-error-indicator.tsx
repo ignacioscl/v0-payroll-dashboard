@@ -3,7 +3,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { AlertTriangle, Clock, Coffee, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -59,8 +59,8 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
   const badges = parsePunchErrorBadges(errorText)
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <HoverCard openDelay={200} closeDelay={100}>
+      <HoverCardTrigger asChild>
         <button
           type="button"
           className="inline-flex shrink-0 cursor-pointer rounded-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -68,8 +68,8 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
         >
           <AlertTriangle className="h-3.5 w-3.5" />
         </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto max-w-xs space-y-2 p-3">
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-auto max-w-xs space-y-2 p-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {t('punch.issues')}
         </p>
@@ -91,7 +91,7 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
             )
           })}
         </div>
-      </PopoverContent>
-    </Popover>
+      </HoverCardContent>
+    </HoverCard>
   )
 }

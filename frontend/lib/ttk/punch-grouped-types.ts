@@ -10,6 +10,7 @@ export type PunchGroupedRow = {
   hoursNumber: number
   breakNumber: number
   hasError: boolean
+  errorSummary?: string | null
   byPaymentType: PunchGroupedPaymentTypeRow[]
 }
 

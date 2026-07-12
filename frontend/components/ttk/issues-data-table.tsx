@@ -108,6 +108,8 @@ export type IssuesDataTableProps = {
   onPaymentTypeFilterChange?: (value: PaymentTypeFilterValue) => void
   /** When false, hours/payment filters live in PunchReportFilterPanel only. */
   showToolbarFilters?: boolean
+  /** When false, hides the toolbar export button (e.g. nested grouped detail). */
+  enableExport?: boolean
 }
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
@@ -147,6 +149,7 @@ export function IssuesDataTable({
   paymentTypeFilter: paymentTypeFilterProp,
   onPaymentTypeFilterChange,
   showToolbarFilters = true,
+  enableExport = true,
 }: IssuesDataTableProps = {}) {
   const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
@@ -882,7 +885,7 @@ export function IssuesDataTable({
           }
           includeAllPageSize
           enableViewOptions
-          enableExport
+          enableExport={enableExport}
           exportFileName={exportFileName}
           fetchAllRowsForExport={fetchAllRowsForExport}
           manualSorting

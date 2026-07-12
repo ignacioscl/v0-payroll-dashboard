@@ -98,7 +98,19 @@ export class GroupedPunchRepository {
          u.nombre                                                                  AS nombreEmployee,
          SUM(TTK_CALCULATE_TIME_DAY(1, tew.punch_out, tew.punch_in, tew.break_end, tew.break_start, 1)) AS hoursNumber,
          SUM(TTK_CALCULATE_TIME_DAY(1, tew.break_end, tew.break_start, NULL, NULL, 1))                  AS breakNumber,
-         MAX(TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IS NOT NULL)                       AS hasError
+         MAX(CASE WHEN TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1, 2, 3) THEN 1 ELSE 0 END)          AS hasError,
+         NULLIF(
+           GROUP_CONCAT(
+             DISTINCT CASE
+               WHEN TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1, 2, 3)
+               THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(TTK_PUNCH_WITH_ERROR(tew.id), '$.res')), '')
+               ELSE NULL
+             END
+             ORDER BY tew.punch_in
+             SEPARATOR '<br/>'
+           ),
+           ''
+         )                                                                                            AS errorSummary
        ${baseFrom}
        GROUP BY u.id_usuario, u.nombre
        ${havingSql}
@@ -166,6 +178,7 @@ export class GroupedPunchRepository {
       hoursNumber: Math.round(Number(r.hoursNumber) * 100) / 100,
       breakNumber: Math.round(Number(r.breakNumber) * 100) / 100,
       hasError: Boolean(Number(r.hasError)),
+      errorSummary: r.errorSummary ? String(r.errorSummary) : null,
       byPaymentType: byType[Number(r.idUsuario)] ?? [],
     }))
 

@@ -385,6 +385,29 @@ export interface Messages {
     expandPunches: string
     collapsePunches: string
     punchesForEmployee: string
+    exportGroupedTitle: string
+    exportGroupedDescription: string
+    exportGroupedOnly: string
+    exportGroupedOnlyHint: string
+    exportGroupedWithDetail: string
+    exportGroupedWithDetailHint: string
+    exportGroupedDetailWarning: string
+    exportGroupedGenerating: string
+    exportGroupedSheetName: string
+    exportSheetSubtitle: string
+    exportDetailSheetTitle: string
+    exportYes: string
+    exportNo: string
+    exportScopeLabel: string
+    exportScopeAll: string
+    exportScopeAllHint: string
+    exportScopeSelected: string
+    exportScopeSelectedHint: string
+    exportScopeSelectedEmpty: string
+    exportSelectedCount: string
+    exportContentLabel: string
+    selectEmployee: string
+    selectAllOnPage: string
   }
   dashboard: {
     title: string
