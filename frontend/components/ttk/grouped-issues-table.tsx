@@ -14,6 +14,7 @@ import { useFilters } from '@/lib/filter-context'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
+import { formatGroupedHoursDisplay } from '@/lib/ttk/format-grouped-hours'
 import { buildTtkListFilterExtra, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
@@ -23,6 +24,8 @@ import { GroupedPunchExportButton } from '@/components/ttk/grouped-punch-export-
 import type { PunchGroupedExportLabels } from '@/lib/ttk/punch-grouped-export'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
@@ -30,9 +33,13 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 
 const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
 
-function formatHoursDecimal(value: number): string {
-  if (!Number.isFinite(value)) return '—'
-  return `${value.toFixed(2)}h`
+const GROUPED_HOURS_FORMAT_STORAGE_KEY = 'punch.grouped.hoursFormat'
+
+function readGroupedHoursFormatPreference(): boolean {
+  if (typeof window === 'undefined') return true
+  const stored = window.localStorage.getItem(GROUPED_HOURS_FORMAT_STORAGE_KEY)
+  if (stored === '0') return false
+  return true
 }
 
 function paymentTypeHours(row: PunchGroupedRow, label: string): number | null {
@@ -40,7 +47,13 @@ function paymentTypeHours(row: PunchGroupedRow, label: string): number | null {
   return match ? match.hoursNumber : null
 }
 
-function GroupedPunchDetail({ row }: { row: PunchGroupedRow }) {
+function GroupedPunchDetail({
+  row,
+  useHoursFormat,
+}: {
+  row: PunchGroupedRow
+  useHoursFormat: boolean
+}) {
   const { t } = useTranslation()
   const employeeId = Number(row.idUsuario)
 
@@ -53,7 +66,7 @@ function GroupedPunchDetail({ row }: { row: PunchGroupedRow }) {
   }
 
   return (
-    <div className="w-full min-w-0 border-l-[3px] border-l-primary/40 bg-muted/20 px-4 py-3">
+    <div className="min-w-0 overflow-x-auto border-l-[3px] border-l-primary/40 bg-muted/20 px-4 py-3">
       <p className="mb-3 text-sm font-medium">
         {t('punch.punchesForEmployee', { name: row.nombreEmployee })}
       </p>
@@ -67,6 +80,8 @@ function GroupedPunchDetail({ row }: { row: PunchGroupedRow }) {
         queryKeySuffix={`grouped-${employeeId}`}
         tableScrollHeight={false}
         enableExport={false}
+        enableTableFocus={false}
+        groupedHoursFormat={useHoursFormat}
       />
     </div>
   )
@@ -85,7 +100,6 @@ export function GroupedIssuesDataTable({
 }: GroupedIssuesDataTableProps) {
   const { t } = useTranslation()
   const {
-    search,
     selectedEmployee,
     selectedDealers,
     selectedType,
@@ -100,12 +114,25 @@ export function GroupedIssuesDataTable({
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'hoursNumber', desc: true },
+    { id: 'employee', desc: false },
   ])
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
+  const [employeeSearch, setEmployeeSearch] = React.useState('')
+  const [useHoursFormat, setUseHoursFormat] = React.useState(true)
+
+  React.useEffect(() => {
+    setUseHoursFormat(readGroupedHoursFormatPreference())
+  }, [])
+
+  const handleHoursFormatChange = React.useCallback((checked: boolean) => {
+    setUseHoursFormat(checked)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(GROUPED_HOURS_FORMAT_STORAGE_KEY, checked ? '1' : '0')
+    }
+  }, [])
 
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
-  const debouncedSearch = useDebouncedValue(search, 300)
+  const debouncedEmployeeSearch = useDebouncedValue(employeeSearch, 300)
   const debouncedMinHours = useDebouncedValue(punchMinHoursRaw, 600)
   const debouncedMaxHours = useDebouncedValue(punchMaxHoursRaw, 600)
   const minHoursTotal = debouncedMinHours !== '' ? Number(debouncedMinHours) : null
@@ -121,7 +148,7 @@ export function GroupedIssuesDataTable({
         dateRange,
         selectedType,
         selectedEmployeeId: selectedEmployee?.id ?? null,
-        search: debouncedSearch,
+        search: debouncedEmployeeSearch,
         page: pageIndex + 1,
         pageSize,
         sort:
@@ -140,7 +167,7 @@ export function GroupedIssuesDataTable({
       dateRange,
       selectedType,
       selectedEmployee?.id,
-      debouncedSearch,
+      debouncedEmployeeSearch,
       pageIndex,
       pageSize,
       sortCol,
@@ -209,7 +236,7 @@ export function GroupedIssuesDataTable({
     setPageIndex(0)
     setRowSelection({})
   }, [
-    debouncedSearch,
+    debouncedEmployeeSearch,
     debouncedDealers,
     selectedType,
     dateRange,
@@ -336,7 +363,7 @@ export function GroupedIssuesDataTable({
         ),
         cell: ({ row }) => (
           <span className="font-mono font-semibold tabular-nums">
-            {formatHoursDecimal(row.original.hoursNumber)}
+            {formatGroupedHoursDisplay(row.original.hoursNumber, useHoursFormat)}
           </span>
         ),
         meta: {
@@ -354,7 +381,7 @@ export function GroupedIssuesDataTable({
         ),
         cell: ({ row }) => (
           <span className="font-mono tabular-nums text-muted-foreground">
-            {formatHoursDecimal(row.original.breakNumber)}
+            {formatGroupedHoursDisplay(row.original.breakNumber, useHoursFormat)}
           </span>
         ),
         meta: {
@@ -391,7 +418,7 @@ export function GroupedIssuesDataTable({
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
     ],
-    [t],
+    [t, useHoursFormat],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
@@ -402,7 +429,7 @@ export function GroupedIssuesDataTable({
       dateRange?.from?.toISOString(),
       dateRange?.to?.toISOString(),
       selectedType,
-      debouncedSearch,
+      debouncedEmployeeSearch,
       pageIndex,
       pageSize,
       sorting,
@@ -442,7 +469,7 @@ export function GroupedIssuesDataTable({
         const hours = paymentTypeHours(row.original, label)
         return (
           <span className="font-mono tabular-nums text-xs">
-            {hours != null ? formatHoursDecimal(hours) : '—'}
+            {hours != null ? formatGroupedHoursDisplay(hours, useHoursFormat) : '—'}
           </span>
         )
       },
@@ -456,7 +483,7 @@ export function GroupedIssuesDataTable({
       } satisfies DataTableColumnMeta<PunchGroupedRow>,
     }))
     return [...columns, ...paymentCols]
-  }, [columns, paymentTypeLabels])
+  }, [columns, paymentTypeLabels, useHoursFormat])
 
   const emptyState = !filtersHydrated ? (
     <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
@@ -479,8 +506,10 @@ export function GroupedIssuesDataTable({
   )
 
   const renderSubComponent = React.useCallback(
-    (row: Row<PunchGroupedRow>) => <GroupedPunchDetail row={row.original} />,
-    [],
+    (row: Row<PunchGroupedRow>) => (
+      <GroupedPunchDetail row={row.original} useHoursFormat={useHoursFormat} />
+    ),
+    [useHoursFormat],
   )
 
   return (
@@ -504,7 +533,11 @@ export function GroupedIssuesDataTable({
         getRowId={(row) => String(row.idUsuario)}
         isLoading={isFetching}
         emptyState={emptyState}
-        enableGlobalFilter={false}
+        enableGlobalFilter
+        globalFilter={employeeSearch}
+        onGlobalFilterChange={setEmployeeSearch}
+        globalFilterPlaceholder={t('punch.searchEmployeeByName')}
+        manualFiltering
         enableExport={false}
         enableRowSelection
         rowSelection={rowSelection}
@@ -533,15 +566,31 @@ export function GroupedIssuesDataTable({
           ) : null
         }
         toolbarTrailing={
-          <GroupedPunchExportButton
-            disabled={!queryEnabled || rows.length === 0}
-            fileName="punch-grouped"
-            groupedParamsBase={groupedParamsBase}
-            ttkListExtra={ttkListExtra}
-            includePaymentType={canViewPayment}
-            buildLabels={buildExportLabels}
-            selectedEmployeeIds={selectedEmployeeIds}
-          />
+          <>
+            <div className="flex items-center gap-2">
+              <Label
+                htmlFor="grouped-hours-format"
+                className="cursor-pointer text-[11px] text-muted-foreground"
+              >
+                {useHoursFormat ? t('punch.hoursFormatHrs') : t('punch.hoursFormatDecimal')}
+              </Label>
+              <Switch
+                id="grouped-hours-format"
+                checked={useHoursFormat}
+                onCheckedChange={handleHoursFormatChange}
+                aria-label={t('punch.hoursFormat')}
+              />
+            </div>
+            <GroupedPunchExportButton
+              disabled={!queryEnabled || rows.length === 0}
+              fileName="punch-grouped"
+              groupedParamsBase={groupedParamsBase}
+              ttkListExtra={ttkListExtra}
+              includePaymentType={canViewPayment}
+              buildLabels={buildExportLabels}
+              selectedEmployeeIds={selectedEmployeeIds}
+            />
+          </>
         }
         renderSubComponent={renderSubComponent}
         subComponentLayout="full"

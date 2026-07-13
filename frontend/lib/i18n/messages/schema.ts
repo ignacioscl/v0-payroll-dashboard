@@ -408,6 +408,10 @@ export interface Messages {
     exportContentLabel: string
     selectEmployee: string
     selectAllOnPage: string
+    searchEmployeeByName: string
+    hoursFormat: string
+    hoursFormatHrs: string
+    hoursFormatDecimal: string
   }
   dashboard: {
     title: string

@@ -392,7 +392,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   getRowCanExpand?: (row: Row<TData>) => boolean
   /**
    * `content` (default): shrink-wrap drilldown (e.g. invoice detail rail).
-   * `full`: stretch sub-component to the full table width (e.g. nested DataTable).
+   * `full`: stretch sub-component to the scrollport width (visible area), not the
+   * full table width — for nested DataTables inside wide parent tables.
    */
   subComponentLayout?: 'content' | 'full'
 
@@ -967,7 +968,7 @@ export function DataTable<TData, TValue = unknown>({
               className={cn(
                 'sticky left-0 z-[2]',
                 subComponentLayout === 'full'
-                  ? 'w-full min-w-0'
+                  ? 'w-[100cqw] min-w-0 max-w-[100cqw]'
                   : 'w-max max-w-[min(100vw-3rem,56rem)]',
               )}
             >
@@ -1048,7 +1049,7 @@ export function DataTable<TData, TValue = unknown>({
         <div
           ref={mainScrollRef}
           onScroll={onMainScroll}
-          className="relative w-full"
+          className="relative w-full [container-type:inline-size]"
           style={scrollContainerStyle}
         >
         <table

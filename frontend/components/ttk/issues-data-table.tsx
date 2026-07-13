@@ -28,6 +28,7 @@ import {
   formatGmtTime,
   toPayrollScopeUser,
 } from '@/lib/ttk/map-header-filters'
+import { formatPunchDurationDisplay } from '@/lib/ttk/format-grouped-hours'
 import { formatUsDateForExport, formatUsTimeForExport } from '@/lib/format-us-datetime'
 import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { SrsPhpPath } from '@/types/enum-url'
@@ -110,6 +111,10 @@ export type IssuesDataTableProps = {
   showToolbarFilters?: boolean
   /** When false, hides the toolbar export button (e.g. nested grouped detail). */
   enableExport?: boolean
+  /** When false, hides the full-screen table focus control (e.g. nested grouped detail). */
+  enableTableFocus?: boolean
+  /** When set, timeWork/timeBreak follow the grouped hrs/decimal toggle. */
+  groupedHoursFormat?: boolean
 }
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
@@ -134,6 +139,19 @@ function punchErrorLabel(row: TtkListRow): string | null {
   return res ? res : null
 }
 
+function formatTimeWorkBreak(
+  row: TtkListRow,
+  field: 'work' | 'break',
+  groupedHoursFormat?: boolean,
+): string {
+  const duration = field === 'work' ? row.timeWork : row.timeBreak
+  if (groupedHoursFormat === undefined) {
+    return formatDurationDisplay(duration) || '—'
+  }
+  const decimal = field === 'work' ? row.numberWork : row.numberBrake
+  return formatPunchDurationDisplay(duration, decimal ?? null, groupedHoursFormat)
+}
+
 export function IssuesDataTable({
   dateRangeOverride,
   issueTypeOverride,
@@ -150,6 +168,8 @@ export function IssuesDataTable({
   onPaymentTypeFilterChange,
   showToolbarFilters = true,
   enableExport = true,
+  enableTableFocus = true,
+  groupedHoursFormat,
 }: IssuesDataTableProps = {}) {
   const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
@@ -524,11 +544,11 @@ export function IssuesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.timeWork')} />
         ),
-        cell: ({ row }) => formatDurationDisplay(row.original.timeWork) || '—',
+        cell: ({ row }) => formatTimeWorkBreak(row.original, 'work', groupedHoursFormat),
         meta: {
           label: t('punch.timeWork'),
           mono: true,
-          exportValue: (r) => formatDurationDisplay(r.timeWork),
+          exportValue: (r) => formatTimeWorkBreak(r, 'work', groupedHoursFormat),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -537,11 +557,11 @@ export function IssuesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.timeBreak')} />
         ),
-        cell: ({ row }) => formatDurationDisplay(row.original.timeBreak) || '—',
+        cell: ({ row }) => formatTimeWorkBreak(row.original, 'break', groupedHoursFormat),
         meta: {
           label: t('punch.timeBreak'),
           mono: true,
-          exportValue: (r) => formatDurationDisplay(r.timeBreak),
+          exportValue: (r) => formatTimeWorkBreak(r, 'break', groupedHoursFormat),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
     ]
@@ -725,6 +745,7 @@ export function IssuesDataTable({
     getEmployeeId,
     getThumbnailUuid,
     handleThumbnailSaved,
+    groupedHoursFormat,
     t,
   ])
 
@@ -906,7 +927,7 @@ export function IssuesDataTable({
             },
           }}
           tableScrollHeight={effectiveScrollHeight}
-          enableTableFocus
+          enableTableFocus={enableTableFocus}
         />
       </div>
 

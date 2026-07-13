@@ -413,6 +413,10 @@ export const es: Messages = {
     exportContentLabel: 'Formato del informe',
     selectEmployee: 'Seleccionar empleado',
     selectAllOnPage: 'Seleccionar todos en esta página',
+    searchEmployeeByName: 'Buscar empleado por nombre…',
+    hoursFormat: 'Formato de horas',
+    hoursFormatHrs: 'Hrs',
+    hoursFormatDecimal: 'Decimal',
   },
   dashboard: {
     title: 'Panel',

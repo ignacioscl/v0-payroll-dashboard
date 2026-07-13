@@ -412,6 +412,10 @@ export const en: Messages = {
     exportContentLabel: 'Report format',
     selectEmployee: 'Select employee',
     selectAllOnPage: 'Select all on this page',
+    searchEmployeeByName: 'Search employee by name…',
+    hoursFormat: 'Hours format',
+    hoursFormatHrs: 'Hrs',
+    hoursFormatDecimal: 'Decimal',
   },
   dashboard: {
     title: 'Dashboard',
