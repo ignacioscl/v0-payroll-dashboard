@@ -7,6 +7,7 @@ import {
   CheckCircle,
   Images,
   Info,
+  Loader2,
   Pencil,
   Trash2,
 } from 'lucide-react'
@@ -14,9 +15,9 @@ import {
   DataTable,
   DataTableColumnHeader,
   createTtkListAdapter,
-  useDataTableQuery,
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
+import { useTtkListInfinite } from '@/hooks/use-ttk-list-infinite'
 import { useFilters } from '@/lib/filter-context'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
@@ -98,7 +99,7 @@ export type IssuesDataTableProps = {
   /**
    * Max-height of the scroll container. Enables sticky header.
    * Defaults to `calc(100dvh - 24rem)` which fits the issues page layout
-   * (nav 4rem + padding + title + KPI cards + toolbar + pagination ≈ 24rem).
+   * (nav 4rem + padding + title + KPI cards + toolbar ≈ 24rem).
    * Pass `false` to disable (page scrolls, no sticky header).
    */
   tableScrollHeight?: string | false
@@ -173,17 +174,16 @@ export function IssuesDataTable({
 }: IssuesDataTableProps = {}) {
   const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
-  // DataTable toolbar, pagination row, and page bottom padding.
+  // DataTable toolbar, and page bottom padding.
   // Updates on window resize so it works on every screen size.
   const [computedScrollHeight, setComputedScrollHeight] = React.useState<string | undefined>(undefined)
   React.useLayoutEffect(() => {
     const NAV_H = 64      // dashboard nav h-16
     const TOOLBAR_H = 40  // DataTable toolbar row
-    const PAGINATION_H = 52 // DataTable pagination row
     const BOTTOM_PAD = 24  // page p-6 bottom padding
 
     const compute = () => {
-      const h = window.innerHeight - NAV_H - TOOLBAR_H - PAGINATION_H - BOTTOM_PAD
+      const h = window.innerHeight - NAV_H - TOOLBAR_H - BOTTOM_PAD
       setComputedScrollHeight(h > 200 ? `${h}px` : undefined)
     }
     compute()
@@ -214,7 +214,6 @@ export function IssuesDataTable({
   const effectiveSelectedType = issueTypeOverride ?? selectedType
   const effectiveSearch = ignoreSearch ? '' : search
 
-  const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(defaultPageSize)
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'date', desc: true },
@@ -255,7 +254,6 @@ export function IssuesDataTable({
   const handlePaymentTypeFilterChange = React.useCallback(
     (next: PaymentTypeFilterValue) => {
       setPaymentTypeFilter(next)
-      setPageIndex(0)
       if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
         setSelectedType('without_salary')
         return
@@ -757,23 +755,6 @@ export function IssuesDataTable({
     [isWideScreen, showActions],
   )
 
-  React.useEffect(() => {
-    setPageIndex(0)
-  }, [
-    debouncedSearch,
-    debouncedDealers,
-    effectiveSelectedType,
-    effectiveDateRange,
-    pageSize,
-    sorting,
-    ignoreSearch,
-    punchMinHours,
-    punchMaxHours,
-    selectedTodayLiveStatus,
-    employeeIdOverride,
-    selectedEmployee?.id,
-  ])
-
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
     if (!queryEnabled) return []
 
@@ -805,8 +786,7 @@ export function IssuesDataTable({
     return collected
   }, [apiRequest, listExtra, queryEnabled, sorting, t])
 
-  const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
-    adapter: ttkListAdapter,
+  const listQuery = useTtkListInfinite<TtkListRow>({
     queryKey: [
       'ttk-list',
       queryKeySuffix,
@@ -819,21 +799,39 @@ export function IssuesDataTable({
       selectedTodayLiveStatus,
       employeeIdOverride,
       selectedEmployee?.id,
+      punchMinHours,
+      punchMaxHours,
     ],
-    queryFn: async (params) => {
-      const data = await apiRequest.getCustom('', undefined, params)
-      throwIfSrsFail(data, t('punch.loadIssuesFailed'))
-      return data as TtkListResponse
-    },
     enabled: queryEnabled,
-    staleTime: 2 * 60 * 1000,
-    pageIndex,
     pageSize,
     sorting,
-    columnFilters: [],
     columns,
     extra: listExtra,
+    mapSort: mapTtkOrderBy,
+    fetchPage: async (params) => {
+      const data = await apiRequest.getCustom('', undefined, params)
+      return data as TtkListResponse
+    },
+    errorMessage: t('punch.loadIssuesFailed'),
+    staleTime: 2 * 60 * 1000,
   })
+
+  const rows = React.useMemo(
+    () => listQuery.data?.pages.flatMap((page) => page.rows) ?? [],
+    [listQuery.data],
+  )
+  const total = listQuery.data?.pages[0]?.total ?? 0
+  const isFetching = listQuery.isFetching
+  const error =
+    listQuery.error instanceof Error
+      ? listQuery.error.message
+      : listQuery.error
+        ? String(listQuery.error)
+        : null
+
+  const onLoadMore = React.useCallback(() => {
+    void listQuery.fetchNextPage()
+  }, [listQuery.fetchNextPage])
 
   const confirmDeletePunch = async () => {
     if (!deleteTarget) return
@@ -881,9 +879,28 @@ export function IssuesDataTable({
           columnPinning={columnPinning}
           data={rows}
           getRowId={(row) => String(row.id)}
-          isLoading={isFetching}
+          isLoading={queryEnabled && isFetching && rows.length === 0}
           emptyState={emptyState}
           enableGlobalFilter={false}
+          recordsCount={queryEnabled ? total : 0}
+          recordsCountLabel={t('punch.issues')}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          showPageSizeInInfiniteScroll
+          pageSizeOptions={[25]}
+          includeAllPageSize
+          infiniteScroll={{
+            hasNextPage: queryEnabled ? (listQuery.hasNextPage ?? false) : false,
+            isFetchingNextPage: listQuery.isFetchingNextPage,
+            onLoadMore,
+            loadingLabel: (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                {t('invoices.loadingMore')}
+              </>
+            ),
+          }}
+          virtualizeThreshold={25}
           toolbarLeading={
             showToolbarFilters ? (
               <div className="flex flex-wrap items-center gap-3">
@@ -904,28 +921,14 @@ export function IssuesDataTable({
               </div>
             ) : undefined
           }
-          includeAllPageSize
           enableViewOptions
           enableExport={enableExport}
           exportFileName={exportFileName}
           fetchAllRowsForExport={fetchAllRowsForExport}
           manualSorting
           sorting={sorting}
-          onSortingChange={(next) => {
-            setSorting(next)
-            setPageIndex(0)
-          }}
+          onSortingChange={setSorting}
           manualFiltering
-          pagination={{
-            pageIndex,
-            pageSize,
-            pageCount,
-            totalRows: total,
-            onPaginationChange: (next) => {
-              setPageIndex(next.pageIndex)
-              setPageSize(next.pageSize)
-            },
-          }}
           tableScrollHeight={effectiveScrollHeight}
           enableTableFocus={enableTableFocus}
         />
