@@ -47,7 +47,9 @@ export function InvoiceRowActions({
   const [emailOpen, setEmailOpen] = React.useState(false)
 
   const isDeleted = row.estado === 0
-  const showLog = isDeleted || row.statementType === GENERIC_STATEMENT_TYPE
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  const showLog =
+    !isExternal && (isDeleted || row.statementType === GENERIC_STATEMENT_TYPE)
   const showPrint = !isDeleted && canPrintInvoice(hasPermission, user?.isSystemAdmin)
   const showEmail = !isDeleted && canSendInvoiceEmail(hasPermission, user?.isSystemAdmin)
 
