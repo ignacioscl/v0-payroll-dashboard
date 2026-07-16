@@ -14,29 +14,21 @@ export type PayrollScopeUser = {
 }
 
 /**
- * Legacy billing swap: externo (company-type dealer) selects providers in combo;
- * interno detailer selects sucursales.
+ * Header combo always lists dealers.
+ * - Interno: id_dealer = selection; provider resolved server-side via getCompany().
+ * - Externo: id_dealer = selection (server intersects with RESTRICTION_DEALER_V2);
+ *   provider resolved server-side via getCompany().
  */
 export function appendPayrollDealerScopeParams(
   params: Record<string, string | number>,
   selectedDealers: string[],
-  user?: PayrollScopeUser | null,
+  _user?: PayrollScopeUser | null,
 ): void {
   if (selectedDealers.length === 0) {
     return
   }
 
-  const selected = selectedDealers.join(',')
-
-  if (user?.isCompanyTypeCompany) {
-    if (user.idDealer != null && user.idDealer > 0) {
-      params.id_dealer = String(user.idDealer)
-    }
-    params.id_dealer_provider = selected
-    return
-  }
-
-  params.id_dealer = selected
+  params.id_dealer = selectedDealers.join(',')
 }
 
 export function toPayrollScopeUser(

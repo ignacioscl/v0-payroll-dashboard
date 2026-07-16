@@ -42,6 +42,12 @@ export function EmployeeSearchInput({
   } = useFilters()
 
   const [employeeTerm, setEmployeeTerm] = React.useState('')
+  // Match DealerMultiSelect: avoid SSR/client mismatch on `disabled`
+  // (Radix trigger + boolean attrs). Apply disable only after mount.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const idDealer = React.useMemo(() => {
     if (selectedDealers.length === 0) return null
@@ -80,6 +86,7 @@ export function EmployeeSearchInput({
   )
 
   const displayValue = isIssuesPage ? selectedEmployee : null
+  const isDisabled = mounted && !filtersHydrated
 
   return (
     <EmployeeCombobox
@@ -89,7 +96,7 @@ export function EmployeeSearchInput({
       onSearchTermChange={setEmployeeTerm}
       employees={employeesQuery.data}
       isLoading={employeesQuery.isFetching}
-      disabled={!filtersHydrated}
+      disabled={isDisabled}
       dealerSelected={idDealer != null}
       compact
       placeholder={t('filters.searchEmployee')}

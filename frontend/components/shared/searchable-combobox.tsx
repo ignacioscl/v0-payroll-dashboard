@@ -311,7 +311,7 @@ export function SearchableCombobox<T>({
           role="combobox"
           aria-expanded={open}
           aria-haspopup="listbox"
-          disabled={disabled}
+          disabled={disabled || undefined}
           className={cn(
             'group relative flex w-full items-center text-left shadow-xs transition-all',
             compact
