@@ -102,6 +102,7 @@ function SidebarInner({
     canAccessTtk,
     canAccessProdKpis: canAccessBusinessKpis(user, hasPermission),
     canAccessBillingInvoices: canAccessBillingInvoices(user, hasPermission),
+    isCompanyTypeCompany: Boolean(user?.isCompanyTypeCompany),
     t,
   })
 

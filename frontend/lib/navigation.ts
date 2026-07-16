@@ -59,6 +59,9 @@ export const ALL_NAVIGATION: NavItemDef[] = [
 
 export const PROD_NAV_HREFS = ['/', '/issues'] as const
 
+/** Externals (isCompanyTypeCompany): Punch Report only — no Dashboard home. */
+export const PROD_NAV_HREFS_EXTERNAL = ['/issues'] as const
+
 /** Real KPI report routes in production (Admin General/Company or production report perm; not /kpis mock). */
 export const PROD_KPI_HREFS = ['/reports/business-kpis', '/reports/production-vs-goal'] as const
 
@@ -73,8 +76,10 @@ export function isProdAllowedPath(
   pathname: string,
   canAccessProdKpis = false,
   canAccessBillingInvoices = false,
+  isCompanyTypeCompany = false,
 ) {
-  if (pathname === '/' || pathname === '/issues') return true
+  if (pathname === '/') return !isCompanyTypeCompany
+  if (pathname === '/issues') return true
   const matches = (hrefs: readonly string[]) =>
     hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
@@ -95,6 +100,8 @@ export function getVisibleNavigation(options: {
   canAccessTtk: boolean
   canAccessProdKpis?: boolean
   canAccessBillingInvoices?: boolean
+  /** External dealer company (type === 1): hide Dashboard nav item. */
+  isCompanyTypeCompany?: boolean
   t: (key: MessageKey) => string
 }): NavItem[] {
   const {
@@ -102,33 +109,40 @@ export function getVisibleNavigation(options: {
     canAccessTtk,
     canAccessProdKpis = false,
     canAccessBillingInvoices = false,
+    isCompanyTypeCompany = false,
     t,
   } = options
 
+  const withoutDashboard = (items: NavItem[]): NavItem[] =>
+    isCompanyTypeCompany ? items.filter((item) => item.href !== '/') : items
+
   if (isDev) {
-    return ALL_NAVIGATION.map((item) => localizeNavItem(item, t))
+    return withoutDashboard(ALL_NAVIGATION.map((item) => localizeNavItem(item, t)))
   }
 
   if (!canAccessTtk && !canAccessBillingInvoices) return []
 
+  const ttkHrefs = isCompanyTypeCompany ? PROD_NAV_HREFS_EXTERNAL : PROD_NAV_HREFS
   const allowedHrefs: readonly string[] = [
-    ...(canAccessTtk ? PROD_NAV_HREFS : []),
+    ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
   ]
 
-  return ALL_NAVIGATION.filter(
-    (item) =>
-      allowedHrefs.includes(item.href) ||
-      (item.children?.some((child) => allowedHrefs.includes(child.href)) ?? false),
-  )
-    .map((item) =>
-      item.children
-        ? {
-            ...item,
-            children: item.children.filter((child) => allowedHrefs.includes(child.href)),
-          }
-        : item,
+  return withoutDashboard(
+    ALL_NAVIGATION.filter(
+      (item) =>
+        allowedHrefs.includes(item.href) ||
+        (item.children?.some((child) => allowedHrefs.includes(child.href)) ?? false),
     )
-    .map((item) => localizeNavItem(item, t))
+      .map((item) =>
+        item.children
+          ? {
+              ...item,
+              children: item.children.filter((child) => allowedHrefs.includes(child.href)),
+            }
+          : item,
+      )
+      .map((item) => localizeNavItem(item, t)),
+  )
 }

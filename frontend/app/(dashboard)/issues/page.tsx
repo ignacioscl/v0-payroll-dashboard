@@ -102,9 +102,18 @@ export default function IssuesPage() {
   const canAdd = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
 
   const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
     usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
+
+  // Externals cannot use issue-type KPI filters — clear any persisted selection.
+  useEffect(() => {
+    if (!isExternal || meLoading) return
+    if (selectedType !== 'all') {
+      setSelectedType('all')
+    }
+  }, [isExternal, meLoading, selectedType, setSelectedType])
 
   useEffect(() => {
     if (!canViewPayment) return
@@ -252,22 +261,26 @@ export default function IssuesPage() {
         showPaymentTypeFilter={canViewPayment && !meLoading}
         paymentTypesLoading={paymentTypesLoading}
         issueCards={
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {visibleIssueCards.map((card) => (
-              <KPICard
-                key={card.type}
-                title={card.title}
-                value={counts[card.type].pending}
-                icon={card.icon}
-                variant={card.variant}
-                loading={loading}
-                filterCard
-                onClick={() => selectFilter(card.type)}
-                active={selectedType === card.type}
-                subtitle={renderSubtitle(card.type)}
-              />
-            ))}
-          </div>
+          isExternal
+            ? null
+            : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {visibleIssueCards.map((card) => (
+                  <KPICard
+                    key={card.type}
+                    title={card.title}
+                    value={counts[card.type].pending}
+                    icon={card.icon}
+                    variant={card.variant}
+                    loading={loading}
+                    filterCard
+                    onClick={() => selectFilter(card.type)}
+                    active={selectedType === card.type}
+                    subtitle={renderSubtitle(card.type)}
+                  />
+                ))}
+              </div>
+            )
         }
       />
 

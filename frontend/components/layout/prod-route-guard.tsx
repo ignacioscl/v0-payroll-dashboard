@@ -24,14 +24,33 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
   const canAccessProdKpis = canAccessBusinessKpis(user, hasPermission)
   const canAccessBilling = canAccessBillingInvoices(user, hasPermission)
   const hasAnyModule = canAccessTtk || canAccessProdKpis || canAccessBilling
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  const homeFallback = isExternal ? '/issues' : '/'
 
   useEffect(() => {
     if (loading || !canAccessDashboard || !hasAnyModule) return
-    if (isDevEnvironment()) return
-    if (!isProdAllowedPath(pathname, canAccessProdKpis, canAccessBilling)) {
-      router.replace('/')
+
+    // Externals never land on Dashboard home (SSO / deep link / typed URL).
+    if (isExternal && pathname === '/') {
+      router.replace('/issues')
+      return
     }
-  }, [pathname, loading, canAccessDashboard, hasAnyModule, canAccessProdKpis, canAccessBilling, router])
+
+    if (isDevEnvironment()) return
+    if (!isProdAllowedPath(pathname, canAccessProdKpis, canAccessBilling, isExternal)) {
+      router.replace(homeFallback)
+    }
+  }, [
+    pathname,
+    loading,
+    canAccessDashboard,
+    hasAnyModule,
+    canAccessProdKpis,
+    canAccessBilling,
+    isExternal,
+    homeFallback,
+    router,
+  ])
 
   if (!loading && !canAccessDashboard) {
     return (

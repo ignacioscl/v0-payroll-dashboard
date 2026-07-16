@@ -94,7 +94,8 @@ export type PunchReportFilterPanelProps = {
   paymentTypeOptions: PaymentTypeCatalogItem[]
   showPaymentTypeFilter?: boolean
   paymentTypesLoading?: boolean
-  issueCards: React.ReactNode
+  /** When null/undefined, hide “Filter by issue type” (e.g. external companies). */
+  issueCards?: React.ReactNode | null
   className?: string
 }
 
@@ -338,7 +339,7 @@ export function PunchReportFilterPanel({
       ) : null}
 
       <CollapsibleContent className="border-t border-border px-4 pb-4 pt-4">
-        <section className="mb-5">
+        <section className={issueCards ? 'mb-5' : undefined}>
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
             <h3 className="text-[13px] font-semibold text-foreground">
               {t('punch.liveStatusToday')}
@@ -350,19 +351,23 @@ export function PunchReportFilterPanel({
           <TodayLiveStatusFilterCards />
         </section>
 
-        <div className="mb-5 border-t border-border" />
+        {issueCards ? (
+          <>
+            <div className="mb-5 border-t border-border" />
 
-        <section>
-          <div className="mb-3 flex flex-wrap items-baseline gap-2">
-            <h3 className="text-[13px] font-semibold text-foreground">
-              {t('punch.filterByIssueType')}
-            </h3>
-            <p className="text-[11px] text-muted-foreground">
-              {t('punch.clickCardToFilter')}
-            </p>
-          </div>
-          {issueCards}
-        </section>
+            <section>
+              <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                <h3 className="text-[13px] font-semibold text-foreground">
+                  {t('punch.filterByIssueType')}
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {t('punch.clickCardToFilter')}
+                </p>
+              </div>
+              {issueCards}
+            </section>
+          </>
+        ) : null}
       </CollapsibleContent>
 
       <div
