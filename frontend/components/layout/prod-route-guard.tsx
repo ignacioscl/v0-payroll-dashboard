@@ -9,6 +9,7 @@ import {
   canAccessPayrollDashboard,
 } from '@/lib/auth/payroll-access'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
+import { canViewRoles } from '@/lib/auth/roles-permissions'
 import { isDevEnvironment, isProdAllowedPath } from '@/lib/navigation'
 import { AccessDenied } from './access-denied'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -23,7 +24,8 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
   const canAccessTtk = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
   const canAccessProdKpis = canAccessBusinessKpis(user, hasPermission)
   const canAccessBilling = canAccessBillingInvoices(user, hasPermission)
-  const hasAnyModule = canAccessTtk || canAccessProdKpis || canAccessBilling
+  const canAccessRoles = canViewRoles(hasPermission, user?.isSystemAdmin)
+  const hasAnyModule = canAccessTtk || canAccessProdKpis || canAccessBilling || canAccessRoles
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const homeFallback = isExternal ? '/issues' : '/'
 
@@ -37,7 +39,15 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (isDevEnvironment()) return
-    if (!isProdAllowedPath(pathname, canAccessProdKpis, canAccessBilling, isExternal)) {
+    if (
+      !isProdAllowedPath(
+        pathname,
+        canAccessProdKpis,
+        canAccessBilling,
+        isExternal,
+        canAccessRoles,
+      )
+    ) {
       router.replace(homeFallback)
     }
   }, [
@@ -47,6 +57,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     hasAnyModule,
     canAccessProdKpis,
     canAccessBilling,
+    canAccessRoles,
     isExternal,
     homeFallback,
     router,
