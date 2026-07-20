@@ -14,8 +14,71 @@ export interface Messages {
     reports: string
     billing: string
     invoices: string
+    rolesAdmin: string
     components: string
     dataTable: string
+  }
+  roles: {
+    title: string
+    subtitle: string
+    permissions: string
+    permissionsTitle: string
+    checkAll: string
+    readOnlyHint: string
+    autosaveHint: string
+    showInactive: string
+    type: string
+    typeAll: string
+    typeInternal: string
+    typeExternal: string
+    empty: string
+    emptyPermissions: string
+    loadingPermissions: string
+    saveError: string
+    saveSuccess: string
+    noAccess: string
+    permissionInfo: string
+    colName: string
+    colDepartment: string
+    colDealer: string
+    colCompany: string
+    colType: string
+    colPermissions: string
+    actions: string
+    addRole: string
+    editRole: string
+    edit: string
+    save: string
+    saving: string
+    cancel: string
+    delete: string
+    viewUsers: string
+    setActive: string
+    setInactive: string
+    accessLevel: string
+    accessLevelTitle: string
+    accessLevelInvalid: string
+    accessLevelSaved: string
+    nameRequired: string
+    typeRequired: string
+    dealerRequired: string
+    selectDealer: string
+    selectDepartment: string
+    departmentAll: string
+    deleteConfirmTitle: string
+    deleteConfirmDesc: string
+    activateConfirmTitle: string
+    activateConfirmDesc: string
+    inactivateConfirmTitle: string
+    inactivateConfirmDesc: string
+    deleteSuccess: string
+    activateSuccess: string
+    inactivateSuccess: string
+    usersTitle: string
+    usersSubtitle: string
+    usersLoading: string
+    usersError: string
+    usersEmpty: string
   }
   invoices: {
     title: string

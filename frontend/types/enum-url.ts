@@ -32,6 +32,12 @@ export const SrsPhpPath = {
   TTK_SAVE_PAYMENT: 'php/api/payroll/ttk-save-payment.php',
   DEALERS: 'php/api/payroll/dealers.php',
   ME: 'php/api/payroll/me.php',
+  ROLES_LIST: 'php/api/payroll/roles-list.php',
+  ROLES_PERMISSIONS: 'php/api/payroll/roles-permissions.php',
+  ROLES_SAVE: 'php/api/payroll/roles-save.php',
+  ROLES_ACTIONS: 'php/api/payroll/roles-actions.php',
+  ROLES_USERS: 'php/api/payroll/roles-users.php',
+  ROLES_DEPARTMENTS: 'php/api/payroll/roles-departments.php',
 } as const
 
 /** Face recognition paths proxied via `/api/face/[...path]`. */

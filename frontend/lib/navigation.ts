@@ -14,6 +14,7 @@ import {
   Table as TableIcon,
   Wallet,
   ReceiptText,
+  Shield,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
 
@@ -53,6 +54,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     icon: Wallet,
     children: [{ nameKey: 'nav.invoices', href: '/billing/invoices', icon: ReceiptText }],
   },
+  { nameKey: 'nav.rolesAdmin', href: '/roles', icon: Shield },
   { nameKey: 'nav.components', href: '/components', icon: Blocks },
   { nameKey: 'nav.dataTable', href: '/datatable-demo', icon: TableIcon },
 ]
@@ -68,6 +70,9 @@ export const PROD_KPI_HREFS = ['/reports/business-kpis', '/reports/production-vs
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
 
+/** Roles Admin — gated by ROL_ACCION 42 (list/view). */
+export const ROLES_NAV_HREFS = ['/roles'] as const
+
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
 }
@@ -77,6 +82,7 @@ export function isProdAllowedPath(
   canAccessProdKpis = false,
   canAccessBillingInvoices = false,
   isCompanyTypeCompany = false,
+  canViewRoles = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
@@ -84,6 +90,7 @@ export function isProdAllowedPath(
     hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
+  if (canViewRoles && matches(ROLES_NAV_HREFS)) return true
   return false
 }
 
@@ -100,6 +107,7 @@ export function getVisibleNavigation(options: {
   canAccessTtk: boolean
   canAccessProdKpis?: boolean
   canAccessBillingInvoices?: boolean
+  canViewRoles?: boolean
   /** External dealer company (type === 1): hide Dashboard nav item. */
   isCompanyTypeCompany?: boolean
   t: (key: MessageKey) => string
@@ -109,6 +117,7 @@ export function getVisibleNavigation(options: {
     canAccessTtk,
     canAccessProdKpis = false,
     canAccessBillingInvoices = false,
+    canViewRoles = false,
     isCompanyTypeCompany = false,
     t,
   } = options
@@ -120,13 +129,14 @@ export function getVisibleNavigation(options: {
     return withoutDashboard(ALL_NAVIGATION.map((item) => localizeNavItem(item, t)))
   }
 
-  if (!canAccessTtk && !canAccessBillingInvoices) return []
+  if (!canAccessTtk && !canAccessBillingInvoices && !canViewRoles) return []
 
   const ttkHrefs = isCompanyTypeCompany ? PROD_NAV_HREFS_EXTERNAL : PROD_NAV_HREFS
   const allowedHrefs: readonly string[] = [
     ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
+    ...(canViewRoles ? ROLES_NAV_HREFS : []),
   ]
 
   return withoutDashboard(
