@@ -34,6 +34,9 @@ export interface Messages {
     empty: string
     emptyPermissions: string
     loadingPermissions: string
+    searchPermissions: string
+    otherPermissions: string
+    noPermissionResults: string
     saveError: string
     saveSuccess: string
     noAccess: string
