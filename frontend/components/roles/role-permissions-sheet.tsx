@@ -58,9 +58,6 @@ export function RolePermissionsSheet({
     () => groupRolePermissions(permissions, searchTerm, t('roles.otherPermissions')),
     [permissions, searchTerm, t],
   )
-  const allAssigned =
-    permissions.length > 0 && permissions.every((p) => p.assigned)
-  const someAssigned = permissions.some((p) => p.assigned)
 
   const setPending = (ids: number[], on: boolean) => {
     setPendingIds((prev) => {
@@ -86,23 +83,6 @@ export function RolePermissionsSheet({
       toast.error(getSrsErrorMessage(err, t('roles.saveError')))
     } finally {
       setPending([id], false)
-    }
-  }
-
-  const toggleAll = async (checked: boolean) => {
-    if (!canEdit || !idRol || permissions.length === 0) return
-    const ids = permissions.map((p) => p.id)
-    setPending(ids, true)
-    try {
-      await mutation.mutateAsync({
-        id_rol: idRol,
-        ids_rol_accion: ids,
-        checked,
-      })
-    } catch (err) {
-      toast.error(getSrsErrorMessage(err, t('roles.saveError')))
-    } finally {
-      setPending(ids, false)
     }
   }
 
@@ -144,22 +124,6 @@ export function RolePermissionsSheet({
             )}
           </SheetDescription>
         </SheetHeader>
-
-        <div className="shrink-0 border-b border-border px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="roles-check-all"
-              checked={allAssigned ? true : someAssigned ? 'indeterminate' : false}
-              disabled={!canEdit || query.isLoading || permissions.length === 0 || pendingIds.size > 0}
-              onCheckedChange={(value) => {
-                void toggleAll(value === true)
-              }}
-            />
-            <Label htmlFor="roles-check-all" className="text-sm font-medium">
-              {t('roles.checkAll')}
-            </Label>
-          </div>
-        </div>
 
         <div className="shrink-0 border-b border-border px-4 py-3">
           <div className="relative">
