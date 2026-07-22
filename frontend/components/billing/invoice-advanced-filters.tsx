@@ -62,6 +62,8 @@ export function InvoiceAdvancedFilters({
   idDealer,
   primaryDealerId,
   disabled,
+  invoiceSearch,
+  onInvoiceSearchChange,
 }: {
   value: InvoiceAdvancedFilterState
   onChange: (next: InvoiceAdvancedFilterState) => void
@@ -69,6 +71,9 @@ export function InvoiceAdvancedFilters({
   /** First selected dealer — employee search requires one dealer scope. */
   primaryDealerId: number | null
   disabled?: boolean
+  /** Invoice statement # (INVOICE_STATEMENT.full_nro). */
+  invoiceSearch?: string
+  onInvoiceSearchChange?: (value: string) => void
 }) {
   const { t } = useTranslation()
   const [deptOpen, setDeptOpen] = React.useState(false)
@@ -111,6 +116,16 @@ export function InvoiceAdvancedFilters({
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <FilterLane title={t('invoices.filterLaneWorkOrder')}>
+          <FilterField label={t('invoices.filterInvoiceLabel')} htmlFor="inv-filter-invoice" className="sm:col-span-2">
+            <Input
+              id="inv-filter-invoice"
+              value={invoiceSearch ?? ''}
+              onChange={(e) => onInvoiceSearchChange?.(e.target.value)}
+              placeholder={t('invoices.filterInvoicePlaceholder')}
+              className="h-8 text-xs"
+              disabled={disabled || !onInvoiceSearchChange}
+            />
+          </FilterField>
           <FilterField label={t('invoices.filterWoLabel')} className="sm:col-span-2">
             <WoNumberFilter
               value={value.woNumbers}

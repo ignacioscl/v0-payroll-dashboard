@@ -133,9 +133,14 @@ export class InvoiceRepository {
     const lineSubParts: string[] = []
     const lineParams: any[] = []
     if (f.woNumbers.length) {
-      const woOr = f.woNumbers.map(() => 'i.wo_nro = ?').join(' OR ')
+      // Match display WO (INVOICE.full_nro, e.g. LFT9750) and numeric wo_nro.
+      const woOr = f.woNumbers
+        .map(() => '(i.full_nro = ? OR i.wo_nro = ?)')
+        .join(' OR ')
       lineSubParts.push(`(${woOr})`)
-      lineParams.push(...f.woNumbers)
+      for (const wo of f.woNumbers) {
+        lineParams.push(wo, wo)
+      }
     }
     if (f.roPo) {
       lineSubParts.push('(i.ro = ? OR i.po = ?)')
@@ -176,7 +181,7 @@ export class InvoiceRepository {
       `SELECT s.id, s.full_nro, s.statement_type, s.estado, s.sended,
               s.emails_sended, s.last_sended,
               s.fecha_create, s.fecha_desde, s.fecha_hasta,
-              s.po, s.ro, s.discount, s.discount_type, ROUND(s.tax, 2) AS tax,
+              s.po, s.ro, s.discount, s.discount_type, s.discount_detail, ROUND(s.tax, 2) AS tax,
               s.invoice_service_sel_rel, s.invoice_note,
               s.id_invoice_statement_schedule,
               d.nombre        AS department,
@@ -188,6 +193,10 @@ export class InvoiceRepository {
               GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total,
               IS_STATEMENT_BILLED(s.id)                                             AS is_billed,
               IS_STATEMENT_PARTIAL_OR_FULL_BILLED(s.id)                             AS is_partial_billed,
+              (SELECT COUNT(*) FROM INVOICE_STATEMENT_NOTE isn
+                WHERE isn.id_statement = s.id AND isn.estado = 1)                    AS notes_count,
+              (SELECT COUNT(*) FROM LOG_CHANGE lc
+                WHERE lc.id_invoice_statement = s.id)                               AS log_count,
               lb.id_billing                                                         AS id_billing,
               b.fecha                                                               AS fecha_pago,
               b.check_number                                                        AS check_number,
@@ -228,6 +237,7 @@ export class InvoiceRepository {
       subtotal: Number(r.sub_total ?? 0),
       discount: r.discount == null ? undefined : Number(r.discount),
       discountType: r.discount_type == null ? undefined : Number(r.discount_type),
+      discountDetail: r.discount_detail ?? undefined,
       total: Number(r.total ?? 0),
       tax: Number(r.tax ?? 0),
       po: r.po ?? undefined,
@@ -237,6 +247,8 @@ export class InvoiceRepository {
       lastSended: r.last_sended ?? undefined,
       isBilled: Number(r.is_billed ?? 0),
       isPartialBilled: Number(r.is_partial_billed ?? 0),
+      notesCount: Number(r.notes_count ?? 0),
+      logCount: Number(r.log_count ?? 0),
       idBilling: r.id_billing ? Number(r.id_billing) : undefined,
       fechaPago: r.fecha_pago ?? undefined,
       checkNumber: r.check_number ?? undefined,

@@ -9,13 +9,13 @@ export function parseCsvPositiveInts(raw?: string): number[] {
   return [...set]
 }
 
-/** Legacy woIn: comma-separated WO numbers, digits only per token. */
+/** Comma/whitespace-separated WO numbers (letters + digits, e.g. LFT9750). */
 export function parseWoNumbers(raw?: string): string[] {
   if (!raw?.trim()) return []
   const set = new Set<string>()
   for (const token of raw.split(/[,\s\n]+/)) {
-    const digits = token.replace(/[^0-9]/g, '')
-    if (digits) set.add(digits)
+    const cleaned = token.trim().replace(/['"$#]/g, '')
+    if (cleaned) set.add(cleaned)
   }
   return [...set]
 }

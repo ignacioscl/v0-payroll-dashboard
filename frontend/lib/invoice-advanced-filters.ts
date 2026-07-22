@@ -32,12 +32,14 @@ export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
   showDeleted: false,
 }
 
+/** Comma/whitespace-separated WO numbers (letters + digits allowed, e.g. LFT9750). */
 export function parseWoInput(raw: string): string[] {
   if (!raw.trim()) return []
   const set = new Set<string>()
   for (const token of raw.split(/[,\s\n]+/)) {
-    const digits = token.replace(/[^0-9]/g, '')
-    if (digits) set.add(digits)
+    // Keep alphanumerics; drop quotes/$/# like legacy sanitization without stripping letters.
+    const cleaned = token.trim().replace(/['"$#]/g, '')
+    if (cleaned) set.add(cleaned)
   }
   return [...set]
 }

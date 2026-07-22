@@ -23,6 +23,7 @@ export interface InvoiceRow {
   subtotal: number
   discount?: number
   discountType?: number
+  discountDetail?: string
   total: number
   tax: number
   po?: string
@@ -32,6 +33,9 @@ export interface InvoiceRow {
   lastSended?: string
   isBilled: number
   isPartialBilled: number
+  notesCount?: number
+  /** LOG_CHANGE rows linked to this statement. */
+  logCount?: number
   idBilling?: number
   fechaPago?: string
   checkNumber?: string

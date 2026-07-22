@@ -236,6 +236,7 @@ export class InvoiceRowDto {
   @ApiProperty() subtotal!: number
   @ApiProperty({ nullable: true }) discount?: number
   @ApiProperty({ nullable: true }) discountType?: number
+  @ApiProperty({ nullable: true }) discountDetail?: string
   @ApiProperty() total!: number
   @ApiProperty() tax!: number
   @ApiProperty({ nullable: true }) po?: string
@@ -247,6 +248,8 @@ export class InvoiceRowDto {
   lastSended?: string
   @ApiProperty() isBilled!: number
   @ApiProperty() isPartialBilled!: number
+  @ApiProperty({ description: 'Active statement notes count' }) notesCount!: number
+  @ApiProperty({ description: 'LOG_CHANGE rows for this statement' }) logCount!: number
   @ApiProperty({ nullable: true }) idBilling?: number
   @ApiProperty({ nullable: true }) fechaPago?: string
   @ApiProperty({ nullable: true }) checkNumber?: string

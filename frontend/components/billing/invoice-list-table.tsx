@@ -8,10 +8,13 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Pencil,
   ReceiptText,
+  Trash2,
   Wallet,
 } from 'lucide-react'
 
+import { InvoicePoRoDialog } from '@/components/billing/invoice-po-ro-dialog'
 import { InvoiceRowActions } from '@/components/billing/invoice-row-actions'
 import {
   DataTable,
@@ -19,14 +22,21 @@ import {
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import { useDeleteInvoiceStatements, useRemoveWoFromInvoice } from '@/hooks/use-invoice-statement-mutations'
+import { canDeleteInvoice, canEditInvoicePoRo, canRemoveWoFromInvoice } from '@/lib/auth/billing-permissions'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { cn } from '@/lib/utils'
 import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
+import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import {
   fetchInvoiceDetail,
   fetchInvoiceList,
   type InvoiceRow,
 } from '@/lib/srs-invoices-api'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
+import { useToast } from '@/hooks/use-toast'
 
 type InvoiceListQuery = ReturnType<typeof useInvoiceList>
 
@@ -207,7 +217,17 @@ function DetailTable({ children }: { children: React.ReactNode }) {
 }
 function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
   const { t } = useTranslation()
+  const { toast } = useToast()
+  const { hasPermission, user } = useSrsMe()
+  const removeWo = useRemoveWoFromInvoice()
+  const [pendingRelId, setPendingRelId] = React.useState<number | null>(null)
   const token = typeTokenOf(row.statementType)
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  const canRemove =
+    !isExternal &&
+    row.estado !== 0 &&
+    canRemoveWoFromInvoice(hasPermission, user?.isSystemAdmin)
+
   const detail = useQuery({
     queryKey: ['srs-invoice-detail', row.id],
     queryFn: () => fetchInvoiceDetail(row.id),
@@ -238,6 +258,12 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     return <div className="py-2 text-xs text-muted-foreground">{t('invoices.detailEmpty')}</div>
   }
 
+  const lineUnpaid = (r: {
+    fechaPago?: string
+    checkNumber?: string
+    amount?: number
+  }) => !r.fechaPago && !r.checkNumber && (r.amount == null || r.amount === 0)
+
   return (
     <div className="space-y-4">
       {woRows.length > 0 ? (
@@ -251,6 +277,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
                 <Th>{t('invoices.colService')}</Th>
                 <Th align="right">{t('invoices.colQty')}</Th>
                 <Th align="right">{t('invoices.colPrice')}</Th>
+                {canRemove ? <Th align="right">{t('invoices.colActions')}</Th> : null}
               </tr>
             </thead>
             <tbody>
@@ -264,6 +291,50 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
                   <td className="px-3 py-2">{r.service ?? '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.qty ?? '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(r.price)}</td>
+                  {canRemove ? (
+                    <td className="px-3 py-2 text-right">
+                      {lineUnpaid(r) ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                          disabled={removeWo.isPending && pendingRelId === r.id}
+                          aria-label={t('invoices.actionRemoveWoTitle')}
+                          onClick={() => {
+                            setPendingRelId(r.id)
+                            void removeWo
+                              .mutateAsync({
+                                id_statement: row.id,
+                                id_service_rel: r.id,
+                              })
+                              .then(() => {
+                                toast({ title: t('invoices.actionRemoveWoSuccess') })
+                              })
+                              .catch((err) => {
+                                toast({
+                                  variant: 'destructive',
+                                  title: t('invoices.actionRemoveWoError'),
+                                  description: getSrsErrorMessage(
+                                    err,
+                                    t('invoices.actionRemoveWoError'),
+                                  ),
+                                })
+                              })
+                              .finally(() => setPendingRelId(null))
+                          }}
+                        >
+                          {removeWo.isPending && pendingRelId === r.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -388,6 +459,21 @@ export function InvoiceListTable({
   payedFilter?: string
 }) {
   const { t } = useTranslation()
+  const { toast } = useToast()
+  const { hasPermission, user } = useSrsMe()
+  const deleteMutation = useDeleteInvoiceStatements()
+  const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
+  const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false)
+  const [poRoRow, setPoRoRow] = React.useState<InvoiceRow | null>(null)
+  const [poRoField, setPoRoField] = React.useState<'PO' | 'RO'>('PO')
+
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  const canBulkDelete =
+    !isExternal &&
+    payedFilter === '0' &&
+    canDeleteInvoice(hasPermission, user?.isSystemAdmin)
+  const canEditPoRo =
+    !isExternal && canEditInvoicePoRo(hasPermission, user?.isSystemAdmin)
 
   const {
     data,
@@ -401,6 +487,15 @@ export function InvoiceListTable({
   const rows = React.useMemo(() => data?.pages.flatMap((p) => p.results) ?? [], [data])
   const summary = data?.pages[0]?.summary
   const total = data?.pages[0]?.total ?? 0
+
+  const selectedIds = React.useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, on]) => on)
+        .map(([id]) => Number(id))
+        .filter((id) => id > 0),
+    [rowSelection],
+  )
 
   const gateReady = hydrated && hasDealer && hasDates
 
@@ -564,6 +659,78 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
+        id: 'po',
+        accessorFn: (row) => row.po ?? '',
+        size: 88,
+        minSize: 72,
+        maxSize: 120,
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('invoices.colPo')} />
+        ),
+        cell: ({ row }) => {
+          const r = row.original
+          const text = r.po?.trim() || '—'
+          if (!canEditPoRo || r.estado === 0) {
+            return <span className="text-muted-foreground">{text}</span>
+          }
+          return (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-left text-foreground hover:text-sky-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                setPoRoField('PO')
+                setPoRoRow(r)
+              }}
+            >
+              <span>{text}</span>
+              <Pencil className="h-3 w-3 opacity-50" />
+            </button>
+          )
+        },
+        meta: {
+          label: t('invoices.colPo'),
+          exportValue: (r) => r.po ?? '',
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
+      {
+        id: 'ro',
+        accessorFn: (row) => row.ro ?? '',
+        size: 88,
+        minSize: 72,
+        maxSize: 120,
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('invoices.colRo')} />
+        ),
+        cell: ({ row }) => {
+          const r = row.original
+          const text = r.ro?.trim() || '—'
+          if (!canEditPoRo || r.estado === 0) {
+            return <span className="text-muted-foreground">{text}</span>
+          }
+          return (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-left text-foreground hover:text-sky-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                setPoRoField('RO')
+                setPoRoRow(r)
+              }}
+            >
+              <span>{text}</span>
+              <Pencil className="h-3 w-3 opacity-50" />
+            </button>
+          )
+        },
+        meta: {
+          label: t('invoices.colRo'),
+          exportValue: (r) => r.ro ?? '',
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
+      {
         id: 'subtotal',
         accessorFn: (row) => row.subtotal,
         size: 84,
@@ -657,11 +824,12 @@ export function InvoiceListTable({
       },
       {
         id: 'actions',
-        size: 96,
-        minSize: 88,
-        maxSize: 110,
+        size: 132,
+        minSize: 72,
+        maxSize: 200,
         enableSorting: false,
         enableHiding: false,
+        enableResizing: true,
         header: ({ column }) => (
           <DataTableColumnHeader
             column={column}
@@ -670,18 +838,19 @@ export function InvoiceListTable({
           />
         ),
         cell: ({ row }) => (
-          <InvoiceRowActions row={row.original} idDealer={idDealer} payedFilter={payedFilter} />
+          <div className="flex justify-end">
+            <InvoiceRowActions row={row.original} idDealer={idDealer} payedFilter={payedFilter} />
+          </div>
         ),
         meta: {
           label: t('invoices.colActions'),
           pin: 'right',
-          numeric: true,
-          headerClassName: 'px-2',
-          cellClassName: 'px-2',
+          headerClassName: 'px-1',
+          cellClassName: 'overflow-visible px-1',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter],
+    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -725,8 +894,22 @@ export function InvoiceListTable({
   const showFooter = gateReady && !isError && rows.length > 0 && Boolean(summary)
 
   return (
-    <DataTable<InvoiceRow>
-        tableId="billing-invoices"
+    <>
+      {canBulkDelete && selectedIds.length > 0 ? (
+        <div className="mb-2 flex items-center gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            {t('invoices.actionDeleteBulk', { count: selectedIds.length })}
+          </Button>
+        </div>
+      ) : null}
+      <DataTable<InvoiceRow>
+        tableId="billing-invoices-v4"
         columns={columns}
         data={rows}
         getRowId={(row) => String(row.id)}
@@ -740,6 +923,9 @@ export function InvoiceListTable({
         showPageSizeInInfiniteScroll
         pageSizeOptions={[25, 50, 100]}
         includeAllPageSize
+        enableRowSelection={canBulkDelete}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
         infiniteScroll={{
           hasNextPage: gateReady ? (hasNextPage ?? false) : false,
           isFetchingNextPage,
@@ -777,5 +963,42 @@ export function InvoiceListTable({
         flexColumnId="detail"
         enableTableFocus
       />
+
+      {poRoRow ? (
+        <InvoicePoRoDialog
+          open={Boolean(poRoRow)}
+          onOpenChange={(open) => {
+            if (!open) setPoRoRow(null)
+          }}
+          row={poRoRow}
+          initialField={poRoField}
+        />
+      ) : null}
+
+      <ConfirmActionDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        tone="danger"
+        title={t('invoices.actionDeleteBulkTitle')}
+        description={t('invoices.actionDeleteBulkConfirm', { count: selectedIds.length })}
+        confirmLabel={t('invoices.actionDeleteConfirmBtn')}
+        cancelLabel={t('common.cancel')}
+        pending={deleteMutation.isPending}
+        onConfirm={async () => {
+          try {
+            await deleteMutation.mutateAsync({ ids_statement: selectedIds })
+            toast({ title: t('invoices.actionDeleteSuccess') })
+            setRowSelection({})
+            setBulkDeleteOpen(false)
+          } catch (err) {
+            toast({
+              variant: 'destructive',
+              title: t('invoices.actionDeleteError'),
+              description: getSrsErrorMessage(err, t('invoices.actionDeleteError')),
+            })
+          }
+        }}
+      />
+    </>
   )
 }

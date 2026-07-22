@@ -147,6 +147,40 @@ export interface Messages {
     actionEmailSuccess: string
     actionEmailError: string
     actionEmailInvalid: string
+    actionDeleteTitle: string
+    actionDeleteConfirm: string
+    actionDeleteConfirmBtn: string
+    actionDeleteSuccess: string
+    actionDeleteError: string
+    actionDeleteBulk: string
+    actionDeleteBulkTitle: string
+    actionDeleteBulkConfirm: string
+    actionDiscountTitle: string
+    actionDiscountAmount: string
+    actionDiscountPercent: string
+    actionDiscountDetail: string
+    actionDiscountSuccess: string
+    actionDiscountError: string
+    actionDiscountInvalid: string
+    actionPoRoTitle: string
+    actionPoRoField: string
+    actionPoRoSuccess: string
+    actionPoRoError: string
+    actionNotesTitle: string
+    actionNotesEmpty: string
+    actionNotesLoadError: string
+    actionNotesStatus: string
+    actionNotesText: string
+    actionNotesPlaceholder: string
+    actionNotesSave: string
+    actionNotesSuccess: string
+    actionNotesError: string
+    actionNotesInvalid: string
+    actionRemoveWoTitle: string
+    actionRemoveWoSuccess: string
+    actionRemoveWoError: string
+    colPo: string
+    colRo: string
     statusPaid: string
     statusUnpaid: string
     statusPartial: string
@@ -192,6 +226,9 @@ export interface Messages {
     includeZeroInvoices: string
     advancedFiltersTitle: string
     advancedFiltersHint: string
+    filterInvoiceLabel: string
+    filterInvoicePlaceholder: string
+    filterInvoiceChip: string
     filterLaneWorkOrder: string
     filterLaneOrganization: string
     filterLaneStatus: string

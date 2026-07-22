@@ -117,7 +117,7 @@ export function InvoiceFilterDeck({
     if (searchInput.trim()) {
       list.push({
         key: 'search',
-        label: t('punch.searchChip', { query: searchInput.trim() }),
+        label: t('invoices.filterInvoiceChip', { value: searchInput.trim() }),
         onRemove: () => onSearchChange(''),
       })
     }
@@ -349,15 +349,21 @@ export function InvoiceFilterDeck({
               <Separator orientation="vertical" className="hidden h-8 lg:block" />
 
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 lg:justify-end">
-                <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchInput}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder={t('invoices.searchPlaceholder')}
-                    className="h-8 pl-8 text-xs"
-                    disabled={disabled}
-                  />
+                <div className="flex min-w-[12rem] flex-1 flex-col gap-1 sm:max-w-xs">
+                  <Label htmlFor="invoice-nro-search" className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t('invoices.filterInvoiceLabel')}
+                  </Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="invoice-nro-search"
+                      value={searchInput}
+                      onChange={(e) => onSearchChange(e.target.value)}
+                      placeholder={t('invoices.filterInvoicePlaceholder')}
+                      className="h-8 pl-8 text-xs"
+                      disabled={disabled}
+                    />
+                  </div>
                 </div>
 
                 <Select
@@ -420,6 +426,8 @@ export function InvoiceFilterDeck({
               idDealer={idDealer}
               primaryDealerId={primaryDealerId}
               disabled={disabled}
+              invoiceSearch={searchInput}
+              onInvoiceSearchChange={onSearchChange}
             />
           </div>
         </Card>

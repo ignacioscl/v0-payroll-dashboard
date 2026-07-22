@@ -95,7 +95,7 @@ export function WoNumberFilter({ value, onChange, disabled }: WoNumberFilterProp
           {value.map((wo) => (
             <span
               key={wo}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium tabular-nums"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium"
             >
               {wo}
               <button
@@ -130,9 +130,9 @@ export function WoNumberFilter({ value, onChange, disabled }: WoNumberFilterProp
               className={cn(
                 'border-input bg-background ring-offset-background placeholder:text-muted-foreground',
                 'focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[120px] w-full rounded-md border px-3 py-2 text-xs',
-                'focus-visible:ring-[3px] focus-visible:outline-none tabular-nums',
+                'focus-visible:ring-[3px] focus-visible:outline-none',
               )}
-              placeholder="12345, 67890"
+              placeholder={t('invoices.filterWoPlaceholder')}
             />
           </div>
           <DialogFooter>
