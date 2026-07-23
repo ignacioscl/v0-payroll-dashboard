@@ -39,6 +39,7 @@ import {
 import { useRolesListFetcher } from '@/hooks/use-roles-list'
 import { useRoleAction } from '@/hooks/use-role-mutations'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { useFilters } from '@/lib/filter-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import type { RoleListRow } from '@/lib/roles/roles-types'
 
@@ -68,8 +69,14 @@ export function RolesDataTable({
   onViewUsers,
 }: RolesDataTableProps) {
   const { t } = useTranslation()
+  const { selectedDealers } = useFilters()
   const fetchRoles = useRolesListFetcher()
   const roleAction = useRoleAction()
+
+  const dealerKey = React.useMemo(
+    () => selectedDealers.slice().sort().join(','),
+    [selectedDealers],
+  )
 
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
@@ -82,7 +89,7 @@ export function RolesDataTable({
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [typeFilter, showInactive])
+  }, [typeFilter, showInactive, dealerKey])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -308,13 +315,14 @@ export function RolesDataTable({
     () => ({
       type: typeFilter || undefined,
       show_inactive: showInactive ? 1 : 0,
+      ...(dealerKey ? { id_dealer: dealerKey } : {}),
     }),
-    [typeFilter, showInactive],
+    [typeFilter, showInactive, dealerKey],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: rolesAdapter,
-    queryKey: ['roles-list', typeFilter, showInactive],
+    queryKey: ['roles-list', typeFilter, showInactive, dealerKey],
     queryFn: fetchRoles,
     enabled,
     pageIndex,
