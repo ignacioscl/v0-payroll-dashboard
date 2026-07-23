@@ -348,7 +348,7 @@ export function InvoiceFilterDeck({
 
               <Separator orientation="vertical" className="hidden h-8 lg:block" />
 
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 lg:justify-end">
+              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 lg:justify-end">
                 <div className="flex min-w-[12rem] flex-1 flex-col gap-1 sm:max-w-xs">
                   <Label htmlFor="invoice-nro-search" className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {t('invoices.filterInvoiceLabel')}

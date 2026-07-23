@@ -10,7 +10,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command'
 import {
   Popover,
@@ -102,6 +101,7 @@ export function DealerMultiSelect({
   const [dealersOnOpen, setDealersOnOpen] = useState<DealerOption[] | null>(null)
   /** Draft selection while the popover is open (committed on close). */
   const [draftValue, setDraftValue] = useState<string[]>([])
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -125,16 +125,29 @@ export function DealerMultiSelect({
     return t('dealer.manySelected', { count: value.length })
   }, [allSelected, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value])
 
+  const orderedDealers = dealersOnOpen ?? dealers
+
+  const filteredDealers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return orderedDealers
+    return orderedDealers.filter((d) => d.label.toLowerCase().includes(q))
+  }, [orderedDealers, search])
+
+  const filteredIds = useMemo(() => filteredDealers.map((d) => d.id), [filteredDealers])
+  const isFiltering = search.trim().length > 0
+
   const handleOpenChange = (next: boolean) => {
     if (isDisabled) return
     if (next) {
       setDraftValue([...value])
       setDealersOnOpen(sortDealersCheckedFirst(dealers, value))
+      setSearch('')
       setOpen(true)
       return
     }
 
     setDealersOnOpen(null)
+    setSearch('')
     setOpen(false)
     if (commitOnClose) {
       if (!dealerSelectionEqual(draftValue, value)) {
@@ -154,11 +167,19 @@ export function DealerMultiSelect({
     onChange(apply(value))
   }
 
-  const toggleAll = () => {
+  const popoverSelection = commitOnClose && open ? draftValue : value
+
+  const allVisibleSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => popoverSelection.includes(id))
+
+  const toggleAllVisible = () => {
     const apply = (prev: string[]) => {
-      const allCurrently =
-        dealers.length > 0 && allIds.every((id) => prev.includes(id))
-      return allCurrently ? [] : [...allIds]
+      if (filteredIds.length === 0) return prev
+      if (filteredIds.every((id) => prev.includes(id))) {
+        const drop = new Set(filteredIds)
+        return prev.filter((id) => !drop.has(id))
+      }
+      return [...new Set([...prev, ...filteredIds])]
     }
 
     if (commitOnClose && open) {
@@ -168,15 +189,13 @@ export function DealerMultiSelect({
     onChange(apply(value))
   }
 
-  const popoverSelection = commitOnClose && open ? draftValue : value
-  const allSelectedInPopover =
-    dealers.length > 0 && allIds.every((id) => popoverSelection.includes(id))
-
   const handleRowMouseDown = (action: () => void) => (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     action()
   }
+
+  const checkAllLabel = isFiltering ? t('dealer.checkAllFiltered') : resolvedAllLabel
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -202,24 +221,32 @@ export function DealerMultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={t('dealer.searchPlaceholder')} className="h-9" />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={t('dealer.searchPlaceholder')}
+            className="h-9"
+            value={search}
+            onValueChange={setSearch}
+          />
+          {/* Sticky outside cmdk filter so it never disappears while searching. */}
+          <button
+            type="button"
+            disabled={filteredIds.length === 0}
+            onMouseDown={handleRowMouseDown(toggleAllVisible)}
+            className={cn(
+              'flex w-full cursor-pointer items-center px-2 py-1.5 text-sm outline-none',
+              'hover:bg-accent hover:text-accent-foreground',
+              'disabled:pointer-events-none disabled:opacity-50',
+              'border-b border-border',
+            )}
+          >
+            <RowCheckbox checked={allVisibleSelected} />
+            <span className="font-medium">{checkAllLabel}</span>
+          </button>
           <CommandList className={maxHeight}>
             <CommandEmpty>{resolvedEmptyLabel}</CommandEmpty>
             <CommandGroup>
-              <CommandItem
-                value="__select_all__"
-                onSelect={() => {}}
-                onMouseDown={handleRowMouseDown(toggleAll)}
-                className="cursor-pointer data-[selected=true]:text-foreground"
-              >
-                <RowCheckbox checked={allSelectedInPopover} />
-                <span className="font-medium">{resolvedAllLabel}</span>
-              </CommandItem>
-            </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
-              {(dealersOnOpen ?? dealers).map((dealer) => {
+              {filteredDealers.map((dealer) => {
                 const checked = popoverSelection.includes(dealer.id)
                 return (
                   <CommandItem

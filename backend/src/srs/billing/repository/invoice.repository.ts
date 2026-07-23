@@ -189,6 +189,11 @@ export class InvoiceRepository {
               u.nombre        AS author,
               c.razon_social  AS dealer,
               GET_NRO_WO_FROM_INVOICE(s.id)                                         AS wo,
+              CASE
+                WHEN s.statement_type = 1
+                THEN GET_SERVICES_NAMES_BY_WO(GET_ID_WO_FROM_INVOICE(s.id))
+                ELSE NULL
+              END                                                                   AS services_by_wo,
               GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)                                 AS sub_total,
               GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total,
               IS_STATEMENT_BILLED(s.id)                                             AS is_billed,
@@ -227,6 +232,7 @@ export class InvoiceRepository {
       department: r.department ?? undefined,
       invoiceService: r.invoice_service ?? undefined,
       invoiceServiceSelRel: r.invoice_service_sel_rel ?? undefined,
+      invoiceServicesByWo: r.services_by_wo ?? undefined,
       invoiceNote: r.invoice_note ?? undefined,
       author: r.author ?? undefined,
       createdBySchedule: Number(r.id_invoice_statement_schedule ?? 0) > 0,

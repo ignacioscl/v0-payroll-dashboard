@@ -17,7 +17,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useInvoiceEmailActiveQueue } from '@/hooks/use-invoice-email-active-queue'
 import { useInvoiceSentEmailAccounts } from '@/hooks/use-invoice-sent-email-accounts'
 import { useToast } from '@/hooks/use-toast'
 import { useSendInvoiceEmail } from '@/hooks/use-send-invoice-email'
@@ -29,7 +28,6 @@ import {
 } from '@/lib/billing/invoice-email-prefs'
 import {
   appendEmailToField,
-  DEFAULT_INVOICE_EMAIL_FILE_NAME,
   formatInvoiceEmailDate,
 } from '@/lib/billing/invoice-email-ui'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -43,29 +41,6 @@ function isValidEmailList(value: string): boolean {
     .filter(Boolean)
   if (parts.length === 0) return false
   return parts.every((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-}
-
-function mergeDraftFields(
-  prefs: ReturnType<typeof loadInvoiceEmailPrefs>,
-  queue: { asunto?: string; message?: string; replyTo?: string } | null | undefined,
-) {
-  let subject = prefs.subject
-  let message = prefs.message
-  let replyTo = prefs.replyTo
-
-  if (queue) {
-    if (queue.asunto?.trim()) {
-      subject = queue.asunto.trim()
-    }
-    if (queue.message != null && queue.message !== '') {
-      message = queue.message
-    }
-    if (queue.replyTo?.trim()) {
-      replyTo = queue.replyTo.trim()
-    }
-  }
-
-  return { subject, message, replyTo }
 }
 
 export function InvoiceSendEmailDialog({
@@ -93,13 +68,13 @@ export function InvoiceSendEmailDialog({
   const { toast } = useToast()
   const { user } = useSrsMe()
   const sendEmail = useSendInvoiceEmail()
-  const activeQueue = useInvoiceEmailActiveQueue(open)
   const sentAccounts = useInvoiceSentEmailAccounts(idDealer, open)
   const [emailTo, setEmailTo] = React.useState('')
   const [subject, setSubject] = React.useState('')
   const [message, setMessage] = React.useState(DEFAULT_INVOICE_EMAIL_MESSAGE)
   const [replyTo, setReplyTo] = React.useState('')
-  const [fileName, setFileName] = React.useState(DEFAULT_INVOICE_EMAIL_FILE_NAME)
+  // Legacy modal starts empty; server falls back to "Invoice Details" when blank.
+  const [fileName, setFileName] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [auditOpen, setAuditOpen] = React.useState(false)
 
@@ -112,20 +87,18 @@ export function InvoiceSendEmailDialog({
 
   React.useEffect(() => {
     if (!open) return
+
+    // Legacy sendmail() modal: do NOT load active email-queue draft (that only
+    // happens on "Create File to Email"). Prefill from localStorage only —
+    // after a successful send legacy clears asunto/message and keeps replyto.
+    const prefs = loadInvoiceEmailPrefs()
     setEmailTo('')
-    setFileName(DEFAULT_INVOICE_EMAIL_FILE_NAME)
+    setFileName('')
+    setSubject(prefs.subject)
+    setMessage(prefs.message || DEFAULT_INVOICE_EMAIL_MESSAGE)
+    setReplyTo(prefs.replyTo)
     setError(null)
   }, [open, statementId])
-
-  React.useEffect(() => {
-    if (!open || activeQueue.isLoading) return
-
-    const prefs = loadInvoiceEmailPrefs()
-    const merged = mergeDraftFields(prefs, activeQueue.data)
-    setSubject(merged.subject)
-    setMessage(merged.message || DEFAULT_INVOICE_EMAIL_MESSAGE)
-    setReplyTo(merged.replyTo)
-  }, [open, statementId, activeQueue.isLoading, activeQueue.data])
 
   const handleAccountPick = React.useCallback((email: string) => {
     setEmailTo((current) => appendEmailToField(current, email))
@@ -162,7 +135,7 @@ export function InvoiceSendEmailDialog({
   }
 
   const sending = sendEmail.isPending
-  const loadingDraft = open && (activeQueue.isLoading || sentAccounts.isLoading)
+  const loadingAccounts = open && sentAccounts.isLoading
 
   return (
     <>
@@ -195,7 +168,7 @@ export function InvoiceSendEmailDialog({
                 onChange={(e) => setEmailTo(e.target.value)}
                 placeholder={t('invoices.actionEmailToPlaceholder')}
                 autoComplete="email"
-                disabled={sending || loadingDraft}
+                disabled={sending || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">{t('invoices.actionEmailToHint')}</p>
             </div>
@@ -208,7 +181,7 @@ export function InvoiceSendEmailDialog({
                   accounts={accountOptions}
                   onPick={handleAccountPick}
                   isLoading={sentAccounts.isLoading}
-                  disabled={sending || loadingDraft}
+                  disabled={sending || loadingAccounts}
                 />
               </div>
             ) : null}
@@ -220,7 +193,7 @@ export function InvoiceSendEmailDialog({
                 value={fileName}
                 onChange={(e) => setFileName(e.target.value)}
                 placeholder={t('invoices.actionEmailFileNamePlaceholder')}
-                disabled={sending || loadingDraft}
+                disabled={sending || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">{t('invoices.actionEmailFileNameHint')}</p>
             </div>
@@ -232,7 +205,7 @@ export function InvoiceSendEmailDialog({
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder={t('invoices.actionEmailSubjectPlaceholder')}
-                disabled={sending || loadingDraft}
+                disabled={sending || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">
                 {t('invoices.actionEmailSubjectDefaultHint', { provider: providerLabel })}
@@ -248,7 +221,7 @@ export function InvoiceSendEmailDialog({
                 placeholder={t('invoices.actionEmailMessagePlaceholder')}
                 rows={4}
                 className="text-sm"
-                disabled={sending || loadingDraft}
+                disabled={sending || loadingAccounts}
               />
             </div>
 
@@ -260,7 +233,7 @@ export function InvoiceSendEmailDialog({
                 value={replyTo}
                 onChange={(e) => setReplyTo(e.target.value)}
                 placeholder={t('invoices.actionEmailReplyPlaceholder')}
-                disabled={sending || loadingDraft}
+                disabled={sending || loadingAccounts}
               />
             </div>
 
@@ -285,7 +258,7 @@ export function InvoiceSendEmailDialog({
               <Button
                 type="button"
                 onClick={() => void handleSend()}
-                disabled={sending || loadingDraft || !emailTo.trim()}
+                disabled={sending || loadingAccounts || !emailTo.trim()}
               >
                 {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                 {t('invoices.actionEmailSend')}

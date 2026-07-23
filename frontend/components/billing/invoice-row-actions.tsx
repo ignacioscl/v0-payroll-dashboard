@@ -4,7 +4,6 @@ import * as React from 'react'
 import {
   ClipboardList,
   DollarSign,
-  Loader2,
   Mail,
   MoreHorizontal,
   Printer,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { InvoiceDiscountDialog } from '@/components/billing/invoice-discount-dialog'
+import { InvoicePrintDialog } from '@/components/billing/invoice-print-dialog'
 import { InvoiceSendEmailDialog } from '@/components/billing/invoice-send-email-dialog'
 import { InvoiceStatementLogDialog } from '@/components/billing/invoice-statement-log-dialog'
 import { InvoiceStatementNotesDialog } from '@/components/billing/invoice-statement-notes-dialog'
@@ -32,7 +32,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useDeleteInvoiceStatements } from '@/hooks/use-invoice-statement-mutations'
-import { usePrintInvoiceStatementPdf } from '@/hooks/use-print-invoice-statement-pdf'
 import {
   canDeleteInvoice,
   canPrintInvoice,
@@ -105,13 +104,13 @@ export function InvoiceRowActions({
   const { t } = useTranslation()
   const { toast } = useToast()
   const { hasPermission, user } = useSrsMe()
-  const printPdf = usePrintInvoiceStatementPdf()
   const deleteMutation = useDeleteInvoiceStatements()
 
   const [logOpen, setLogOpen] = React.useState(false)
   const [emailOpen, setEmailOpen] = React.useState(false)
   const [notesOpen, setNotesOpen] = React.useState(false)
   const [discountOpen, setDiscountOpen] = React.useState(false)
+  const [printOpen, setPrintOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
 
   const isDeleted = row.estado === 0
@@ -259,28 +258,8 @@ export function InvoiceRowActions({
                 : null}
 
               {showPrint ? (
-                <DropdownMenuItem
-                  disabled={printPdf.isPending}
-                  onClick={() => {
-                    printPdf.mutate(
-                      { ids_invoices: String(row.id), payed: payedFilter },
-                      {
-                        onError: (err) => {
-                          toast({
-                            variant: 'destructive',
-                            title: t('invoices.actionPrintError'),
-                            description: getSrsErrorMessage(err, t('invoices.actionPrintError')),
-                          })
-                        },
-                      },
-                    )
-                  }}
-                >
-                  {printPdf.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Printer className="size-4" />
-                  )}
+                <DropdownMenuItem onClick={() => setPrintOpen(true)}>
+                  <Printer className="size-4" />
                   {t('invoices.actionPrintTitle')}
                 </DropdownMenuItem>
               ) : null}
@@ -329,6 +308,13 @@ export function InvoiceRowActions({
         onOpenChange={setLogOpen}
         statementId={row.id}
         invoiceLabel={label}
+      />
+
+      <InvoicePrintDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        rows={[row]}
+        payedFilter={payedFilter}
       />
 
       <InvoiceSendEmailDialog

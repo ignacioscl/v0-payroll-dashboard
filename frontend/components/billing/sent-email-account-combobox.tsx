@@ -29,6 +29,21 @@ export function SentEmailAccountCombobox({
   const { t } = useTranslation()
   const [searchTerm, setSearchTerm] = React.useState('')
 
+  // API groups by email but collation / joins can still yield duplicates — React keys must be unique.
+  const uniqueAccounts = React.useMemo(() => {
+    const seen = new Set<string>()
+    const out: InvoiceSentEmailAccount[] = []
+    for (const row of accounts) {
+      const email = row.email.trim()
+      if (!email) continue
+      const key = email.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ email })
+    }
+    return out
+  }, [accounts])
+
   const handleChange = React.useCallback(
     (item: InvoiceSentEmailAccount | null) => {
       if (!item?.email.trim()) return
@@ -44,8 +59,8 @@ export function SentEmailAccountCombobox({
       onChange={handleChange}
       searchTerm={searchTerm}
       onSearchTermChange={setSearchTerm}
-      items={accounts}
-      getItemKey={(row) => row.email}
+      items={uniqueAccounts}
+      getItemKey={(row) => row.email.toLowerCase()}
       getItemLabel={(row) => row.email}
       isLoading={isLoading}
       disabled={disabled}

@@ -89,8 +89,18 @@ export interface Messages {
     searchPlaceholder: string
     typesLabel: string
     typeWo: string
+    typeIndividual: string
+    typeByServices: string
+    typeMultiService: string
+    typeSelectedServices: string
     typeTtk: string
     typeGeneric: string
+    servicesIndividualPrefix: string
+    servicesGenericPrefix: string
+    servicesByServices: string
+    servicesMultiService: string
+    servicesTimeTracking: string
+    servicesNotePrefix: string
     paymentLabel: string
     paymentAll: string
     paymentPaid: string
@@ -115,6 +125,50 @@ export interface Messages {
     actionLogError: string
     actionPrintTitle: string
     actionPrintError: string
+    bulkSelectRequired: string
+    bulkSelectAll: string
+    bulkSelectRow: string
+    bulkExportTitle: string
+    bulkExportHint: string
+    bulkExportFormat: string
+    bulkExportDownload: string
+    bulkExportError: string
+    bulkExportEmailHint: string
+    bulkExportXlsxHint: string
+    bulkExportCsvHint: string
+    bulkGsTitle: string
+    bulkGsShort: string
+    bulkGsHint: string
+    bulkGsTypeGeneral: string
+    bulkGsTypeStatement: string
+    bulkGsTypePaidDetail: string
+    bulkGsExcludeZero: string
+    bulkGsIncludeGeneric: string
+    bulkGsDealerError: string
+    bulkPrintTitle: string
+    bulkPrintShort: string
+    bulkPrintCount: string
+    printDialogTitle: string
+    printDialogHint: string
+    printReportLabel: string
+    printReportByServices: string
+    printReportMultiserviceByServices: string
+    printReportDetailedMultiservice: string
+    printReportMultiserviceCarInfo: string
+    printReportCompactMultiservice: string
+    printReportWoDetail: string
+    printOrderLabel: string
+    printOrderDate: string
+    printOrderWo: string
+    printVisibilityLabel: string
+    printColRo: string
+    printColPo: string
+    printColTag: string
+    printColServiceNotes: string
+    printZipLabel: string
+    printZipHint: string
+    printAttachTimeCard: string
+    printConfirm: string
     actionSessionExpired: string
     actionEmailTitle: string
     actionEmailSent: string
@@ -360,6 +414,7 @@ export interface Messages {
     invalidSelected: string
     pickFirst: string
     selectInHeaderToSearch: string
+    checkAllFiltered: string
   }
   punch: {
     report: string

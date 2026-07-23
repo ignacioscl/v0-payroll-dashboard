@@ -101,6 +101,23 @@ export async function assertPdfBlob(blob: Blob, fallbackMessage: string): Promis
   throw new Error(fallbackMessage)
 }
 
+/** PDF or ZIP from print endpoint (separate_invoices_zip). */
+export async function assertPdfOrZipBlob(
+  blob: Blob,
+  fallbackMessage: string,
+): Promise<{ blob: Blob; kind: 'pdf' | 'zip' }> {
+  const headerBytes = new Uint8Array(await blob.slice(0, 4).arrayBuffer())
+  // ZIP local file header: PK\x03\x04
+  if (headerBytes[0] === 0x50 && headerBytes[1] === 0x4b) {
+    return {
+      blob: blob.type === 'application/zip' ? blob : new Blob([blob], { type: 'application/zip' }),
+      kind: 'zip',
+    }
+  }
+  const pdf = await assertPdfBlob(blob, fallbackMessage)
+  return { blob: pdf, kind: 'pdf' }
+}
+
 /** Opens a PDF blob in a new browser tab. */
 export function openPdfBlobInNewTab(blob: Blob): void {
   const url = URL.createObjectURL(blob)
@@ -110,4 +127,17 @@ export function openPdfBlobInNewTab(blob: Blob): void {
     throw new Error('Pop-up blocked — allow pop-ups for this site to view the PDF')
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+}
+
+/** Triggers a file download for a blob (ZIP or PDF). */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }

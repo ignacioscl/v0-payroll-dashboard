@@ -223,6 +223,11 @@ export class InvoiceRowDto {
   @ApiProperty({ nullable: true }) department?: string
   @ApiProperty({ nullable: true }) invoiceService?: string
   @ApiProperty({ nullable: true }) invoiceServiceSelRel?: string
+  @ApiProperty({
+    nullable: true,
+    description: 'GET_SERVICES_NAMES_BY_WO raw (Individual statements only)',
+  })
+  invoiceServicesByWo?: string
   @ApiProperty({ nullable: true }) invoiceNote?: string
   @ApiProperty({ nullable: true }) author?: string
   @ApiProperty({

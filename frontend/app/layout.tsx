@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SRS Suite · Time Tracking Dashboard',
-  description: 'Payroll and attendance management dashboard',
+  title: 'SRS Suite Pro',
+  description: 'Payroll, billing and attendance management dashboard',
   icons: {
     icon: [{ url: '/favicon.png', sizes: '32x32', type: 'image/png' }],
     apple: '/favicon.png',

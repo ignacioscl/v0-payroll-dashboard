@@ -7,14 +7,20 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  FileSpreadsheet,
   Loader2,
+  Mail,
   Pencil,
+  Printer,
   ReceiptText,
   Trash2,
   Wallet,
 } from 'lucide-react'
 
+import { InvoiceExportDialog } from '@/components/billing/invoice-export-dialog'
+import { InvoiceGeneralStatementDialog } from '@/components/billing/invoice-general-statement-dialog'
 import { InvoicePoRoDialog } from '@/components/billing/invoice-po-ro-dialog'
+import { InvoicePrintDialog } from '@/components/billing/invoice-print-dialog'
 import { InvoiceRowActions } from '@/components/billing/invoice-row-actions'
 import {
   DataTable,
@@ -23,9 +29,21 @@ import {
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useDeleteInvoiceStatements, useRemoveWoFromInvoice } from '@/hooks/use-invoice-statement-mutations'
-import { canDeleteInvoice, canEditInvoicePoRo, canRemoveWoFromInvoice } from '@/lib/auth/billing-permissions'
+import {
+  canDeleteInvoice,
+  canEditInvoicePoRo,
+  canPrintInvoice,
+  canRemoveWoFromInvoice,
+} from '@/lib/auth/billing-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { cn } from '@/lib/utils'
 import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
@@ -37,6 +55,7 @@ import {
 } from '@/lib/srs-invoices-api'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
+import { toast as sonnerToast } from 'sonner'
 
 type InvoiceListQuery = ReturnType<typeof useInvoiceList>
 
@@ -77,22 +96,29 @@ function typeTokenOf(statementType: number): TypeToken {
 }
 
 function typeMeta(statementType: number, t: TranslateFn): { label: string; className: string } {
-  switch (typeTokenOf(statementType)) {
-    case 'ttk':
+  const woClass =
+    'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+  switch (statementType) {
+    case 1:
+      return { label: t('invoices.typeIndividual'), className: woClass }
+    case 2:
+      return { label: t('invoices.typeByServices'), className: woClass }
+    case 3:
+      return { label: t('invoices.typeMultiService'), className: woClass }
+    case 4:
+      return { label: t('invoices.typeSelectedServices'), className: woClass }
+    case 5:
       return {
         label: t('invoices.typeTtk'),
         className: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
       }
-    case 'generic':
+    case 6:
       return {
         label: t('invoices.typeGeneric'),
         className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
       }
     default:
-      return {
-        label: t('invoices.typeWo'),
-        className: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-      }
+      return { label: t('invoices.typeWo'), className: woClass }
   }
 }
 
@@ -121,11 +147,55 @@ function authorDisplay(row: InvoiceRow, t: TranslateFn): string {
   return name || '—'
 }
 
-function rowDetailText(row: InvoiceRow): string {
-  const parts = [row.wo, row.department, row.invoiceService, row.invoiceServiceSelRel].filter(
-    (p): p is string => Boolean(p && p.trim()),
-  )
-  return parts.length ? parts.join(' · ') : '—'
+function parseServicesByWoNames(raw?: string): string {
+  if (!raw?.trim()) return ''
+  const names: string[] = []
+  for (const part of raw.split(',')) {
+    const name = part.trim().split('|')[0]?.trim()
+    if (name) names.push(name)
+  }
+  return names.join(', ')
+}
+
+/** Legacy Services column text (Individual - … / Generic - … / service name). */
+function rowServicesText(row: InvoiceRow, t: TranslateFn): string {
+  const note = row.invoiceNote?.trim()
+  const noteSuffix = note ? ` — ${t('invoices.servicesNotePrefix')} ${note}` : ''
+  const selRel = row.invoiceServiceSelRel?.trim() ?? ''
+  const type = row.statementType
+
+  if ((type === 4 || type === 6) && selRel) {
+    const truncated = selRel.length >= 25 ? `${selRel.slice(0, 25)}…` : selRel
+    const body =
+      type === 6 ? `${t('invoices.servicesGenericPrefix')} ${truncated}` : truncated
+    return `${body}${noteSuffix}`
+  }
+
+  if (type === 1) {
+    const svc = parseServicesByWoNames(row.invoiceServicesByWo)
+    const body = svc
+      ? `${t('invoices.servicesIndividualPrefix')} ${svc}`
+      : t('invoices.servicesIndividualPrefix')
+    return `${body}${noteSuffix}`
+  }
+
+  const serviceName = row.invoiceService?.trim()
+  if (!serviceName) {
+    switch (type) {
+      case 2:
+        return t('invoices.servicesByServices')
+      case 3:
+        return t('invoices.servicesMultiService')
+      case 5:
+        return t('invoices.servicesTimeTracking')
+      case 6:
+        return t('invoices.typeGeneric')
+      default:
+        return '—'
+    }
+  }
+
+  return `${serviceName}${noteSuffix}`
 }
 
 /* -------------------------- in-table empty states ------------------------ */
@@ -472,8 +542,14 @@ export function InvoiceListTable({
     !isExternal &&
     payedFilter === '0' &&
     canDeleteInvoice(hasPermission, user?.isSystemAdmin)
+  const canPrint = canPrintInvoice(hasPermission, user?.isSystemAdmin)
   const canEditPoRo =
     !isExternal && canEditInvoicePoRo(hasPermission, user?.isSystemAdmin)
+  const enableSelection = true
+
+  const [printRows, setPrintRows] = React.useState<InvoiceRow[] | null>(null)
+  const [gsRows, setGsRows] = React.useState<InvoiceRow[] | null>(null)
+  const [exportRows, setExportRows] = React.useState<InvoiceRow[] | null>(null)
 
   const {
     data,
@@ -497,7 +573,24 @@ export function InvoiceListTable({
     [rowSelection],
   )
 
+  const selectedRows = React.useMemo(
+    () => rows.filter((r) => selectedIds.includes(r.id)),
+    [rows, selectedIds],
+  )
+
+  const requireSelection = React.useCallback(() => {
+    if (selectedRows.length === 0) {
+      sonnerToast.error(t('invoices.bulkSelectRequired'))
+      return false
+    }
+    return true
+  }, [selectedRows.length, t])
+
   const gateReady = hydrated && hasDealer && hasDates
+
+  React.useEffect(() => {
+    setRowSelection({})
+  }, [input])
 
   const onLoadMore = React.useCallback(() => {
     void fetchNextPage()
@@ -505,6 +598,48 @@ export function InvoiceListTable({
 
   const columns = React.useMemo<ColumnDef<InvoiceRow>[]>(
     () => [
+      ...(enableSelection
+        ? [
+            {
+              id: 'select',
+              size: 40,
+              minSize: 40,
+              maxSize: 44,
+              enableSorting: false,
+              enableHiding: false,
+              header: ({ table }) => (
+                <Checkbox
+                  checked={
+                    table.getIsAllPageRowsSelected()
+                      ? true
+                      : table.getIsSomePageRowsSelected()
+                        ? 'indeterminate'
+                        : false
+                  }
+                  onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                  aria-label={t('invoices.bulkSelectAll')}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ),
+              cell: ({ row }) => (
+                <Checkbox
+                  checked={row.getIsSelected()}
+                  disabled={!row.getCanSelect()}
+                  onCheckedChange={(value) => row.toggleSelected(!!value)}
+                  aria-label={t('invoices.bulkSelectRow')}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ),
+              meta: {
+                label: t('invoices.bulkSelectRow'),
+                pin: 'left',
+                exportable: false,
+                headerClassName: 'w-[40px] px-2',
+                cellClassName: 'px-2',
+              } satisfies DataTableColumnMeta<InvoiceRow>,
+            } satisfies ColumnDef<InvoiceRow>,
+          ]
+        : []),
       {
         id: 'expander',
         size: 40,
@@ -636,26 +771,33 @@ export function InvoiceListTable({
       },
       {
         id: 'detail',
-        accessorFn: (row) => rowDetailText(row),
-        size: 160,
-        minSize: 100,
-        enableResizing: false,
+        accessorFn: (row) => rowServicesText(row, t),
+        size: 200,
+        minSize: 140,
+        enableResizing: true,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colDetail')} />
         ),
         cell: ({ row }) => {
-          const text = rowDetailText(row.original)
+          const text = rowServicesText(row.original, t)
+          const selRel = row.original.invoiceServiceSelRel?.trim() ?? ''
+          const truncated =
+            (row.original.statementType === 4 || row.original.statementType === 6) &&
+            selRel.length >= 25
           return (
-            <span className="block text-[11px] leading-snug break-words text-foreground">
-              {text}
+            <span
+              className="block text-[11px] leading-snug break-words text-foreground"
+              title={truncated ? selRel : undefined}
+            >
+              {text || '—'}
             </span>
           )
         },
         meta: {
           label: t('invoices.colDetail'),
           cellClassName: 'whitespace-normal',
-          exportValue: (r) => rowDetailText(r),
+          exportValue: (r) => rowServicesText(r, t),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -850,7 +992,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo],
+    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -893,6 +1035,80 @@ export function InvoiceListTable({
 
   const showFooter = gateReady && !isError && rows.length > 0 && Boolean(summary)
 
+  const toolbarTrailing = enableSelection ? (
+      <TooltipProvider delayDuration={250}>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
+                onClick={() => {
+                  if (!requireSelection()) return
+                  setExportRows(selectedRows)
+                }}
+              >
+                <FileSpreadsheet className="size-3.5" />
+                <span className="text-muted-foreground">/</span>
+                <Mail className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('invoices.bulkExportTitle')}</TooltipContent>
+          </Tooltip>
+
+          {canPrint ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2"
+                    onClick={() => {
+                      if (!requireSelection()) return
+                      setGsRows(selectedRows)
+                    }}
+                  >
+                    <Printer className="size-3.5" />
+                    <span className="text-muted-foreground">/</span>
+                    <Mail className="size-3.5" />
+                    <span className="ml-0.5 hidden text-xs sm:inline">{t('invoices.bulkGsShort')}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('invoices.bulkGsTitle')}</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2"
+                    onClick={() => {
+                      if (!requireSelection()) return
+                      setPrintRows(selectedRows)
+                    }}
+                  >
+                    <Printer className="size-3.5" />
+                    <span className="text-muted-foreground">/</span>
+                    <Mail className="size-3.5" />
+                    <span className="ml-0.5 hidden text-xs sm:inline">
+                      {t('invoices.bulkPrintShort')}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('invoices.bulkPrintTitle')}</TooltipContent>
+              </Tooltip>
+            </>
+          ) : null}
+        </div>
+      </TooltipProvider>
+    ) : null
+
   return (
     <>
       {canBulkDelete && selectedIds.length > 0 ? (
@@ -909,7 +1125,7 @@ export function InvoiceListTable({
         </div>
       ) : null}
       <DataTable<InvoiceRow>
-        tableId="billing-invoices-v4"
+        tableId="billing-invoices-v7"
         columns={columns}
         data={rows}
         getRowId={(row) => String(row.id)}
@@ -923,9 +1139,10 @@ export function InvoiceListTable({
         showPageSizeInInfiniteScroll
         pageSizeOptions={[25, 50, 100]}
         includeAllPageSize
-        enableRowSelection={canBulkDelete}
+        enableRowSelection={enableSelection}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        toolbarTrailing={toolbarTrailing}
         infiniteScroll={{
           hasNextPage: gateReady ? (hasNextPage ?? false) : false,
           isFetchingNextPage,
@@ -998,6 +1215,34 @@ export function InvoiceListTable({
             })
           }
         }}
+      />
+
+      <InvoicePrintDialog
+        open={printRows != null}
+        onOpenChange={(open) => {
+          if (!open) setPrintRows(null)
+        }}
+        rows={printRows ?? []}
+        payedFilter={payedFilter}
+      />
+
+      <InvoiceGeneralStatementDialog
+        open={gsRows != null}
+        onOpenChange={(open) => {
+          if (!open) setGsRows(null)
+        }}
+        rows={gsRows ?? []}
+        idDealer={idDealer}
+        fechaDesde={input?.fechaDesde}
+        fechaHasta={input?.fechaHasta}
+      />
+
+      <InvoiceExportDialog
+        open={exportRows != null}
+        onOpenChange={(open) => {
+          if (!open) setExportRows(null)
+        }}
+        rows={exportRows ?? []}
       />
     </>
   )
