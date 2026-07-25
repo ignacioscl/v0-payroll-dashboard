@@ -15,6 +15,8 @@ export interface Messages {
     billing: string
     invoices: string
     rolesAdmin: string
+    rolesList: string
+    roleTemplates: string
     components: string
     dataTable: string
   }
@@ -36,6 +38,10 @@ export interface Messages {
     loadingPermissions: string
     searchPermissions: string
     otherPermissions: string
+    expandPermissionGroup: string
+    collapsePermissionGroup: string
+    expandAllPermissionGroups: string
+    collapseAllPermissionGroups: string
     noPermissionResults: string
     saveError: string
     saveSuccess: string
@@ -82,6 +88,100 @@ export interface Messages {
     usersLoading: string
     usersError: string
     usersEmpty: string
+    activity: string
+    activityTitle: string
+    activitySubtitle: string
+    activityEmpty: string
+    basedOn: string
+    basedOnFilter: string
+    basedOnFilterAll: string
+    basedOnFilterSearch: string
+    basedOnFilterEmpty: string
+    basedOnFilterLoading: string
+    templateReadOnlyHint: string
+  }
+  roleTemplates: {
+    title: string
+    subtitle: string
+    noAccess: string
+    empty: string
+    add: string
+    edit: string
+    delete: string
+    addTitle: string
+    editTitle: string
+    save: string
+    saving: string
+    cancel: string
+    type: string
+    typeAll: string
+    typeInternal: string
+    typeExternal: string
+    typeRequired: string
+    name: string
+    nameRequired: string
+    accessLevel: string
+    accessLevelInvalid: string
+    estado: string
+    showInactive: string
+    colName: string
+    colType: string
+    colAccessLevel: string
+    colPerms: string
+    colRoles: string
+    colEstado: string
+    actions: string
+    permissions: string
+    permissionsTitle: string
+    syncHint: string
+    saveSuccess: string
+    saveError: string
+    permissionsSaveSuccess: string
+    permissionsSaveSuccessSynced: string
+    permissionsSaveError: string
+    activity: string
+    activityTitle: string
+    activitySubtitle: string
+    activityLoading: string
+    activityEmpty: string
+    activityBy: string
+    activityAdded: string
+    activityRemoved: string
+    activitySyncedRoles: string
+    setActive: string
+    setInactive: string
+    activateConfirmTitle: string
+    activateConfirmDesc: string
+    activateSuccess: string
+    inactivateConfirmTitle: string
+    inactivateConfirmDesc: string
+    inactivateSuccess: string
+    deleteConfirmTitle: string
+    deleteConfirmDesc: string
+    deleteBlocked: string
+    deleteSuccess: string
+    deleteError: string
+    createRoles: string
+    createRolesTitle: string
+    basedRoles: string
+    basedRolesSubtitle: string
+    createInternalConfirmTitle: string
+    createInternalConfirm: string
+    createSuccess: string
+    createError: string
+    selectDealers: string
+    selectDealersHint: string
+    noDealersAvailable: string
+    roleEmpty: string
+    roleColName: string
+    roleColDealer: string
+    roleColPerms: string
+    roleColEstado: string
+    roleDeleteConfirmTitle: string
+    roleDeleteConfirmDesc: string
+    roleDeleteSuccess: string
+    roleDeleteError: string
+    roleEstadoError: string
   }
   invoices: {
     title: string

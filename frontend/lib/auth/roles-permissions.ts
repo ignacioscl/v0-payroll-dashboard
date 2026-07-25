@@ -2,6 +2,8 @@
 export const ROL_ACCION_ROLES_LIST = 42
 export const ROL_ACCION_ROLES_EDIT = 43
 export const ROL_ACCION_USERS_MODULE = 24
+/** Roles Admin > Role Templates (SRS Nest API). */
+export const ROL_ACCION_ROLE_TEMPLATES = 144
 
 /** Enter Roles Admin + list/read permissions (`show-rol-action-42`). */
 export function canViewRoles(
@@ -25,4 +27,12 @@ export function canViewRoleUsers(
   isSystemAdmin?: boolean,
 ): boolean {
   return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_USERS_MODULE)
+}
+
+/** Manage Role Templates — create/edit/delete templates, their permissions and child roles (`show-rol-action-144`). */
+export function canManageRoleTemplates(
+  hasPermission: (id: number) => boolean,
+  isSystemAdmin?: boolean,
+): boolean {
+  return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_ROLE_TEMPLATES)
 }

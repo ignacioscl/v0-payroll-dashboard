@@ -1,0 +1,70 @@
+---
+description: Nest CRUD — EntityBase + BaseRepository + GlobalBaseService + @Transactional; one feature per resource; raw SQL only complex reports.
+globs: v0-payroll-dashboard/backend/**/*.{ts,js}
+alwaysApply: false
+---
+
+# Nest CRUD — homologar con bases del proyecto
+
+**También leé:** `nest-feature-one-resource.mdc` — **un recurso = un feature**. No meter entities ajenas en el mismo folder.
+
+## Obligatorio en cada recurso
+
+| Capa | Patrón |
+|------|--------|
+| **Ubicación** | `src/features/<name>/` — **solo** entity/repo/service/dto/controller de **ese** recurso |
+| **Entity (Suite + tablas nuevas)** | `extends EntityBase` + `*.entity.ts` en **conexión default** |
+| **Entity (SRS legacy, tablas viejas)** | `extends SrsEntityBase` + feature `srs-*`; **no** mezclar con EntityBase nuevas |
+| **Repository** | `extends BaseRepository` + `@InjectRepository(Entity)` **sin** segundo arg |
+| **Service** | `extends GlobalBaseService` + `getRepository()` |
+| **Mutaciones multi-tabla** | Service orquestador inyecta otros **services** + `@Transactional()` |
+| **Controller** | Thin; auth payroll: `SrsJwtGuard` en `/srs/...` si el FE manda JWT PHP |
+
+**No uses `SRS_CONNECTION` en features CRUD nuevos.** No está en `create-feature`. Misma DB; default alcanza.
+
+Scaffold: `npm run create-feature <name>`.
+
+## Tablas SQL nuevas = EntityBase
+
+Al crear tablas en `public/sql/` para features Nest:
+
+- Incluir **siempre**: `id`, `created_at`, `updated_at`, `deleted_at`.
+- Entity: `extends EntityBase` — **no** inventar otra base “porque es SRS”.
+- FKs nombrados; inserts plain (rules del repo).
+- **Un script SQL por requerimiento** — no alter files sueltos.
+
+```ts
+// ✅ GOOD
+@Entity({ name: 'FOO', synchronize: false })
+export class Foo extends EntityBase { … }
+
+// ❌ BAD — inventar base paralela para tabla nueva
+export class Foo extends SrsEntityWithId { … }
+```
+
+## TypeORM / SQL
+
+- CRUD: TypeORM (`save` / `find` / `createQueryBuilder`). **Prohibido** raw `INSERT/SELECT` básico.
+- Raw SQL: **solo** reportes/KPI complejos.
+- Orquestación = inyectar services de **otros features**, nunca copiar sus entities al folder.
+
+```ts
+@Transactional()
+async setPermissionsAndSync(…) { … }
+```
+
+## Anti-patrones (rechazar en review)
+
+```ts
+// ❌ BAD — mega-módulo (ROL_ACCION / usuarios / CONTRATISTA dentro de template)
+src/srs/role-template/entity/{rol-template,rol,rol-accion,usuario,contratista}.entity.ts
+
+// ✅ GOOD — dueño + su REL; el resto features propios
+src/features/rol-template/          # + rol-accion-rel-template
+src/features/srs-rol/               # + rol-accion-rel
+src/features/srs-rol-accion/
+src/features/srs-usuario/
+src/features/srs-contratista/
+```
+
+Única excepción de “compartir CRUD”: joins `rol-accion-rel*`. Ver `nest-feature-one-resource.mdc`.

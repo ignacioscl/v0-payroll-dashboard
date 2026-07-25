@@ -1,0 +1,35 @@
+---
+description: Clickable UI (buttons, close X, icon actions) must use cursor-pointer on hover.
+globs: v0-payroll-dashboard/frontend/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Cursor pointer on clickable controls
+
+Every interactive control that the user can click must show the **pointer** (hand) cursor on hover.
+
+## Do
+
+- Put `cursor-pointer` on buttons, close/dismiss controls (`Sheet`/`Dialog` X), icon-only actions, **collapse/expand triggers** (group headers, expand-all / collapse-all), tabs triggers used as buttons, and custom `<button>` / `role="button"` elements.
+- Prefer baking it into shared primitives (`Button`, Sheet/Dialog close) so callers inherit it.
+- Disabled controls: `disabled:cursor-not-allowed` (and keep non-interactive).
+
+## Do NOT
+
+- Leave close buttons or ghost/icon buttons without `cursor-pointer` (default arrow looks broken).
+- Rely on browser default for `<button>` alone when Tailwind/`button` reset may leave `cursor: default`.
+
+## Examples
+
+```tsx
+// ✅ Sheet / Dialog close
+<SheetPrimitive.Close className="… cursor-pointer …">
+
+// ✅ Custom icon button
+<button type="button" className="… cursor-pointer …">
+
+// ❌ Missing pointer
+<SheetPrimitive.Close className="absolute top-4 right-4 opacity-70 …">
+```
+
+`Button` (`components/ui/button.tsx`) already includes `cursor-pointer`. Raw Radix closes and one-off `<button>`s do **not** — always add it.

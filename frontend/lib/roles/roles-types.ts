@@ -13,6 +13,8 @@ export type RoleListRow = {
   idDealer?: number | null
   dealerText: string
   companyTxt: string
+  idTemplate?: number | null
+  templateNombre?: string | null
 }
 
 export type RolesListResponse = {

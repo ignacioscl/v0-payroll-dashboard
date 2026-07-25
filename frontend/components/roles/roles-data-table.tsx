@@ -4,6 +4,7 @@ import * as React from 'react'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import {
   Check,
+  History,
   MoreHorizontal,
   Pencil,
   Shield,
@@ -47,6 +48,8 @@ const rolesAdapter = createPaginatedAdapter<RoleListRow>()
 
 export type RolesDataTableProps = {
   typeFilter: string
+  /** When set, list only roles created from this ROL_TEMPLATE. */
+  idTemplate?: number | null
   showInactive: boolean
   enabled: boolean
   canEdit: boolean
@@ -55,10 +58,12 @@ export type RolesDataTableProps = {
   onEdit: (role: RoleListRow) => void
   onAccessLevel: (role: RoleListRow) => void
   onViewUsers: (role: RoleListRow) => void
+  onViewActivity: (role: RoleListRow) => void
 }
 
 export function RolesDataTable({
   typeFilter,
+  idTemplate = null,
   showInactive,
   enabled,
   canEdit,
@@ -67,6 +72,7 @@ export function RolesDataTable({
   onEdit,
   onAccessLevel,
   onViewUsers,
+  onViewActivity,
 }: RolesDataTableProps) {
   const { t } = useTranslation()
   const { selectedDealers } = useFilters()
@@ -89,7 +95,7 @@ export function RolesDataTable({
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [typeFilter, showInactive, dealerKey])
+  }, [typeFilter, showInactive, dealerKey, idTemplate])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -118,6 +124,23 @@ export function RolesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('roles.colName')} />
         ),
+        cell: ({ row }) => {
+          const r = row.original
+          const based =
+            r.idTemplate && r.templateNombre
+              ? t('roles.basedOn', { name: r.templateNombre })
+              : r.idTemplate
+                ? t('roles.basedOn', { name: String(r.idTemplate) })
+                : null
+          return (
+            <div className="min-w-0">
+              <div className="truncate font-medium">{r.nombre}</div>
+              {based ? (
+                <div className="truncate text-xs text-muted-foreground">{based}</div>
+              ) : null}
+            </div>
+          )
+        },
         meta: { label: t('roles.colName'), sortKey: 'r.nombre' } satisfies DataTableColumnMeta<RoleListRow>,
       },
       {
@@ -170,20 +193,24 @@ export function RolesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('roles.accessLevel')} />
         ),
-        cell: ({ row }) => (
+        cell: ({ row }) => {
+          const r = row.original
+          const templated = Boolean(r.idTemplate && r.idTemplate > 0)
+          return (
           <button
             type="button"
             className="inline-flex items-center gap-1 tabular-nums text-sm hover:underline disabled:no-underline"
-            disabled={!canEdit}
+            disabled={!canEdit || templated}
             onClick={(e) => {
               e.stopPropagation()
               onAccessLevel(row.original)
             }}
           >
             {row.original.ponderacion ?? '—'}
-            {canEdit ? <Pencil className="size-3 opacity-50" /> : null}
+            {canEdit && !templated ? <Pencil className="size-3 opacity-50" /> : null}
           </button>
-        ),
+          )
+        },
         meta: {
           label: t('roles.accessLevel'),
           sortKey: 'r.ponderacion',
@@ -214,6 +241,7 @@ export function RolesDataTable({
         header: () => <span className="sr-only">{t('roles.actions')}</span>,
         cell: ({ row }) => {
           const r = row.original
+          const templated = Boolean(r.idTemplate && r.idTemplate > 0)
           return (
             <div className="flex items-center justify-end gap-0.5">
               <TooltipProvider delayDuration={300}>
@@ -236,7 +264,7 @@ export function RolesDataTable({
                   <TooltipContent side="top">{t('roles.permissions')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {(canEdit || canViewUsers) && (
+              {(canEdit || canViewUsers || !templated) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -251,7 +279,13 @@ export function RolesDataTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    {canEdit ? (
+                    {!templated ? (
+                      <DropdownMenuItem onClick={() => onViewActivity(r)}>
+                        <History className="size-4" />
+                        {t('roles.activity')}
+                      </DropdownMenuItem>
+                    ) : null}
+                    {canEdit && !templated ? (
                       <DropdownMenuItem onClick={() => onEdit(r)}>
                         <Pencil className="size-4" />
                         {t('roles.edit')}
@@ -308,6 +342,7 @@ export function RolesDataTable({
       onEdit,
       onAccessLevel,
       onViewUsers,
+      onViewActivity,
     ],
   )
 
@@ -316,13 +351,14 @@ export function RolesDataTable({
       type: typeFilter || undefined,
       show_inactive: showInactive ? 1 : 0,
       ...(dealerKey ? { id_dealer: dealerKey } : {}),
+      ...(idTemplate && idTemplate > 0 ? { id_template: idTemplate } : {}),
     }),
-    [typeFilter, showInactive, dealerKey],
+    [typeFilter, showInactive, dealerKey, idTemplate],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: rolesAdapter,
-    queryKey: ['roles-list', typeFilter, showInactive, dealerKey],
+    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate],
     queryFn: fetchRoles,
     enabled,
     pageIndex,
@@ -417,6 +453,13 @@ export function RolesDataTable({
             : confirm?.action === 'activate'
               ? t('roles.setActive')
               : t('roles.setInactive')
+        }
+        confirmIcon={
+          confirm?.action === 'delete'
+            ? Trash2
+            : confirm?.action === 'activate'
+              ? Check
+              : UserX
         }
         cancelLabel={t('roles.cancel')}
         confirmVariant={confirm?.action === 'delete' ? 'destructive' : 'default'}

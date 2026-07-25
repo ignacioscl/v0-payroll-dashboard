@@ -2,6 +2,7 @@
 import 'dotenv/config'
 
 import { DataSource, DataSourceOptions } from 'typeorm'
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 import { resolveTypeOrmLogging } from '../db-logging'
 
@@ -12,6 +13,8 @@ import { resolveTypeOrmLogging } from '../db-logging'
  *  - synchronize: false SIEMPRE — el backend nunca altera el schema que el PHP usa.
  *  - Sin migraciones de TypeORM sobre tablas legacy.
  *  - Solo agarra entidades *.srsentity.ts (las legacy).
+ *  - SnakeNamingStrategy: homologa EntityBase (created_at / updated_at / deleted_at)
+ *    en tablas nuevas; columnas legacy siguen con `name:` explícito.
  *
  * Inyectar repos de esta conexión:  @InjectRepository(Invoice, 'srs')  / @InjectDataSource('srs')
  */
@@ -29,6 +32,7 @@ export const srsDataSourceOptions: DataSourceOptions = {
   charset: 'utf8mb4',
   entities: [`${__dirname}/**/*.srsentity{.ts,.js}`],
   synchronize: false, // NO NEGOCIABLE: nunca tocar el schema
+  namingStrategy: new SnakeNamingStrategy(),
   migrations: [],
   migrationsRun: false,
   timezone: 'Z',

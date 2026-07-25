@@ -66,15 +66,19 @@ export function Header() {
 
   const showStatusFilter = pathname === '/schedule'
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
+  const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
+  const showDateFilter = !isRolesPage
 
   // Count active filters for mobile badge
   const activeFilterCount =
     (selectedDealers.length > 0 ? 1 : 0) +
-    (isInvoicesPage
-      ? (invoiceDateFrom ? 1 : 0) + (invoiceDateTo ? 1 : 0)
-      : dateRange?.from
-        ? 1
-        : 0) +
+    (showDateFilter
+      ? isInvoicesPage
+        ? (invoiceDateFrom ? 1 : 0) + (invoiceDateTo ? 1 : 0)
+        : dateRange?.from
+          ? 1
+          : 0
+      : 0) +
     (showStatusFilter && selectedStatus && selectedStatus !== 'all' ? 1 : 0)
 
   return (
@@ -122,24 +126,26 @@ export function Header() {
             </Select>
           )}
 
-          {isInvoicesPage ? (
-            <div className="flex shrink-0 items-center gap-2">
-              <DatePicker
-                value={invoiceDateFrom}
-                onChange={setInvoiceDateFrom}
-                placeholder={t('filters.dateFrom')}
-                toDate={invoiceDateTo}
-              />
-              <DatePicker
-                value={invoiceDateTo}
-                onChange={setInvoiceDateTo}
-                placeholder={t('filters.dateTo')}
-                fromDate={invoiceDateFrom}
-              />
-            </div>
-          ) : (
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          )}
+          {showDateFilter ? (
+            isInvoicesPage ? (
+              <div className="flex shrink-0 items-center gap-2">
+                <DatePicker
+                  value={invoiceDateFrom}
+                  onChange={setInvoiceDateFrom}
+                  placeholder={t('filters.dateFrom')}
+                  toDate={invoiceDateTo}
+                />
+                <DatePicker
+                  value={invoiceDateTo}
+                  onChange={setInvoiceDateTo}
+                  placeholder={t('filters.dateTo')}
+                  fromDate={invoiceDateFrom}
+                />
+              </div>
+            ) : (
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
+            )
+          ) : null}
         </div>
 
         {/* Right side */}
@@ -217,36 +223,38 @@ export function Header() {
               </div>
             )}
 
-            {/* Date range / invoice period */}
-            {isInvoicesPage ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateFrom')}</span>
-                  <DatePicker
-                    value={invoiceDateFrom}
-                    onChange={setInvoiceDateFrom}
-                    placeholder={t('filters.dateFrom')}
-                    toDate={invoiceDateTo}
-                    className="w-full min-w-0"
-                  />
+            {/* Date range / invoice period — hidden on Roles */}
+            {showDateFilter ? (
+              isInvoicesPage ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-muted-foreground">{t('filters.dateFrom')}</span>
+                    <DatePicker
+                      value={invoiceDateFrom}
+                      onChange={setInvoiceDateFrom}
+                      placeholder={t('filters.dateFrom')}
+                      toDate={invoiceDateTo}
+                      className="w-full min-w-0"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-muted-foreground">{t('filters.dateTo')}</span>
+                    <DatePicker
+                      value={invoiceDateTo}
+                      onChange={setInvoiceDateTo}
+                      placeholder={t('filters.dateTo')}
+                      fromDate={invoiceDateFrom}
+                      className="w-full min-w-0"
+                    />
+                  </div>
                 </div>
+              ) : (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateTo')}</span>
-                  <DatePicker
-                    value={invoiceDateTo}
-                    onChange={setInvoiceDateTo}
-                    placeholder={t('filters.dateTo')}
-                    fromDate={invoiceDateFrom}
-                    className="w-full min-w-0"
-                  />
+                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
+                  <DateRangePicker value={dateRange} onChange={setDateRange} />
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
-                <DateRangePicker value={dateRange} onChange={setDateRange} />
-              </div>
-            )}
+              )
+            ) : null}
 
             <Button
               className="mt-2 w-full"

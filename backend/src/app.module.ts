@@ -41,6 +41,7 @@ import { SrsBillingModule } from './srs/billing/srs-billing.module'
 import { SrsCollectionsModule } from './srs/collections/srs-collections.module'
 import { SrsPunchModule } from './srs/punch/srs-punch.module'
 import { SrsPayrollModule } from './srs/payroll/srs-payroll.module'
+import { RolTemplateModule } from './features/rol-template/rol-template.module'
 //ImportTemplateModule
 //NO BORRAR LA LINEA DE ARRIBA
 HttpModule.registerAsync({
@@ -94,6 +95,7 @@ HttpModule.registerAsync({
     SrsCollectionsModule,
     SrsPunchModule,
     SrsPayrollModule,
+    RolTemplateModule,
     //TemplateModule
     //NO BORRAR LA LINEA DE ARRIBA
   ],

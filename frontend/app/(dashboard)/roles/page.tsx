@@ -6,8 +6,13 @@ import { Plus, Shield } from 'lucide-react'
 import { PageHeading } from '@/components/layout/page-heading'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { AccessLevelDialog } from '@/components/roles/access-level-dialog'
+import { RoleActivityPanel } from '@/components/roles/role-activity-panel'
 import { RoleFormDialog } from '@/components/roles/role-form-dialog'
 import { RolePermissionsSheet } from '@/components/roles/role-permissions-sheet'
+import {
+  RoleTemplateFilterCombobox,
+  type RoleTemplateFilterOption,
+} from '@/components/roles/role-template-filter-combobox'
 import { RoleUsersSheet } from '@/components/roles/role-users-sheet'
 import { RolesDataTable } from '@/components/roles/roles-data-table'
 import { Button } from '@/components/ui/button'
@@ -38,6 +43,7 @@ export default function RolesPage() {
   const canViewUsers = canViewRoleUsers(hasPermission, user?.isSystemAdmin)
 
   const [typeFilter, setTypeFilter] = useState('')
+  const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
   const [showInactive, setShowInactive] = useState(false)
   const [permRole, setPermRole] = useState<RoleListRow | null>(null)
   const [permOpen, setPermOpen] = useState(false)
@@ -47,6 +53,8 @@ export default function RolesPage() {
   const [pondOpen, setPondOpen] = useState(false)
   const [usersRole, setUsersRole] = useState<RoleListRow | null>(null)
   const [usersOpen, setUsersOpen] = useState(false)
+  const [activityRole, setActivityRole] = useState<RoleListRow | null>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
 
   const onOpenPermissions = useCallback((role: RoleListRow) => {
     setPermRole(role)
@@ -54,6 +62,7 @@ export default function RolesPage() {
   }, [])
 
   const onEdit = useCallback((role: RoleListRow) => {
+    if (role.idTemplate) return
     setFormRole(role)
     setFormOpen(true)
   }, [])
@@ -64,6 +73,7 @@ export default function RolesPage() {
   }, [])
 
   const onAccessLevel = useCallback((role: RoleListRow) => {
+    if (role.idTemplate) return
     setPondRole(role)
     setPondOpen(true)
   }, [])
@@ -71,6 +81,12 @@ export default function RolesPage() {
   const onViewUsers = useCallback((role: RoleListRow) => {
     setUsersRole(role)
     setUsersOpen(true)
+  }, [])
+
+  const onViewActivity = useCallback((role: RoleListRow) => {
+    if (role.idTemplate) return
+    setActivityRole(role)
+    setActivityOpen(true)
   }, [])
 
   if (!loading && !canView) {
@@ -111,6 +127,15 @@ export default function RolesPage() {
           </Select>
         </div>
 
+        <div className="w-[280px] space-y-1.5">
+          <Label>{t('roles.basedOnFilter')}</Label>
+          <RoleTemplateFilterCombobox
+            value={templateFilter}
+            onChange={setTemplateFilter}
+            enabled={!loading && canView}
+          />
+        </div>
+
         <div className="flex items-center gap-2 pb-1">
           <Switch
             id="roles-inactive"
@@ -125,6 +150,7 @@ export default function RolesPage() {
 
       <RolesDataTable
         typeFilter={typeFilter}
+        idTemplate={templateFilter?.id ?? null}
         showInactive={showInactive}
         enabled={!loading && canView}
         canEdit={canEdit}
@@ -133,13 +159,14 @@ export default function RolesPage() {
         onEdit={onEdit}
         onAccessLevel={onAccessLevel}
         onViewUsers={onViewUsers}
+        onViewActivity={onViewActivity}
       />
 
       <RolePermissionsSheet
         role={permRole}
         open={permOpen}
         onOpenChange={setPermOpen}
-        canEdit={canEdit}
+        canEdit={canEdit && !permRole?.idTemplate}
       />
 
       <RoleFormDialog
@@ -153,6 +180,12 @@ export default function RolesPage() {
       <AccessLevelDialog open={pondOpen} onOpenChange={setPondOpen} role={pondRole} />
 
       <RoleUsersSheet role={usersRole} open={usersOpen} onOpenChange={setUsersOpen} />
+
+      <RoleActivityPanel
+        role={activityRole}
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+      />
     </div>
   )
 }

@@ -1,0 +1,73 @@
+---
+description: One Nest feature = one resource. Only join tables (rol-accion-rel*) may share a CRUD folder.
+globs: v0-payroll-dashboard/backend/src/**/*.{ts,js}
+alwaysApply: false
+---
+
+# Nest — un recurso = un feature
+
+Misma regla que Suite (`npm run create-feature <name>`): **cada tabla de negocio tiene su carpeta** bajo `src/features/<name>/`.
+
+## Estructura obligatoria (por recurso)
+
+```
+src/features/<name>/
+  <name>.module.ts
+  entity/<name>.entity.ts
+  repository/<name>.repository.ts
+  service/<name>.service.ts
+  dto/<name>.dto.ts
+  controller/<name>.controller.ts  # solo si expone HTTP propio
+```
+
+## Única excepción — tablas relacionales (N:M)
+
+**Solo** las join tables tipo `*_REL` / `rol-accion-rel` pueden **compartir** el feature del dueño (mismo module, entity/repo/service hermanos).
+
+| Dueño | Join permitida en el mismo feature |
+|-------|--------------------------------------|
+| `rol-template` | `rol-accion-rel-template` |
+| `srs-rol` | `rol-accion-rel` |
+
+```ts
+// ✅ GOOD — template + su REL en el mismo feature
+features/rol-template/
+  entity/rol-template.entity.ts
+  entity/rol-accion-rel-template.entity.ts
+  repository/rol-template.repository.ts
+  repository/rol-accion-rel-template.repository.ts
+  service/…
+
+// ✅ GOOD — ROL + ROL_ACCION_REL juntos
+features/srs-rol/
+  entity/rol.entity.ts
+  entity/rol-accion-rel.entity.ts
+  …
+
+// ❌ BAD — meter ROL_ACCION, usuarios, CONTRATISTA dentro de rol-template
+// ❌ BAD — inventar más “excepciones” (cualquier otra tabla = feature propio)
+```
+
+Todo lo demás (`ROL_ACCION`, `usuarios`, `CONTRATISTA`, …) = **feature propio**. Orquestación = importar módulos e inyectar services — no copiar entities.
+
+```ts
+// ✅ GOOD
+@Module({
+  imports: [SrsRolModule, SrsRolAccionModule, SrsUsuarioModule, SrsContratistaModule],
+  providers: [RolTemplateService, RolAccionRelTemplateService, RoleTemplateFacadeService],
+})
+export class RolTemplateModule {}
+```
+
+## Naming
+
+- Tablas nuevas EntityBase → `features/<kebab>/` (ej. `rol-template`).
+- Legacy SRS → prefijo `srs-` (`srs-rol` ≠ Suite `role`).
+- `*.entity.ts` + conexión **default**. No `SRS_CONNECTION` para CRUD nuevo.
+
+## Checklist
+
+1. ¿Es tabla de negocio (no join)? → feature propio.
+2. ¿Es `*_REL` / rol-accion-rel del dueño? → puede compartir ese feature.
+3. ¿Cualquier otra entity en el folder? → **sacar**.
+4. Orquestación multi-tabla → inyectar services de otros módulos.

@@ -28,7 +28,11 @@ export class SrsAuthContextService {
   async resolveContext(
     idUsuario: number,
     idUsuarioRolrel: number | null,
-    fallbackIdDealerProvider?: number | null,
+    /**
+     * Only for Admin General/Company (id_rol 1|2) without id_contratista_owner.
+     * Must come from Next session via proxy header — never from client query.
+     */
+    sessionIdDealerProvider?: number | null,
   ): Promise<SrsContext> {
     const rolRows = await this.srs.query(
       `SELECT u.id_rol AS idRol FROM usuarios u WHERE u.id_usuario = ? LIMIT 1`,
@@ -50,7 +54,7 @@ export class SrsAuthContextService {
 
     // Role-scoped login (USUARIO_ROL_REL) when owner row is absent.
     if (!idDealerProvider && idUsuarioRolrel && idUsuarioRolrel > 0) {
-      const rolRows = await this.srs.query(
+      const scopeRows = await this.srs.query(
         `SELECT COALESCE(NULLIF(urr.id_dealer_asigned, 0), NULLIF(r.id_dealer, 0), NULLIF(r.id_compania, 0)) AS idDealerProvider
          FROM USUARIO_ROL_REL urr
          JOIN ROL r ON r.id_rol = urr.id_rol
@@ -58,14 +62,13 @@ export class SrsAuthContextService {
          LIMIT 1`,
         [idUsuarioRolrel],
       )
-      idDealerProvider = Number(rolRows[0]?.idDealerProvider ?? 0)
+      idDealerProvider = Number(scopeRows[0]?.idDealerProvider ?? 0)
     }
 
-    // Admin General / Admin Company have no id_contratista_owner; PHP sets provider from session empresa.
-    if (!idDealerProvider && fallbackIdDealerProvider && fallbackIdDealerProvider > 0) {
-      const isAdminScope = idRol === 1 || idRol === 2
-      if (isAdminScope) {
-        idDealerProvider = fallbackIdDealerProvider
+    // PHP session empresa for Admin General / Admin Company (no contratista_owner).
+    if (!idDealerProvider && sessionIdDealerProvider && sessionIdDealerProvider > 0) {
+      if (idRol === 1 || idRol === 2) {
+        idDealerProvider = sessionIdDealerProvider
       }
     }
 

@@ -44,7 +44,7 @@ import {
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import { canAccessBusinessKpis, canAccessBillingInvoices } from '@/lib/auth/payroll-access'
-import { canViewRoles } from '@/lib/auth/roles-permissions'
+import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 import { getAppTitle } from '@/lib/branding'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -104,6 +104,7 @@ function SidebarInner({
     canAccessProdKpis: canAccessBusinessKpis(user, hasPermission),
     canAccessBillingInvoices: canAccessBillingInvoices(user, hasPermission),
     canViewRoles: canViewRoles(hasPermission, user?.isSystemAdmin),
+    canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
     isCompanyTypeCompany: Boolean(user?.isCompanyTypeCompany),
     t,
   })

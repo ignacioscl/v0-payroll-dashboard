@@ -45,12 +45,14 @@ export class SrsJwtGuard implements CanActivate {
       throw new UnauthorizedException('Token sin usuario')
     }
 
-    const fallbackProvider = Number(request.query?.idDealerProvider ?? 0) || null
+    // Provider from JWT user + DB. Optional Admin-only fallback comes from the
+    // Next proxy (session cookie → x-srs-dealer-provider), never from query.
+    const sessionProvider = Number(request.headers['x-srs-dealer-provider'] ?? 0) || null
 
     const context = await this.authContext.resolveContext(
       idUsuario,
       data.idUsuarioRolrel ? Number(data.idUsuarioRolrel) : null,
-      fallbackProvider,
+      sessionProvider,
     )
     if (!context.idDealerProvider) {
       throw new UnauthorizedException('No se pudo resolver el provider del usuario')

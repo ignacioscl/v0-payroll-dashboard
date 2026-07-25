@@ -16,18 +16,26 @@ async function handle(request: NextRequest, context: RouteContext) {
   }
 
   const { path } = await context.params
-  const search = request.nextUrl.search
-  const url = new URL(`http://local${search}`)
-  if (session.user.idDealerProvider && session.user.idDealerProvider > 0) {
-    url.searchParams.set('idDealerProvider', String(session.user.idDealerProvider))
-  }
+  // Keep list filters (page, term, …). Never forward idDealerProvider from the
+  // browser query — Nest resolves provider from JWT+DB; for Admin General/Company
+  // (no id_contratista_owner) we inject the session empresa as an internal header.
+  const url = new URL(`http://local${request.nextUrl.search}`)
+  url.searchParams.delete('idDealerProvider')
   const query = url.search
   const target = `api/srs/${path.map((p) => encodeURIComponent(p)).join('/')}${query}`
 
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD'
+  const headers: Record<string, string> = {
+    'Content-Type': request.headers.get('content-type') ?? 'application/json',
+  }
+  // Overwrite any client-supplied value: only httpOnly session may set this.
+  if (session.user.idDealerProvider && session.user.idDealerProvider > 0) {
+    headers['x-srs-dealer-provider'] = String(session.user.idDealerProvider)
+  }
+
   const upstream = await fetchBackend(target, session.token, {
     method: request.method,
-    headers: { 'Content-Type': request.headers.get('content-type') ?? 'application/json' },
+    headers,
     body: hasBody ? await request.arrayBuffer() : undefined,
   })
 
@@ -40,3 +48,5 @@ async function handle(request: NextRequest, context: RouteContext) {
 
 export const GET = handle
 export const POST = handle
+export const PUT = handle
+export const DELETE = handle
