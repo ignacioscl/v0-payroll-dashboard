@@ -387,11 +387,15 @@ export class RoleTemplateFacadeService {
       )
     }
 
-    const dealerRows = await this.dealers.findManyByIds(idDealers)
-    const scoped = dealerRows.filter((d) => d.idEmpresa === owner || d.id === owner)
-    if (scoped.length !== idDealers.length) {
-      throw new BadRequestException('One or more dealers are invalid or out of scope')
+    const dealerRows = await this.dealers.findScopedByIds(idDealers, owner)
+    if (dealerRows.length !== idDealers.length) {
+      const found = new Set(dealerRows.map((d) => Number(d.id)))
+      const missing = idDealers.filter((id) => !found.has(id))
+      throw new BadRequestException(
+        `One or more dealers are invalid or out of scope: ${missing.join(', ')}`,
+      )
     }
+    const scoped = dealerRows
 
     const createdIds: number[] = []
     for (const d of scoped) {

@@ -31,4 +31,27 @@ export class ContratistaRepository extends BaseRepository<Contratista, Contratis
     if (!ids.length) return Promise.resolve([] as Contratista[])
     return this.find({ where: { id: In(ids) } })
   }
+
+  /**
+   * Dealers in scope for a provider company — same idea as payroll combo (`idDealerProv`):
+   * DEALER_REL customer of provider, or CONTRATISTA.id_empresa = provider, or the provider itself.
+   */
+  async findScopedByIds(ids: number[], idProvider: number): Promise<Contratista[]> {
+    if (!ids.length || idProvider < 1) return []
+    return this.createQueryBuilder('c')
+      .where('c.id IN (:...ids)', { ids })
+      .andWhere(
+        `(
+          c.id = :idProvider
+          OR c.idEmpresa = :idProvider
+          OR EXISTS (
+            SELECT 1 FROM DEALER_REL dr
+            WHERE dr.id_dealer_customer = c.id
+              AND dr.id_dealer_provider = :idProvider
+          )
+        )`,
+        { idProvider },
+      )
+      .getMany()
+  }
 }
