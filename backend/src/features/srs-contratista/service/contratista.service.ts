@@ -20,4 +20,9 @@ export class ContratistaService extends GlobalBaseService<Contratista, Contratis
   findManyByIds(ids: number[]) {
     return this.repository.findByIds(ids)
   }
+
+  /** Dealers valid for this provider (DEALER_REL / id_empresa / self). */
+  findScopedByIds(ids: number[], idProvider: number) {
+    return this.repository.findScopedByIds(ids, idProvider)
+  }
 }

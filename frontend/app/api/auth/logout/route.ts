@@ -1,20 +1,20 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { appPublicUrl } from '@/lib/app-public-url'
 import { buildClearSessionCookies } from '@/lib/auth/session'
 
-function getPhpLogoutUrl() {
-  const base = (process.env.SRS_PUBLIC_URL ?? 'http://srs.com').replace(/\/$/, '')
-  return `${base}/logout.php`
-}
-
-export async function GET() {
-  const response = NextResponse.redirect(getPhpLogoutUrl())
+function redirectToV0Login(request?: NextRequest) {
+  const response = NextResponse.redirect(appPublicUrl('/login', request))
   for (const cookie of buildClearSessionCookies()) {
     response.cookies.set(cookie)
   }
   return response
 }
 
-export async function POST(request: Request) {
+export async function GET(request: NextRequest) {
+  return redirectToV0Login(request)
+}
+
+export async function POST(request: NextRequest) {
   const accept = request.headers.get('accept') ?? ''
   if (accept.includes('application/json')) {
     const response = NextResponse.json({ ok: true })
@@ -23,5 +23,5 @@ export async function POST(request: Request) {
     }
     return response
   }
-  return GET()
+  return redirectToV0Login(request)
 }
