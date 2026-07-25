@@ -117,14 +117,10 @@ export function RoleTemplatePermissionsSheet({
       .map((p) => p.id)
     setPending([permId], true)
     try {
-      const result = await mutation.mutateAsync({
+      await mutation.mutateAsync({
         id,
         payload: { idsRolAccion: nextIds },
       })
-      const synced = result.syncedCount ?? 0
-      if (synced > 0) {
-        toast.success(t('roleTemplates.permissionsSaveSuccessSynced', { count: synced }))
-      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : t('roleTemplates.permissionsSaveError'),
