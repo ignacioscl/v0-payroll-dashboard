@@ -137,7 +137,7 @@ export interface WoStatusSlice {
 
 export const WO_STATUS_PIPELINE: WoStatusSlice[] = [
   { statusKey: 'waiting', count: 182, color: '#f59e0b' },
-  { statusKey: 'inProcess', count: 174, color: '#3b82f6' },
+  { statusKey: 'inProcess', count: 174, color: 'var(--chart-1)' },
   { statusKey: 'pause', count: 36, color: '#8b5cf6' },
   { statusKey: 'inTransit', count: 45, color: '#06b6d4' },
 ]
@@ -414,7 +414,7 @@ export interface PaymentTypeSlice {
 export function getPayrollByType(period: KpiPeriod, t: TranslateFn): { type: string; value: number; color: string }[] {
   const total = PAYROLL_KPIS[period].totalPayroll
   const mix: [PaymentTypeKey, number, string][] = [
-    ['hourly', 0.52, '#3b82f6'],
+    ['hourly', 0.52, 'var(--chart-1)'],
     ['piecework', 0.28, '#22c55e'],
     ['salary', 0.09, '#8b5cf6'],
     ['flatRate', 0.06, '#06b6d4'],

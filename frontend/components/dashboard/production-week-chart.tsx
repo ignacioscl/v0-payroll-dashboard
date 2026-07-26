@@ -86,7 +86,7 @@ export function ProductionWeekChart({ data, loading }: ProductionWeekChartProps)
                 yAxisId="left"
                 dataKey="woCompleted"
                 name={t('mockKpis.chartWosDone')}
-                fill="#3b82f6"
+                fill="var(--chart-1)"
                 radius={[4, 4, 0, 0]}
               />
               <Line

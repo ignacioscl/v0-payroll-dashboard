@@ -43,7 +43,7 @@ export function DataTableViewOptions<TData>({
           className="h-7 gap-1 px-2 text-[11px]"
           aria-label={t('common.toggleColumns')}
         >
-          <SlidersHorizontal className="size-3 text-blue-600" />
+          <SlidersHorizontal className="size-3 text-primary" />
           {t('common.columns')}
           <Badge variant="secondary" className="ml-0 px-1 py-0 text-[10px]">
             {visibleCount}

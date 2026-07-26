@@ -187,9 +187,9 @@ export function DataTableExport<TData>({
           onClick={() => void handleExport('csv')}
         >
           {busy === 'csv' ? (
-            <Loader2 className="mr-2 size-3.5 animate-spin text-blue-600" />
+            <Loader2 className="mr-2 size-3.5 animate-spin text-primary" />
           ) : (
-            <FileText className="mr-2 size-3.5 text-blue-600" />
+            <FileText className="mr-2 size-3.5 text-primary" />
           )}
           {t('dataTable.exportCsv')}
         </DropdownMenuItem>

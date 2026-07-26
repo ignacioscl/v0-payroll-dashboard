@@ -14,6 +14,13 @@ export function legacyLogoUrl(logoImg: string | null | undefined): string | null
   return `/api/srs/uploads/${encodeURIComponent(logoImg.trim())}`
 }
 
+/** Tenant logo (contratista.logo_img). Null when the tenant has none loaded. */
+export function providerLogoUrl(
+  user: { providerLogoImg?: string | null } | null | undefined,
+): string | null {
+  return legacyLogoUrl(user?.providerLogoImg)
+}
+
 export function userAvatarUrl(user: {
   thumbnailUuid?: string | null
   logoImg?: string | null

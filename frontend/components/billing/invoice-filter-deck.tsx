@@ -306,7 +306,7 @@ export function InvoiceFilterDeck({
             'hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
           )}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent dark:text-accent">
             <Filter className="h-3.5 w-3.5" />
           </div>
           <span className="text-sm font-semibold text-foreground">{t('invoices.filterPanelTitle')}</span>
@@ -314,7 +314,7 @@ export function InvoiceFilterDeck({
           <span className="flex-1" />
 
           {chips.length > 0 ? (
-            <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+            <span className="rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent dark:text-accent">
               {t('invoices.filtersActive', { count: chips.length })}
             </span>
           ) : null}

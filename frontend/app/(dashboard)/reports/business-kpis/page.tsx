@@ -533,9 +533,9 @@ const kpiTabAccentStyles: Record<
     label: 'group-data-[state=active]:text-emerald-950 dark:group-data-[state=active]:text-emerald-50',
   },
   sky: {
-    icon: 'group-data-[state=active]:bg-sky-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-sky-500/35',
-    ring: 'group-data-[state=active]:ring-sky-500/25',
-    label: 'group-data-[state=active]:text-sky-950 dark:group-data-[state=active]:text-sky-50',
+    icon: 'group-data-[state=active]:bg-accent group-data-[state=active]:text-white group-data-[state=active]:shadow-accent/35',
+    ring: 'group-data-[state=active]:ring-accent/25',
+    label: 'group-data-[state=active]:text-accent dark:group-data-[state=active]:text-accent',
   },
   amber: {
     icon: 'group-data-[state=active]:bg-amber-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-amber-500/35',

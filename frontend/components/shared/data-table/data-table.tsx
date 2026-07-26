@@ -518,7 +518,7 @@ export function DataTable<TData, TValue = unknown>({
   className,
   density = 'compact',
   headerVariant = 'colored',
-  headerColor = '#1565C0',
+  headerColor = 'var(--table-header)',
   stickyHeader = true,
   zebraRows = true,
   tableScrollHeight,

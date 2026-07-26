@@ -318,7 +318,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden border-blue-100 bg-gradient-to-br from-white to-blue-50/50">
+        <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-white to-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">

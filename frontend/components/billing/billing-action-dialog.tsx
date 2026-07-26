@@ -20,8 +20,8 @@ const TONE: Record<
   { wrap: string; icon: string }
 > = {
   sky: {
-    wrap: 'bg-sky-500/12 ring-sky-500/20',
-    icon: 'text-sky-600 dark:text-sky-400',
+    wrap: 'bg-accent/12 ring-accent/20',
+    icon: 'text-accent dark:text-accent',
   },
   emerald: {
     wrap: 'bg-emerald-500/12 ring-emerald-500/20',

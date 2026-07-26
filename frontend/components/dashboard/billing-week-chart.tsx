@@ -74,7 +74,7 @@ export function BillingWeekChart({ data, loading }: BillingWeekChartProps) {
               <Bar
                 dataKey="invoicedValue"
                 name={t('mockKpis.chartInvoicedDollar')}
-                fill="#3b82f6"
+                fill="var(--chart-1)"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
