@@ -103,6 +103,11 @@ export const es: Messages = {
     basedOnFilterLoading: 'Cargando plantillas…',
     templateReadOnlyHint:
       'Este rol está basado en la plantilla “{name}”. Editá los permisos desde Plantillas de roles.',
+    addFromTemplateHint:
+      'Para gestionar los permisos de múltiples roles, generá el rol desde una plantilla.',
+    basedOnTemplate: 'Basado en plantilla',
+    selectTemplate: 'Seleccionar plantilla',
+    templateRequired: 'Seleccioná una plantilla para crear el rol',
   },
   roleTemplates: {
     title: 'Plantillas de roles',

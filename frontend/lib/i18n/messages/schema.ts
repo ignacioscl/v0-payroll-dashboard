@@ -99,6 +99,10 @@ export interface Messages {
     basedOnFilterEmpty: string
     basedOnFilterLoading: string
     templateReadOnlyHint: string
+    addFromTemplateHint: string
+    basedOnTemplate: string
+    selectTemplate: string
+    templateRequired: string
   }
   roleTemplates: {
     title: string

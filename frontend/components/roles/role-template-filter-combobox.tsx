@@ -16,16 +16,23 @@ type RoleTemplateFilterComboboxProps = {
   onChange: (value: RoleTemplateFilterOption | null) => void
   enabled?: boolean
   className?: string
+  /** Override trigger placeholder (default: filter “any template”). */
+  placeholder?: string
+  /** Optional tipo filter: 1=internal, 2=external. */
+  tipo?: 1 | 2
 }
 
 /**
- * “Based on” filter for Roles Admin — SearchableCombobox over Nest role-templates list.
+ * Template picker — SearchableCombobox over Nest role-templates list.
+ * Used as Roles Admin “Based on” filter and in Add Role (create from template).
  */
 export function RoleTemplateFilterCombobox({
   value,
   onChange,
   enabled = true,
   className,
+  placeholder,
+  tipo,
 }: RoleTemplateFilterComboboxProps) {
   const { t } = useTranslation()
   const [term, setTerm] = React.useState('')
@@ -42,6 +49,7 @@ export function RoleTemplateFilterCombobox({
       pageSize: 50,
       term: debounced || undefined,
       estado: '1',
+      ...(tipo != null ? { type: String(tipo) as '1' | '2' } : {}),
     },
     enabled,
   )
@@ -62,7 +70,7 @@ export function RoleTemplateFilterCombobox({
       serverSideSearch
       compact
       className={className}
-      placeholder={t('roles.basedOnFilterAll')}
+      placeholder={placeholder ?? t('roles.basedOnFilterAll')}
       searchPlaceholder={t('roles.basedOnFilterSearch')}
       emptyTitle={t('roles.basedOnFilterEmpty')}
       loadingMessage={t('roles.basedOnFilterLoading')}
