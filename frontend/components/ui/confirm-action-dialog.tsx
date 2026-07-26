@@ -118,7 +118,7 @@ export function ConfirmActionDialog({
           </AlertDialogDescription>
         </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-2 border-t bg-muted/30 px-6 py-4 sm:flex-row sm:justify-end">
+        <div className="mt-6 flex flex-col-reverse gap-3 border-t bg-muted/30 px-6 py-4 sm:flex-row sm:justify-end">
           <AlertDialogCancel asChild disabled={pending}>
             <Button type="button" variant="outline" className="w-full sm:w-auto">
               <CancelIcon className="size-4" />

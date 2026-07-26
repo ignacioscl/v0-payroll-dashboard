@@ -27,6 +27,7 @@ export function useRoleTemplateRoles(idTemplate: number | null, enabled = true) 
 function invalidateRoles(queryClient: ReturnType<typeof useQueryClient>, idTemplate: number) {
   void queryClient.invalidateQueries({ queryKey: roleTemplateRolesQueryKey(idTemplate) })
   void queryClient.invalidateQueries({ queryKey: ['role-templates-list'] })
+  void queryClient.invalidateQueries({ queryKey: ['roles-list'] })
 }
 
 export function useCreateRolesFromTemplate() {

@@ -103,6 +103,11 @@ export const en: Messages = {
     basedOnFilterLoading: 'Loading templates…',
     templateReadOnlyHint:
       'This role is based on template “{name}”. Edit permissions from Role Templates.',
+    addFromTemplateHint:
+      'To manage permissions across multiple roles, create the role from a template.',
+    basedOnTemplate: 'Based on template',
+    selectTemplate: 'Select template',
+    templateRequired: 'Select a template to create the role from',
   },
   roleTemplates: {
     title: 'Role Templates',
