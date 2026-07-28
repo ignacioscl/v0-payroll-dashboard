@@ -8,6 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFilters } from '@/lib/filter-context'
 import {
@@ -253,6 +254,27 @@ export function PunchReportFilterPanel({
   ])
 
   const activeKey = chips.map((c) => c.key).join('|')
+  const hasClearableFilters = chips.some((c) => c.onRemove)
+
+  const clearAllFilters = React.useCallback(() => {
+    setSearch('')
+    setSelectedEmployee(null)
+    setSelectedType('all')
+    setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
+    setDateRange(getDefaultDateRange())
+    onPunchMinHoursChange('')
+    onPunchMaxHoursChange('')
+    onPaymentTypeFilterChange(PAYMENT_TYPE_FILTER_ALL)
+  }, [
+    setSearch,
+    setSelectedEmployee,
+    setSelectedType,
+    setSelectedTodayLiveStatus,
+    setDateRange,
+    onPunchMinHoursChange,
+    onPunchMaxHoursChange,
+    onPaymentTypeFilterChange,
+  ])
 
   React.useEffect(() => {
     try {
@@ -334,6 +356,18 @@ export function PunchReportFilterPanel({
             <span className="text-[10px] text-muted-foreground">
               ({dateRangePresets.find((p) => p.key === activePreset)?.label})
             </span>
+          ) : null}
+          {hasClearableFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 cursor-pointer gap-1 px-1.5 text-[11px] text-muted-foreground"
+              onClick={clearAllFilters}
+            >
+              <X className="size-3" />
+              {t('common.clearAll')}
+            </Button>
           ) : null}
         </div>
       ) : null}
