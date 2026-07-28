@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { Menu, Settings2, SlidersHorizontal } from 'lucide-react'
+import { Menu, SlidersHorizontal } from 'lucide-react'
 import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
 import {
   Select,
@@ -27,16 +26,12 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 export function Header() {
   const { t } = useTranslation()
   const pathname = usePathname()
   const { collapsed, setMobileOpen } = useSidebar()
-  const { user, hasPermission } = useSrsMe()
-  const showSystemConfig = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const { dealers: dealerOptions, loading: dealersLoading } = useSrsDealers()
   const {
     selectedDealers,
@@ -163,17 +158,6 @@ export function Header() {
               </span>
             )}
           </button>
-
-          {showSystemConfig && (
-            <Link
-              href="/settings/system"
-              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              title={t('filters.systemConfig')}
-              aria-label={t('filters.systemConfig')}
-            >
-              <Settings2 className="h-5 w-5" />
-            </Link>
-          )}
 
           <NotificationsPopover />
         </div>

@@ -6,8 +6,11 @@ import { Settings2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
+import { VisualSettingsForm } from '@/components/settings/visual-settings-form'
+import { getAppTitle } from '@/lib/branding'
 import {
   useInvoiceNoteStatuses,
   useUpdateInvoiceNoteStatusLabel,
@@ -72,46 +75,66 @@ export default function SystemConfigPage() {
         <p className="text-muted-foreground mt-1">{t('systemConfig.subtitle')}</p>
       </div>
 
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="text-lg">{t('systemConfig.invoiceNoteStatuses')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading && <p className="text-sm text-muted-foreground">{t('systemConfig.loadingStatuses')}</p>}
-          {error && (
-            <p className="text-sm text-destructive">
-              {getSrsErrorMessage(error, t('systemConfig.loadFailed'))}
-            </p>
-          )}
-          {data?.statuses.map((status) => (
-            <div
-              key={status.id}
-              className="grid gap-3 rounded-lg border border-border p-4 md:grid-cols-[180px_1fr_auto]"
-            >
-              <div>
-                <p className="text-sm font-medium text-foreground">{status.defaultName}</p>
-                <p className="text-xs text-muted-foreground">{status.code}</p>
-              </div>
-              <Input
-                value={drafts[status.id] ?? status.displayName}
-                onChange={(e) =>
-                  setDrafts((prev) => ({ ...prev, [status.id]: e.target.value }))
-                }
-                placeholder={status.defaultName}
-              />
-              <Button
-                variant="outline"
-                disabled={updateLabel.isPending}
-                onClick={() => void handleSave(status)}
-              >
-                {t('common.save')}
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="general" className="cursor-pointer">
+            {t('systemConfig.tabGeneral')}
+          </TabsTrigger>
+          <TabsTrigger value="visual" className="cursor-pointer">
+            {t('visualSettings.title')}
+          </TabsTrigger>
+        </TabsList>
 
-      <p className="text-sm text-muted-foreground">{t('systemConfig.billingNoteHint')}</p>
+        <TabsContent value="general" className="space-y-6">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-lg">{t('systemConfig.invoiceNoteStatuses')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoading && (
+                <p className="text-sm text-muted-foreground">{t('systemConfig.loadingStatuses')}</p>
+              )}
+              {error && (
+                <p className="text-sm text-destructive">
+                  {getSrsErrorMessage(error, t('systemConfig.loadFailed'))}
+                </p>
+              )}
+              {data?.statuses.map((status) => (
+                <div
+                  key={status.id}
+                  className="grid gap-3 rounded-lg border border-border p-4 md:grid-cols-[180px_1fr_auto]"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{status.defaultName}</p>
+                    <p className="text-xs text-muted-foreground">{status.code}</p>
+                  </div>
+                  <Input
+                    value={drafts[status.id] ?? status.displayName}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({ ...prev, [status.id]: e.target.value }))
+                    }
+                    placeholder={status.defaultName}
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={updateLabel.isPending}
+                    onClick={() => void handleSave(status)}
+                  >
+                    {t('common.save')}
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <p className="text-sm text-muted-foreground">{t('systemConfig.billingNoteHint')}</p>
+        </TabsContent>
+
+        <TabsContent value="visual">
+          <VisualSettingsForm companyName={getAppTitle(user)} />
+        </TabsContent>
+      </Tabs>
+
       <Link href="/" className="text-sm text-primary hover:underline">
         {t('systemConfig.backToDashboard')}
       </Link>

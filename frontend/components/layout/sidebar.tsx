@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   ArrowLeft,
+  Settings2,
 } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import {
@@ -30,6 +31,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { providerLogoUrl, userAvatarUrl } from '@/lib/face/face-proxy-url'
+import { useProviderBranding } from '@/hooks/use-provider-branding'
+import { brandingLogoUrl } from '@/lib/srs-provider-branding-api'
 import {
   Tooltip,
   TooltipContent,
@@ -119,7 +122,10 @@ function SidebarInner({
   // Tenant identity sits above the SRS wordmark: the contratista logo when it
   // has one loaded, its razón social otherwise. Neither exists for a system
   // admin, and then the rail just shows the wordmark.
-  const tenantLogoSrc = providerLogoUrl(user)
+  // The `me` logo paints on first render; the branding one takes over once loaded
+  // and wins, since it is the logo configured for v0.
+  const { data: branding } = useProviderBranding()
+  const tenantLogoSrc = brandingLogoUrl(branding) ?? providerLogoUrl(user)
   const tenantName = user?.providerName?.trim() || null
   const showTenantSlot = Boolean(tenantLogoSrc) || Boolean(tenantName && !effectiveCollapsed)
 
@@ -229,7 +235,7 @@ function SidebarInner({
                 className={cn(
                   'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm'
+                    ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
                     : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white',
                   effectiveCollapsed && 'justify-center px-0'
                 )}
@@ -289,7 +295,7 @@ function SidebarInner({
                             className={cn(
                               'group relative flex items-center justify-center rounded-lg px-0 py-2 text-sm font-medium transition-all duration-200',
                               childActive
-                                ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm'
+                                ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
                                 : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white'
                             )}
                           >
@@ -323,7 +329,7 @@ function SidebarInner({
                         className={cn(
                           'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200',
                           childActive
-                            ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm'
+                            ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
                             : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white'
                         )}
                       >
@@ -390,6 +396,14 @@ function SidebarInner({
               <User className="h-4 w-4" />
               <span>{t('sidebar.profile')}</span>
             </DropdownMenuItem>
+            {user?.isSystemAdmin && (
+              <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+                <Link href="/settings/system" onClick={onNavigate}>
+                  <Settings2 className="h-4 w-4" />
+                  <span>{t('sidebar.settings')}</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild className="gap-2 cursor-pointer">
               <a href="/api/sso/to-php">
                 <ArrowLeft className="h-4 w-4" />

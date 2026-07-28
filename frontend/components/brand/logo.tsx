@@ -79,12 +79,10 @@ export function Logo({
       {tier === 'pro' && (
         <span
           className={cn(
-            'whitespace-nowrap font-bold leading-none',
-            // On the navy chrome the chip cannot ride the tenant accent, or it
-            // disappears whenever that accent is itself a navy.
-            onDark
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'bg-client-accent text-client-accent-foreground',
+            'bg-client-accent text-client-accent-foreground whitespace-nowrap font-bold leading-none',
+            // On the navy chrome the chip needs an edge, or it vanishes whenever the
+            // tenant accent is itself a navy.
+            onDark && 'ring-1 ring-white/25',
           )}
           style={{
             fontSize: Math.round(8 * scale),

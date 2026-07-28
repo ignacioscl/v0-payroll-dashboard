@@ -86,10 +86,10 @@
   --sidebar-muted-foreground: rgb(255 255 255 / 0.72);
   --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: var(--navy-900);
-  /* Deliberately NOT --client-accent: the rail is navy, so the active item
-     must stay legible whatever accent a tenant picks. */
-  --sidebar-accent: rgb(255 255 255 / 0.16);
-  --sidebar-accent-foreground: #ffffff;
+  /* Follows the tenant accent. The active item carries a white hairline ring so it
+     stays readable even when the accent is a navy sitting on the navy rail. */
+  --sidebar-accent: var(--client-accent);
+  --sidebar-accent-foreground: var(--client-accent-foreground);
   --sidebar-border: rgb(255 255 255 / 0.1);
   --sidebar-subnav-rule: rgb(255 255 255 / 0.14);
   --sidebar-ring: #60a5fa;
@@ -97,8 +97,8 @@
   --sidebar-width-collapsed: 72px;
   --sidebar-header-height: 64px;
 
-  /* Table header - follows the navy chrome */
-  --table-header: var(--navy-800);
+  /* Table header - follows the tenant accent */
+  --table-header: var(--client-accent);
   --table-header-foreground: #ffffff;
 }
 

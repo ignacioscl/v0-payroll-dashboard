@@ -28,4 +28,16 @@ export class Contratista extends SrsEntityBase {
   /** 1=has the TV module enabled. */
   @Column({ name: 'has_module_tv', type: 'tinyint', nullable: true })
   hasModuleTv?: number
+
+  /** Legacy logo. Legacy keeps showing this one; v0 only reads it as a fallback. */
+  @Column({ name: 'logo_img', type: 'varchar', length: 128, nullable: true })
+  logoImg?: string | null
+
+  /** v0-only logo. When set it wins over logoImg. Legacy never reads this column. */
+  @Column({ name: 'v0_logo_img', type: 'varchar', length: 255, nullable: true })
+  v0LogoImg?: string | null
+
+  /** v0-only accent as #rrggbb. NULL = product default. */
+  @Column({ name: 'accent_color', type: 'varchar', length: 7, nullable: true })
+  accentColor?: string | null
 }

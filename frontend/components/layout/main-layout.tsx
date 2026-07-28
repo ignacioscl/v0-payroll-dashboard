@@ -2,6 +2,7 @@
 
 import { Sidebar } from './sidebar'
 import { Header } from './header'
+import { TenantAccent } from '@/components/brand/tenant-accent'
 import { ProdRouteGuard } from './prod-route-guard'
 import { ScrollToTopButton } from './scroll-to-top-button'
 import { FilterProvider } from '@/lib/filter-context'
@@ -40,6 +41,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     <SidebarProvider>
       <FilterProvider>
         <div className="min-h-screen bg-background">
+          <TenantAccent />
           <MainContent>{children}</MainContent>
           <ScrollToTopButton />
         </div>
