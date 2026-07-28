@@ -65,6 +65,11 @@ services:
     env_file:
       # Credenciales de DB y secretos, fuera del repo. Sobrescribir con BACKEND_ENV_FILE.
       - ${BACKEND_ENV_FILE:-/opt/srs/srs-backend.env}
+    volumes:
+      # Logos que el provider sube desde v0 (Settings > Visual). Viven en el repo,
+      # fuera de la imagen, para que sobrevivan al deploy. Los sirve ServeStaticModule
+      # en /branding/<archivo>. Ruta relativa: misma en prod y en dev.
+      - ./uploads/branding:/app/public/branding
     extra_hosts:
       # Para alcanzar MariaDB y demás servicios en el host.
       - "host.docker.internal:host-gateway"

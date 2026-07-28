@@ -391,7 +391,7 @@ export function TtkWithoutGroupTable() {
       <CardContent className="p-0">
         <Table>
           <TableHeader className="[&_tr]:border-0">
-            <TableRow className="border-0 bg-[#1565C0] hover:bg-[#1565C0]">
+            <TableRow className="border-0 bg-table-header hover:bg-table-header">
               {visibleColumns.has('employee') && (
                 <TableHead className="h-8 px-3 py-1.5 text-xs font-semibold text-white">
                   <button type="button" className="flex cursor-pointer items-center hover:text-white/80" onClick={() => handleSort('employee')}>
@@ -544,7 +544,7 @@ export function TtkWithoutGroupTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                            className="h-7 w-7 text-muted-foreground hover:bg-accent/10 hover:text-accent"
                             onClick={() =>
                               setPhotoTarget({
                                 employeeName: row.usuario?.nombre ?? '',
@@ -561,7 +561,7 @@ export function TtkWithoutGroupTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                            className="h-7 w-7 text-muted-foreground hover:bg-accent/10 hover:text-accent"
                             onClick={() =>
                               setLogTarget({
                                 id: row.id,

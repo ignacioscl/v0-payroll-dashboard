@@ -19,10 +19,10 @@ const TYPE_ACTIVE: Record<
   { button: string; icon: string; ring: string; focus: string }
 > = {
   wo: {
-    button: 'bg-sky-500/10 text-sky-800 dark:text-sky-200',
-    icon: 'text-sky-600 dark:text-sky-400',
-    ring: 'ring-sky-500/30',
-    focus: 'focus-visible:ring-sky-500/50',
+    button: 'bg-accent/10 text-accent dark:text-accent',
+    icon: 'text-accent dark:text-accent',
+    ring: 'ring-accent/30',
+    focus: 'focus-visible:ring-accent/50',
   },
   ttk: {
     button: 'bg-violet-500/10 text-violet-800 dark:text-violet-200',

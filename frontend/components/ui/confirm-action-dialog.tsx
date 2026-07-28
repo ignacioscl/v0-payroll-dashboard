@@ -46,8 +46,8 @@ const TONE_CONFIG: Record<
   },
   info: {
     icon: Info,
-    iconWrap: 'bg-sky-500/15 ring-sky-500/25',
-    iconColor: 'text-sky-600 dark:text-sky-400',
+    iconWrap: 'bg-accent/15 ring-accent/25',
+    iconColor: 'text-accent dark:text-accent',
   },
 }
 

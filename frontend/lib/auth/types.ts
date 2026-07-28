@@ -12,6 +12,8 @@ export interface SrsSessionUser {
   dealerName: string | null
   idDealerProvider: number | null
   providerName?: string | null
+  /** contratista.logo_img — tenant logo shown in the sidebar rail. */
+  providerLogoImg?: string | null
   rolesRelCount?: number
   isCompanyTypeCompany?: boolean
   thumbnailUuid?: string | null
@@ -33,6 +35,8 @@ export interface SrsMeUser {
   dealerName: string | null
   idDealerProvider: number | null
   providerName?: string | null
+  /** contratista.logo_img — tenant logo shown in the sidebar rail. */
+  providerLogoImg?: string | null
   isCompanyTypeCompany: boolean
   isSystemAdmin: boolean
   navTemplate?: 1 | 2

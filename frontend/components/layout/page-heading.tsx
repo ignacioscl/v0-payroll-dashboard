@@ -16,8 +16,8 @@ const variantConfig: Record<
   { iconBg: string; iconShadow: string }
 > = {
   default: {
-    iconBg: 'bg-gradient-to-br from-blue-500 to-blue-700',
-    iconShadow: 'shadow-lg shadow-blue-500/30',
+    iconBg: 'bg-[image:var(--icon-navy)]',
+    iconShadow: 'shadow-[var(--shadow-navy)]',
   },
   warning: {
     iconBg: 'bg-gradient-to-br from-amber-400 to-orange-600',

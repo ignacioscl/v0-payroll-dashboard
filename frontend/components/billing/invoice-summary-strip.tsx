@@ -25,7 +25,7 @@ function StatCell({
       <p
         className={cn(
           'mt-1 text-xl font-semibold tabular-nums',
-          highlight === 'total' && 'text-sky-700 dark:text-sky-300',
+          highlight === 'total' && 'text-accent dark:text-accent',
           highlight === 'discount' && 'text-amber-600 dark:text-amber-400',
         )}
       >

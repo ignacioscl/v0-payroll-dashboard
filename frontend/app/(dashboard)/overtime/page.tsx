@@ -340,7 +340,7 @@ export default function OvertimePage() {
             <CardContent className="p-0">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#1565C0] text-white">
+                  <tr className="bg-table-header text-white">
                     <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">{t('common.employee')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium">{t('dealer.label')}</th>
                     <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalHours')}</th>
@@ -402,7 +402,7 @@ export default function OvertimePage() {
             <CardContent className="p-0">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#1565C0] text-white">
+                  <tr className="bg-table-header text-white">
                     <th className="px-4 py-3 text-left text-xs font-medium rounded-tl-md">{t('dealer.label')}</th>
                     <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableEmployeesWithOt')}</th>
                     <th className="px-4 py-3 text-right text-xs font-medium">{t('mockOvertime.tableTotalHours')}</th>

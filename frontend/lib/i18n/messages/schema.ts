@@ -426,6 +426,7 @@ export interface Messages {
     collapseMenu: string
     expandMenu: string
     profile: string
+    settings: string
     backToLegacy: string
     logOut: string
     navigationMenu: string
@@ -1255,6 +1256,32 @@ export interface Messages {
     loadFailed: string
     billingNoteHint: string
     backToDashboard: string
+    tabGeneral: string
+  }
+  visualSettings: {
+    title: string
+    scope: string
+    logo: string
+    logoHint: string
+    logoLegacy: string
+    replace: string
+    remove: string
+    noLogo: string
+    accent: string
+    accentHint: string
+    accentInvalid: string
+    useDefault: string
+    chromeNote: string
+    preview: string
+    previewNav: string
+    previewButton: string
+    previewCheck: string
+    previewSwitch: string
+    discard: string
+    saved: string
+    logoUpdated: string
+    logoRemoved: string
+    saveFailed: string
   }
   mockEmployees: {
     title: string

@@ -75,11 +75,11 @@ function initials(name: string) {
 
 function avatarTone(id: number) {
   const tones = [
-    'from-blue-500 to-indigo-500',
+    'from-primary to-indigo-500',
     'from-emerald-500 to-teal-500',
     'from-amber-500 to-orange-500',
     'from-fuchsia-500 to-pink-500',
-    'from-cyan-500 to-sky-500',
+    'from-cyan-500 to-accent',
     'from-violet-500 to-purple-500',
   ]
   return tones[id % tones.length]!

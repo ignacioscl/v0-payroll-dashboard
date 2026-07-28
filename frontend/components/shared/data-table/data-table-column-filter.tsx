@@ -148,7 +148,7 @@ export function DataTableColumnFilter<TData>({
           className={cn(
             'inline-flex size-5 items-center justify-center rounded transition-colors',
             isActive
-              ? 'bg-amber-400 text-blue-900 ring-1 ring-amber-200'
+              ? 'bg-amber-400 text-navy-900 ring-1 ring-amber-200'
               : 'text-inherit/70 opacity-70 hover:bg-white/15 hover:opacity-100',
           )}
         >

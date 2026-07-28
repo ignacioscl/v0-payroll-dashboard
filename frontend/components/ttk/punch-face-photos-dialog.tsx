@@ -106,7 +106,7 @@ export function PunchFacePhotosDialog({
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 pr-6">
-            <Images className="size-5 shrink-0 text-sky-600" />
+            <Images className="size-5 shrink-0 text-accent" />
             <span className="leading-snug">
               {titleName}
               <span className="font-normal text-muted-foreground"> {t('punch.faceRecognition')}</span>

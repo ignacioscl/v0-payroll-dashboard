@@ -142,7 +142,7 @@ export function InvoiceCollectionMonthChart({ data, loading }: InvoiceCollection
               <Bar
                 dataKey="invoicedValue"
                 name={t('mockKpis.chartInvoicedDollar')}
-                fill="#3b82f6"
+                fill="var(--chart-1)"
                 radius={[4, 4, 0, 0]}
               />
               <Bar

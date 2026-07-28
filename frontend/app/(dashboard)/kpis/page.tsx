@@ -303,7 +303,7 @@ export default function KpisPage() {
                     <YAxis yAxisId="right" orientation="right" fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
                     <Tooltip formatter={(value: number, name: string) => (name === t('mockKpis.chartProductionDollar') ? fmtMoney(value) : value)} />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="woCompleted" name={t('mockKpis.chartWosDone')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="woCompleted" name={t('mockKpis.chartWosDone')} fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                     <Line yAxisId="right" dataKey="productionValue" name={t('mockKpis.chartProductionDollar')} stroke="#22c55e" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -397,7 +397,7 @@ export default function KpisPage() {
                     <Tooltip formatter={(value: number) => fmtMoney(value)} />
                     <Legend />
                     <Bar dataKey="productionValue" name={t('mockKpis.chartProductionDollar')} fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -508,7 +508,7 @@ export default function KpisPage() {
                     <YAxis fontSize={12} tickFormatter={(v) => fmtMoneyK(v)} />
                     <Tooltip formatter={(value: number) => fmtMoney(value)} />
                     <Legend />
-                    <Line dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    <Line dataKey="invoicedValue" name={t('mockKpis.chartInvoicedDollar')} stroke="var(--chart-1)" strokeWidth={2} dot={false} />
                     <Line dataKey="collectedValue" name={t('mockKpis.chartCollectedDollar')} stroke="#22c55e" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>

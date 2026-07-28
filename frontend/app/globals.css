@@ -4,6 +4,29 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* SRS Suite Pro - navy chrome. Fixed product color, never per-tenant. */
+  --navy-700: #26407f;
+  --navy-800: #173764;
+  --navy-900: #091c3a;
+  --navy-950: #06142b;
+
+  /* The only color a tenant overrides. The navy chrome stays put, so
+     contrast is guaranteed whatever accent is set. Paints: active nav,
+     PRO chip, primary buttons, focus rings, chart-1. */
+  --client-accent: var(--navy-700);
+  --client-accent-foreground: #ffffff;
+  --client-accent-shadow: 0 4px 12px rgb(38 64 127 / 0.28);
+
+  /* Brand wordmark (the font itself is declared in @theme, below) */
+  --brand-suite-tracking: 0.26em;
+  --brand-suite-color: #94a8c4;
+
+  /* Navy icon containers (the ones that used the old menu blue) */
+  --icon-navy: linear-gradient(135deg, #26407f 0%, #091c3a 100%);
+  --icon-navy-soft: linear-gradient(135deg, #26407f 0%, #173764 100%);
+  --shadow-navy: 0 6px 16px rgb(9 28 58 / 0.28);
+  --shadow-navy-lg: 0 8px 28px rgb(9 28 58 / 0.22);
+
   /* Premium Light Theme - Executive Dashboard */
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -14,9 +37,9 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
   
-  /* Primary - Rich Blue */
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
+  /* Primary - follows the tenant accent */
+  --primary: var(--client-accent);
+  --primary-foreground: var(--client-accent-foreground);
   
   /* Secondary - Soft gray */
   --secondary: #f1f5f9;
@@ -45,10 +68,10 @@
   /* Border and input */
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #2563eb;
-  
+  --ring: var(--client-accent);
+
   /* Chart colors - Premium palette */
-  --chart-1: #2563eb;
+  --chart-1: var(--client-accent);
   --chart-2: #0891b2;
   --chart-3: #10b981;
   --chart-4: #f59e0b;
@@ -56,24 +79,40 @@
   
   --radius: 0.625rem;
   
-  /* Sidebar - Premium blue gradient */
-  --sidebar: #1e40af;
+  /* Sidebar - navy gradient, dark at the top */
+  --sidebar: var(--navy-900);
+  --sidebar-gradient: linear-gradient(180deg, #091c3a 0%, #173764 58%, #26407f 100%);
   --sidebar-foreground: #ffffff;
+  --sidebar-muted-foreground: rgb(255 255 255 / 0.72);
   --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #1e40af;
-  --sidebar-accent: #1d4ed8;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #2563eb;
+  --sidebar-primary-foreground: var(--navy-900);
+  /* Follows the tenant accent. The active item carries a white hairline ring so it
+     stays readable even when the accent is a navy sitting on the navy rail. */
+  --sidebar-accent: var(--client-accent);
+  --sidebar-accent-foreground: var(--client-accent-foreground);
+  --sidebar-border: rgb(255 255 255 / 0.1);
+  --sidebar-subnav-rule: rgb(255 255 255 / 0.14);
   --sidebar-ring: #60a5fa;
-  
-  /* Table header */
-  --table-header: #1e40af;
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 72px;
+  --sidebar-header-height: 64px;
+
+  /* Table header - follows the tenant accent */
+  --table-header: var(--client-accent);
   --table-header-foreground: #ffffff;
 }
 
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+  --font-brand: var(--font-michroma), 'Michroma', system-ui, sans-serif;
+  --color-navy-700: var(--navy-700);
+  --color-navy-800: var(--navy-800);
+  --color-navy-900: var(--navy-900);
+  --color-navy-950: var(--navy-950);
+  --color-client-accent: var(--client-accent);
+  --color-client-accent-foreground: var(--client-accent-foreground);
+  --color-brand-suite: var(--brand-suite-color);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -104,6 +143,7 @@
   --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);

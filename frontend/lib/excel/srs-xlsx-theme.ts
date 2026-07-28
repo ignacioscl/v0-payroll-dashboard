@@ -1,15 +1,17 @@
 import type ExcelJS from 'exceljs'
 
-/** SRS dashboard table palette (matches DataTable headerColor #1565C0). */
+/** SRS dashboard table palette, mirroring the navy chrome.
+ *  ExcelJS writes ARGB into the workbook, so these cannot be CSS tokens —
+ *  keep them in step with --table-header / --navy-900 / --client-accent. */
 export const SRS_XLSX_THEME = {
-  headerBg: 'FF1565C0',
+  headerBg: 'FF173764',
   headerFg: 'FFFFFFFF',
-  titleBg: 'FFE3F2FD',
-  titleFg: 'FF0D47A1',
+  titleBg: 'FFE8ECF3',
+  titleFg: 'FF091C3A',
   subtitleFg: 'FF546E7A',
   zebraBg: 'FFF5F8FC',
   border: 'FFD0D7DE',
-  linkFg: 'FF1565C0',
+  linkFg: 'FF2563EB',
   errorBg: 'FFFFF3E0',
   errorFg: 'FFE65100',
   white: 'FFFFFFFF',

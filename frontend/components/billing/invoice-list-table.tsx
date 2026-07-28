@@ -84,7 +84,7 @@ type TypeToken = 'wo' | 'ttk' | 'generic'
 
 /** Left rail accent on expanded detail — matches type badge colors. */
 const TYPE_RAIL: Record<TypeToken, string> = {
-  wo: 'border-l-sky-500',
+  wo: 'border-l-accent',
   ttk: 'border-l-violet-500',
   generic: 'border-l-amber-500',
 }
@@ -97,7 +97,7 @@ function typeTokenOf(statementType: number): TypeToken {
 
 function typeMeta(statementType: number, t: TranslateFn): { label: string; className: string } {
   const woClass =
-    'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+    'border-accent/30 bg-accent/10 text-accent dark:text-accent'
   switch (statementType) {
     case 1:
       return { label: t('invoices.typeIndividual'), className: woClass }
@@ -491,7 +491,7 @@ function TotalsBar({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsTotal')}
           </span>
-          <span className="text-base font-bold text-sky-700 dark:text-sky-300">
+          <span className="text-base font-bold text-accent dark:text-accent">
             {fmtMoney(grandTotal)}
           </span>
         </div>
@@ -657,7 +657,7 @@ export function InvoiceListTable({
             }}
             aria-expanded={row.getIsExpanded()}
             aria-label={t('invoices.viewDetail')}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/50"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           >
             {row.getIsExpanded() ? (
               <ChevronDown className="h-4 w-4 transition-transform duration-150" />
@@ -819,7 +819,7 @@ export function InvoiceListTable({
           return (
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-left text-foreground hover:text-sky-600"
+              className="inline-flex items-center gap-1 text-left text-foreground hover:text-accent"
               onClick={(e) => {
                 e.stopPropagation()
                 setPoRoField('PO')
@@ -855,7 +855,7 @@ export function InvoiceListTable({
           return (
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-left text-foreground hover:text-sky-600"
+              className="inline-flex items-center gap-1 text-left text-foreground hover:text-accent"
               onClick={(e) => {
                 e.stopPropagation()
                 setPoRoField('RO')

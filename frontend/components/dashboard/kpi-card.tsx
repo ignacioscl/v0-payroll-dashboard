@@ -72,12 +72,12 @@ export function KPICard({
   const displayedValue = valueExpanded && valueFull ? valueFull : value
   const variantConfig = {
     default: {
-      bg: 'bg-gradient-to-br from-white to-blue-50/60',
-      border: 'border-blue-100',
-      activeBorder: 'border-blue-600/70',
-      iconBg: 'bg-gradient-to-br from-blue-500 to-blue-700',
+      bg: 'bg-gradient-to-br from-white to-primary/5',
+      border: 'border-primary/15',
+      activeBorder: 'border-primary/70',
+      iconBg: 'bg-[image:var(--icon-navy)]',
       iconColor: 'text-white',
-      iconShadow: 'shadow-lg shadow-blue-500/30',
+      iconShadow: 'shadow-[var(--shadow-navy)]',
       glow: 'shadow-primary/10'
     },
     warning: {

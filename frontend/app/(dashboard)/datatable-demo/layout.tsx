@@ -50,7 +50,7 @@ export default function DataTableDemoLayout({ children }: { children: React.Reac
               className={cn(
                 'flex flex-1 min-w-[180px] items-start gap-2 rounded-md px-3 py-2 transition-colors',
                 active
-                  ? 'bg-[#1565C0] text-white shadow-sm'
+                  ? 'bg-table-header text-white shadow-sm'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >

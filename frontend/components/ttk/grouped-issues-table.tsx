@@ -515,7 +515,7 @@ export function GroupedIssuesDataTable({
   return (
     <div className="space-y-4">
       {(minHoursTotal != null || maxHoursTotal != null) && (
-        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+        <p className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
           {t('punch.groupedHoursHint')}
         </p>
       )}

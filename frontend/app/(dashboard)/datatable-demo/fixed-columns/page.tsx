@@ -89,7 +89,7 @@ export default function DataTableFixedColumnsPage() {
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dataTableDemo.colEmployee')} />,
         cell: ({ row }) => (
           <div className="flex min-w-0 items-center gap-2">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-[9px] font-semibold text-white shadow-sm">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-indigo-500 text-[9px] font-semibold text-white shadow-sm">
               {row.original.name
                 .split(' ')
                 .map((s) => s[0])
@@ -213,7 +213,7 @@ export default function DataTableFixedColumnsPage() {
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0 space-y-2">
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Pin className="size-3 rotate-45 text-blue-600" />
+          <Pin className="size-3 rotate-45 text-primary" />
           {t('dataTableDemo.fixedPinHint')}
         </p>
         <DataTable<MockEmployee>

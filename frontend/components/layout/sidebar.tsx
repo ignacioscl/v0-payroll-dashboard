@@ -12,9 +12,10 @@ import {
   User,
   LogOut,
   ChevronDown,
-  Sparkles,
   ArrowLeft,
+  Settings2,
 } from 'lucide-react'
+import { Logo } from '@/components/brand/logo'
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { userAvatarUrl } from '@/lib/face/face-proxy-url'
+import { providerLogoUrl, userAvatarUrl } from '@/lib/face/face-proxy-url'
+import { useProviderBranding } from '@/hooks/use-provider-branding'
+import { brandingLogoUrl } from '@/lib/srs-provider-branding-api'
 import {
   Tooltip,
   TooltipContent,
@@ -116,9 +119,47 @@ function SidebarInner({
   const initials = userInitials(displayName)
   const photoSrc = userAvatarUrl(user)
 
+  // Tenant identity sits above the SRS wordmark: the contratista logo when it
+  // has one loaded, its razón social otherwise. Neither exists for a system
+  // admin, and then the rail just shows the wordmark.
+  // The `me` logo paints on first render; the branding one takes over once loaded
+  // and wins, since it is the logo configured for v0.
+  const { data: branding } = useProviderBranding()
+  const tenantLogoSrc = brandingLogoUrl(branding) ?? providerLogoUrl(user)
+  const tenantName = user?.providerName?.trim() || null
+  const showTenantSlot = Boolean(tenantLogoSrc) || Boolean(tenantName && !effectiveCollapsed)
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header with Logo and Collapse Button */}
+      {/* Tenant identity */}
+      {showTenantSlot && (
+        <>
+          <div
+            className={cn(
+              'flex justify-center',
+              effectiveCollapsed ? 'px-3 pt-3' : 'px-4 pt-4',
+            )}
+          >
+            {tenantLogoSrc ? (
+              <img
+                src={tenantLogoSrc}
+                alt={appTitle}
+                className={cn(
+                  'block rounded bg-white object-contain',
+                  effectiveCollapsed ? 'w-12' : 'w-full max-w-[200px]',
+                )}
+              />
+            ) : (
+              <span className="truncate text-xs font-medium uppercase tracking-wide text-sidebar-muted-foreground">
+                {tenantName}
+              </span>
+            )}
+          </div>
+          <div className="mx-4 mt-4 h-px bg-white/15" />
+        </>
+      )}
+
+      {/* Header with wordmark and Collapse Button */}
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-3">
         <AnimatePresence mode="wait">
           {!effectiveCollapsed ? (
@@ -128,19 +169,9 @@ function SidebarInner({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="flex items-center gap-3"
+              className="flex items-center pl-1"
             >
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-sidebar-foreground text-sm tracking-tight">
-                  {appTitle}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {t('sidebar.appSubtitle')}
-                </span>
-              </div>
+              <Logo size="sidebar" />
             </motion.div>
           ) : (
             <motion.div
@@ -149,9 +180,9 @@ function SidebarInner({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 mx-auto"
+              className="mx-auto flex items-center justify-center"
             >
-              <Sparkles className="h-5 w-5" />
+              <Logo size="compact" descriptor={false} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -162,7 +193,7 @@ function SidebarInner({
             <TooltipTrigger asChild>
               <button
                 onClick={() => setCollapsed(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/15 hover:text-white transition-all duration-200"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground transition-all duration-200 hover:bg-white/8 hover:text-white"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -179,7 +210,7 @@ function SidebarInner({
             <TooltipTrigger asChild>
               <button
                 onClick={() => setCollapsed(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/15 hover:text-white transition-all duration-200"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground transition-all duration-200 hover:bg-white/8 hover:text-white"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -204,8 +235,8 @@ function SidebarInner({
                 className={cn(
                   'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
-                    : 'text-white/80 hover:bg-white/15 hover:text-white',
+                    ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
+                    : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white',
                   effectiveCollapsed && 'justify-center px-0'
                 )}
               >
@@ -264,8 +295,8 @@ function SidebarInner({
                             className={cn(
                               'group relative flex items-center justify-center rounded-lg px-0 py-2 text-sm font-medium transition-all duration-200',
                               childActive
-                                ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
-                                : 'text-white/60 hover:bg-white/15 hover:text-white'
+                                ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
+                                : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white'
                             )}
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
@@ -286,7 +317,7 @@ function SidebarInner({
             return (
               <div key={item.href} className="space-y-1">
                 {linkContent}
-                <div className="ml-5 space-y-1 border-l border-white/15 pl-3">
+                <div className="ml-5 space-y-1 border-l border-[var(--sidebar-subnav-rule)] pl-3">
                   {childItems.map((child) => {
                     const childActive = pathname === child.href
                     const ChildIcon = child.icon
@@ -298,8 +329,8 @@ function SidebarInner({
                         className={cn(
                           'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200',
                           childActive
-                            ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/25'
-                            : 'text-white/70 hover:bg-white/15 hover:text-white'
+                            ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-white/25'
+                            : 'text-sidebar-muted-foreground hover:bg-white/8 hover:text-white'
                         )}
                       >
                         <ChildIcon className="h-4 w-4 shrink-0" />
@@ -320,7 +351,7 @@ function SidebarInner({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all duration-200',
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-white/8 hover:text-white transition-all duration-200',
                 effectiveCollapsed && 'justify-center px-0'
               )}
             >
@@ -336,7 +367,7 @@ function SidebarInner({
                     <span className="text-sidebar-foreground font-medium text-sm truncate w-full">
                       {displayName}
                     </span>
-                    <span className="text-sky-100 text-xs truncate w-full">
+                    <span className="text-sidebar-muted-foreground text-xs truncate w-full">
                       {displayRole}
                     </span>
                   </div>
@@ -365,6 +396,14 @@ function SidebarInner({
               <User className="h-4 w-4" />
               <span>{t('sidebar.profile')}</span>
             </DropdownMenuItem>
+            {user?.isSystemAdmin && (
+              <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+                <Link href="/settings/system" onClick={onNavigate}>
+                  <Settings2 className="h-4 w-4" />
+                  <span>{t('sidebar.settings')}</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild className="gap-2 cursor-pointer">
               <a href="/api/sso/to-php">
                 <ArrowLeft className="h-4 w-4" />
@@ -429,7 +468,7 @@ export function Sidebar() {
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar hidden md:block"
+        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
       >
         <SidebarInner />
       </motion.aside>
@@ -438,7 +477,7 @@ export function Sidebar() {
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side="left"
-          className="p-0 w-[260px] bg-sidebar border-sidebar-border [&>button]:text-white/60 [&>button]:hover:text-white"
+          className="p-0 w-[260px] bg-sidebar bg-[image:var(--sidebar-gradient)] border-sidebar-border [&>button]:text-white/60 [&>button]:hover:text-white"
         >
           <SheetTitle className="sr-only">{t('sidebar.navigationMenu')}</SheetTitle>
           <SidebarInner

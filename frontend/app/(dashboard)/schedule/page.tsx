@@ -242,7 +242,7 @@ export default function SchedulePage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-[#1565C0] text-white">
+                <tr className="bg-table-header text-white">
                   <th className="px-4 py-3 text-left rounded-tl-md">
                     <button className="flex items-center text-xs font-medium hover:text-white/80" onClick={() => handleSort('employee')}>
                       {t('common.employee')} <SortIcon field="employee" />

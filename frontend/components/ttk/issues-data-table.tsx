@@ -626,7 +626,7 @@ export function IssuesDataTable({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 cursor-pointer text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                  className="h-7 w-7 cursor-pointer text-muted-foreground hover:bg-accent/10 hover:text-accent"
                   onClick={() =>
                     setPhotoTarget({
                       employeeName: r.usuario?.nombre ?? '',
@@ -645,7 +645,7 @@ export function IssuesDataTable({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 cursor-pointer text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600"
+                  className="h-7 w-7 cursor-pointer text-muted-foreground hover:bg-accent/10 hover:text-accent"
                   onClick={() =>
                     setLogTarget({
                       id: r.id,

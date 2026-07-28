@@ -15,3 +15,6 @@ docker-compose.override.yml
 
 # Logs sueltos
 *.log
+
+# Archivos que suben los usuarios (logos de branding). El dir se crea en cada entorno.
+uploads/
