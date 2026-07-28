@@ -85,6 +85,9 @@ export const ROLES_NAV_HREFS = ['/roles', '/roles/templates'] as const
 /** Role Templates — gated separately by ROL_ACCION 144 (`canManageRoleTemplates`). */
 const ROLE_TEMPLATES_NAV_HREFS = ['/roles/templates'] as const
 
+/** System settings — gated by ROL_ACCION 141 or system admin (`canAccessSystemConfig`). */
+export const SETTINGS_NAV_HREFS = ['/settings'] as const
+
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
 }
@@ -96,6 +99,7 @@ export function isProdAllowedPath(
   isCompanyTypeCompany = false,
   canViewRoles = false,
   canManageRoleTemplates = false,
+  canAccessSystemConfig = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
@@ -104,6 +108,7 @@ export function isProdAllowedPath(
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
   if (canManageRoleTemplates && matches(ROLE_TEMPLATES_NAV_HREFS)) return true
+  if (canAccessSystemConfig && matches(SETTINGS_NAV_HREFS)) return true
   if (canViewRoles && (pathname === '/roles' || pathname.startsWith('/roles/'))) {
     // Templates requires 144 — do not open via 42 alone.
     if (pathname === '/roles/templates' || pathname.startsWith('/roles/templates/')) {
