@@ -63,13 +63,16 @@ export function RoleTemplatePermissionsSheet({
     templateId: number | null
     value: string
   }>({ templateId: null, value: '' })
-  /** Group keys present here are collapsed; absent = expanded (default). */
+  /** Group keys present here are collapsed; absent = expanded. Default: all collapsed. */
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
     () => new Set(),
   )
+  const [collapsedInitForTemplateId, setCollapsedInitForTemplateId] =
+    React.useState<number | null>(null)
 
   React.useEffect(() => {
     setCollapsedGroups(new Set())
+    setCollapsedInitForTemplateId(null)
   }, [id])
 
   const permissions = query.data?.permissions ?? []
@@ -91,13 +94,25 @@ export function RoleTemplatePermissionsSheet({
     [asRolePerms, searchTerm, t],
   )
 
-  const expandAllGroups = React.useCallback(() => {
-    setCollapsedGroups(new Set())
-  }, [])
-
-  const collapseAllGroups = React.useCallback(() => {
+  React.useEffect(() => {
+    if (id == null || permissionGroups.length === 0) return
+    if (collapsedInitForTemplateId === id) return
     setCollapsedGroups(new Set(permissionGroups.map((group) => group.key)))
-  }, [permissionGroups])
+    setCollapsedInitForTemplateId(id)
+  }, [id, permissionGroups, collapsedInitForTemplateId])
+
+  const allGroupsExpanded =
+    collapsedInitForTemplateId === id &&
+    permissionGroups.length > 0 &&
+    permissionGroups.every((group) => !collapsedGroups.has(group.key))
+
+  const toggleAllGroups = React.useCallback(() => {
+    if (allGroupsExpanded) {
+      setCollapsedGroups(new Set(permissionGroups.map((group) => group.key)))
+    } else {
+      setCollapsedGroups(new Set())
+    }
+  }, [allGroupsExpanded, permissionGroups])
 
   const setPending = (ids: number[], on: boolean) => {
     setPendingIds((prev) => {
@@ -193,20 +208,16 @@ export function RoleTemplatePermissionsSheet({
                 variant="outline"
                 size="sm"
                 className="h-7 gap-1.5 border-border/80 px-2.5 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground"
-                onClick={expandAllGroups}
+                onClick={toggleAllGroups}
               >
-                <ChevronsUpDown className="size-3.5" aria-hidden="true" />
-                {t('roles.expandAllPermissionGroups')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 border-border/80 px-2.5 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground"
-                onClick={collapseAllGroups}
-              >
-                <ChevronsDownUp className="size-3.5" aria-hidden="true" />
-                {t('roles.collapseAllPermissionGroups')}
+                {allGroupsExpanded ? (
+                  <ChevronsDownUp className="size-3.5" aria-hidden="true" />
+                ) : (
+                  <ChevronsUpDown className="size-3.5" aria-hidden="true" />
+                )}
+                {allGroupsExpanded
+                  ? t('roles.collapseAllPermissionGroups')
+                  : t('roles.expandAllPermissionGroups')}
               </Button>
             </div>
           ) : null}
@@ -229,7 +240,9 @@ export function RoleTemplatePermissionsSheet({
             <TooltipProvider delayDuration={200}>
               <div className="space-y-2 py-3">
                 {permissionGroups.map((group) => {
-                  const isOpen = !collapsedGroups.has(group.key)
+                  const isOpen =
+                    collapsedInitForTemplateId === id &&
+                    !collapsedGroups.has(group.key)
                   return (
                     <Collapsible
                       key={group.key}

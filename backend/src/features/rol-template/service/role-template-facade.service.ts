@@ -54,12 +54,19 @@ export class RoleTemplateFacadeService {
     @Inject(ContratistaService) private readonly dealers: ContratistaService,
   ) {}
 
+  /**
+   * Templates CRUD — ROL_ACCION 144, Admin Company (id_rol 2), or Admin General (id_rol 1).
+   * `userHasRolAccion` already returns true for id_rol 1|2.
+   */
   private async assertCanManage(ctx: SrsContext): Promise<void> {
     const ok = await this.usuarios.userHasRolAccion(ctx.idUsuario, ROL_ACCION_ROLE_TEMPLATES)
     if (!ok) throw new ForbiddenException('Forbidden')
   }
 
-  /** List templates for Roles Admin filter (42) or templates CRUD (144). */
+  /**
+   * List templates for Roles Admin filter (42) or templates manage
+   * (144 / Admin Company / Admin General via userHasRolAccion).
+   */
   private async assertCanList(ctx: SrsContext): Promise<void> {
     const manage = await this.usuarios.userHasRolAccion(ctx.idUsuario, ROL_ACCION_ROLE_TEMPLATES)
     if (manage) return

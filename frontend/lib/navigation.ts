@@ -82,7 +82,7 @@ export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
 /** Roles Admin — gated by ROL_ACCION 42 (list/view). Includes the Role Templates sub-route. */
 export const ROLES_NAV_HREFS = ['/roles', '/roles/templates'] as const
 
-/** Role Templates — gated separately by ROL_ACCION 144 (`canManageRoleTemplates`). */
+/** Role Templates — 144, Admin Company, or Admin General (`canManageRoleTemplates`). */
 const ROLE_TEMPLATES_NAV_HREFS = ['/roles/templates'] as const
 
 /** System settings — gated by ROL_ACCION 141 or system admin (`canAccessSystemConfig`). */
