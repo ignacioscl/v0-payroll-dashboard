@@ -1,12 +1,10 @@
 import ExcelJS from 'exceljs'
-import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
+import { fetchPunchGrouped, fetchPunchList } from '@/lib/srs-kpis-api'
 import type { PunchGroupedQueryParams } from '@/lib/ttk/punch-grouped-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
-import { srsProxyUrl } from '@/lib/srs-proxy-url'
-import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
-import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
+import type { PunchListCursor, PunchListQueryParams } from '@/lib/ttk/punch-list-filters'
+import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { ttkListRowToExportRecord, type TtkListExportLabels } from '@/lib/ttk/ttk-list-export-rows'
-import { SrsPhpPath } from '@/types/enum-url'
 import {
   applyTitleRow,
   downloadExcelWorkbook,
@@ -32,7 +30,7 @@ export type PunchGroupedExportInput = {
   /** When scope is `selected`, export only these employee ids. */
   employeeIds?: number[]
   groupedParamsBase: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>
-  ttkListExtra: Record<string, string | number>
+  punchListParams: Omit<PunchListQueryParams, 'afterValue' | 'afterId' | 'idEmployee'>
   includePaymentType: boolean
   labels: PunchGroupedExportLabels
   fileName: string
@@ -112,8 +110,18 @@ async function fetchAllGroupedRows(
 ): Promise<PunchGroupedRow[]> {
   const collected: PunchGroupedRow[] = []
   let page = 1
+  // Frontera congelada: la primera respuesta la trae y las siguientes la reenvían.
+  // Sin esto, exportar durante el pico de ponchado repite o saltea empleados,
+  // porque cada alta nueva corre los OFFSET de las páginas que faltan.
+  let snapshotAt = base.snapshotAt
   while (true) {
-    const res = await fetchPunchGrouped({ ...base, page, pageSize: EXPORT_PAGE_SIZE })
+    const res = await fetchPunchGrouped({
+      ...base,
+      snapshotAt,
+      page,
+      pageSize: EXPORT_PAGE_SIZE,
+    })
+    snapshotAt = res.snapshotAt
     collected.push(...res.results)
     if (!res.hasMore) break
     page++
@@ -121,44 +129,28 @@ async function fetchAllGroupedRows(
   return collected
 }
 
-async function fetchTtkListPage(
-  params: Record<string, string | number>,
-): Promise<TtkListResponse> {
-  const url = srsProxyUrl(SrsPhpPath.TTK_LIST, params)
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) {
-    throw new Error(`ttk-list (${res.status})`)
-  }
-  const data = (await res.json()) as TtkListResponse
-  throwIfSrsFail(data, 'Failed to load punches')
-  return data
-}
-
 async function fetchAllPunchesForEmployee(
-  baseExtra: Record<string, string | number>,
+  base: Omit<PunchListQueryParams, 'afterValue' | 'afterId' | 'idEmployee'>,
   employeeId: number,
 ): Promise<TtkListRow[]> {
   const collected: TtkListRow[] = []
-  let pageIndex = 0
-  let total = 0
+  let cursor: PunchListCursor | null = null
 
+  // Paginado por cursor, no por offset: aunque un empleado suele entrar en un solo
+  // lote, el bucle queda correcto si entran ponchadas mientras se exporta.
   do {
-    const params: Record<string, string | number> = {
-      ...baseExtra,
-      id_employee: employeeId,
-      'search[value]': '',
-      draw: pageIndex + 1,
-      start: pageIndex * EXPORT_PAGE_SIZE,
-      length: EXPORT_PAGE_SIZE,
-      order_by: 'tew.punch_in DESC',
-    }
-    const data = await fetchTtkListPage(params)
-    const batch = data.data ?? []
-    collected.push(...batch)
-    total = Number(data.recordsFiltered ?? data.recordsTotal ?? 0)
-    pageIndex++
-    if (batch.length === 0) break
-  } while (collected.length < total)
+    const page = await fetchPunchList({
+      ...base,
+      idEmployee: employeeId,
+      pageSize: EXPORT_PAGE_SIZE,
+      sort: 'punchIn',
+      dir: 'desc',
+      afterValue: cursor?.value,
+      afterId: cursor?.id,
+    })
+    collected.push(...page.results)
+    cursor = page.hasMore ? page.nextCursor : null
+  } while (cursor)
 
   return collected
 }
@@ -182,7 +174,7 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     scope = 'all',
     employeeIds,
     groupedParamsBase,
-    ttkListExtra,
+    punchListParams,
     includePaymentType,
     labels,
     fileName,
@@ -259,7 +251,7 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
         `${labels.exportingProgress} (${i + 1}/${groupedRows.length}) — ${employee.nombreEmployee}`,
       )
 
-      const punches = await fetchAllPunchesForEmployee(ttkListExtra, employee.idUsuario)
+      const punches = await fetchAllPunchesForEmployee(punchListParams, employee.idUsuario)
       const detailRecords = punches.map((p) =>
         ttkListRowToExportRecord(p, labels, { includePaymentType }),
       )

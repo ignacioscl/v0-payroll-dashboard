@@ -22,6 +22,7 @@ export class GroupedPunchService {
       search: query.search,
       idEmployee: query.idEmployee,
       issueType: query.issueType,
+      snapshotAt: query.snapshotAt,
     })
   }
 }

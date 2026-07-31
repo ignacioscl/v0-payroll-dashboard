@@ -72,6 +72,24 @@ export class PunchGroupedQueryDto extends SrsKpiQueryDto {
   @IsOptional()
   @IsString()
   issueType?: string
+
+  /**
+   * Congela la frontera superior del período: `punch_in <= snapshotAt`.
+   *
+   * Esta vista pagina por número de página (OFFSET). Sin el snapshot, cada ponchada
+   * nueva que entra mientras el usuario navega corre los offsets y hace que un
+   * empleado aparezca dos veces o se saltee. El front lo captura al montar la tabla
+   * y lo manda en TODAS las páginas para que todas miren la misma foto.
+   *
+   * Opcional: sin él, el comportamiento es exactamente el de antes.
+   */
+  @ApiPropertyOptional({
+    example: '2026-07-30 12:08:13',
+    description: 'Frontera superior congelada (YYYY-MM-DD HH:mm:ss)',
+  })
+  @IsOptional()
+  @IsString()
+  snapshotAt?: string
 }
 
 export class PunchGroupedPaymentTypeRowDto {
@@ -126,4 +144,12 @@ export class PunchGroupedResponseDto {
 
   @ApiProperty({ example: true })
   hasMore!: boolean
+
+  /**
+   * Frontera congelada con la que se resolvió esta página. La genera el server
+   * (`NOW()` de la base) en la primera y el cliente la reenvía en las siguientes,
+   * para que todas las páginas miren la misma foto.
+   */
+  @ApiProperty({ example: '2026-07-30 12:08:13' })
+  snapshotAt!: string
 }

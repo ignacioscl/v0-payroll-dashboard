@@ -848,6 +848,18 @@ export function DataTable<TData, TValue = unknown>({
     estimateSize: () => estimatedRowHeight,
     overscan: 12,
     enabled: shouldVirtualize,
+    /**
+     * Mide la fila real en vez de confiar en la estimación.
+     *
+     * `estimateSize` devuelve 45px, pero una fila con avatar y dos líneas (empleado
+     * + dealer) mide ~58px. Con la estimación sola, los spacers de arriba y abajo
+     * quedan cortos: el scroll salta y el sentinel de "cargar más" se dispara
+     * antes de tiempo, pidiendo varias páginas de golpe.
+     */
+    measureElement:
+      typeof window !== 'undefined' && !navigator.userAgent.includes('Firefox')
+        ? (element) => element?.getBoundingClientRect().height
+        : undefined,
   })
 
   const virtualItems = shouldVirtualize ? rowVirtualizer.getVirtualItems() : []
@@ -901,12 +913,21 @@ export function DataTable<TData, TValue = unknown>({
     return () => observer.disconnect()
   }, [isInfinite, bodyRows.length])
 
-  const renderBodyRow = (row: Row<TData>, index: number) => {
+  const renderBodyRow = (
+    row: Row<TData>,
+    index: number,
+    /** Sólo en modo virtual: permite que el virtualizador mida la altura real. */
+    measureProps?: {
+      'data-index': number
+      ref: (element: HTMLTableRowElement | null) => void
+    },
+  ) => {
     const baseBg = rowBg(index)
     const isExpanded = renderSubComponent ? row.getIsExpanded() : false
     return (
       <React.Fragment key={row.id}>
       <TableRow
+        {...measureProps}
         data-state={row.getIsSelected() ? 'selected' : undefined}
         onClick={onRowClick ? () => onRowClick(row.original) : undefined}
         className={cn(
@@ -1227,7 +1248,10 @@ export function DataTable<TData, TValue = unknown>({
                 ) : null}
                 {shouldVirtualize
                   ? virtualItems.map((virtualRow) =>
-                      renderBodyRow(bodyRows[virtualRow.index]!, virtualRow.index),
+                      renderBodyRow(bodyRows[virtualRow.index]!, virtualRow.index, {
+                        'data-index': virtualRow.index,
+                        ref: rowVirtualizer.measureElement,
+                      }),
                     )
                   : bodyRows.map((row, index) => renderBodyRow(row, index))}
                 {shouldVirtualize && paddingBottom > 0 ? (

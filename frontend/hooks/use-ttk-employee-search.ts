@@ -18,17 +18,29 @@ type TtkEmployeesResponse = {
   error?: { message?: string }
 }
 
-export function useTtkEmployeeSearch(term: string, idDealer: number | null, enabled: boolean) {
-  const apiRequest = useSrsApiRequest<undefined, { term: string; id_dealer: number }, TtkEmployeesResponse>(
+/**
+ * `idDealer` acepta un id o un CSV de ids. Vacío/null busca en toda la compañía
+ * del usuario logueado (el backend siempre filtra por ella).
+ *
+ * El requisito de tener dealer NO vive acá: cada consumidor lo expresa en `enabled`.
+ */
+export function useTtkEmployeeSearch(
+  term: string,
+  idDealer: number | string | null,
+  enabled: boolean,
+) {
+  const apiRequest = useSrsApiRequest<undefined, { term: string; id_dealer: string }, TtkEmployeesResponse>(
     SrsPhpPath.TTK_EMPLOYEES,
   )
 
+  const idDealerParam = idDealer == null ? '' : String(idDealer)
+
   return useQuery({
-    queryKey: ['ttk-employees', idDealer, term],
+    queryKey: ['ttk-employees', idDealerParam, term],
     queryFn: async () => {
       const raw = await apiRequest.getCustom('', undefined, {
         term,
-        id_dealer: idDealer!,
+        id_dealer: idDealerParam,
       })
       const data = assertSrsSuccess<{ results: TtkEmployeeOption[] }>(
         raw,
@@ -36,7 +48,7 @@ export function useTtkEmployeeSearch(term: string, idDealer: number | null, enab
       )
       return data.results ?? []
     },
-    enabled: enabled && idDealer != null && idDealer > 0 && term.trim().length >= 2,
+    enabled: enabled && term.trim().length >= 2,
     staleTime: 30_000,
   })
 }

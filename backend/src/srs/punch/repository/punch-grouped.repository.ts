@@ -23,6 +23,8 @@ export interface GroupedPunchOptions {
   search?: string
   idEmployee?: number
   issueType?: string
+  /** Frontera superior congelada (`punch_in <= ?`) para que todas las páginas vean la misma foto. */
+  snapshotAt?: string
 }
 
 const SORTABLE_COLUMNS: Record<string, string> = {
@@ -52,6 +54,22 @@ export class GroupedPunchRepository {
     const searchParams =
       !opts.idEmployee && opts.search?.trim() ? [`%${opts.search.trim()}%`] : []
 
+    // Frontera congelada: sin esto, cada ponchada nueva corre los OFFSET de las
+    // páginas siguientes y un empleado puede repetirse o saltearse al navegar.
+    //
+    // La genera la BASE, no el navegador: `punch_in` se compara contra el reloj de
+    // MariaDB, y la hora local del cliente cortaría filas de más. La primera página
+    // la resuelve acá y el cliente la reenvía en las siguientes.
+    let snapshotAt = opts.snapshotAt
+    if (!snapshotAt) {
+      const nowRows: { now_at: string }[] = await this.srs.query(
+        "SELECT DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s') AS now_at",
+      )
+      snapshotAt = String(nowRows[0]?.now_at ?? '')
+    }
+    const snapshotSql = snapshotAt ? ' AND tew.punch_in <= ?' : ''
+    const snapshotParams = snapshotAt ? [snapshotAt] : []
+
     const baseFrom = `
       FROM TTK_EMPLOYEE_WORK tew
       ${ttk.join}
@@ -60,6 +78,7 @@ export class GroupedPunchRepository {
         AND tew.id_dealer_provider = ?
         ${ttk.and}
         AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+        ${snapshotSql}
         ${issue.extraSql}
         ${paymentTypeFilterSql}
         ${employeeSql}
@@ -71,6 +90,7 @@ export class GroupedPunchRepository {
       ...ttk.params,
       fechaDesde,
       fechaHasta,
+      ...snapshotParams,
       ...paymentTypeParams,
       ...employeeParams,
       ...searchParams,
@@ -114,7 +134,7 @@ export class GroupedPunchRepository {
        ${baseFrom}
        GROUP BY u.id_usuario, u.nombre
        ${havingSql}
-       ORDER BY ${sortCol} ${sortDir}
+       ORDER BY ${sortCol} ${sortDir}, u.id_usuario ${sortDir}
        LIMIT ? OFFSET ?`,
       [...baseParams, ...havingParams, opts.pageSize, offset],
     )
@@ -188,6 +208,7 @@ export class GroupedPunchRepository {
       pageSize: opts.pageSize,
       total,
       hasMore: offset + results.length < total,
+      snapshotAt,
     }
   }
 }

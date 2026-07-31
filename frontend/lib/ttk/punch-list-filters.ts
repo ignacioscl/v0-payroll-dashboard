@@ -5,56 +5,55 @@ import {
   PAYMENT_TYPE_FILTER_ALL,
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 
-export type PunchGroupedQueryParams = {
+/** Cursor keyset devuelto por el backend; el cliente lo reenvía tal cual. */
+export type PunchListCursor = {
+  value: string
+  id: number
+}
+
+export type PunchListSort = 'punchIn' | 'employee'
+
+export type PunchListQueryParams = {
   fechaDesde: string
   fechaHasta: string
   idDealer: string
-  page: number
   pageSize: number
-  sort?: string
+  sort?: PunchListSort
   dir?: 'asc' | 'desc'
-  minHoursTotal?: number
-  maxHoursTotal?: number
+  afterValue?: string
+  afterId?: number
+  /** Horas de la ponchada individual (no el total del empleado, como en grouped). */
+  minHours?: number
+  maxHours?: number
   idPaymentType?: number
   search?: string
   idEmployee?: number
   issueType?: string
-  /**
-   * Frontera superior congelada (`punch_in <= snapshotAt`).
-   *
-   * Esta tabla pagina por número de página. Sin el snapshot, cada ponchada que
-   * entra mientras el usuario navega corre los offsets y hace que un empleado
-   * aparezca dos veces o se saltee.
-   *
-   * Lo GENERA EL SERVER en la primera página y el cliente lo reenvía tal cual en
-   * las siguientes. No se arma en el navegador: su hora local no es la de la base
-   * (`punch_in` viaja en GMT0) y cortaría filas de más.
-   */
-  snapshotAt?: string
+  todayLiveStatus?: string
 }
 
-export function formatDateParamGrouped(date: Date | undefined): string {
+export function formatDateParamPunchList(date: Date | undefined): string {
   if (!date) return ''
   return format(date, 'yyyy-MM-dd')
 }
 
-/** Builds query params for Nest GET /srs/punch/grouped */
-export function buildPunchGroupedParams(input: {
+/** Builds query params for Nest GET /srs/punch/list */
+export function buildPunchListParams(input: {
   selectedDealers: string[]
   dateRange: DateRange | undefined
   selectedType: string
   selectedEmployeeId?: number | null
   search?: string
-  page: number
   pageSize: number
-  sort?: string
+  sort?: PunchListSort
   dir?: 'asc' | 'desc'
-  minHoursTotal?: number | null
-  maxHoursTotal?: number | null
+  minHours?: number | null
+  maxHours?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
-  snapshotAt?: string
-}): PunchGroupedQueryParams {
+  todayLiveStatus?: string
+}): PunchListQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
   let issueType = input.selectedType && input.selectedType !== 'all' ? input.selectedType : undefined
@@ -72,43 +71,42 @@ export function buildPunchGroupedParams(input: {
       : undefined
 
   return {
-    fechaDesde: formatDateParamGrouped(input.dateRange?.from),
-    fechaHasta: formatDateParamGrouped(input.dateRange?.to ?? input.dateRange?.from),
+    fechaDesde: formatDateParamPunchList(input.dateRange?.from),
+    fechaHasta: formatDateParamPunchList(input.dateRange?.to ?? input.dateRange?.from),
     idDealer: input.selectedDealers.join(','),
-    page: input.page,
     pageSize: input.pageSize,
     sort: input.sort,
     dir: input.dir,
-    minHoursTotal:
-      input.minHoursTotal != null && input.minHoursTotal > 0 ? input.minHoursTotal : undefined,
-    maxHoursTotal:
-      input.maxHoursTotal != null && input.maxHoursTotal > 0 ? input.maxHoursTotal : undefined,
+    minHours: input.minHours != null && input.minHours > 0 ? input.minHours : undefined,
+    maxHours: input.maxHours != null && input.maxHours > 0 ? input.maxHours : undefined,
     idPaymentType,
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
-    snapshotAt: input.snapshotAt,
+    todayLiveStatus:
+      input.todayLiveStatus && input.todayLiveStatus !== TODAY_LIVE_STATUS_ALL
+        ? input.todayLiveStatus
+        : undefined,
   }
 }
 
-export function punchGroupedParamsToSearchParams(
-  params: PunchGroupedQueryParams,
-): URLSearchParams {
+export function punchListParamsToSearchParams(params: PunchListQueryParams): URLSearchParams {
   const qs = new URLSearchParams({
     fechaDesde: params.fechaDesde,
     fechaHasta: params.fechaHasta,
     idDealer: params.idDealer,
-    page: String(params.page),
     pageSize: String(params.pageSize),
   })
   if (params.sort) qs.set('sort', params.sort)
   if (params.dir) qs.set('dir', params.dir)
-  if (params.minHoursTotal != null) qs.set('minHoursTotal', String(params.minHoursTotal))
-  if (params.maxHoursTotal != null) qs.set('maxHoursTotal', String(params.maxHoursTotal))
+  if (params.afterValue) qs.set('afterValue', params.afterValue)
+  if (params.afterId != null) qs.set('afterId', String(params.afterId))
+  if (params.minHours != null) qs.set('minHours', String(params.minHours))
+  if (params.maxHours != null) qs.set('maxHours', String(params.maxHours))
   if (params.idPaymentType != null) qs.set('idPaymentType', String(params.idPaymentType))
   if (params.search) qs.set('search', params.search)
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
-  if (params.snapshotAt) qs.set('snapshotAt', params.snapshotAt)
+  if (params.todayLiveStatus) qs.set('todayLiveStatus', params.todayLiveStatus)
   return qs
 }

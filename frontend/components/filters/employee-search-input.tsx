@@ -49,17 +49,18 @@ export function EmployeeSearchInput({
     setMounted(true)
   }, [])
 
-  const idDealer = React.useMemo(() => {
-    if (selectedDealers.length === 0) return null
-    const id = Number(selectedDealers[0])
-    return Number.isFinite(id) && id > 0 ? id : null
-  }, [selectedDealers])
-
-  const employeesQuery = useTtkEmployeeSearch(
-    employeeTerm,
-    idDealer,
-    filtersHydrated && idDealer != null,
+  // Todos los dealers seleccionados, no solo el primero. Sin selección va vacío:
+  // el backend busca en toda la compañía del usuario logueado.
+  const idDealers = React.useMemo(
+    () =>
+      selectedDealers
+        .map((dealer) => Number(dealer))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .join(','),
+    [selectedDealers],
   )
+
+  const employeesQuery = useTtkEmployeeSearch(employeeTerm, idDealers, filtersHydrated)
 
   React.useEffect(() => {
     if (!filtersHydrated || isIssuesPage) return
@@ -97,7 +98,6 @@ export function EmployeeSearchInput({
       employees={employeesQuery.data}
       isLoading={employeesQuery.isFetching}
       disabled={isDisabled}
-      dealerSelected={idDealer != null}
       compact
       placeholder={t('filters.searchEmployee')}
       className={cn(className, inputClassName)}

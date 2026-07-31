@@ -15,7 +15,7 @@ import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
 import { formatGroupedHoursDisplay } from '@/lib/ttk/format-grouped-hours'
-import { buildTtkListFilterExtra, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
+import { buildPunchListParams } from '@/lib/ttk/punch-list-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
@@ -28,7 +28,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
-import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
@@ -141,6 +140,16 @@ export function GroupedIssuesDataTable({
   const sortCol = sorting[0]?.id
   const sortDir = sorting[0]?.desc ? 'desc' : 'asc'
 
+  /**
+   * Frontera congelada del período. La genera el server en la página 1 y la
+   * reusamos en las siguientes, para que todas miren la misma foto: esta tabla
+   * pagina por OFFSET y cada ponchada nueva correría las páginas.
+   *
+   * Va en un ref y no en state para no forzar un render extra: el memo de params
+   * ya se recalcula al cambiar de página, que es cuando hace falta leerlo.
+   */
+  const snapshotAtRef = React.useRef<string | undefined>(undefined)
+
   const listExtra = React.useMemo(
     () =>
       buildPunchGroupedParams({
@@ -151,6 +160,7 @@ export function GroupedIssuesDataTable({
         search: debouncedEmployeeSearch,
         page: pageIndex + 1,
         pageSize,
+        snapshotAt: pageIndex > 0 ? snapshotAtRef.current : undefined,
         sort:
           sortCol === 'employee'
             ? 'nombreEmployee'
@@ -191,21 +201,19 @@ export function GroupedIssuesDataTable({
     return rest
   }, [listExtra])
 
-  const ttkListExtra = React.useMemo(
+  /** Params del detalle por empleado del export (endpoint nuevo, paginado por cursor). */
+  const punchListParams = React.useMemo(
     () =>
-      buildTtkListFilterExtra({
+      buildPunchListParams({
         search: '',
         selectedDealers: debouncedDealers,
         dateRange,
         selectedType,
         selectedEmployeeId: null,
-        scopeUser: toPayrollScopeUser(user),
-        todayLiveStatus:
-          selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
-            ? selectedTodayLiveStatus
-            : undefined,
+        pageSize: 500,
+        todayLiveStatus: selectedTodayLiveStatus,
       }),
-    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus, user],
+    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus],
   )
 
   const buildExportLabels = React.useCallback((): PunchGroupedExportLabels => {
@@ -438,7 +446,13 @@ export function GroupedIssuesDataTable({
       paymentTypeFilter,
       selectedEmployee?.id,
     ],
-    queryFn: async () => fetchPunchGrouped(listExtra),
+    queryFn: async () => {
+      const res = await fetchPunchGrouped(listExtra)
+      // La página 1 viene sin snapshot y el server devuelve el suyo: lo guardamos
+      // para que las siguientes pidan contra la misma foto.
+      snapshotAtRef.current = res.snapshotAt
+      return res
+    },
     enabled: queryEnabled,
     staleTime: 2 * 60 * 1000,
     pageIndex,
@@ -585,7 +599,7 @@ export function GroupedIssuesDataTable({
               disabled={!queryEnabled || rows.length === 0}
               fileName="punch-grouped"
               groupedParamsBase={groupedParamsBase}
-              ttkListExtra={ttkListExtra}
+              punchListParams={punchListParams}
               includePaymentType={canViewPayment}
               buildLabels={buildExportLabels}
               selectedEmployeeIds={selectedEmployeeIds}

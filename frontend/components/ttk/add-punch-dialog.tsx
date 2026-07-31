@@ -61,7 +61,12 @@ export function AddPunchDialog({
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<PunchTimeKey, string>>>({})
 
   const addMutation = useTtkAddPunch()
-  const employeesQuery = useTtkEmployeeSearch(employeeSearch, idDealer, open)
+  // Un punch necesita un dealer concreto: sin él no buscamos.
+  const employeesQuery = useTtkEmployeeSearch(
+    employeeSearch,
+    idDealer,
+    open && idDealer != null && idDealer > 0,
+  )
 
   useEffect(() => {
     if (!open) return

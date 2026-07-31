@@ -20,4 +20,6 @@ export type PunchGroupedResponse = {
   pageSize: number
   total: number
   hasMore: boolean
+  /** Frontera congelada que generó el server; se reenvía en las páginas siguientes. */
+  snapshotAt: string
 }

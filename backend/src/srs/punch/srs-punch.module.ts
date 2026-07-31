@@ -11,11 +11,21 @@ import { PunchKpiRepository } from './repository/punch-kpi.repository'
 import { GroupedPunchController } from './controller/punch-grouped.controller'
 import { GroupedPunchService } from './service/punch-grouped.service'
 import { GroupedPunchRepository } from './repository/punch-grouped.repository'
+import { PunchListController } from './controller/punch-list.controller'
+import { PunchListService } from './service/punch-list.service'
+import { PunchListRepository } from './repository/punch-list.repository'
 
 @Module({
   imports: [SrsAuthModule, TypeOrmModule.forFeature([TtkEmployeeWork], SRS_CONNECTION)],
-  providers: [PunchKpiRepository, PunchKpiService, GroupedPunchRepository, GroupedPunchService],
-  controllers: [PunchKpiController, GroupedPunchController],
-  exports: [PunchKpiService, GroupedPunchService],
+  providers: [
+    PunchKpiRepository,
+    PunchKpiService,
+    GroupedPunchRepository,
+    GroupedPunchService,
+    PunchListRepository,
+    PunchListService,
+  ],
+  controllers: [PunchKpiController, GroupedPunchController, PunchListController],
+  exports: [PunchKpiService, GroupedPunchService, PunchListService],
 })
 export class SrsPunchModule {}

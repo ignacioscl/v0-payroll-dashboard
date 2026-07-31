@@ -5,6 +5,12 @@ import {
   punchGroupedParamsToSearchParams,
   type PunchGroupedQueryParams,
 } from '@/lib/ttk/punch-grouped-filters'
+import {
+  punchListParamsToSearchParams,
+  type PunchListCursor,
+  type PunchListQueryParams,
+} from '@/lib/ttk/punch-list-filters'
+import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
 
 export interface ProductionKpi {
   woCompleted: number
@@ -190,4 +196,30 @@ export async function fetchPunchGrouped(
     throw new Error(`punch/grouped (${res.status})`)
   }
   return res.json() as Promise<PunchGroupedResponse>
+}
+
+/**
+ * Listado individual de ponchadas, paginado por cursor (keyset).
+ *
+ * Reemplaza a `ttk-list.php` para la tabla de Punch Report: al cortar por contenido
+ * y no por posición, las ponchadas que entran mientras se scrollea no corren la
+ * ventana y por lo tanto no se repiten ni se saltean filas.
+ */
+export type PunchListResponse = {
+  results: TtkListRow[]
+  pageSize: number
+  total: number
+  hasMore: boolean
+  nextCursor: PunchListCursor | null
+}
+
+export async function fetchPunchList(
+  params: PunchListQueryParams,
+): Promise<PunchListResponse> {
+  const qs = punchListParamsToSearchParams(params)
+  const res = await fetch(`/api/srs-kpis/punch/list?${qs.toString()}`, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`punch/list (${res.status})`)
+  }
+  return res.json() as Promise<PunchListResponse>
 }

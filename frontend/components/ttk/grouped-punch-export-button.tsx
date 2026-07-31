@@ -29,13 +29,14 @@ import {
   type PunchGroupedExportScope,
 } from '@/lib/ttk/punch-grouped-export'
 import type { PunchGroupedQueryParams } from '@/lib/ttk/punch-grouped-filters'
+import type { PunchListQueryParams } from '@/lib/ttk/punch-list-filters'
 import type { PunchGroupedExportLabels } from '@/lib/ttk/punch-grouped-export'
 
 export type GroupedPunchExportButtonProps = {
   disabled?: boolean
   fileName?: string
   groupedParamsBase: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>
-  ttkListExtra: Record<string, string | number>
+  punchListParams: Omit<PunchListQueryParams, 'afterValue' | 'afterId' | 'idEmployee'>
   includePaymentType: boolean
   buildLabels: () => PunchGroupedExportLabels
   selectedEmployeeIds: number[]
@@ -96,7 +97,7 @@ export function GroupedPunchExportButton({
   disabled = false,
   fileName = 'punch-grouped',
   groupedParamsBase,
-  ttkListExtra,
+  punchListParams,
   includePaymentType,
   buildLabels,
   selectedEmployeeIds,
@@ -137,7 +138,7 @@ export function GroupedPunchExportButton({
       scope,
       employeeIds: scope === 'selected' ? selectedEmployeeIds : undefined,
       groupedParamsBase,
-      ttkListExtra,
+      punchListParams,
       includePaymentType,
       labels: buildLabels(),
       fileName,

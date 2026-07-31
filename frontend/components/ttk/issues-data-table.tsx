@@ -14,25 +14,25 @@ import {
 import {
   DataTable,
   DataTableColumnHeader,
-  createTtkListAdapter,
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
-import { useTtkListInfinite } from '@/hooks/use-ttk-list-infinite'
+import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
-import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
-import { throwIfSrsFail } from '@/lib/srs/parse-srs-response'
+import { fetchPunchList, type PunchListResponse } from '@/lib/srs-kpis-api'
 import {
-  buildTtkListFilterExtra,
+  buildPunchListParams,
+  type PunchListCursor,
+  type PunchListSort,
+} from '@/lib/ttk/punch-list-filters'
+import {
   formatDurationDisplay,
   formatGmtDate,
   formatGmtTime,
-  toPayrollScopeUser,
 } from '@/lib/ttk/map-header-filters'
 import { formatPunchDurationDisplay } from '@/lib/ttk/format-grouped-hours'
 import { formatUsDateForExport, formatUsTimeForExport } from '@/lib/format-us-datetime'
-import type { TtkListResponse, TtkListRow } from '@/lib/ttk/ttk-list-types'
-import { SrsPhpPath } from '@/types/enum-url'
+import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
 import { EmployeeThumbnail } from '@/components/ttk/employee-thumbnail'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { PunchTimeCell } from '@/components/ttk/punch-time-cell'
@@ -71,7 +71,6 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
-import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
@@ -118,15 +117,15 @@ export type IssuesDataTableProps = {
   groupedHoursFormat?: boolean
 }
 
-const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
+/** Columna de orden → whitelist del endpoint (`punchIn` | `employee`). */
+function mapPunchListSort(sorting: SortingState): PunchListSort {
+  return sorting[0]?.id === 'employee' ? 'employee' : 'punchIn'
+}
 
-function mapTtkOrderBy(sorting: SortingState): string {
+function mapPunchListDir(sorting: SortingState): 'asc' | 'desc' {
   const first = sorting[0]
-  if (!first) return 'tew.punch_in DESC'
-  if (first.id === 'employee') {
-    return first.desc ? 'us.nombre DESC' : 'us.nombre'
-  }
-  return first.desc ? 'tew.punch_in DESC' : 'tew.punch_in'
+  if (!first) return 'desc'
+  return first.desc ? 'desc' : 'asc'
 }
 
 function roleLabel(row: TtkListRow): string {
@@ -307,28 +306,21 @@ export function IssuesDataTable({
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
   const debouncedSearch = useDebouncedValue(search, 300)
 
-  const apiRequest = useSrsApiRequest<
-    unknown,
-    Record<string, string | number>,
-    TtkListResponse
-  >(SrsPhpPath.TTK_LIST)
-
-  const listExtra = React.useMemo(
+  const listParams = React.useMemo(
     () =>
-      buildTtkListFilterExtra({
+      buildPunchListParams({
         search: effectiveSearch,
         selectedDealers: debouncedDealers,
         dateRange: effectiveDateRange,
         selectedType: effectiveSelectedType,
         selectedEmployeeId: employeeIdOverride ?? selectedEmployee?.id ?? null,
-        punchMinHours,
-        punchMaxHours,
+        pageSize,
+        sort: mapPunchListSort(sorting),
+        dir: mapPunchListDir(sorting),
+        minHours: punchMinHours,
+        maxHours: punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
-        todayLiveStatus:
-          selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
-            ? selectedTodayLiveStatus
-            : undefined,
-        scopeUser: toPayrollScopeUser(user),
+        todayLiveStatus: selectedTodayLiveStatus,
       }),
     [
       effectiveSearch,
@@ -337,19 +329,20 @@ export function IssuesDataTable({
       effectiveSelectedType,
       selectedEmployee?.id,
       employeeIdOverride,
+      pageSize,
+      sorting,
       punchMinHours,
       punchMaxHours,
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
-      user,
     ],
   )
 
   const queryEnabled =
     filtersHydrated &&
     debouncedDealers.length > 0 &&
-    Boolean(listExtra.fecha_desde) &&
-    Boolean(listExtra.fecha_hasta)
+    Boolean(listParams.fechaDesde) &&
+    Boolean(listParams.fechaHasta)
 
   const getEmployeeId = React.useCallback(
     (row: TtkListRow) => Number(row.usuario?.id ?? 0),
@@ -758,37 +751,29 @@ export function IssuesDataTable({
   const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
     if (!queryEnabled) return []
 
+    // Export por CURSOR, no por offset: si paginara por posición, exportar durante
+    // el pico de ponchado devolvería filas repetidas o faltantes, igual que la lista.
     const exportPageSize = 500
     const collected: TtkListRow[] = []
-    let pageIndex = 0
-    let totalRows = 0
+    let cursor: PunchListCursor | null = null
 
     do {
-      const params = ttkListAdapter.buildRequest({
-        pageIndex,
+      const page: PunchListResponse = await fetchPunchList({
+        ...listParams,
         pageSize: exportPageSize,
-        sorting,
-        columnFilters: [],
-        columns: [],
-        extra: listExtra,
+        afterValue: cursor?.value,
+        afterId: cursor?.id,
       })
-      const data = await apiRequest.getCustom('', undefined, params)
-      throwIfSrsFail(data, t('punch.loadExportFailed'))
-      const parsed = ttkListAdapter.parseResponse(data as TtkListResponse, {
-        pageIndex,
-        pageSize: exportPageSize,
-      })
-      collected.push(...parsed.rows)
-      totalRows = parsed.total
-      pageIndex += 1
-    } while (collected.length < totalRows && collected.length > 0)
+      collected.push(...page.results)
+      cursor = page.hasMore ? page.nextCursor : null
+    } while (cursor)
 
     return collected
-  }, [apiRequest, listExtra, queryEnabled, sorting, t])
+  }, [listParams, queryEnabled])
 
-  const listQuery = useTtkListInfinite<TtkListRow>({
+  const listQuery = usePunchListInfinite({
     queryKey: [
-      'ttk-list',
+      'punch-list',
       queryKeySuffix,
       debouncedSearch,
       debouncedDealers.slice().sort().join(','),
@@ -801,26 +786,17 @@ export function IssuesDataTable({
       selectedEmployee?.id,
       punchMinHours,
       punchMaxHours,
+      pageSize,
+      listParams.sort,
+      listParams.dir,
     ],
     enabled: queryEnabled,
-    pageSize,
-    sorting,
-    columns,
-    extra: listExtra,
-    mapSort: mapTtkOrderBy,
-    fetchPage: async (params) => {
-      const data = await apiRequest.getCustom('', undefined, params)
-      return data as TtkListResponse
-    },
-    errorMessage: t('punch.loadIssuesFailed'),
+    params: listParams,
     staleTime: 2 * 60 * 1000,
   })
 
-  const rows = React.useMemo(
-    () => listQuery.data?.pages.flatMap((page) => page.rows) ?? [],
-    [listQuery.data],
-  )
-  const total = listQuery.data?.pages[0]?.total ?? 0
+  const rows = listQuery.rows
+  const total = listQuery.total
   const isFetching = listQuery.isFetching
   const error =
     listQuery.error instanceof Error
