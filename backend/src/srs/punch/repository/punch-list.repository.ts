@@ -36,18 +36,28 @@ const SORT_COLUMNS: Record<PunchListSort, string> = {
 }
 
 /**
- * Formato de fecha que ya consume el frontend (`punchInGmt0`), idéntico al que
- * emite `ttk-list.php`: ISO con sufijo Z.
+ * El instante real de la ponchada, en segundos.
  *
- * Se arma en SQL a propósito, para no depender de la config del driver. PHP y Nest
- * abren la conexión sin setear `time_zone`, así que MariaDB convierte el TIMESTAMP
- * igual para los dos y los valores coinciden.
+ * `punch_in` & co. son TIMESTAMP: MariaDB los guarda en UTC y los devuelve convertidos a la zona
+ * de la sesión. `UNIX_TIMESTAMP` saltea esa conversión y entrega el UTC guardado, que es
+ * exactamente lo que produce `GeneralUtils::getDateGMT0()` en PHP.
+ *
+ * La versión anterior hacía `DATE_FORMAT(col, '…Z')`: le pegaba una `Z` literal al reloj de pared
+ * sin convertir nada. El browser después le restaba su propio offset y la hora salía 4 h corrida.
+ * **No volver a formatear la fecha como texto acá.**
  */
-function gmt0Expr(column: string): string {
+export function utcEpochExpr(column: string): string {
   return `CASE WHEN ${column} IS NULL OR ${column} <= '1970-01-01'
                THEN NULL
-               ELSE DATE_FORMAT(${column}, '%Y-%m-%dT%H:%i:%s.000000Z')
+               ELSE UNIX_TIMESTAMP(${column})
           END`
+}
+
+/** epoch (s) → ISO 8601 UTC, el formato que el frontend ya consume en `punchInGmt0`. */
+export function epochToIso(raw: unknown): string | null {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return new Date(n * 1000).toISOString()
 }
 
 /** Mirror de TTKEmployeeDao::getTodayLiveStatusCondition() (línea 156). Sin params. */
@@ -82,10 +92,10 @@ const SELECT_FIELDS = `
   tew.hourly_rate                          AS hourly_rate,
   tew.type_payment                         AS type_payment,
 
-  ${gmt0Expr('tew.punch_in')}              AS punch_in_gmt0,
-  ${gmt0Expr('tew.punch_out')}             AS punch_out_gmt0,
-  ${gmt0Expr('tew.break_start')}           AS break_start_gmt0,
-  ${gmt0Expr('tew.break_end')}             AS break_end_gmt0,
+  ${utcEpochExpr('tew.punch_in')}          AS punch_in_epoch,
+  ${utcEpochExpr('tew.punch_out')}         AS punch_out_epoch,
+  ${utcEpochExpr('tew.break_start')}       AS break_start_epoch,
+  ${utcEpochExpr('tew.break_end')}         AS break_end_epoch,
 
   DATE_FORMAT(tew.punch_in, '%Y-%m-%d %H:%i:%s')                                   AS punch_in_cursor,
 
@@ -264,10 +274,10 @@ export class PunchListRepository {
     return {
       id: Number(r.id),
 
-      punchInGmt0: toStringOrNull(r.punch_in_gmt0),
-      punchOutGmt0: toStringOrNull(r.punch_out_gmt0),
-      breakStartGmt0: toStringOrNull(r.break_start_gmt0),
-      breakEndGmt0: toStringOrNull(r.break_end_gmt0),
+      punchInGmt0: epochToIso(r.punch_in_epoch),
+      punchOutGmt0: epochToIso(r.punch_out_epoch),
+      breakStartGmt0: epochToIso(r.break_start_epoch),
+      breakEndGmt0: epochToIso(r.break_end_epoch),
 
       timeWork: toStringOrNull(r.time_work) ?? toStringOrNull(r.total_time_work) ?? '00:00',
       timeBreak: toStringOrNull(r.time_break) ?? '00:00',

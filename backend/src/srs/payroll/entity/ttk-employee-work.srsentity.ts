@@ -27,16 +27,18 @@ export class TtkEmployeeWork {
   @Column({ name: 'fecha', type: 'date', nullable: true })
   fecha?: string
 
-  @Column({ name: 'punch_in', type: 'datetime', nullable: true })
+  // Las cuatro marcas de la ponchada son TIMESTAMP en la base, no DATETIME: guardan un instante
+  // en UTC. `fixed_at` (abajo) sí es DATETIME y viaja naive.
+  @Column({ name: 'punch_in', type: 'timestamp', nullable: true })
   punchIn?: string
 
-  @Column({ name: 'punch_out', type: 'datetime', nullable: true })
+  @Column({ name: 'punch_out', type: 'timestamp', nullable: true })
   punchOut?: string
 
-  @Column({ name: 'break_start', type: 'datetime', nullable: true })
+  @Column({ name: 'break_start', type: 'timestamp', nullable: true })
   breakStart?: string
 
-  @Column({ name: 'break_end', type: 'datetime', nullable: true })
+  @Column({ name: 'break_end', type: 'timestamp', nullable: true })
   breakEnd?: string
 
   @Column({ name: 'manual_create', type: 'tinyint', nullable: true })
