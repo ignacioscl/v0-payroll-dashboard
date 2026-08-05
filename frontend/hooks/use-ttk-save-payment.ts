@@ -27,6 +27,8 @@ export function useTtkSavePayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ttk-list'] })
+      queryClient.invalidateQueries({ queryKey: ['punch-list'] })
+      queryClient.invalidateQueries({ queryKey: ['punch-grouped'] })
       queryClient.invalidateQueries({ queryKey: ['ttk-issue-counts'] })
     },
   })

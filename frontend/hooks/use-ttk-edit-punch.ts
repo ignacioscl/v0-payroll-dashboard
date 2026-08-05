@@ -25,6 +25,8 @@ export function useTtkEditPunch() {
     },
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['ttk-list'] })
+      queryClient.invalidateQueries({ queryKey: ['punch-list'] })
+      queryClient.invalidateQueries({ queryKey: ['punch-grouped'] })
       queryClient.invalidateQueries({ queryKey: ['ttk-issue-counts'] })
       queryClient.invalidateQueries({ queryKey: ['ttk-punch-detail', saved.id] })
     },
