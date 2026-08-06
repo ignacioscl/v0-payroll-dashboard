@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { SortingState } from '@tanstack/react-table'
 import { format } from 'date-fns'
 import { ReceiptText } from 'lucide-react'
 
@@ -42,7 +43,13 @@ function formatUsDateRange(from: Date | undefined, to: Date | undefined): string
 
 export default function InvoicesPage() {
   const { t } = useTranslation()
-  const { invoiceDateFrom, invoiceDateTo, selectedDealers, filtersHydrated } = useFilters()
+  const {
+    invoiceDateFrom,
+    invoiceDateTo,
+    selectedDealers,
+    filtersHydrated,
+    setDealerIdAllowList,
+  } = useFilters()
 
   const [types, setTypes] = useState<InvoiceTypeState>(ALL_TYPES)
   const [payed, setPayed] = useState<TriState>('0')
@@ -55,6 +62,18 @@ export default function InvoicesPage() {
   const [stock, setStock] = useState('')
   const [checkNumber, setCheckNumber] = useState('')
   const [pageSize, setPageSize] = useState(25)
+  // Default matches Nest ORDER BY fecha_desde DESC when no orderBy is sent.
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'period', desc: true }])
+
+  useEffect(() => {
+    return () => setDealerIdAllowList(null)
+  }, [setDealerIdAllowList])
+
+  const handleAdvancedChange = (next: InvoiceAdvancedFilterState) => {
+    setAdvanced(next)
+    // G8: setting check date forces Paid = Yes in the UI control too
+    if (next.checkDate) setPayed('1')
+  }
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(searchInput.trim()), 350)
@@ -99,15 +118,29 @@ export default function InvoicesPage() {
   const hasDates = Boolean(headerRange.fechaDesde && headerRange.fechaHasta)
   const ready = filtersHydrated && hasDealer && hasDates
 
+  const sortParams = useMemo(() => {
+    const col = sorting[0]
+    if (!col) return {} as { orderBy?: 'invoiceNro' | 'dateFrom'; orderDir?: 'asc' | 'desc' }
+    if (col.id === 'invoice') {
+      return { orderBy: 'invoiceNro' as const, orderDir: col.desc ? ('desc' as const) : ('asc' as const) }
+    }
+    if (col.id === 'period') {
+      return { orderBy: 'dateFrom' as const, orderDir: col.desc ? ('desc' as const) : ('asc' as const) }
+    }
+    return {}
+  }, [sorting])
+
   const input = useMemo<InvoiceListInput | null>(() => {
     if (!ready) return null
+    const checkDate = advanced.checkDate ? formatDateParam(advanced.checkDate) : undefined
     return {
       fechaDesde: headerRange.fechaDesde,
       fechaHasta: headerRange.fechaHasta,
       idDealer,
       types: typesToCsv(types),
       search: search || undefined,
-      payed: payed === 'all' ? undefined : payed,
+      // G8: check date implies Paid=Yes (legacy parity)
+      payed: checkDate ? '1' : payed === 'all' ? undefined : payed,
       sended: sended === 'all' ? undefined : sended,
       includeZero: !hideZero,
       idDepartment: idsToCsv(advanced.departmentIds),
@@ -115,11 +148,14 @@ export default function InvoicesPage() {
       wo: advanced.woNumbers.length ? advanced.woNumbers.join(',') : undefined,
       roPo: roPo || undefined,
       stock: stock || undefined,
-      checkDate: advanced.checkDate ? formatDateParam(advanced.checkDate) : undefined,
+      checkDate,
       checkNumber: checkNumber || undefined,
-      idAuthor: advanced.employeeId ?? undefined,
+      idAuthorIn: idsToCsv(advanced.authorIds),
+      authorsExclude: advanced.authorsExclude && advanced.authorIds.length > 0 ? 1 : undefined,
+      exactMatch: advanced.exactMatch || undefined,
       dueOn: advanced.overdue || undefined,
       showDeleted: advanced.showDeleted || undefined,
+      ...sortParams,
     }
   }, [
     ready,
@@ -134,12 +170,15 @@ export default function InvoicesPage() {
     advanced.serviceIds,
     advanced.woNumbers,
     advanced.checkDate,
-    advanced.employeeId,
+    advanced.authorIds,
+    advanced.authorsExclude,
+    advanced.exactMatch,
     advanced.overdue,
     advanced.showDeleted,
     roPo,
     stock,
     checkNumber,
+    sortParams,
   ])
 
   const query = useInvoiceList(input, pageSize)
@@ -173,9 +212,8 @@ export default function InvoicesPage() {
         hideZero={hideZero}
         onHideZeroChange={setHideZero}
         advanced={advanced}
-        onAdvancedChange={setAdvanced}
+        onAdvancedChange={handleAdvancedChange}
         idDealer={idDealer}
-        primaryDealerId={primaryDealerId}
         disabled={!ready}
       />
 
@@ -194,6 +232,8 @@ export default function InvoicesPage() {
         hasDates={hasDates}
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
+        sorting={sorting}
+        onSortingChange={setSorting}
         showDealerSubline={selectedDealers.length > 1}
         idDealer={
           primaryDealerId != null

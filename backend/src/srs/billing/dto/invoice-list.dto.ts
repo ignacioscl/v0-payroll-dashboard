@@ -115,6 +115,25 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @Min(1)
   idAuthor?: number
 
+  @ApiPropertyOptional({ description: 'Author ids CSV (multi). Prefer over idAuthor.' })
+  @IsOptional()
+  @IsString()
+  idAuthorIn?: string
+
+  @ApiPropertyOptional({
+    description: 'When 1 with idAuthorIn: NOT IN authors (invoices NOT created by)',
+    enum: [0, 1],
+  })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsIn([0, 1])
+  authorsExclude?: number
+
+  @ApiPropertyOptional({ description: 'When 1: full_nro exact match instead of LIKE' })
+  @IsOptional()
+  @Transform(({ value }) => parseFlag01(value))
+  exactMatch?: boolean
+
   @ApiPropertyOptional({ description: 'Overdue unpaid statements (due_on)' })
   @IsOptional()
   @Transform(({ value }) => parseFlag01(value))
@@ -124,6 +143,16 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @IsOptional()
   @Transform(({ value }) => parseFlag01(value))
   showDeleted?: boolean
+
+  @ApiPropertyOptional({ description: 'Server-side sort column', enum: ['invoiceNro', 'dateFrom'] })
+  @IsOptional()
+  @IsIn(['invoiceNro', 'dateFrom'])
+  orderBy?: 'invoiceNro' | 'dateFrom'
+
+  @ApiPropertyOptional({ description: 'Sort direction', enum: ['asc', 'desc'] })
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  orderDir?: 'asc' | 'desc'
 }
 
 /** Filtro resuelto (contexto + query) que consume el repositorio. */
@@ -151,8 +180,15 @@ export interface InvoiceListFilter {
   checkDate?: string
   checkNumber?: string
   idAuthor?: number
+  /** Multi-author filter (CSV resolved to ints). */
+  authorIds: number[]
+  /** When true with authorIds: NOT IN. */
+  authorsExclude: boolean
+  exactMatch: boolean
   dueOn: boolean
   showDeleted: boolean
+  orderBy?: 'invoiceNro' | 'dateFrom'
+  orderDir: 'asc' | 'desc'
 }
 
 const TYPE_TOKENS: Record<string, StatementType[]> = {
@@ -205,8 +241,13 @@ export function buildInvoiceListFilter(
     checkDate: parseOptionalTrimmed(query.checkDate),
     checkNumber: parseOptionalTrimmed(query.checkNumber),
     idAuthor: query.idAuthor && query.idAuthor > 0 ? query.idAuthor : undefined,
+    authorIds: parseCsvPositiveInts(query.idAuthorIn),
+    authorsExclude: Number(query.authorsExclude) === 1,
+    exactMatch: parseFlag01(query.exactMatch),
     dueOn: parseFlag01(query.dueOn),
     showDeleted: parseFlag01(query.showDeleted),
+    orderBy: query.orderBy,
+    orderDir: query.orderDir === 'asc' ? 'asc' : 'desc',
   }
 }
 
@@ -235,6 +276,7 @@ export class InvoiceRowDto {
   })
   createdBySchedule!: boolean
   @ApiProperty({ nullable: true, description: 'Dealer (CONTRATISTA.razon_social)' }) dealer?: string
+  @ApiProperty({ nullable: true, description: 'Dealer id (INVOICE_STATEMENT.id_dealer)' }) idDealer?: number
   @ApiProperty() fechaCreate!: string
   @ApiProperty({ nullable: true }) fechaDesde?: string
   @ApiProperty({ nullable: true }) fechaHasta?: string

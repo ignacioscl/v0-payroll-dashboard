@@ -56,6 +56,11 @@ export function BillingActionDialog({
   pending = false,
   pendingLabel,
   confirmDisabled = false,
+  secondaryLabel,
+  secondaryIcon: SecondaryIcon,
+  onSecondary,
+  secondaryDisabled = false,
+  secondaryPending = false,
   className,
 }: {
   open: boolean
@@ -72,9 +77,15 @@ export function BillingActionDialog({
   pending?: boolean
   pendingLabel?: string
   confirmDisabled?: boolean
+  secondaryLabel?: string
+  secondaryIcon?: LucideIcon
+  onSecondary?: () => void | Promise<void>
+  secondaryDisabled?: boolean
+  secondaryPending?: boolean
   className?: string
 }) {
   const toneCfg = TONE[tone]
+  const busy = pending || secondaryPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,16 +129,32 @@ export function BillingActionDialog({
             type="button"
             variant="outline"
             className="w-full sm:w-auto"
-            disabled={pending}
+            disabled={busy}
             onClick={() => onOpenChange(false)}
           >
             <X className="size-4" />
             {cancelLabel}
           </Button>
+          {secondaryLabel && onSecondary ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={busy || secondaryDisabled}
+              onClick={() => void onSecondary()}
+            >
+              {secondaryPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : SecondaryIcon ? (
+                <SecondaryIcon className="size-4" />
+              ) : null}
+              {secondaryLabel}
+            </Button>
+          ) : null}
           <Button
             type="button"
             className="w-full sm:w-auto"
-            disabled={pending || confirmDisabled}
+            disabled={busy || confirmDisabled}
             onClick={() => void onConfirm()}
           >
             {pending ? (
@@ -247,7 +274,7 @@ export function BillingToggleRow({
       onClick={() => onCheckedChange(!checked)}
       aria-pressed={checked}
       className={cn(
-        'flex w-full items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-left transition-colors',
+        'flex w-full cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-left transition-colors',
         'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
         checked && 'border-border bg-muted/35',
         disabled && 'pointer-events-none opacity-50',

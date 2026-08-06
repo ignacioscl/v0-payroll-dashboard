@@ -1,6 +1,11 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
+import {
+  ROL_ACCION_BILLING_DISTRICT,
+  ROL_ACCION_INVOICES_MODULE_ACCESS,
+  SrsPermissionRepository,
+} from '../../auth/srs-permission.repository'
 import { skipDealerRestrictionForRol } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { InvoiceRepository } from '../repository/invoice.repository'
 import {
@@ -18,9 +23,17 @@ import { InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
 
 @Injectable()
 export class InvoiceService {
-  constructor(@Inject(InvoiceRepository) private readonly repository: InvoiceRepository) {}
+  constructor(
+    @Inject(InvoiceRepository) private readonly repository: InvoiceRepository,
+    @Inject(SrsPermissionRepository) private readonly permissions: SrsPermissionRepository,
+  ) {}
+
+  private async assertInvoicesModuleAccess(ctx: SrsContext): Promise<void> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_INVOICES_MODULE_ACCESS)
+  }
 
   async list(ctx: SrsContext, query: InvoiceListQueryDto): Promise<InvoiceListResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
     const filter = buildInvoiceListFilter(ctx, query)
     if (filter.dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer to list invoices')
@@ -40,6 +53,7 @@ export class InvoiceService {
   }
 
   async detail(ctx: SrsContext, idStatement: number): Promise<InvoiceDetailResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
     const { inScope, statementType } = await this.repository.isStatementInScope({
       idStatement,
       idDealerProvider: ctx.idDealerProvider,
@@ -70,6 +84,7 @@ export class InvoiceService {
     ctx: SrsContext,
     query: InvoiceLookupQueryDto,
   ): Promise<InvoiceLookupResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
     const { dealerIds, search, limit } = buildDepartmentLookupFilter(query)
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
@@ -89,6 +104,7 @@ export class InvoiceService {
     ctx: SrsContext,
     query: InvoiceLookupQueryDto,
   ): Promise<InvoiceLookupResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
     const { dealerIds, departmentIds, search, limit } = buildServiceLookupFilter(query)
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
@@ -99,6 +115,41 @@ export class InvoiceService {
       dealerIds,
       departmentIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
+  }
+
+  async lookupAuthors(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
+    const { dealerIds, search, limit } = buildDepartmentLookupFilter(query)
+    if (dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer')
+    }
+    const results = await this.repository.lookupAuthors({
+      idDealerProvider: ctx.idDealerProvider,
+      idUsuario: ctx.idUsuario,
+      dealerIds,
+      skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
+  }
+
+  async lookupDistricts(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<{ results: Array<{ id: number; label: string; dealerIds: number[] }> }> {
+    await this.assertInvoicesModuleAccess(ctx)
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_BILLING_DISTRICT)
+    const { search, limit } = buildDepartmentLookupFilter(query)
+    const results = await this.repository.lookupDistricts({
+      idDealerProvider: ctx.idDealerProvider,
       search,
       limit,
     })

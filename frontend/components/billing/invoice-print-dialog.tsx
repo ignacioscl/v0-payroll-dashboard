@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { CalendarDays, Hash, Printer } from 'lucide-react'
+import { CalendarDays, Hash, Inbox, Printer } from 'lucide-react'
 
 import {
   BillingActionDialog,
@@ -9,6 +9,11 @@ import {
   BillingOptionTile,
   BillingToggleRow,
 } from '@/components/billing/billing-action-dialog'
+import {
+  InvoiceEmailQueueFields,
+  useInvoiceEmailQueuePanelState,
+} from '@/components/billing/invoice-email-queue-fields'
+import { useAddInvoiceEmailQueue } from '@/hooks/use-invoice-email-queue-add'
 import {
   usePrintInvoiceStatementPdf,
   type InvoicePrintOrderBy,
@@ -58,6 +63,8 @@ export function InvoicePrintDialog({
   const { t } = useTranslation()
   const { toast } = useToast()
   const printPdf = usePrintInvoiceStatementPdf()
+  const addToQueue = useAddInvoiceEmailQueue()
+  const queuePanel = useInvoiceEmailQueuePanelState(open)
 
   const primary = rows[0]
   const allTtkOrGeneric =
@@ -76,6 +83,7 @@ export function InvoicePrintDialog({
   const [showServiceNotes, setShowServiceNotes] = React.useState(false)
   const [separateZip, setSeparateZip] = React.useState(false)
   const [attachTimeCard, setAttachTimeCard] = React.useState(false)
+  const [queueFileName, setQueueFileName] = React.useState('')
 
   React.useEffect(() => {
     if (!open) return
@@ -87,6 +95,7 @@ export function InvoicePrintDialog({
     setShowServiceNotes(false)
     setSeparateZip(false)
     setAttachTimeCard(false)
+    setQueueFileName('')
   }, [open, rows])
 
   const label =
@@ -94,11 +103,13 @@ export function InvoicePrintDialog({
       ? primary?.fullNro || `#${primary?.id}`
       : t('invoices.bulkPrintCount', { count: rows.length })
 
+  const idsCsv = rows.map((r) => r.id).join(',')
+
   const onPrint = async () => {
     if (rows.length === 0) return
     try {
       await printPdf.mutateAsync({
-        ids_invoices: rows.map((r) => r.id).join(','),
+        ids_invoices: idsCsv,
         payed: payedFilter,
         report_type: showWoOptions ? reportType : '-1',
         order_by: showWoOptions ? orderBy : '',
@@ -113,12 +124,41 @@ export function InvoicePrintDialog({
         attach_time_card: showTimeCard && attachTimeCard,
         separate_invoices_zip: separateZip,
       })
+      toast({ title: t('invoices.actionPrintSuccess') })
       onOpenChange(false)
     } catch (err) {
       toast({
         variant: 'destructive',
         title: t('invoices.actionPrintError'),
         description: getSrsErrorMessage(err, t('invoices.actionPrintError')),
+      })
+    }
+  }
+
+  const onAddToQueue = async () => {
+    if (rows.length === 0) return
+    if (!queuePanel.hasActiveQueue && !queuePanel.queueName.trim()) {
+      toast({
+        variant: 'destructive',
+        title: t('invoices.emailQueueNameRequired'),
+      })
+      return
+    }
+    try {
+      await addToQueue.mutateAsync({
+        idsInvoices: idsCsv,
+        payed: payedFilter,
+        queuename: queuePanel.queueName.trim(),
+        fileName: queueFileName.trim(),
+        attachTimeCard: showTimeCard && attachTimeCard,
+      })
+      toast({ title: t('invoices.emailQueueSuccess') })
+      onOpenChange(false)
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: t('invoices.emailQueueError'),
+        description: getSrsErrorMessage(err, t('invoices.emailQueueError')),
       })
     }
   }
@@ -143,6 +183,11 @@ export function InvoicePrintDialog({
       onConfirm={onPrint}
       pending={printPdf.isPending}
       confirmDisabled={rows.length === 0}
+      secondaryLabel={t('invoices.emailQueueAdd')}
+      secondaryIcon={Inbox}
+      onSecondary={onAddToQueue}
+      secondaryPending={addToQueue.isPending}
+      secondaryDisabled={rows.length === 0}
       className="sm:max-w-xl"
     >
       {showWoOptions ? (
@@ -155,7 +200,7 @@ export function InvoicePrintDialog({
                   selected={reportType === opt.value}
                   onSelect={() => setReportType(opt.value)}
                   title={t(opt.labelKey)}
-                  disabled={printPdf.isPending}
+                  disabled={printPdf.isPending || addToQueue.isPending}
                 />
               ))}
             </div>
@@ -168,14 +213,14 @@ export function InvoicePrintDialog({
                 onSelect={() => setOrderBy('1')}
                 title={t('invoices.printOrderDate')}
                 icon={CalendarDays}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
               <BillingOptionTile
                 selected={orderBy === '2'}
                 onSelect={() => setOrderBy('2')}
                 title={t('invoices.printOrderWo')}
                 icon={Hash}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
             </div>
           </BillingActionSection>
@@ -186,25 +231,25 @@ export function InvoicePrintDialog({
                 checked={showRo}
                 onCheckedChange={setShowRo}
                 title={t('invoices.printColRo')}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
               <BillingToggleRow
                 checked={showPo}
                 onCheckedChange={setShowPo}
                 title={t('invoices.printColPo')}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
               <BillingToggleRow
                 checked={showTag}
                 onCheckedChange={setShowTag}
                 title={t('invoices.printColTag')}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
               <BillingToggleRow
                 checked={showServiceNotes}
                 onCheckedChange={setShowServiceNotes}
                 title={t('invoices.printColServiceNotes')}
-                disabled={printPdf.isPending}
+                disabled={printPdf.isPending || addToQueue.isPending}
               />
             </div>
           </BillingActionSection>
@@ -217,17 +262,30 @@ export function InvoicePrintDialog({
           onCheckedChange={setSeparateZip}
           title={t('invoices.printZipLabel')}
           description={t('invoices.printZipHint')}
-          disabled={printPdf.isPending}
+          disabled={printPdf.isPending || addToQueue.isPending}
         />
         {showTimeCard ? (
           <BillingToggleRow
             checked={attachTimeCard}
             onCheckedChange={setAttachTimeCard}
             title={t('invoices.printAttachTimeCard')}
-            disabled={printPdf.isPending}
+            disabled={printPdf.isPending || addToQueue.isPending}
           />
         ) : null}
       </div>
+
+      <InvoiceEmailQueueFields
+        open={open}
+        queueName={queuePanel.queueName}
+        onQueueNameChange={queuePanel.setQueueName}
+        hasActiveQueue={queuePanel.hasActiveQueue}
+        activeQueueLabel={queuePanel.draft?.descripcion}
+        isLoading={queuePanel.isLoading}
+        disabled={printPdf.isPending || addToQueue.isPending}
+        showFileName
+        fileName={queueFileName}
+        onFileNameChange={setQueueFileName}
+      />
     </BillingActionDialog>
   )
 }

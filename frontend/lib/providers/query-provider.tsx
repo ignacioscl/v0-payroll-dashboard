@@ -19,7 +19,10 @@ export function QueryProvider({ children }: QueryProviderProps) {
             refetchOnWindowFocus: false,
           },
           mutations: {
-            retry: 1,
+            // Never auto-retry: mutations here send emails, delete statements and
+            // apply discounts. A retry after a failure that already reached the
+            // server duplicates the side effect (two emails for one click).
+            retry: 0,
           },
         },
       })

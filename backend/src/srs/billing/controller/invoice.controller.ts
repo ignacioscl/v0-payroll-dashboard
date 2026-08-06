@@ -42,6 +42,23 @@ export class InvoiceController {
     return this.service.lookupServices(request.srsContext, query)
   }
 
+  @Get('/invoices/lookups/authors')
+  @ApiOkResponse({ type: InvoiceLookupResponseDto })
+  async lookupAuthors(
+    @Req() request: any,
+    @Query() query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    return this.service.lookupAuthors(request.srsContext, query)
+  }
+
+  @Get('/invoices/lookups/districts')
+  async lookupDistricts(
+    @Req() request: any,
+    @Query() query: InvoiceLookupQueryDto,
+  ) {
+    return this.service.lookupDistricts(request.srsContext, query)
+  }
+
   @Get('/invoices/:id/detail')
   @ApiOkResponse({ type: InvoiceDetailResponseDto })
   async detail(

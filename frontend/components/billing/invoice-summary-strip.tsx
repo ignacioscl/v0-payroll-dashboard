@@ -5,7 +5,12 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 import type { InvoiceSummary } from '@/lib/srs-invoices-api'
 
 function fmtMoney(n: number): string {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // Sign before the symbol: -$15.00, not $-15.00.
+  const abs = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return n < 0 ? `-$${abs}` : `$${abs}`
 }
 
 function StatCell({

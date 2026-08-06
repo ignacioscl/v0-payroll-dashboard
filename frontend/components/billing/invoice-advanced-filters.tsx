@@ -3,17 +3,16 @@
 import * as React from 'react'
 
 import { DatePicker } from '@/components/filters/date-picker'
-import { EmployeeCombobox } from '@/components/ttk/employee-combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { LookupMultiSelect } from '@/components/billing/lookup-multi-select'
 import { WoNumberFilter } from '@/components/billing/wo-number-filter'
 import {
+  useInvoiceAuthorLookup,
   useInvoiceDepartmentLookup,
   useInvoiceServiceLookup,
 } from '@/hooks/use-invoice-lookups'
-import { useTtkEmployeeSearch } from '@/hooks/use-ttk-employee-search'
 import type { InvoiceAdvancedFilterState } from '@/lib/invoice-advanced-filters'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -60,7 +59,6 @@ export function InvoiceAdvancedFilters({
   value,
   onChange,
   idDealer,
-  primaryDealerId,
   disabled,
   invoiceSearch,
   onInvoiceSearchChange,
@@ -68,8 +66,6 @@ export function InvoiceAdvancedFilters({
   value: InvoiceAdvancedFilterState
   onChange: (next: InvoiceAdvancedFilterState) => void
   idDealer: string
-  /** First selected dealer — employee search requires one dealer scope. */
-  primaryDealerId: number | null
   disabled?: boolean
   /** Invoice statement # (INVOICE_STATEMENT.full_nro). */
   invoiceSearch?: string
@@ -78,9 +74,10 @@ export function InvoiceAdvancedFilters({
   const { t } = useTranslation()
   const [deptOpen, setDeptOpen] = React.useState(false)
   const [svcOpen, setSvcOpen] = React.useState(false)
+  const [authorOpen, setAuthorOpen] = React.useState(false)
   const [deptSearch, setDeptSearch] = React.useState('')
   const [svcSearch, setSvcSearch] = React.useState('')
-  const [employeeTerm, setEmployeeTerm] = React.useState('')
+  const [authorSearch, setAuthorSearch] = React.useState('')
 
   const deptQuery = useInvoiceDepartmentLookup(idDealer, deptSearch, deptOpen)
   const svcQuery = useInvoiceServiceLookup(
@@ -89,23 +86,11 @@ export function InvoiceAdvancedFilters({
     svcSearch,
     svcOpen,
   )
-  const employeeQuery = useTtkEmployeeSearch(
-    employeeTerm,
-    primaryDealerId,
-    !disabled && primaryDealerId != null,
-  )
+  const authorQuery = useInvoiceAuthorLookup(idDealer, authorSearch, authorOpen)
 
   const patch = (partial: Partial<InvoiceAdvancedFilterState>) => {
     onChange({ ...value, ...partial })
   }
-
-  const selectedEmployee =
-    value.employeeId != null && value.employeeLabel
-      ? {
-          id: value.employeeId,
-          nombre: value.employeeLabel,
-        }
-      : null
 
   return (
     <div className="space-y-4 border-t border-border/60 pt-4">
@@ -126,6 +111,17 @@ export function InvoiceAdvancedFilters({
               disabled={disabled || !onInvoiceSearchChange}
             />
           </FilterField>
+          <div className="flex items-center justify-between gap-3 sm:col-span-2">
+            <Label htmlFor="inv-exact-match" className="text-xs text-muted-foreground">
+              {t('invoices.filterExactMatch')}
+            </Label>
+            <Switch
+              id="inv-exact-match"
+              checked={value.exactMatch}
+              onCheckedChange={(exactMatch) => patch({ exactMatch })}
+              disabled={disabled}
+            />
+          </div>
           <FilterField label={t('invoices.filterWoLabel')} className="sm:col-span-2">
             <WoNumberFilter
               value={value.woNumbers}
@@ -156,6 +152,7 @@ export function InvoiceAdvancedFilters({
         </FilterLane>
 
         <FilterLane title={t('invoices.filterLaneOrganization')}>
+          {/* District lives in the header, left of the dealer combo (legacy layout). */}
           <FilterField label={t('invoices.filterDepartmentLabel')}>
             <LookupMultiSelect
               options={deptQuery.data ?? []}
@@ -186,24 +183,35 @@ export function InvoiceAdvancedFilters({
             />
           </FilterField>
           <FilterField label={t('invoices.filterEmployeeLabel')} className="sm:col-span-2">
-            <EmployeeCombobox
-              value={selectedEmployee}
-              onChange={(emp) =>
+            <LookupMultiSelect
+              options={authorQuery.data ?? []}
+              value={value.authorIds}
+              onChange={(authorIds) =>
                 patch({
-                  employeeId: emp?.id ?? null,
-                  employeeLabel: emp?.nombre ?? null,
+                  authorIds,
+                  authorsExclude: authorIds.length === 0 ? false : value.authorsExclude,
+                  employeeId: null,
+                  employeeLabel: null,
                 })
               }
-              searchTerm={employeeTerm}
-              onSearchTermChange={setEmployeeTerm}
-              employees={employeeQuery.data}
-              isLoading={employeeQuery.isFetching}
-              disabled={disabled}
-              dealerSelected={primaryDealerId != null}
-              compact
+              onSearchChange={setAuthorSearch}
+              onOpenChange={setAuthorOpen}
               placeholder={t('invoices.filterEmployeePlaceholder')}
+              loading={authorQuery.isFetching}
+              disabled={disabled}
             />
           </FilterField>
+          <div className="flex items-center justify-between gap-3 sm:col-span-2">
+            <Label htmlFor="inv-authors-exclude" className="text-xs text-muted-foreground">
+              {t('invoices.filterAuthorsExclude')}
+            </Label>
+            <Switch
+              id="inv-authors-exclude"
+              checked={value.authorsExclude}
+              onCheckedChange={(authorsExclude) => patch({ authorsExclude })}
+              disabled={disabled || value.authorIds.length === 0}
+            />
+          </div>
         </FilterLane>
 
         <FilterLane title={t('invoices.filterLaneStatus')}>

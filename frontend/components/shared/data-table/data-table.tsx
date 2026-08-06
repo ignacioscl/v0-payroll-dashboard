@@ -63,6 +63,8 @@ export interface DataTableColumnMeta<TData> {
   label?: string
   /** Custom value getter used when exporting (defaults to the accessor). */
   exportValue?: (row: TData) => unknown
+  /** Set to false to exclude this column from XLSX/CSV export. */
+  exportable?: boolean
   /** Tailwind class applied to the header cell. */
   headerClassName?: string
   /** Tailwind class applied to every body cell of this column. */

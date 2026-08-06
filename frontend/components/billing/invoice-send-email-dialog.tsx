@@ -1,8 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2, Mail } from 'lucide-react'
+import { Inbox, Loader2, Mail } from 'lucide-react'
 
+import { InvoiceEmailQueueFields, useInvoiceEmailQueuePanelState } from '@/components/billing/invoice-email-queue-fields'
 import { InvoiceStatementEmailAuditDialog } from '@/components/billing/invoice-statement-email-audit-dialog'
 import { SentEmailAccountCombobox } from '@/components/billing/sent-email-account-combobox'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useAddInvoiceEmailQueue } from '@/hooks/use-invoice-email-queue-add'
 import { useInvoiceSentEmailAccounts } from '@/hooks/use-invoice-sent-email-accounts'
 import { useToast } from '@/hooks/use-toast'
 import { useSendInvoiceEmail } from '@/hooks/use-send-invoice-email'
@@ -68,6 +70,8 @@ export function InvoiceSendEmailDialog({
   const { toast } = useToast()
   const { user } = useSrsMe()
   const sendEmail = useSendInvoiceEmail()
+  const addToQueue = useAddInvoiceEmailQueue()
+  const queuePanel = useInvoiceEmailQueuePanelState(open)
   const sentAccounts = useInvoiceSentEmailAccounts(idDealer, open)
   const [emailTo, setEmailTo] = React.useState('')
   const [subject, setSubject] = React.useState('')
@@ -134,21 +138,55 @@ export function InvoiceSendEmailDialog({
     }
   }
 
-  const sending = sendEmail.isPending
+  const handleAddToQueue = async () => {
+    if (!statementId) return
+    if (!queuePanel.hasActiveQueue && !queuePanel.queueName.trim()) {
+      setError(t('invoices.emailQueueNameRequired'))
+      return
+    }
+    if (emailTo.trim() && !isValidEmailList(emailTo)) {
+      setError(t('invoices.actionEmailInvalid'))
+      return
+    }
+
+    setError(null)
+    try {
+      await addToQueue.mutateAsync({
+        idsInvoices: String(statementId),
+        idDealer,
+        emailto: emailTo.trim() || undefined,
+        payed: payedFilter,
+        subject: subject.trim(),
+        message: message.trim(),
+        replyto: replyTo.trim(),
+        fileName: fileName.trim(),
+        queuename: queuePanel.queueName.trim(),
+      })
+      toast({ title: t('invoices.emailQueueSuccess') })
+      onOpenChange(false)
+    } catch (err) {
+      setError(getSrsErrorMessage(err, t('invoices.emailQueueError')))
+    }
+  }
+
+  const busy = sendEmail.isPending || addToQueue.isPending
   const loadingAccounts = open && sentAccounts.isLoading
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        {/* Tall form: cap the height and scroll the fields so the footer buttons
+            always stay on screen. Wider than the default so the four actions fit
+            on one row instead of wrapping. */}
+        <DialogContent className="flex max-h-[90dvh] flex-col gap-4 overflow-hidden sm:max-w-xl">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base">{t('invoices.actionEmailTitle')}</DialogTitle>
             <DialogDescription className="text-xs tabular-nums">
               {invoiceLabel}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-1">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-1 pr-1">
             {showPriorSendPanel ? (
               <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs">
                 <p className="font-medium text-foreground">
@@ -168,7 +206,7 @@ export function InvoiceSendEmailDialog({
                 onChange={(e) => setEmailTo(e.target.value)}
                 placeholder={t('invoices.actionEmailToPlaceholder')}
                 autoComplete="email"
-                disabled={sending || loadingAccounts}
+                disabled={busy || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">{t('invoices.actionEmailToHint')}</p>
             </div>
@@ -181,7 +219,7 @@ export function InvoiceSendEmailDialog({
                   accounts={accountOptions}
                   onPick={handleAccountPick}
                   isLoading={sentAccounts.isLoading}
-                  disabled={sending || loadingAccounts}
+                  disabled={busy || loadingAccounts}
                 />
               </div>
             ) : null}
@@ -193,7 +231,7 @@ export function InvoiceSendEmailDialog({
                 value={fileName}
                 onChange={(e) => setFileName(e.target.value)}
                 placeholder={t('invoices.actionEmailFileNamePlaceholder')}
-                disabled={sending || loadingAccounts}
+                disabled={busy || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">{t('invoices.actionEmailFileNameHint')}</p>
             </div>
@@ -205,7 +243,7 @@ export function InvoiceSendEmailDialog({
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder={t('invoices.actionEmailSubjectPlaceholder')}
-                disabled={sending || loadingAccounts}
+                disabled={busy || loadingAccounts}
               />
               <p className="text-[11px] text-muted-foreground">
                 {t('invoices.actionEmailSubjectDefaultHint', { provider: providerLabel })}
@@ -221,7 +259,7 @@ export function InvoiceSendEmailDialog({
                 placeholder={t('invoices.actionEmailMessagePlaceholder')}
                 rows={4}
                 className="text-sm"
-                disabled={sending || loadingAccounts}
+                disabled={busy || loadingAccounts}
               />
             </div>
 
@@ -233,14 +271,25 @@ export function InvoiceSendEmailDialog({
                 value={replyTo}
                 onChange={(e) => setReplyTo(e.target.value)}
                 placeholder={t('invoices.actionEmailReplyPlaceholder')}
-                disabled={sending || loadingAccounts}
+                disabled={busy || loadingAccounts}
               />
             </div>
+
+            <InvoiceEmailQueueFields
+              open={open}
+              queueName={queuePanel.queueName}
+              onQueueNameChange={queuePanel.setQueueName}
+              hasActiveQueue={queuePanel.hasActiveQueue}
+              activeQueueLabel={queuePanel.draft?.descripcion}
+              isLoading={queuePanel.isLoading}
+              disabled={busy}
+              className="border-t-0 pt-1"
+            />
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
 
-          <DialogFooter className={cn('gap-2 sm:justify-between')}>
+          <DialogFooter className={cn('shrink-0 gap-2 sm:justify-between')}>
             <Button
               type="button"
               variant="outline"
@@ -251,16 +300,29 @@ export function InvoiceSendEmailDialog({
             >
               {t('invoices.actionEmailAuditTitle')}
             </Button>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
                 {t('common.cancel')}
               </Button>
               <Button
                 type="button"
-                onClick={() => void handleSend()}
-                disabled={sending || loadingAccounts || !emailTo.trim()}
+                variant="outline"
+                onClick={() => void handleAddToQueue()}
+                disabled={busy || loadingAccounts || !statementId}
               >
-                {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                {addToQueue.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Inbox className="mr-2 h-4 w-4" />
+                )}
+                {t('invoices.emailQueueAdd')}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={busy || loadingAccounts || !emailTo.trim()}
+              >
+                {sendEmail.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                 {t('invoices.actionEmailSend')}
               </Button>
             </div>

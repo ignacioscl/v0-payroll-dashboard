@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import {
   AlertTriangle,
   ChevronDown,
@@ -22,6 +22,7 @@ import { InvoiceGeneralStatementDialog } from '@/components/billing/invoice-gene
 import { InvoicePoRoDialog } from '@/components/billing/invoice-po-ro-dialog'
 import { InvoicePrintDialog } from '@/components/billing/invoice-print-dialog'
 import { InvoiceRowActions } from '@/components/billing/invoice-row-actions'
+import { InvoiceTtkDetailDialog } from '@/components/billing/invoice-ttk-detail-dialog'
 import {
   DataTable,
   DataTableColumnHeader,
@@ -63,7 +64,13 @@ type InvoiceListQuery = ReturnType<typeof useInvoiceList>
 
 function fmtMoney(n: number | undefined | null): string {
   if (n === undefined || n === null) return '—'
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // Sign goes before the symbol: -$15.00, not $-15.00 (statements whose discount
+  // exceeds the subtotal do show negative totals).
+  const abs = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return n < 0 ? `-$${abs}` : `$${abs}`
 }
 
 function fmtDate(value: string | undefined | null): string {
@@ -291,6 +298,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
   const { hasPermission, user } = useSrsMe()
   const removeWo = useRemoveWoFromInvoice()
   const [pendingRelId, setPendingRelId] = React.useState<number | null>(null)
+  const [ttkDetailOpen, setTtkDetailOpen] = React.useState(false)
   const token = typeTokenOf(row.statementType)
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const canRemove =
@@ -304,19 +312,49 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     staleTime: 5 * 60 * 1000,
   })
 
+  const ttkDetailButton =
+    token === 'ttk' ? (
+      <>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => setTtkDetailOpen(true)}
+          >
+            <ReceiptText className="h-3.5 w-3.5" />
+            {t('invoices.ttkDetailViewButton')}
+          </Button>
+        </div>
+        <InvoiceTtkDetailDialog
+          open={ttkDetailOpen}
+          onOpenChange={setTtkDetailOpen}
+          statementId={row.id}
+          invoiceLabel={row.fullNro ? `#${row.fullNro}` : String(row.id)}
+        />
+      </>
+    ) : null
+
   if (detail.isLoading) {
     return (
-      <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t('invoices.detailLoading')}
+      <div className="space-y-3">
+        {ttkDetailButton}
+        <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('invoices.detailLoading')}
+        </div>
       </div>
     )
   }
   if (detail.isError) {
     return (
-      <div className="flex items-center gap-2 py-2 text-xs text-destructive">
-        <AlertTriangle className="h-4 w-4" />
-        {t('invoices.detailError')}
+      <div className="space-y-3">
+        {ttkDetailButton}
+        <div className="flex items-center gap-2 py-2 text-xs text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          {t('invoices.detailError')}
+        </div>
       </div>
     )
   }
@@ -325,7 +363,12 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
   const genericRows = detail.data?.genericRows ?? []
 
   if (woRows.length === 0 && genericRows.length === 0) {
-    return <div className="py-2 text-xs text-muted-foreground">{t('invoices.detailEmpty')}</div>
+    return (
+      <div className="space-y-3">
+        {ttkDetailButton}
+        <div className="py-2 text-xs text-muted-foreground">{t('invoices.detailEmpty')}</div>
+      </div>
+    )
   }
 
   const lineUnpaid = (r: {
@@ -336,6 +379,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
 
   return (
     <div className="space-y-4">
+      {ttkDetailButton}
       {woRows.length > 0 ? (
         <DetailSection title={t('invoices.detailWoTitle')}>
           <DetailTable>
@@ -512,6 +556,8 @@ export function InvoiceListTable({
   hasDates,
   pageSize,
   onPageSizeChange,
+  sorting,
+  onSortingChange,
   showDealerSubline,
   idDealer,
   payedFilter,
@@ -523,6 +569,8 @@ export function InvoiceListTable({
   hasDates: boolean
   pageSize: number
   onPageSizeChange: (pageSize: number) => void
+  sorting: SortingState
+  onSortingChange: (next: SortingState) => void
   /** Legacy: debajo del nro de invoice cuando hay multi-dealer en el header. */
   showDealerSubline?: boolean
   idDealer: string
@@ -678,7 +726,7 @@ export function InvoiceListTable({
         accessorFn: (row) => row.fullNro,
         size: 190,
         minSize: 150,
-        enableSorting: false,
+        enableSorting: true,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colInvoice')} />
         ),
@@ -728,7 +776,7 @@ export function InvoiceListTable({
         size: 148,
         minSize: 128,
         maxSize: 168,
-        enableSorting: false,
+        enableSorting: true,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colPeriod')} />
         ),
@@ -1142,6 +1190,9 @@ export function InvoiceListTable({
         enableRowSelection={enableSelection}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        sorting={sorting}
+        onSortingChange={onSortingChange}
+        manualSorting
         toolbarTrailing={toolbarTrailing}
         infiniteScroll={{
           hasNextPage: gateReady ? (hasNextPage ?? false) : false,
@@ -1243,6 +1294,22 @@ export function InvoiceListTable({
           if (!open) setExportRows(null)
         }}
         rows={exportRows ?? []}
+        filters={{
+          idDealer,
+          fechaDesde: input?.fechaDesde,
+          fechaHasta: input?.fechaHasta,
+          payed: payedFilter,
+          idDepartment: input?.idDepartment,
+          idService: input?.idInvoiceService,
+          includeZero: input?.includeZero,
+          filterNotCero: input?.includeZero ? 0 : 1,
+          idsEmployees: input?.idAuthorIn
+            ? input.idAuthorIn
+            : input?.idAuthor
+              ? String(input.idAuthor)
+              : undefined,
+          isNotinIdsEmployees: input?.authorsExclude === 1,
+        }}
       />
     </>
   )

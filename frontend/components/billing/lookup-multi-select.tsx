@@ -75,6 +75,12 @@ export function LookupMultiSelect({
     return t('invoices.filterManySelected', { count: value.length })
   }, [options, placeholder, t, value])
 
+  const visibleIds = useMemo(() => options.map((o) => o.id), [options])
+  const isFiltering = search.trim().length > 0
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => draft.includes(id))
+  const checkAllLabel = isFiltering ? t('common.checkAllFiltered') : t('common.checkAll')
+
   const handleOpenChange = (next: boolean) => {
     if (disabled) return
     onOpenChange?.(next)
@@ -93,6 +99,23 @@ export function LookupMultiSelect({
 
   const toggle = (id: number) => {
     setDraft((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]))
+  }
+
+  const toggleAllVisible = () => {
+    setDraft((prev) => {
+      if (visibleIds.length === 0) return prev
+      if (visibleIds.every((id) => prev.includes(id))) {
+        const drop = new Set(visibleIds)
+        return prev.filter((id) => !drop.has(id))
+      }
+      return [...new Set([...prev, ...visibleIds])]
+    })
+  }
+
+  const handleRowMouseDown = (action: () => void) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    action()
   }
 
   return (
@@ -129,6 +152,21 @@ export function LookupMultiSelect({
             onValueChange={setSearch}
             className="text-xs"
           />
+          {/* Sticky outside cmdk filter so it never disappears while searching. */}
+          <button
+            type="button"
+            disabled={visibleIds.length === 0}
+            onMouseDown={handleRowMouseDown(toggleAllVisible)}
+            className={cn(
+              'flex w-full cursor-pointer items-center px-2 py-1.5 text-xs outline-none',
+              'hover:bg-accent hover:text-accent-foreground',
+              'disabled:pointer-events-none disabled:opacity-50',
+              'border-b border-border',
+            )}
+          >
+            <RowCheckbox checked={allVisibleSelected} />
+            <span className="font-medium">{checkAllLabel}</span>
+          </button>
           <CommandList className="max-h-[240px]">
             <CommandEmpty>{emptyLabel ?? t('common.noRecords')}</CommandEmpty>
             <CommandGroup>
@@ -138,8 +176,9 @@ export function LookupMultiSelect({
                   <CommandItem
                     key={opt.id}
                     value={String(opt.id)}
-                    onSelect={() => toggle(opt.id)}
-                    className="cursor-pointer text-xs"
+                    onSelect={() => {}}
+                    onMouseDown={handleRowMouseDown(() => toggle(opt.id))}
+                    className="cursor-pointer text-xs data-[selected=true]:text-foreground"
                   >
                     <RowCheckbox checked={checked} />
                     <span className="min-w-0 flex-1">

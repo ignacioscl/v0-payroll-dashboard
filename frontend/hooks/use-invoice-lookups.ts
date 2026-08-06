@@ -3,12 +3,15 @@
 import { useQuery } from '@tanstack/react-query'
 
 import {
+  fetchInvoiceAuthors,
   fetchInvoiceDepartments,
+  fetchInvoiceDistricts,
   fetchInvoiceServices,
+  type InvoiceDistrictOption,
   type InvoiceLookupOption,
 } from '@/lib/srs-invoices-api'
 
-export type { InvoiceLookupOption }
+export type { InvoiceDistrictOption, InvoiceLookupOption }
 
 export function useInvoiceDepartmentLookup(
   idDealer: string,
@@ -39,6 +42,28 @@ export function useInvoiceServiceLookup(
         search: search || undefined,
       }),
     enabled: enabled && idDealer.length > 0,
+    staleTime: 60_000,
+  })
+}
+
+export function useInvoiceAuthorLookup(
+  idDealer: string,
+  search: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['invoice-author-lookup', idDealer, search],
+    queryFn: () => fetchInvoiceAuthors({ idDealer, search: search || undefined }),
+    enabled: enabled && idDealer.length > 0,
+    staleTime: 60_000,
+  })
+}
+
+export function useInvoiceDistrictLookup(search: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['invoice-district-lookup', search],
+    queryFn: () => fetchInvoiceDistricts({ search: search || undefined }),
+    enabled,
     staleTime: 60_000,
   })
 }

@@ -10,6 +10,7 @@ export type InvoiceEmailActiveQueueDraft = {
   asunto: string
   message: string
   replyTo: string
+  descripcion?: string
 }
 
 export function invoiceEmailActiveQueueQueryKey() {
@@ -31,7 +32,7 @@ export function useInvoiceEmailActiveQueue(enabled: boolean) {
       const raw = await apiRequest.getCustom('', undefined, {})
       throwIfSrsFail(raw, 'Failed to load email queue draft')
       if (raw && typeof raw === 'object' && 'data' in raw) {
-        const data = (raw as { data?: InvoiceEmailActiveQueueDraft | null }).data
+        const data = (raw as unknown as { data?: InvoiceEmailActiveQueueDraft | null }).data
         return data ?? null
       }
       return null

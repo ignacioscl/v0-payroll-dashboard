@@ -6,7 +6,6 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { buildDealerFilterSql, buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
 import {
   applyZeroFilter,
-  statementHasPositiveTotalSql,
 } from '../../shared/kpi/srs-kpi-zero-filter'
 import { StatementType, statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
 import {
@@ -50,8 +49,13 @@ export class InvoiceRepository {
       where += ` AND s.statement_type IN (${statementTypesSqlIn(f.statementTypes)})`
     }
     if (f.search) {
-      where += ` AND s.full_nro LIKE CONCAT('%', ?, '%')`
-      params.push(f.search)
+      if (f.exactMatch) {
+        where += ' AND s.full_nro = ?'
+        params.push(f.search)
+      } else {
+        where += ` AND s.full_nro LIKE CONCAT('%', ?, '%')`
+        params.push(f.search)
+      }
     }
     if (f.sended === '0' || f.sended === '1') {
       where += ' AND s.sended = ?'
@@ -60,7 +64,12 @@ export class InvoiceRepository {
     if (f.payed === '0') where += ' AND IS_STATEMENT_BILLED(s.id) = 0'
     else if (f.payed === '1') where += ' AND IS_STATEMENT_BILLED(s.id) = 1'
 
-    if (f.idAuthor) {
+    if (f.authorIds.length) {
+      const ids = sqlInInts(f.authorIds)
+      where += f.authorsExclude
+        ? ` AND s.id_author NOT IN (${ids})`
+        : ` AND s.id_author IN (${ids})`
+    } else if (f.idAuthor) {
       where += ' AND s.id_author = ?'
       params.push(f.idAuthor)
     }
@@ -164,7 +173,15 @@ export class InvoiceRepository {
       params.push(...lineParams)
     }
 
-    where += applyZeroFilter(f.includeZero, statementHasPositiveTotalSql('s'))
+    // "Hide $0 invoices": legacy evaluates the total with discount = 0
+    // (InvoiceStatementHelperDao:144), i.e. "does this statement have billable
+    // services?", not "is the final amount positive?". Using the real discount here
+    // hid statements whose discount exceeds the subtotal (negative total) — e.g.
+    // CHV33871: subtotal 85, discount 100 → -15 → legacy lists it, v0 dropped it.
+    where += applyZeroFilter(
+      f.includeZero,
+      ' AND GET_TOTAL_BY_STATEMENT(s.id, 0, 0, s.discount_type, NULL) > 0',
+    )
 
     return { join: stmt.join, where, params }
   }
@@ -177,6 +194,16 @@ export class InvoiceRepository {
         ? ''
         : ` LIMIT ${Math.trunc(f.pageSize)} OFFSET ${Math.trunc((f.page - 1) * f.pageSize)}`
 
+    // Whitelist only — never interpolate client values into ORDER BY.
+    const ORDER_COLUMNS: Record<'invoiceNro' | 'dateFrom', string> = {
+      invoiceNro: 's.full_nro',
+      dateFrom: 's.fecha_desde',
+    }
+    const dir = f.orderDir === 'asc' ? 'ASC' : 'DESC'
+    const orderBy = f.orderBy
+      ? `${ORDER_COLUMNS[f.orderBy]} ${dir}, s.id ${dir}`
+      : 's.fecha_desde DESC, s.fecha_create, s.id DESC'
+
     const rows = await this.srs.query(
       `SELECT s.id, s.full_nro, s.statement_type, s.estado, s.sended,
               s.emails_sended, s.last_sended,
@@ -188,6 +215,7 @@ export class InvoiceRepository {
               inv_serv.nombre AS invoice_service,
               u.nombre        AS author,
               c.razon_social  AS dealer,
+              s.id_dealer     AS id_dealer,
               GET_NRO_WO_FROM_INVOICE(s.id)                                         AS wo,
               CASE
                 WHEN s.statement_type = 1
@@ -219,7 +247,7 @@ export class InvoiceRepository {
        ) lb ON lb.id_statement = s.id
        LEFT JOIN BILLING b ON b.id = lb.id_billing
        ${where}
-       ORDER BY s.fecha_desde DESC, s.fecha_create${limitClause}`,
+       ORDER BY ${orderBy}${limitClause}`,
       params,
     )
 
@@ -237,6 +265,7 @@ export class InvoiceRepository {
       author: r.author ?? undefined,
       createdBySchedule: Number(r.id_invoice_statement_schedule ?? 0) > 0,
       dealer: r.dealer ?? undefined,
+      idDealer: r.id_dealer != null ? Number(r.id_dealer) : undefined,
       fechaCreate: r.fecha_create,
       fechaDesde: r.fecha_desde ?? undefined,
       fechaHasta: r.fecha_hasta ?? undefined,
@@ -546,6 +575,101 @@ export class InvoiceRepository {
       id: Number(r.id),
       label: String(r.label ?? ''),
       sublabel: r.sublabel ? String(r.sublabel) : undefined,
+    }))
+  }
+
+  /**
+   * Authors who have created invoices in the dealer scope (legacy haveInvoice filter).
+   * Source: distinct INVOICE_STATEMENT.id_author for the provider + dealers.
+   */
+  async lookupAuthors(f: {
+    idDealerProvider: number
+    idUsuario: number
+    dealerIds: number[]
+    skipDealerRestriction: boolean
+    search?: string
+    limit: number
+  }): Promise<InvoiceLookupOptionDto[]> {
+    if (f.dealerIds.length === 0) return []
+    const restrict = buildDealerRestrictionClause(
+      f.idUsuario,
+      f.dealerIds,
+      f.skipDealerRestriction,
+    )
+    const params: any[] = [f.idDealerProvider, ...restrict.params]
+    let extra = ''
+    if (f.search) {
+      extra += ' AND u.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    const rows = await this.srs.query(
+      `SELECT DISTINCT u.id_usuario AS id, u.nombre AS label
+       FROM INVOICE_STATEMENT s
+       INNER JOIN CONTRATISTA c ON c.id = s.id_dealer
+       INNER JOIN usuarios u ON u.id_usuario = s.id_author
+       WHERE s.estado = 1
+         AND s.id_dealer_provider = ?
+         AND s.id_author IS NOT NULL
+         AND s.id_author > 0
+         ${restrict.and}
+         ${extra}
+       ORDER BY u.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+    }))
+  }
+
+  /**
+   * Districts (datos_parametricos, CategoriaParametrica::$ID_DISTRICTS = 23) for the
+   * provider, with linked dealer customer ids.
+   * Client filters the dealer multiselect by these ids (legacy districtManager parity).
+   */
+  async lookupDistricts(f: {
+    idDealerProvider: number
+    search?: string
+    limit: number
+  }): Promise<Array<InvoiceLookupOptionDto & { dealerIds: number[] }>> {
+    // Order matters: join provider, category, then the owner filter (legacy
+    // `addingIdDealer`: global districts plus the caller company's own).
+    const params: any[] = [f.idDealerProvider, 23, f.idDealerProvider]
+    let extra = ''
+    if (f.search) {
+      extra += ' AND dp.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    // Table/column names mirror DatosParametricosDao (legacy): `datos_parametricos`
+    // keyed by `id_dato_parametrico`, categories joined through `categorias_parametricas`.
+    const rows = await this.srs.query(
+      `SELECT dp.id_dato_parametrico AS id, dp.nombre AS label,
+              GROUP_CONCAT(DISTINCT dr.id_dealer_customer) AS dealer_ids
+       FROM datos_parametricos dp
+       INNER JOIN categorias_parametricas cp
+         ON cp.id_categoria_parametrica = dp.id_categoria_parametrica
+        AND cp.estado = 1
+       LEFT JOIN DEALER_DISTRICT_REL ddr ON ddr.id_district = dp.id_dato_parametrico
+       LEFT JOIN DEALER_REL dr ON dr.id = ddr.id_dealer_rel
+         AND dr.id_dealer_provider = ?
+         AND dr.fecha_end IS NULL
+       WHERE dp.id_categoria_parametrica = ?
+         AND dp.estado = 1
+         AND (dp.id_dealer IS NULL OR dp.id_dealer = ?)
+         ${extra}
+       GROUP BY dp.id_dato_parametrico, dp.nombre
+       ORDER BY dp.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+      dealerIds: String(r.dealer_ids ?? '')
+        .split(',')
+        .map((x) => Number(x))
+        .filter((n) => Number.isFinite(n) && n > 0),
     }))
   }
 }

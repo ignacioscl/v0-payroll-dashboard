@@ -23,6 +23,15 @@ interface FilterContextType {
   setSelectedDealer: (value: string) => void
   selectedDealers: string[]
   setSelectedDealers: (value: string[] | ((prev: string[]) => string[])) => void
+  /**
+   * When set (invoices district filter), header DealerMultiSelect only shows these ids.
+   * `null` = no restriction.
+   */
+  dealerIdAllowList: string[] | null
+  setDealerIdAllowList: (value: string[] | null) => void
+  /** Invoices header district filter (narrows the dealer combo; not a query param). */
+  selectedDistricts: number[]
+  setSelectedDistricts: (value: number[]) => void
   selectedType: string
   setSelectedType: (value: string) => void
   selectedStatus: string
@@ -48,6 +57,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
   const [selectedDealers, setSelectedDealersState] = useState<string[]>([])
+  const [dealerIdAllowList, setDealerIdAllowList] = useState<string[] | null>(null)
+  const [selectedDistricts, setSelectedDistricts] = useState<number[]>([])
   const [selectedDealer, setSelectedDealer] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
@@ -94,6 +105,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSelectedEmployee(null)
     writeSelectedDealersCookie([])
     setSelectedDealersState([])
+    setDealerIdAllowList(null)
     setSelectedDealer('all')
     setSelectedType('all')
     setSelectedStatus('all')
@@ -114,6 +126,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setSelectedDealer,
       selectedDealers,
       setSelectedDealers,
+      dealerIdAllowList,
+      selectedDistricts,
+      setSelectedDistricts,
+      setDealerIdAllowList,
       selectedType,
       setSelectedType,
       selectedStatus,

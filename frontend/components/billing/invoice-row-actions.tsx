@@ -322,7 +322,10 @@ export function InvoiceRowActions({
         onOpenChange={setEmailOpen}
         statementId={row.id}
         invoiceLabel={label}
-        idDealer={idDealer}
+        // The statement's own dealer — the header filter may hold several dealers and
+        // only the first one reaches this component. Using that one would load another
+        // dealer's sent-email accounts and file the audit row under the wrong dealer.
+        idDealer={row.idDealer != null ? String(row.idDealer) : idDealer}
         payedFilter={payedFilter}
         sended={row.sended}
         emailsSended={row.emailsSended}

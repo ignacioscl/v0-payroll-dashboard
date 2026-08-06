@@ -40,7 +40,10 @@ export function usePrintGeneralStatementPdf() {
         include_generic: payload.include_generic ? '1' : '0',
       })
       const result = await assertPdfOrZipBlob(blob, 'Failed to generate general statement PDF')
-      openPdfBlobInNewTab(result.blob)
+      openPdfBlobInNewTab(
+        result.blob,
+        `general_statement_${new Date().toISOString().slice(0, 10)}.pdf`,
+      )
     },
   })
 }

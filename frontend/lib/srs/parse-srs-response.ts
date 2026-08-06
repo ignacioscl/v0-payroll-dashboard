@@ -119,14 +119,27 @@ export async function assertPdfOrZipBlob(
 }
 
 /** Opens a PDF blob in a new browser tab. */
-export function openPdfBlobInNewTab(blob: Blob): void {
+export function openPdfBlobInNewTab(blob: Blob, downloadName = 'invoice.pdf'): 'opened' | 'downloaded' {
   const url = URL.createObjectURL(blob)
-  const opened = window.open(url, '_blank', 'noopener,noreferrer')
-  if (!opened) {
-    URL.revokeObjectURL(url)
-    throw new Error('Pop-up blocked — allow pop-ups for this site to view the PDF')
+  // No `noopener` here: with that feature the browser returns null even when the tab
+  // opens fine, which would make the check below think it was blocked and download a
+  // duplicate copy. The URL is a same-origin blob, so we just detach `opener` instead.
+  const opened = window.open(url, '_blank')
+  if (opened) {
+    try {
+      opened.opener = null
+    } catch {
+      /* ignore — cross-origin access is not expected for blob: URLs */
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+    return 'opened'
   }
-  window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+  // The PDF is fetched with `await`, so by the time we call window.open the browser
+  // no longer treats it as user-initiated and blocks the pop-up. The document is
+  // already in hand — download it instead of failing.
+  URL.revokeObjectURL(url)
+  downloadBlob(blob, downloadName)
+  return 'downloaded'
 }
 
 /** Triggers a file download for a blob (ZIP or PDF). */

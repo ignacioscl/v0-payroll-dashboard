@@ -1,6 +1,9 @@
 'use client'
 
-import { useToast } from '@/hooks/use-toast'
+// Unmounted shadcn toaster: the app renders sonner's <Toaster /> instead
+// (see components/app-providers.tsx). Kept on the original shadcn store so it
+// still type-checks; `@/hooks/use-toast` now forwards to sonner.
+import { useToast } from '@/components/ui/use-toast'
 import {
   Toast,
   ToastClose,

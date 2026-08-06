@@ -11,9 +11,10 @@ const toOptionalInt = ({ value }: { value: unknown }) => {
 }
 
 export class InvoiceLookupQueryDto {
-  @ApiProperty({ description: 'Dealer ids (comma-separated)', example: '12,34' })
+  @ApiPropertyOptional({ description: 'Dealer ids (comma-separated)', example: '12,34' })
+  @IsOptional()
   @IsString()
-  idDealer!: string
+  idDealer?: string
 
   @ApiPropertyOptional({ description: 'Filter by name', example: 'Body' })
   @IsOptional()
@@ -47,7 +48,7 @@ export class InvoiceLookupResponseDto {
 
 export function buildDepartmentLookupFilter(query: InvoiceLookupQueryDto) {
   return {
-    dealerIds: parseCsvPositiveInts(query.idDealer),
+    dealerIds: parseCsvPositiveInts(query.idDealer ?? ''),
     search: parseOptionalTrimmed(query.search),
     limit: query.limit && query.limit > 0 ? Math.min(query.limit, 200) : 80,
   }
@@ -55,7 +56,7 @@ export function buildDepartmentLookupFilter(query: InvoiceLookupQueryDto) {
 
 export function buildServiceLookupFilter(query: InvoiceLookupQueryDto) {
   return {
-    dealerIds: parseCsvPositiveInts(query.idDealer),
+    dealerIds: parseCsvPositiveInts(query.idDealer ?? ''),
     departmentIds: parseCsvPositiveInts(query.idDepartment),
     search: parseOptionalTrimmed(query.search),
     limit: query.limit && query.limit > 0 ? Math.min(query.limit, 200) : 80,

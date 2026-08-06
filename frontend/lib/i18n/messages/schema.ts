@@ -229,6 +229,7 @@ export interface Messages {
     actionLogError: string
     actionPrintTitle: string
     actionPrintError: string
+    actionPrintSuccess: string
     bulkSelectRequired: string
     bulkSelectAll: string
     bulkSelectRow: string
@@ -236,8 +237,18 @@ export interface Messages {
     bulkExportHint: string
     bulkExportFormat: string
     bulkExportDownload: string
+    bulkExportSendEmail: string
+    bulkExportEmailSuccess: string
+    bulkExportDownloadSuccess: string
     bulkExportError: string
-    bulkExportEmailHint: string
+    bulkExportType: string
+    bulkExportTypeGrid: string
+    bulkExportTypeGridHint: string
+    bulkExportTypeInvoice: string
+    bulkExportTypeInvoiceHint: string
+    bulkExportTypeWo: string
+    bulkExportTypeWoHint: string
+    bulkExportDelivery: string
     bulkExportXlsxHint: string
     bulkExportCsvHint: string
     bulkGsTitle: string
@@ -305,6 +316,17 @@ export interface Messages {
     actionEmailSuccess: string
     actionEmailError: string
     actionEmailInvalid: string
+    emailQueueAdd: string
+    emailQueueSuccess: string
+    emailQueueError: string
+    emailQueueNameRequired: string
+    emailQueueLoading: string
+    emailQueueActive: string
+    emailQueueActiveNamed: string
+    emailQueueNone: string
+    emailQueueName: string
+    emailQueueNamePlaceholder: string
+    emailQueueNameHint: string
     actionDeleteTitle: string
     actionDeleteConfirm: string
     actionDeleteConfirmBtn: string
@@ -367,6 +389,24 @@ export interface Messages {
     detailWoTitle: string
     detailGenericTitle: string
     detailTtkTitle: string
+    ttkDetailTitle: string
+    ttkDetailLoading: string
+    ttkDetailEmpty: string
+    ttkDetailError: string
+    ttkDetailViewButton: string
+    ttkDateAllPeriod: string
+    ttkColEmployee: string
+    ttkColDptoRole: string
+    ttkColDate: string
+    ttkColTotalHrs: string
+    ttkColHrs: string
+    ttkColHrsPay: string
+    ttkColOt: string
+    ttkColOtPay: string
+    ttkColPayroll: string
+    ttkColPayrollTaxes: string
+    ttkColTotalPayroll: string
+    ttkColDealerAmount: string
     colWo: string
     colVehicle: string
     colDepartment: string
@@ -410,6 +450,13 @@ export interface Messages {
     filterServiceChip: string
     filterEmployeeLabel: string
     filterEmployeePlaceholder: string
+    filterAuthorsExclude: string
+    filterAuthorsChip: string
+    filterAuthorsExcludeChip: string
+    filterExactMatch: string
+    filterDistrictLabel: string
+    filterDistrictPlaceholder: string
+    filterDistrictChip: string
     filterCheckDateLabel: string
     filterCheckDatePlaceholder: string
     filterCheckDateChip: string
@@ -491,6 +538,8 @@ export interface Messages {
     exportInProgress: string
     clearSearch: string
     clearAll: string
+    checkAll: string
+    checkAllFiltered: string
     fullScreen: string
     rows: string
     columns: string

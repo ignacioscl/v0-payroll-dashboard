@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 
 import { SrsJwtGuard } from './srs-jwt.guard'
 import { SrsAuthContextService } from './srs-auth-context.service'
+import { SrsPermissionRepository } from './srs-permission.repository'
 
 /**
  * Auth de los endpoints SRS: valida el JWT de PHP y resuelve el contexto del
@@ -17,8 +18,8 @@ import { SrsAuthContextService } from './srs-auth-context.service'
       useFactory: (config: ConfigService) => ({ secret: config.get<string>('jwtSecret') }),
     }),
   ],
-  providers: [SrsJwtGuard, SrsAuthContextService],
+  providers: [SrsJwtGuard, SrsAuthContextService, SrsPermissionRepository],
   // JwtModule must be exported so SrsJwtGuard can inject JwtService in KPI modules.
-  exports: [SrsJwtGuard, SrsAuthContextService, JwtModule],
+  exports: [SrsJwtGuard, SrsAuthContextService, SrsPermissionRepository, JwtModule],
 })
 export class SrsAuthModule {}

@@ -51,10 +51,11 @@ export function usePrintInvoiceStatementPdf() {
         separate_invoices_zip: payload.separate_invoices_zip ? '1' : '',
       })
       const result = await assertPdfOrZipBlob(blob, 'Failed to generate invoice PDF')
+      const stamp = new Date().toISOString().slice(0, 10)
       if (result.kind === 'zip') {
-        downloadBlob(result.blob, `invoices_${new Date().toISOString().slice(0, 10)}.zip`)
+        downloadBlob(result.blob, `invoices_${stamp}.zip`)
       } else {
-        openPdfBlobInNewTab(result.blob)
+        openPdfBlobInNewTab(result.blob, `invoices_${stamp}.pdf`)
       }
     },
   })

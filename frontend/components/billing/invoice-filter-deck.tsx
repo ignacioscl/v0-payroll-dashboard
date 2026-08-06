@@ -4,6 +4,7 @@ import * as React from 'react'
 import { ChevronDown, Filter, Search, X } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,6 +24,7 @@ import {
 import { InvoiceTypeFilter, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
 import { InvoiceAdvancedFilters } from '@/components/billing/invoice-advanced-filters'
 import {
+  EMPTY_ADVANCED_FILTERS,
   type InvoiceAdvancedFilterState,
   woNumbersToInput,
 } from '@/lib/invoice-advanced-filters'
@@ -86,7 +88,6 @@ export function InvoiceFilterDeck({
   advanced,
   onAdvancedChange,
   idDealer,
-  primaryDealerId,
   disabled,
 }: {
   types: InvoiceTypeState
@@ -103,7 +104,6 @@ export function InvoiceFilterDeck({
   advanced: InvoiceAdvancedFilterState
   onAdvancedChange: (next: InvoiceAdvancedFilterState) => void
   idDealer: string
-  primaryDealerId: number | null
   disabled?: boolean
 }) {
   const { t } = useTranslation()
@@ -220,6 +220,34 @@ export function InvoiceFilterDeck({
       })
     }
 
+    if (advanced.authorIds.length) {
+      list.push({
+        key: 'authors',
+        label: advanced.authorsExclude
+          ? t('invoices.filterAuthorsExcludeChip', { count: advanced.authorIds.length })
+          : t('invoices.filterAuthorsChip', { count: advanced.authorIds.length }),
+        onRemove: () =>
+          onAdvancedChange({
+            ...advanced,
+            authorIds: [],
+            authorsExclude: false,
+            employeeId: null,
+            employeeLabel: null,
+          }),
+      })
+    }
+
+    if (advanced.exactMatch) {
+      list.push({
+        key: 'exact',
+        label: t('invoices.filterExactMatch'),
+        onRemove: () => onAdvancedChange({ ...advanced, exactMatch: false }),
+      })
+    }
+
+    // District has no chip: the combo lives in the header next to the dealer filter
+    // and shows its own selection.
+
     if (advanced.employeeId != null) {
       list.push({
         key: 'emp',
@@ -263,6 +291,23 @@ export function InvoiceFilterDeck({
   ])
 
   const activeKey = chips.map((c) => c.key).join('|')
+  const hasClearableFilters = chips.some((c) => c.onRemove)
+
+  const clearAllFilters = React.useCallback(() => {
+    onSearchChange('')
+    onTypesChange(ALL_TYPES)
+    onPayedChange('0')
+    onSendedChange('all')
+    onHideZeroChange(true)
+    onAdvancedChange(EMPTY_ADVANCED_FILTERS)
+  }, [
+    onSearchChange,
+    onTypesChange,
+    onPayedChange,
+    onSendedChange,
+    onHideZeroChange,
+    onAdvancedChange,
+  ])
 
   React.useEffect(() => {
     try {
@@ -337,6 +382,18 @@ export function InvoiceFilterDeck({
           {chips.map((chip) => (
             <FilterChipBadge key={chip.key} chip={chip} clearLabel={t('common.clear')} />
           ))}
+          {hasClearableFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 cursor-pointer gap-1 px-1.5 text-[11px] text-muted-foreground"
+              onClick={clearAllFilters}
+            >
+              <X className="size-3" />
+              {t('common.clearAll')}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -424,7 +481,6 @@ export function InvoiceFilterDeck({
               value={advanced}
               onChange={onAdvancedChange}
               idDealer={idDealer}
-              primaryDealerId={primaryDealerId}
               disabled={disabled}
               invoiceSearch={searchInput}
               onInvoiceSearchChange={onSearchChange}

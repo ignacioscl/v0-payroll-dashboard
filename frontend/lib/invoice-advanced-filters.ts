@@ -12,6 +12,11 @@ export type InvoiceAdvancedFilterState = {
   stock: string
   checkDate: Date | undefined
   checkNumber: string
+  /** Multi author ids (replaces single employeeId). */
+  authorIds: number[]
+  authorsExclude: boolean
+  exactMatch: boolean
+  /** @deprecated prefer authorIds — kept for chip migration */
   employeeId: number | null
   employeeLabel: string | null
   overdue: boolean
@@ -26,6 +31,9 @@ export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
   stock: '',
   checkDate: undefined,
   checkNumber: '',
+  authorIds: [],
+  authorsExclude: false,
+  exactMatch: false,
   employeeId: null,
   employeeLabel: null,
   overdue: false,
@@ -61,6 +69,9 @@ export function hasAdvancedFilters(f: InvoiceAdvancedFilterState): boolean {
     Boolean(f.stock.trim()) ||
     Boolean(f.checkDate) ||
     Boolean(f.checkNumber.trim()) ||
+    f.authorIds.length > 0 ||
+    f.authorsExclude ||
+    f.exactMatch ||
     f.employeeId != null ||
     f.overdue ||
     f.showDeleted

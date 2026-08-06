@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Menu, SlidersHorizontal } from 'lucide-react'
 import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
 import {
@@ -15,6 +15,7 @@ import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DatePicker } from '@/components/filters/date-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
+import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -32,10 +33,11 @@ export function Header() {
   const { t } = useTranslation()
   const pathname = usePathname()
   const { collapsed, setMobileOpen } = useSidebar()
-  const { dealers: dealerOptions, loading: dealersLoading } = useSrsDealers()
+  const { dealers: allDealerOptions, loading: dealersLoading } = useSrsDealers()
   const {
     selectedDealers,
     setSelectedDealers,
+    dealerIdAllowList,
     selectedStatus,
     setSelectedStatus,
     dateRange,
@@ -45,6 +47,11 @@ export function Header() {
     setInvoiceDateFrom,
     setInvoiceDateTo,
   } = useFilters()
+  const dealerOptions = useMemo(() => {
+    if (!dealerIdAllowList || dealerIdAllowList.length === 0) return allDealerOptions
+    const allow = new Set(dealerIdAllowList)
+    return allDealerOptions.filter((d) => allow.has(d.id))
+  }, [allDealerOptions, dealerIdAllowList])
   const didSanitizeDealers = useRef(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -98,6 +105,10 @@ export function Header() {
         {/* Desktop filters */}
         <div className="hidden md:flex min-w-0 flex-1 items-center gap-2">
           <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" />
+
+          {isInvoicesPage ? (
+            <DistrictMultiSelect className="w-[170px] shrink-0" />
+          ) : null}
 
           <DealerMultiSelect
             dealers={dealerOptions}
