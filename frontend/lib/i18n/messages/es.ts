@@ -459,6 +459,8 @@ export const es: Messages = {
     filterEmployeeLabel: 'Empleado',
     filterEmployeePlaceholder: 'Autor de la factura',
     filterAuthorsExclude: 'No creado por',
+    filterCreatedBySystem: 'Creadas por Sistema / Schedule',
+    filterCreatedBySystemChip: 'Sistema / Schedule',
     filterAuthorsChip: '{count} autores',
     filterAuthorsExcludeChip: 'No por {count} autores',
     filterExactMatch: 'Coincidencia exacta de # factura',

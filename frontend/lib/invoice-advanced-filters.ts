@@ -15,6 +15,8 @@ export type InvoiceAdvancedFilterState = {
   /** Multi author ids (replaces single employeeId). */
   authorIds: number[]
   authorsExclude: boolean
+  /** Include statements created by batch/schedule or non-employee system accounts. */
+  createdBySystem: boolean
   exactMatch: boolean
   /** @deprecated prefer authorIds — kept for chip migration */
   employeeId: number | null
@@ -33,6 +35,7 @@ export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
   checkNumber: '',
   authorIds: [],
   authorsExclude: false,
+  createdBySystem: false,
   exactMatch: false,
   employeeId: null,
   employeeLabel: null,
@@ -71,6 +74,7 @@ export function hasAdvancedFilters(f: InvoiceAdvancedFilterState): boolean {
     Boolean(f.checkNumber.trim()) ||
     f.authorIds.length > 0 ||
     f.authorsExclude ||
+    f.createdBySystem ||
     f.exactMatch ||
     f.employeeId != null ||
     f.overdue ||

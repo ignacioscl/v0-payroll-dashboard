@@ -237,6 +237,14 @@ export function InvoiceFilterDeck({
       })
     }
 
+    if (advanced.createdBySystem) {
+      list.push({
+        key: 'system',
+        label: t('invoices.filterCreatedBySystemChip'),
+        onRemove: () => onAdvancedChange({ ...advanced, createdBySystem: false }),
+      })
+    }
+
     if (advanced.exactMatch) {
       list.push({
         key: 'exact',

@@ -212,6 +212,19 @@ export function InvoiceAdvancedFilters({
               disabled={disabled || value.authorIds.length === 0}
             />
           </div>
+          {/* Batch/cron statements have no employee author, so they can only be
+              reached with this toggle — the combo above lists employees only. */}
+          <div className="flex items-center justify-between gap-3 sm:col-span-2">
+            <Label htmlFor="inv-created-by-system" className="text-xs text-muted-foreground">
+              {t('invoices.filterCreatedBySystem')}
+            </Label>
+            <Switch
+              id="inv-created-by-system"
+              checked={value.createdBySystem}
+              onCheckedChange={(createdBySystem) => patch({ createdBySystem })}
+              disabled={disabled}
+            />
+          </div>
         </FilterLane>
 
         <FilterLane title={t('invoices.filterLaneStatus')}>

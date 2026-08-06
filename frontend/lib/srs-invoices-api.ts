@@ -128,6 +128,7 @@ export interface InvoiceListParams {
   idAuthor?: number
   idAuthorIn?: string
   authorsExclude?: 0 | 1
+  createdBySystem?: 0 | 1
   exactMatch?: boolean
   dueOn?: boolean
   showDeleted?: boolean
@@ -172,6 +173,7 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.idAuthor) qs.set('idAuthor', String(params.idAuthor))
   if (params.idAuthorIn) qs.set('idAuthorIn', params.idAuthorIn)
   if (params.authorsExclude === 1) qs.set('authorsExclude', '1')
+  if (params.createdBySystem === 1) qs.set('createdBySystem', '1')
   if (params.exactMatch) qs.set('exactMatch', 'true')
   if (params.dueOn) qs.set('dueOn', 'true')
   if (params.showDeleted) qs.set('showDeleted', 'true')

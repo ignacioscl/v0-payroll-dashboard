@@ -451,6 +451,8 @@ export interface Messages {
     filterEmployeeLabel: string
     filterEmployeePlaceholder: string
     filterAuthorsExclude: string
+    filterCreatedBySystem: string
+    filterCreatedBySystemChip: string
     filterAuthorsChip: string
     filterAuthorsExcludeChip: string
     filterExactMatch: string

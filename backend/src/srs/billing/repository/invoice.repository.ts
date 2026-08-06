@@ -64,11 +64,25 @@ export class InvoiceRepository {
     if (f.payed === '0') where += ' AND IS_STATEMENT_BILLED(s.id) = 0'
     else if (f.payed === '1') where += ' AND IS_STATEMENT_BILLED(s.id) = 1'
 
+    // Statements not authored by a person: batch/cron runs (schedule billing) and
+    // system accounts such as Administrator, which is not an employee of any detailer
+    // but authors thousands of statements. Those are hidden from the employee combo
+    // (legacy `isEmployee=1`), so this is the only way to filter them.
+    const systemAuthored = `(s.id_invoice_statement_schedule > 0 OR EXISTS (
+      SELECT 1 FROM usuarios ua WHERE ua.id_usuario = s.id_author AND ua.is_empleado <> 1
+    ))`
+
     if (f.authorIds.length) {
       const ids = sqlInInts(f.authorIds)
-      where += f.authorsExclude
-        ? ` AND s.id_author NOT IN (${ids})`
-        : ` AND s.id_author IN (${ids})`
+      const byAuthor = f.authorsExclude
+        ? `s.id_author NOT IN (${ids})`
+        : `s.id_author IN (${ids})`
+      // Combined with employees it widens the set: those employees OR system/schedule.
+      where += f.createdBySystem
+        ? ` AND (${byAuthor} OR ${systemAuthored})`
+        : ` AND ${byAuthor}`
+    } else if (f.createdBySystem) {
+      where += ` AND ${systemAuthored}`
     } else if (f.idAuthor) {
       where += ' AND s.id_author = ?'
       params.push(f.idAuthor)
@@ -596,7 +610,16 @@ export class InvoiceRepository {
       f.dealerIds,
       f.skipDealerRestriction,
     )
-    const params: any[] = [f.idDealerProvider, ...restrict.params]
+    // Legacy fills this combo through /ajax/json.usuarios.php with isEmployee=1 and
+    // haveInvoice (json.usuarios.php:69-78, UsuarioDao:136), which restricts users to:
+    // employees only, active only, and belonging to the caller's company. Administrator
+    // (id 1) is excluded by the last one — id_contratista_owner NULL, yet it authors
+    // thousands of statements from batch runs.
+    // NOTE: keep these notes out of the SQL string — a `?` inside a SQL comment is still
+    // counted as a positional placeholder by the driver and breaks the query.
+    //
+    // Param order: statement provider, author's own company, then dealer restriction.
+    const params: any[] = [f.idDealerProvider, f.idDealerProvider, ...restrict.params]
     let extra = ''
     if (f.search) {
       extra += ' AND u.nombre LIKE CONCAT(\'%\', ?, \'%\')'
@@ -611,6 +634,9 @@ export class InvoiceRepository {
          AND s.id_dealer_provider = ?
          AND s.id_author IS NOT NULL
          AND s.id_author > 0
+         AND u.is_empleado = 1
+         AND u.estado = 1
+         AND u.id_contratista_owner = ?
          ${restrict.and}
          ${extra}
        ORDER BY u.nombre

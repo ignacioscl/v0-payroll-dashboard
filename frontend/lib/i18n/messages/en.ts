@@ -459,6 +459,8 @@ export const en: Messages = {
     filterEmployeeLabel: 'Employee',
     filterEmployeePlaceholder: 'Invoice author',
     filterAuthorsExclude: 'Not created by',
+    filterCreatedBySystem: 'Created by System / Schedule',
+    filterCreatedBySystemChip: 'System / Schedule',
     filterAuthorsChip: '{count} authors',
     filterAuthorsExcludeChip: 'Not by {count} authors',
     filterExactMatch: 'Exact invoice # match',

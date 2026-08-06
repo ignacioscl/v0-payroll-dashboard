@@ -129,6 +129,16 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @IsIn([0, 1])
   authorsExclude?: number
 
+  @ApiPropertyOptional({
+    description:
+      'When 1: include statements authored by System/Schedule (batch runs and non-employee ' +
+      'accounts such as Administrator, which are hidden from the employee combo). ' +
+      'Combined with idAuthorIn it widens the result: those employees OR system/schedule.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseFlag01(value))
+  createdBySystem?: boolean
+
   @ApiPropertyOptional({ description: 'When 1: full_nro exact match instead of LIKE' })
   @IsOptional()
   @Transform(({ value }) => parseFlag01(value))
@@ -184,6 +194,7 @@ export interface InvoiceListFilter {
   authorIds: number[]
   /** When true with authorIds: NOT IN. */
   authorsExclude: boolean
+  createdBySystem: boolean
   exactMatch: boolean
   dueOn: boolean
   showDeleted: boolean
@@ -243,6 +254,7 @@ export function buildInvoiceListFilter(
     idAuthor: query.idAuthor && query.idAuthor > 0 ? query.idAuthor : undefined,
     authorIds: parseCsvPositiveInts(query.idAuthorIn),
     authorsExclude: Number(query.authorsExclude) === 1,
+    createdBySystem: parseFlag01(query.createdBySystem),
     exactMatch: parseFlag01(query.exactMatch),
     dueOn: parseFlag01(query.dueOn),
     showDeleted: parseFlag01(query.showDeleted),
