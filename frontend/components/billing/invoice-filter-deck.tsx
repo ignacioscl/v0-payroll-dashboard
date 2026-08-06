@@ -107,7 +107,8 @@ export function InvoiceFilterDeck({
   disabled?: boolean
 }) {
   const { t } = useTranslation()
-  const [open, setOpen] = React.useState(true)
+  /** Closed by default; sessionStorage can reopen after the user expands it. */
+  const [open, setOpen] = React.useState(false)
   const [hydrated, setHydrated] = React.useState(false)
   const prevActiveKeyRef = React.useRef('')
 
