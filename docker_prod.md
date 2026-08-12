@@ -269,7 +269,7 @@ No proxear `:3020` — el browser no lo necesita.
 
 Docker usa la subnet fija **`172.20.0.0/16`** (gateway del host = **`172.20.0.1`**). CSF bloquea por defecto tráfico desde esa red al host.
 
-Necesitás **dos reglas** en `/etc/csf/csfpre.sh`:
+Necesitás **tres reglas** en `/etc/csf/csfpre.sh`:
 
 ```bash
 cat >> /etc/csf/csfpre.sh << 'EOF'
@@ -278,11 +278,20 @@ cat >> /etc/csf/csfpre.sh << 'EOF'
 iptables -I INPUT 1 -s 172.20.0.0/16 -p tcp --dport 3002 -j ACCEPT
 # v0 Docker -> MariaDB :3306 (backend Nest)
 iptables -I INPUT 1 -s 172.20.0.0/16 -p tcp --dport 3306 -j ACCEPT
+# v0 Docker: trafico ENTRE contenedores (frontend -> backend :3020, cadena FORWARD)
+iptables -I FORWARD 1 -s 172.20.0.0/16 -d 172.20.0.0/16 -j ACCEPT
 EOF
 
 chmod +x /etc/csf/csfpre.sh
 csf -r
 ```
+
+> ⚠️ **La regla FORWARD es tan crítica como las INPUT.** Incidente 2026-08-12: al recargar CSF
+> pisó las cadenas de Docker y el tráfico contenedor→contenedor quedó muerto durante días con TODO
+> "healthy" (los healthchecks son localhost adentro de cada contenedor). Síntoma: cada request a
+> `/api/srs-kpis/*` cuelga y termina en 500 pelado, mientras el passthrough PHP (que va al host)
+> funciona. Fix inmediato: `systemctl restart docker` (reescribe las reglas de Docker). Fix duradero:
+> la regla FORWARD de arriba.
 
 ### MariaDB — GRANT para la subnet Docker
 
@@ -415,6 +424,7 @@ docker compose down
 | 406 HTML al llamar PHP                   | `SRS_API_URL` apunta a `pro` o HTTP :80    | `SRS_API_URL=https://main.srssuite.com`                   |
 | Login OK en browser, falla en contenedor | DNS de `main` → otro server o `172.17.0.1` | `extra_hosts: main.srssuite.com:IP`                       |
 | 500 en `/api/face/*`                     | CSF bloquea Docker → `:3002`               | Regla CSF + `FACE_RECOGNITION_URL=http://172.20.0.1:3002` |
+| 500 pelado en TODO `/api/srs-kpis/*` (cuelga y explota) con contenedores "healthy" y PHP andando | CSF pisó las cadenas de Docker → tráfico contenedor→contenedor muerto (FORWARD). Test: `docker exec srs-payroll-dashboard wget -qO- http://srs-backend:3020/api/health` cuelga | `systemctl restart docker` ya; regla FORWARD en `csfpre.sh` para siempre (sección CSF) |
 | KPIs en blanco / 502                     | Falta `BACKEND_API_URL` o backend caído    | Archivo A + `docker compose logs srs-backend`             |
 | Backend unhealthy                        | No llega a MariaDB                         | CSF `:3306` + GRANT `172.20.%` + password en Archivo B    |
 | KPIs 401                                 | `JWT_SECRET` ≠ `JWT_AUTH` de PHP           | Igualar en Archivo B y `config.php`                       |
