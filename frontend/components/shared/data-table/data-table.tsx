@@ -728,6 +728,13 @@ export function DataTable<TData, TValue = unknown>({
   const visibleColCount = table.getVisibleLeafColumns().length
   const rowPadding = density === 'compact' ? 'py-1.5' : 'py-2.5'
 
+  /* Both the loader and the empty message render as viewport overlays instead of
+   * table cells: with `table-layout: fixed` and pinned columns the table is far
+   * wider than the visible area, so `text-center` inside a cell would center them
+   * thousands of px to the right. */
+  const showInitialLoader = isLoading && data.length === 0
+  const showEmptyMessage = !showInitialLoader && table.getRowModel().rows.length === 0
+
   const headerIsColored = headerVariant === 'colored'
   const headerStyle = headerIsColored ? { backgroundColor: headerColor } : undefined
   const headerClassName = headerIsColored ? 'text-white' : 'text-foreground'
@@ -1066,7 +1073,7 @@ export function DataTable<TData, TValue = unknown>({
       <div
         className={cn(
           'relative w-full min-w-0',
-          isLoading && data.length === 0 && 'min-h-32',
+          showInitialLoader && 'min-h-32',
         )}
       >
         <div
@@ -1212,7 +1219,7 @@ export function DataTable<TData, TValue = unknown>({
           </TableHeader>
 
           <TableBody>
-            {isLoading && data.length === 0 ? (
+            {showInitialLoader ? (
               /* Spacer only — spinner is in the viewport overlay below so wide
                  pinned tables don't center the loader thousands of px to the right. */
               <TableRow className="border-0 hover:bg-transparent">
@@ -1222,19 +1229,23 @@ export function DataTable<TData, TValue = unknown>({
                   aria-hidden
                 />
               </TableRow>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={visibleColCount}
-                  className="h-32 text-center align-middle"
-                >
-                  {emptyState ?? (
-                    <div className="flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
-                      <Database className="size-7 opacity-30" />
-                      <p className="text-xs font-medium text-foreground">No rows</p>
-                      <p className="text-[11px]">Nothing to show with the current filters.</p>
-                    </div>
-                  )}
+            ) : showEmptyMessage ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={visibleColCount} className="overflow-visible p-0">
+                  {/* Same trick as the drilldown row: `sticky left-0` keeps the message
+                      in view while the wide pinned table scrolls, and `100cqw` sizes it
+                      to the visible area instead of the full table width. Kept as real
+                      cell content — an absolute overlay would pin the row to a fixed
+                      height and clip taller empty states (e.g. invoices' StateBlock). */}
+                  <div className="sticky left-0 z-[1] flex w-[100cqw] min-w-0 max-w-[100cqw] items-center justify-center">
+                    {emptyState ?? (
+                      <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center text-muted-foreground">
+                        <Database className="size-7 opacity-30" />
+                        <p className="text-xs font-medium text-foreground">No rows</p>
+                        <p className="text-[11px]">Nothing to show with the current filters.</p>
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -1290,7 +1301,7 @@ export function DataTable<TData, TValue = unknown>({
             </div>
           )}
 
-        {isLoading && data.length === 0 && (
+        {showInitialLoader && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>

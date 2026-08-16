@@ -334,7 +334,7 @@ export default function DashboardPage() {
               </div>
             ) : trendData.length === 0 ? (
               <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-                {t('dashboard.noErrorsInPeriod')}
+                {t('common.noDataToDisplay')}
               </div>
             ) : (
               <div className="h-72">
@@ -420,7 +420,7 @@ export default function DashboardPage() {
               </div>
             ) : issueDistribution.length === 0 ? (
               <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-                {t('dashboard.noErrorsToDisplay')}
+                {t('common.noDataToDisplay')}
               </div>
             ) : (
               <div className="h-72">
@@ -480,7 +480,7 @@ export default function DashboardPage() {
             {loading ? (
               <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : summary.top_dealers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('dashboard.noDealerErrors')}</p>
+              <p className="text-sm text-muted-foreground">{t('common.noDataToDisplay')}</p>
             ) : (
               <div className="space-y-4">
                 {summary.top_dealers.map((dealerItem, index) => (

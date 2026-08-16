@@ -56,6 +56,20 @@ export function canViewPaymentType(
   )
 }
 
+/**
+ * View payment amounts (hourly rate, payment type price) — legacy 105 only.
+ *
+ * 130 (View Payment type) and 136 (Edit Payroll Type) can see the payment type
+ * name but NOT the values: 136 is defined as "Permite editar tipo de pagos de
+ * ponchadas. Sin permitir ver valores".
+ */
+export function canViewPaymentAmount(
+  hasPermission: (id: number) => boolean,
+  isSystemAdmin?: boolean,
+): boolean {
+  return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_EDIT_PAYMENT_TYPE)
+}
+
 export function canAccessSystemConfig(
   hasPermission: (id: number) => boolean,
   isSystemAdmin?: boolean,

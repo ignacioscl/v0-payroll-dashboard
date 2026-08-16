@@ -188,7 +188,7 @@ export function DashboardYesterdayIssuesTable() {
   ) : (
     <div className="flex flex-col items-center gap-2 text-muted-foreground">
       <AlertTriangle className="h-8 w-8 opacity-20" />
-      <span className="text-xs">{t('dashboard.noYesterdayErrors')}</span>
+      <span className="text-xs">{t('common.noDataToDisplay')}</span>
     </div>
   )
 

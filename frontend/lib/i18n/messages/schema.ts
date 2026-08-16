@@ -509,6 +509,7 @@ export interface Messages {
     record: string
     of: string
     noRecords: string
+    noDataToDisplay: string
     required: string
     saving: string
     update: string
@@ -737,9 +738,6 @@ export interface Messages {
     errorDistribution: string
     dealersMostErrors: string
     yesterdayIssues: string
-    noErrorsInPeriod: string
-    noErrorsToDisplay: string
-    noDealerErrors: string
     withoutClockOutChart: string
     breakMissingChart: string
     shift20hChart: string
@@ -747,7 +745,6 @@ export interface Messages {
     todayStatus: string
     todayStatusSubtitle: string
     yesterdayTableNote: string
-    noYesterdayErrors: string
     yesterdayLoadFailed: string
   }
   filters: {

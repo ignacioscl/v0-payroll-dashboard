@@ -21,7 +21,7 @@ import { useTtkPunchLog } from '@/hooks/use-ttk-punch-log'
 import type { TtkPunchLogEntry } from '@/lib/ttk/ttk-log-types'
 import { ttkLogEvidenceUrl } from '@/lib/ttk/ttk-log-evidence-url'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { canViewPaymentAmount, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import type { TranslateFn } from '@/lib/i18n/locale-context'
 
@@ -165,9 +165,17 @@ function PaymentDetailsRestrictedMessage({ t }: { t: TranslateFn }) {
   )
 }
 
-function PaymentChangeCell({ entry, t }: { entry: TtkPunchLogEntry; t: TranslateFn }) {
+function PaymentChangeCell({
+  entry,
+  canViewAmount,
+  t,
+}: {
+  entry: TtkPunchLogEntry
+  canViewAmount: boolean
+  t: TranslateFn
+}) {
   const paymentChanged = hasPaymentTypeChange(entry)
-  const hourlyChanged = hasHourlyRateChange(entry)
+  const hourlyChanged = canViewAmount && hasHourlyRateChange(entry)
 
   if (!paymentChanged && !hourlyChanged && !entry.note) {
     return null
@@ -205,11 +213,13 @@ function PaymentChangeCell({ entry, t }: { entry: TtkPunchLogEntry; t: Translate
 function LogRow({
   entry,
   canViewPayment,
+  canViewAmount,
   t,
   slotLabels,
 }: {
   entry: TtkPunchLogEntry
   canViewPayment: boolean
+  canViewAmount: boolean
   t: TranslateFn
   slotLabels: { punchIn: string; breakStart: string; breakEnd: string; punchOut: string }
 }) {
@@ -245,7 +255,7 @@ function LogRow({
 
   const paymentRestricted = entry.paymentDetailsRestricted === true
   const paymentChanged = hasPaymentTypeChange(entry)
-  const hourlyChanged = hasHourlyRateChange(entry)
+  const hourlyChanged = canViewAmount && hasHourlyRateChange(entry)
   const timeChanged = hasTimeFieldChanges(entry)
   const showPaymentDetails = canViewPayment && (paymentChanged || hourlyChanged)
 
@@ -256,7 +266,7 @@ function LogRow({
         <TableCell className="text-xs">{entry.usuario?.nombre ?? '—'}</TableCell>
         <TableCell colSpan={4} className="align-top text-xs">
           {showPaymentDetails ? (
-            <PaymentChangeCell entry={entry} t={t} />
+            <PaymentChangeCell entry={entry} canViewAmount={canViewAmount} t={t} />
           ) : paymentRestricted ? (
             <PaymentDetailsRestrictedMessage t={t} />
           ) : null}
@@ -287,7 +297,7 @@ function LogRow({
         <>
           <TableCell colSpan={4} className="align-top text-xs">
             <div className="space-y-2">
-              {showPaymentDetails ? <PaymentChangeCell entry={entry} t={t} /> : null}
+              {showPaymentDetails ? <PaymentChangeCell entry={entry} canViewAmount={canViewAmount} t={t} /> : null}
               {paymentRestricted ? <PaymentDetailsRestrictedMessage t={t} /> : null}
               <div className="grid gap-2 sm:grid-cols-2">
                 <LogTimeCell
@@ -385,6 +395,8 @@ export function PunchLogDialog({
   const { t } = useTranslation()
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+  //130/136 ven el tipo de pago pero no los importes; solo 105 ve el valor hora
+  const canViewAmount = canViewPaymentAmount(hasPermission, user?.isSystemAdmin)
 
   const slotLabels = {
     punchIn: t('punch.slotPunchIn'),
@@ -455,6 +467,7 @@ export function PunchLogDialog({
                     key={String(entry.id ?? i)}
                     entry={entry}
                     canViewPayment={canViewPayment}
+                    canViewAmount={canViewAmount}
                     t={t}
                     slotLabels={slotLabels}
                   />
