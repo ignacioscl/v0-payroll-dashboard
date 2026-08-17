@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Plus, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -151,10 +151,11 @@ export function InvoiceStatementNotesDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <X />
             {t('common.close')}
           </Button>
           <Button type="button" onClick={() => void onSave()} disabled={saveNote.isPending}>
-            {saveNote.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {saveNote.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
             {t('invoices.actionNotesSave')}
           </Button>
         </DialogFooter>

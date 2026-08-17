@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { SortingState } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { ReceiptText } from 'lucide-react'
+import { Plus, ReceiptText } from 'lucide-react'
 
-import { PageHeading } from '@/components/layout/page-heading'
+import { GenericInvoiceDialog } from '@/components/billing/generic-invoice-dialog'
 import { InvoiceFilterDeck } from '@/components/billing/invoice-filter-deck'
+import { PageHeading } from '@/components/layout/page-heading'
+import { Button } from '@/components/ui/button'
+import { useGenericInvoiceConfig } from '@/hooks/use-generic-invoice'
 import { InvoiceSummaryStrip } from '@/components/billing/invoice-summary-strip'
 import { InvoiceListTable } from '@/components/billing/invoice-list-table'
 import { typesToCsv, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
@@ -43,6 +46,8 @@ function formatUsDateRange(from: Date | undefined, to: Date | undefined): string
 
 export default function InvoicesPage() {
   const { t } = useTranslation()
+  const genericConfig = useGenericInvoiceConfig()
+  const [genericOpen, setGenericOpen] = useState(false)
   const {
     invoiceDateFrom,
     invoiceDateTo,
@@ -200,7 +205,16 @@ export default function InvoicesPage() {
         }
         icon={<ReceiptText />}
         variant="info"
+        actions={
+          genericConfig.data?.canCreate ? (
+            <Button type="button" onClick={() => setGenericOpen(true)}>
+              <Plus />
+              {t('invoices.generic.newButton')}
+            </Button>
+          ) : null
+        }
       />
+      <GenericInvoiceDialog open={genericOpen} onOpenChange={setGenericOpen} />
 
       <InvoiceFilterDeck
         types={types}

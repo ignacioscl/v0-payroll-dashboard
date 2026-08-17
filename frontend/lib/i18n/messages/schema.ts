@@ -469,6 +469,56 @@ export interface Messages {
     filterShowDeletedLabel: string
     filterOneSelected: string
     filterManySelected: string
+    generic: {
+      newButton: string
+      title: string
+      dealer: string
+      dealerPlaceholder: string
+      dealerSearch: string
+      pickDealerFirst: string
+      dateFrom: string
+      dateTo: string
+      invoiceNote: string
+      headerNote: string
+      headerNotePlaceholder: string
+      tax: string
+      description: string
+      descriptionPlaceholder: string
+      qty: string
+      unitAmount: string
+      addItem: string
+      colItem: string
+      colRate: string
+      colQty: string
+      colAmount: string
+      edit: string
+      remove: string
+      removeConfirmTitle: string
+      removeConfirm: string
+      total: string
+      create: string
+      creating: string
+      created: string
+      createError: string
+      dealerRequired: string
+      datesRequired: string
+      dateOrder: string
+      itemsRequired: string
+      duplicateItem: string
+      descriptionRequired: string
+      descriptionTooLong: string
+      draftDiscarded: string
+      amountRequired: string
+      qtyInvalid: string
+      taxInvalid: string
+      useCustom: string
+      deleteCatalogTitle: string
+      deleteCatalogAction: string
+      deleteCatalogConfirm: string
+      deleteCatalogSuccess: string
+      deleteCatalogError: string
+      catalogEmpty: string
+    }
   }
   sidebar: {
     appSubtitle: string
@@ -1406,6 +1456,7 @@ export interface Messages {
     resultPlural: string
     ofTotal: string
     clearSelection: string
+    deleteItem: string
     clearSearch: string
     navigateHint: string
   }

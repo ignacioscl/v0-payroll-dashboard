@@ -1,7 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Check, ChevronsUpDown, Loader2, Search, X } from 'lucide-react'
+import { Command as CommandPrimitive } from 'cmdk'
+import { Check, ChevronsUpDown, Loader2, Search, Trash2, X } from 'lucide-react'
 import {
   Command,
   CommandEmpty,
@@ -165,6 +166,23 @@ export interface SearchableComboboxProps<T> {
     icon?: React.ReactNode
   }
 
+  /**
+   * When set, a typed term that does not already match a listed label
+   * (case-insensitive) is offered as a custom option converted to `T`.
+   */
+  createCustomItem?: (term: string) => T
+  /** Label for the custom-create row. Defaults to the raw term. */
+  createItemLabel?: (term: string) => string
+
+  /**
+   * Optional per-row delete. Wire `stopPropagation` on the control so cmdk
+   * does not also select the row. Hidden when `canDeleteItem` returns false.
+   */
+  onDeleteItem?: (item: T) => void
+  canDeleteItem?: (item: T) => boolean
+  /** a11y label for the per-row delete control. */
+  deleteItemAriaLabel?: string
+
   // ---------- Style ----------
   /** Extra classes for the trigger. */
   className?: string
@@ -210,6 +228,11 @@ export function SearchableCombobox<T>({
   loadMoreLabel,
   loadingMoreLabel,
   prerequisite,
+  createCustomItem,
+  createItemLabel,
+  onDeleteItem,
+  canDeleteItem,
+  deleteItemAriaLabel,
   className,
   compact = false,
   popoverWidth = 'w-(--radix-popover-trigger-width)',
@@ -234,10 +257,21 @@ export function SearchableCombobox<T>({
   const trimmedTerm = searchTerm.trim()
   const needsMoreChars = trimmedTerm.length < minSearchChars
   const hasResults = !!items && items.length > 0
-  const showEmpty =
-    !isLoading && !needsMoreChars && !!items && items.length === 0
   const prereqMet = !prerequisite || prerequisite.met
   const paginationEnabled = !!onLoadMore
+  const termAlreadyListed =
+    trimmedTerm.length > 0 &&
+    !!items &&
+    items.some((item) => getItemLabel(item).trim().toLowerCase() === trimmedTerm.toLowerCase())
+  const showCreateOption =
+    !!createCustomItem &&
+    prereqMet &&
+    !needsMoreChars &&
+    !isLoading &&
+    trimmedTerm.length > 0 &&
+    !termAlreadyListed
+  const showEmpty =
+    !isLoading && !needsMoreChars && !!items && items.length === 0 && !showCreateOption
 
   // Auto-focus the search input on open so users can start typing right away.
   React.useEffect(() => {
@@ -273,6 +307,35 @@ export function SearchableCombobox<T>({
     onChange(item)
     onSearchTermChange('')
     setOpen(false)
+  }
+
+  const activateItemLikeClick = () => {
+    const list = listRef.current
+    const highlighted =
+      list?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]') ??
+      list?.querySelector<HTMLElement>('[cmdk-item][data-selected="true"]')
+    const first = list?.querySelector<HTMLElement>(
+      '[cmdk-item]:not([aria-disabled="true"])',
+    )
+    const target = highlighted ?? first
+    if (target) {
+      target.click()
+      return
+    }
+    if (showCreateOption && createCustomItem) {
+      selectItem(createCustomItem(trimmedTerm))
+      return
+    }
+    if (items && items.length > 0) {
+      selectItem(items[0])
+    }
+  }
+
+  const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing || event.key !== 'Enter') return
+    event.preventDefault()
+    event.stopPropagation()
+    activateItemLikeClick()
   }
 
   const clearSelection = (event: React.MouseEvent | React.KeyboardEvent) => {
@@ -366,10 +429,11 @@ export function SearchableCombobox<T>({
         <Command shouldFilter={!serverSideSearch} className="bg-popover">
           <div className="flex items-center gap-2 border-b border-border/70 px-3">
             <Search className="size-4 shrink-0 text-muted-foreground" />
-            <input
+            <CommandPrimitive.Input
               ref={inputRef}
               value={searchTerm}
-              onChange={(e) => onSearchTermChange(e.target.value)}
+              onValueChange={onSearchTermChange}
+              onKeyDown={onSearchKeyDown}
               placeholder={resolvedSearchPlaceholder}
               className="flex h-10 w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
               autoComplete="off"
@@ -433,12 +497,14 @@ export function SearchableCombobox<T>({
               </CommandEmpty>
             )}
 
-            {prereqMet && !needsMoreChars && !isLoading && hasResults && (
-              <CommandGroup heading={renderedHeading}>
-                {items!.map((item) => {
+            {prereqMet && !needsMoreChars && !isLoading && (hasResults || showCreateOption) && (
+              <CommandGroup heading={hasResults ? renderedHeading : undefined}>
+                {(items ?? []).map((item) => {
                   const key = getItemKey(item)
                   const isSelected =
                     value !== null && getItemKey(value) === key
+                  const showDelete =
+                    !!onDeleteItem && (!canDeleteItem || canDeleteItem(item))
                   return (
                     <CommandItem
                       key={key}
@@ -457,9 +523,31 @@ export function SearchableCombobox<T>({
                           {getItemLabel(item)}
                         </span>
                       )}
+                      {showDelete ? (
+                        <button
+                          type="button"
+                          aria-label={deleteItemAriaLabel ?? t('combobox.deleteItem')}
+                          className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          onPointerDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setOpen(false)
+                            onDeleteItem?.(item)
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      ) : null}
                       {isSelected && (
                         <span
-                          className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+                          className={cn(
+                            'flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm',
+                            !showDelete && 'ml-auto',
+                          )}
                           aria-hidden
                         >
                           <Check className="size-3 stroke-[3]" />
@@ -468,6 +556,16 @@ export function SearchableCombobox<T>({
                     </CommandItem>
                   )
                 })}
+                {showCreateOption ? (
+                  <CommandItem
+                    key={`create-${trimmedTerm}`}
+                    value={`create-${trimmedTerm}`}
+                    onSelect={() => selectItem(createCustomItem!(trimmedTerm))}
+                    className="group/item my-0.5 cursor-pointer gap-3 rounded-md px-2 py-2 text-sm font-medium text-foreground"
+                  >
+                    {createItemLabel ? createItemLabel(trimmedTerm) : trimmedTerm}
+                  </CommandItem>
+                ) : null}
 
                 {/* Pagination affordances */}
                 {paginationEnabled && hasMore && (
@@ -501,7 +599,7 @@ export function SearchableCombobox<T>({
             )}
           </CommandList>
 
-          {showFooterHint && prereqMet && !needsMoreChars && hasResults && (
+          {showFooterHint && prereqMet && !needsMoreChars && (hasResults || showCreateOption) && (
             <div className="border-t border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] text-muted-foreground">
               {t('combobox.navigateHint')}
             </div>

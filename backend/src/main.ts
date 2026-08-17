@@ -65,10 +65,7 @@ async function bootstrap() {
       }));
 
         */
-        const result: IdetailError[] = errors.map(error => ({
-          field: error.property,
-          message: error?.constraints ? error?.constraints[Object.keys(error.constraints as any)[0]] : '',
-        }))
+        const result: IdetailError[] = flattenValidationErrors(errors)
 
         console.error('Validation Errors: ', result)
         const err = new DataError(HttpStatus.BAD_REQUEST, 'Validation Error', undefined, undefined, result)
@@ -106,3 +103,20 @@ async function bootstrap() {
 }
 
 bootstrap()
+
+/** Nested `@ValidateNested` errors live in `children`; first-level-only flatten
+ *  produced `{field:"items", message:""}` for `items[0].description`. */
+function flattenValidationErrors(errors: ValidationError[], parent = ''): IdetailError[] {
+  const out: IdetailError[] = []
+  for (const error of errors) {
+    const field = parent ? `${parent}.${error.property}` : error.property
+    if (error.constraints) {
+      const first = Object.keys(error.constraints)[0]
+      out.push({ field, message: first ? error.constraints[first] ?? '' : '' })
+    }
+    if (error.children?.length) {
+      out.push(...flattenValidationErrors(error.children, field))
+    }
+  }
+  return out
+}
