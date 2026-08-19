@@ -376,7 +376,7 @@ export function SearchableCombobox<T>({
           aria-haspopup="listbox"
           disabled={disabled || undefined}
           className={cn(
-            'group relative flex w-full items-center text-left shadow-xs transition-all',
+            'group relative flex w-full cursor-pointer items-center text-left shadow-xs transition-all',
             compact
               ? 'h-8 gap-2 overflow-hidden rounded-md border bg-background px-2.5 text-xs'
               : 'gap-3 rounded-lg border bg-background px-3 py-2.5 text-sm',
@@ -403,7 +403,7 @@ export function SearchableCombobox<T>({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') clearSelection(e)
                     }}
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <X className="size-3.5" />
                   </span>
@@ -443,7 +443,7 @@ export function SearchableCombobox<T>({
               <button
                 type="button"
                 onClick={() => onSearchTermChange('')}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label={t('combobox.clearSearch')}
               >
                 <X className="size-3.5" />
@@ -527,7 +527,7 @@ export function SearchableCombobox<T>({
                         <button
                           type="button"
                           aria-label={deleteItemAriaLabel ?? t('combobox.deleteItem')}
-                          className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          className="ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           onPointerDown={(event) => {
                             event.preventDefault()
                             event.stopPropagation()

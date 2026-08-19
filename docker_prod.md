@@ -428,6 +428,7 @@ docker compose down
 | KPIs en blanco / 502                     | Falta `BACKEND_API_URL` o backend caído    | Archivo A + `docker compose logs srs-backend`             |
 | Backend unhealthy                        | No llega a MariaDB                         | CSF `:3306` + GRANT `172.20.%` + password en Archivo B    |
 | KPIs 401                                 | `JWT_SECRET` ≠ `JWT_AUTH` de PHP           | Igualar en Archivo B y `config.php`                       |
+| `INSERT/UPDATE command denied to user 'srssui5_srs'@'172.20.x.x'` en una mutación Nest | La cuenta MySQL de Docker (`'srssui5_srs'@'172.20.%'`) nació sólo-lectura; cada feature nueva de Nest que escribe en tablas nuevas necesita su GRANT (los permisos son por tabla, mínimo privilegio). Pasó 2026-08-17 con el alta de invoices genéricas | Como root: `mysql -e "GRANT INSERT, UPDATE ON srssui5_srs.<TABLA> TO 'srssui5_srs'@'172.20.%';"` — sin reiniciar nada. Ya otorgadas: INVOICE_STATEMENT, INVOICE_STATEMENT_INV_REL, LOG_CHANGE, GENERIC_DATA |
 | `git pull` y no arranca                  | Faltan Archivos A/B/C                      | Crear envs (no vienen en git)                             |
 | Contenedor busca `/opt/srs/...`          | Falta Archivo C                            | Crear `.env` del compose con rutas `/home/srssui5/...`    |
 

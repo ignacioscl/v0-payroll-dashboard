@@ -487,6 +487,12 @@ export interface Messages {
       qty: string
       unitAmount: string
       addItem: string
+      addItemHint: string
+      servicePeriod: string
+      itemsEmptyTitle: string
+      itemsEmptyBody: string
+      subtotal: string
+      taxRow: string
       colItem: string
       colRate: string
       colQty: string
@@ -508,6 +514,9 @@ export interface Messages {
       descriptionRequired: string
       descriptionTooLong: string
       draftDiscarded: string
+      discardTitle: string
+      discardConfirm: string
+      discardAction: string
       amountRequired: string
       qtyInvalid: string
       taxInvalid: string

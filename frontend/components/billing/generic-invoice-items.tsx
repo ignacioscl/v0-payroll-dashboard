@@ -13,7 +13,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -30,7 +29,17 @@ export type GenericItemDraft = {
   unitAmount: number
 }
 
-function fmtMoney(n: number): string {
+/** Bare figure, no currency symbol — the ledger columns. */
+export function fmtNum(n: number): string {
+  const abs = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return n < 0 ? `-${abs}` : abs
+}
+
+/** Currency figure — reserved for the grand total. */
+export function fmtMoney(n: number): string {
   const abs = Math.abs(n).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -38,9 +47,22 @@ function fmtMoney(n: number): string {
   return n < 0 ? `-$${abs}` : `$${abs}`
 }
 
-function lineTotal(item: GenericItemDraft): number {
+/** Mirrors `round2` in backend generic-invoice.repository.ts. */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * Raw line value, deliberately unrounded — the backend accumulates the subtotal
+ * from unrounded lines and rounds the sum once. Use `round2` only to display a row.
+ */
+export function lineTotal(item: GenericItemDraft): number {
   return item.qty ? item.unitAmount * item.qty : item.unitAmount
 }
+
+/** Shared micro-caps label — invoice vernacular, keeps the value dominant. */
+const EYEBROW =
+  'text-[10.5px] font-semibold uppercase tracking-[0.085em] text-muted-foreground leading-none'
 
 function parseOptionalQty(raw: string): { ok: true; value: number | null } | { ok: false } {
   const trimmed = raw.trim()
@@ -68,12 +90,14 @@ export function GenericInvoiceItems({
   idDealer,
   canDeleteCatalogItem,
   disabled = false,
+  onDraftDirtyChange,
 }: {
   items: GenericItemDraft[]
   onChange: (items: GenericItemDraft[]) => void
   idDealer: number | null
   canDeleteCatalogItem: boolean
   disabled?: boolean
+  onDraftDirtyChange?: (dirty: boolean) => void
 }) {
   const { t } = useTranslation()
   const [nextKey, setNextKey] = React.useState(1)
@@ -89,6 +113,15 @@ export function GenericInvoiceItems({
     const id = window.setTimeout(() => setDebouncedDesc(descTerm.trim()), 250)
     return () => window.clearTimeout(id)
   }, [descTerm])
+
+  React.useEffect(() => {
+    const dirty =
+      Boolean(descItem?.name?.trim()) ||
+      descTerm.trim() !== '' ||
+      qty.trim() !== '' ||
+      unitAmount.trim() !== ''
+    onDraftDirtyChange?.(dirty)
+  }, [descItem, descTerm, qty, unitAmount, onDraftDirtyChange])
 
   const catalog = useGenericCatalog(36, idDealer, debouncedDesc)
   const deleteCatalog = useDeleteCatalogItem()
@@ -177,13 +210,12 @@ export function GenericInvoiceItems({
     addItem()
   }
 
-  const total = items.reduce((sum, item) => sum + lineTotal(item), 0)
-
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_7rem_8rem_auto] md:items-end">
+    <>
+      {/* Composer — sunken and pinned, so "writing an item" reads apart from "setting the invoice". */}
+      <div className="sticky top-0 z-10 grid gap-3 border-y border-border bg-muted px-6 py-4 md:grid-cols-[minmax(0,1fr)_7rem_8rem_auto] md:items-end">
         <div className="space-y-1.5">
-          <Label>{t('invoices.generic.description')}</Label>
+          <Label className={EYEBROW}>{t('invoices.generic.description')}</Label>
           <SearchableCombobox<GenericCatalogItem>
             value={descItem}
             onChange={fillFromCatalog}
@@ -196,6 +228,7 @@ export function GenericInvoiceItems({
             minSearchChars={0}
             serverSideSearch
             disabled={disabled}
+            className="h-9 rounded-md bg-card py-0"
             placeholder={t('invoices.generic.descriptionPlaceholder')}
             searchPlaceholder={t('invoices.generic.descriptionPlaceholder')}
             emptyTitle={t('invoices.generic.catalogEmpty')}
@@ -220,7 +253,9 @@ export function GenericInvoiceItems({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="generic-item-qty">{t('invoices.generic.qty')}</Label>
+          <Label htmlFor="generic-item-qty" className={EYEBROW}>
+            {t('invoices.generic.qty')}
+          </Label>
           <Input
             id="generic-item-qty"
             type="number"
@@ -228,12 +263,15 @@ export function GenericInvoiceItems({
             step="0.01"
             value={qty}
             disabled={disabled}
+            className="bg-card text-right font-mono tabular-nums"
             onChange={(e) => setQty(e.target.value)}
             onKeyDown={onDraftKeyDown}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="generic-item-amount">{t('invoices.generic.unitAmount')}</Label>
+          <Label htmlFor="generic-item-amount" className={EYEBROW}>
+            {t('invoices.generic.unitAmount')}
+          </Label>
           <Input
             id="generic-item-amount"
             type="number"
@@ -242,6 +280,7 @@ export function GenericInvoiceItems({
             step="0.01"
             value={unitAmount}
             disabled={disabled}
+            className="bg-card text-right font-mono tabular-nums"
             onChange={(e) => setUnitAmount(e.target.value)}
             onKeyDown={onDraftKeyDown}
           />
@@ -252,41 +291,65 @@ export function GenericInvoiceItems({
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-border/60">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('invoices.generic.colItem')}</TableHead>
-              <TableHead className="text-right">{t('invoices.generic.colRate')}</TableHead>
-              <TableHead className="text-right">{t('invoices.generic.colQty')}</TableHead>
-              <TableHead className="text-right">{t('invoices.generic.colAmount')}</TableHead>
-              <TableHead className="w-[1%] text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                  —
-                </TableCell>
+      {/* Ledger */}
+      <div className="px-6">
+        {items.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="text-sm font-semibold text-foreground/80">
+              {t('invoices.generic.itemsEmptyTitle')}
+            </p>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+              {t('invoices.generic.itemsEmptyBody')}
+            </p>
+          </div>
+        ) : (
+          <Table className="table-fixed">
+            <colgroup>
+              <col />
+              <col className="w-[108px]" />
+              <col className="w-[92px]" />
+              <col className="w-[128px]" />
+              <col className="w-[76px]" />
+            </colgroup>
+            <TableHeader>
+              {/* RULE 1 — the ledger head, ruled in the document's own ink. */}
+              <TableRow className="hover:bg-transparent [&>th]:border-b [&>th]:border-primary">
+                <TableHead className={`${EYEBROW} h-auto px-0 pt-3 pb-2`}>
+                  {t('invoices.generic.colItem')}
+                </TableHead>
+                <TableHead className={`${EYEBROW} h-auto px-0 pt-3 pb-2 text-right`}>
+                  {t('invoices.generic.colRate')}
+                </TableHead>
+                <TableHead className={`${EYEBROW} h-auto px-0 pt-3 pb-2 text-right`}>
+                  {t('invoices.generic.colQty')}
+                </TableHead>
+                <TableHead className={`${EYEBROW} h-auto px-0 pt-3 pb-2 text-right`}>
+                  {t('invoices.generic.colAmount')}
+                </TableHead>
+                <TableHead className="h-auto px-0 pt-3 pb-2" />
               </TableRow>
-            ) : (
-              items.map((item) => (
-                <TableRow key={item.key}>
-                  <TableCell className="max-w-[28rem] truncate font-medium">
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.key} className="group hover:bg-transparent">
+                  <TableCell className="truncate py-2.5 pr-5 pl-0 font-medium">
                     {item.description}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtMoney(item.unitAmount)}
+                  <TableCell className="py-2.5 pr-0 pl-3 text-right font-mono text-[13.5px] tabular-nums">
+                    {fmtNum(item.unitAmount)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {item.qty == null ? '—' : item.qty}
+                  <TableCell className="py-2.5 pr-0 pl-3 text-right font-mono text-[13.5px] tabular-nums">
+                    {item.qty == null ? (
+                      <span className="text-muted-foreground/50">—</span>
+                    ) : (
+                      item.qty
+                    )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtMoney(lineTotal(item))}
+                  <TableCell className="py-2.5 pr-0 pl-3 text-right font-mono text-[13.5px] font-medium tabular-nums">
+                    {fmtNum(round2(lineTotal(item)))}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                  <TableCell className="py-2.5 pr-0 pl-3">
+                    <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <Button
                         type="button"
                         variant="ghost"
@@ -303,6 +366,7 @@ export function GenericInvoiceItems({
                         size="icon-sm"
                         disabled={disabled}
                         aria-label={t('invoices.generic.remove')}
+                        className="hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => setPendingRemove(item)}
                       >
                         <Trash2 />
@@ -310,23 +374,10 @@ export function GenericInvoiceItems({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-          {items.length > 0 ? (
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={3} className="text-right font-medium">
-                  {t('invoices.generic.total')}
-                </TableCell>
-                <TableCell className="text-right tabular-nums font-semibold">
-                  {fmtMoney(total)}
-                </TableCell>
-                <TableCell />
-              </TableRow>
-            </TableFooter>
-          ) : null}
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       <ConfirmActionDialog
@@ -380,6 +431,6 @@ export function GenericInvoiceItems({
           }
         }}
       />
-    </div>
+    </>
   )
 }
