@@ -60,16 +60,11 @@ export function InvoiceAdvancedFilters({
   onChange,
   idDealer,
   disabled,
-  invoiceSearch,
-  onInvoiceSearchChange,
 }: {
   value: InvoiceAdvancedFilterState
   onChange: (next: InvoiceAdvancedFilterState) => void
   idDealer: string
   disabled?: boolean
-  /** Invoice statement # (INVOICE_STATEMENT.full_nro). */
-  invoiceSearch?: string
-  onInvoiceSearchChange?: (value: string) => void
 }) {
   const { t } = useTranslation()
   const [deptOpen, setDeptOpen] = React.useState(false)
@@ -101,16 +96,9 @@ export function InvoiceAdvancedFilters({
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <FilterLane title={t('invoices.filterLaneWorkOrder')}>
-          <FilterField label={t('invoices.filterInvoiceLabel')} htmlFor="inv-filter-invoice" className="sm:col-span-2">
-            <Input
-              id="inv-filter-invoice"
-              value={invoiceSearch ?? ''}
-              onChange={(e) => onInvoiceSearchChange?.(e.target.value)}
-              placeholder={t('invoices.filterInvoicePlaceholder')}
-              className="h-8 text-xs"
-              disabled={disabled || !onInvoiceSearchChange}
-            />
-          </FilterField>
+          {/* El campo "Invoice #" vive sólo en la barra superior (invoice-filter-deck.tsx).
+              Acá estaba duplicado, escribiendo el mismo estado y bajo el título de Work Order,
+              donde se confundía con el campo "WO #" de al lado. */}
           <div className="flex items-center justify-between gap-3 sm:col-span-2">
             <Label htmlFor="inv-exact-match" className="text-xs text-muted-foreground">
               {t('invoices.filterExactMatch')}
@@ -182,7 +170,7 @@ export function InvoiceAdvancedFilters({
               disabled={disabled}
             />
           </FilterField>
-          <FilterField label={t('invoices.filterEmployeeLabel')} className="sm:col-span-2">
+          <FilterField label={t('invoices.filterCreatedByLabel')} className="sm:col-span-2">
             <LookupMultiSelect
               options={authorQuery.data ?? []}
               value={value.authorIds}
@@ -196,7 +184,7 @@ export function InvoiceAdvancedFilters({
               }
               onSearchChange={setAuthorSearch}
               onOpenChange={setAuthorOpen}
-              placeholder={t('invoices.filterEmployeePlaceholder')}
+              placeholder={t('invoices.filterCreatedByPlaceholder')}
               loading={authorQuery.isFetching}
               disabled={disabled}
             />
@@ -257,17 +245,6 @@ export function InvoiceAdvancedFilters({
               />
               <Label htmlFor="inv-filter-overdue" className="cursor-pointer text-sm font-normal">
                 {t('invoices.filterOverdueLabel')}
-              </Label>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
-              <Switch
-                id="inv-filter-deleted"
-                checked={value.showDeleted}
-                onCheckedChange={(showDeleted) => patch({ showDeleted })}
-                disabled={disabled}
-              />
-              <Label htmlFor="inv-filter-deleted" className="cursor-pointer text-sm font-normal">
-                {t('invoices.filterShowDeletedLabel')}
               </Label>
             </div>
           </div>

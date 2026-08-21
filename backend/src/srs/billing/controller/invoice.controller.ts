@@ -51,6 +51,15 @@ export class InvoiceController {
     return this.service.lookupAuthors(request.srsContext, query)
   }
 
+  @Get('/invoices/lookups/workers')
+  @ApiOkResponse({ type: InvoiceLookupResponseDto })
+  async lookupWorkers(
+    @Req() request: any,
+    @Query() query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    return this.service.lookupWorkers(request.srsContext, query)
+  }
+
   @Get('/invoices/lookups/districts')
   async lookupDistricts(
     @Req() request: any,

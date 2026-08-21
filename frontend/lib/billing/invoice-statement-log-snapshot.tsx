@@ -56,6 +56,38 @@ function formatMoneySnapshot(value: unknown): string {
   return amount.toFixed(2)
 }
 
+function parseCatalogPriceChange(
+  descJson?: string | Record<string, unknown>,
+  descCambio?: string,
+): { name: string; idDealer?: number; priceOld: unknown; priceNew: unknown } | null {
+  let parsed: Record<string, unknown> | null = null
+  if (typeof descJson === 'string') {
+    try {
+      parsed = JSON.parse(descJson) as Record<string, unknown>
+    } catch {
+      parsed = null
+    }
+  } else if (descJson && typeof descJson === 'object') {
+    parsed = descJson
+  }
+  const looksLikeCatalog =
+    parsed != null &&
+    typeof parsed === 'object' &&
+    'name' in parsed &&
+    'priceNew' in parsed &&
+    !('items' in parsed)
+  if (descCambio === 'Generic catalog price change' || looksLikeCatalog) {
+    if (!parsed) return null
+    return {
+      name: String(parsed.name ?? ''),
+      idDealer: parsed.idDealer == null ? undefined : Number(parsed.idDealer),
+      priceOld: parsed.priceOld,
+      priceNew: parsed.priceNew,
+    }
+  }
+  return null
+}
+
 export function parseInvoiceStatementLogSnapshot(
   descJson?: string | Record<string, unknown>,
 ): InvoiceStatementLogSnapshot | null {
@@ -74,9 +106,31 @@ export function parseInvoiceStatementLogSnapshot(
 /** Mirrors legacy `buildSnapshotHtml` in app.binvoice_main.js */
 export function InvoiceStatementLogSnapshotView({
   descJson,
+  descCambio,
 }: {
   descJson?: string | Record<string, unknown>
+  descCambio?: string
 }) {
+  const catalogChange = parseCatalogPriceChange(descJson, descCambio)
+  if (catalogChange) {
+    return (
+      <div className="mt-2 rounded-md border border-border/70 bg-muted/30 p-2.5 text-left text-xs text-foreground">
+        <div>
+          <strong>Service:</strong> {displayText(catalogChange.name)}
+        </div>
+        {catalogChange.idDealer != null ? (
+          <div>
+            <strong>Dealer id:</strong> {displayText(catalogChange.idDealer)}
+          </div>
+        ) : null}
+        <div>
+          <strong>Price:</strong> {formatMoneySnapshot(catalogChange.priceOld)} →{' '}
+          {formatMoneySnapshot(catalogChange.priceNew)}
+        </div>
+      </div>
+    )
+  }
+
   const snapshot = parseInvoiceStatementLogSnapshot(descJson)
   if (!snapshot) {
     if (!descJson) return null

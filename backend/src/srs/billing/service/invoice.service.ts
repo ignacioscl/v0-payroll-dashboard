@@ -141,6 +141,26 @@ export class InvoiceService {
     return { results }
   }
 
+  async lookupWorkers(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
+    const { dealerIds, search, limit } = buildDepartmentLookupFilter(query)
+    if (dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer')
+    }
+    const results = await this.repository.lookupWorkers({
+      idDealerProvider: ctx.idDealerProvider,
+      idUsuario: ctx.idUsuario,
+      dealerIds,
+      skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
+  }
+
   async lookupDistricts(
     ctx: SrsContext,
     query: InvoiceLookupQueryDto,

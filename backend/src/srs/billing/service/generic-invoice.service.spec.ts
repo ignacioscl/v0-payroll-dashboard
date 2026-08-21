@@ -2,6 +2,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import { QueryFailedError } from 'typeorm'
 
 import { GenericInvoiceService } from './generic-invoice.service'
+import { GenericInvoiceConflictError } from '../generic-invoice-conflict.error'
+import { assertRelWriteAffected, conflictFromMysql } from '../generic-invoice-write-errors'
 
 const ctx = {
   idUsuario: 10,
@@ -28,8 +30,15 @@ function buildService(overrides?: {
     dealerRelExists: jest.fn().mockResolvedValue(overrides?.dealerRel ?? true),
     restrictionDealerAllows: jest.fn().mockResolvedValue(overrides?.restriction ?? true),
     checkDateFreeze: jest.fn().mockResolvedValue(overrides?.freeze ?? 1),
-    upsertCatalogItem: jest.fn().mockResolvedValue(undefined),
+    upsertCatalogItem: jest.fn().mockResolvedValue(null),
     upsertCatalogHeaderNote: jest.fn().mockResolvedValue(undefined),
+    logCatalogPriceChanges: jest.fn().mockResolvedValue(undefined),
+    loadEmployeeNames: jest.fn().mockResolvedValue(new Map()),
+    listTtkPunches: jest.fn().mockResolvedValue([]),
+    loadGenericHeader: jest.fn(),
+    loadGenericDetail: jest.fn(),
+    listTtkEmployees: jest.fn(),
+    updateGenericInvoice: jest.fn(),
     createStatement: jest.fn().mockImplementation(
       overrides?.create ??
         (async () => ({ id: 1, invoiceNro: 10, fullNro: 'AW10' })),
@@ -175,5 +184,106 @@ describe('GenericInvoiceService.config', () => {
     const cfg = await service.config(ctx as any)
     expect(cfg.hasGenericInvoice).toBe(true)
     expect(cfg.canCreate).toBe(false)
+  })
+})
+
+describe('GenericInvoiceService.create ttk', () => {
+  it('treats items without kind as free', async () => {
+    const { service, repository } = buildService()
+    await service.create(ctx as any, happyDto as any)
+    const persist = repository.createStatement.mock.calls[0][0]
+    expect(persist.items.every((row: { kind: string }) => row.kind === 'free')).toBe(true)
+  })
+
+  it('400 when a ttk item includes unitAmount in the raw body', async () => {
+    const { service } = buildService()
+    await expect(
+      service.create(
+        ctx as any,
+        { ...happyDto, items: [{ kind: 'ttk', idEmployee: 8 }] } as any,
+        { items: [{ kind: 'ttk', idEmployee: 8, unitAmount: 10 }] },
+      ),
+    ).rejects.toThrow('TTK items cannot include unitAmount, description, or qty.')
+  })
+
+  it('409 EMPLOYEE_NO_ROWS when the employee has no punches', async () => {
+    const { service, repository } = buildService()
+    repository.listTtkPunches.mockResolvedValue([])
+    await expect(
+      service.create(ctx as any, {
+        ...happyDto,
+        items: [{ kind: 'ttk', idEmployee: 88 }],
+      } as any),
+    ).rejects.toMatchObject({ code: 'EMPLOYEE_NO_ROWS', meta: { idEmployee: 88 } })
+  })
+})
+
+describe('GenericInvoiceService.update validations', () => {
+  function header() {
+    return {
+      id: 9,
+      fullNro: 'AW9',
+      idDealer: 100,
+      dealerName: 'Acme',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-07',
+      invoiceNote: null,
+      headerNote: null,
+      tax: null,
+      discount: null,
+      discountType: null,
+      discountDetail: null,
+      statementPaid: false,
+      estado: 1,
+      statementType: 6,
+      idDealerProvider: 79,
+    }
+  }
+
+  it('400 when idDealer is present in the raw body', async () => {
+    const { service, repository } = buildService()
+    repository.loadGenericHeader.mockResolvedValue(header())
+    await expect(
+      service.update(
+        ctx as any,
+        9,
+        { dateFrom: '2026-08-01', dateTo: '2026-08-07', items: [] } as any,
+        { idDealer: 100, dateFrom: '2026-08-01', dateTo: '2026-08-07', items: [] },
+      ),
+    ).rejects.toThrow('idDealer cannot be changed.')
+  })
+
+  it('400 on duplicate idEmployee', async () => {
+    const { service, repository } = buildService()
+    repository.loadGenericHeader.mockResolvedValue(header())
+    await expect(
+      service.update(ctx as any, 9, {
+        dateFrom: '2026-08-01',
+        dateTo: '2026-08-07',
+        items: [
+          { kind: 'ttk', idEmployee: 1 },
+          { kind: 'ttk', idEmployee: 1 },
+        ],
+      } as any),
+    ).rejects.toThrow('Duplicate TTK employee.')
+  })
+})
+
+describe('generic-invoice write guards', () => {
+  it('affectedRows 0 ⇒ LINE_PAID', () => {
+    try {
+      assertRelWriteAffected(0)
+      throw new Error('expected throw')
+    } catch (err) {
+      expect(err).toBeInstanceOf(GenericInvoiceConflictError)
+      expect((err as GenericInvoiceConflictError).code).toBe('LINE_PAID')
+    }
+  })
+
+  it('maps 1451 / 1213 / 1205 to 409 codes', () => {
+    const mk = (errno: number) => new QueryFailedError('x', [], { errno } as any)
+    expect(conflictFromMysql(mk(1451))?.code).toBe('LINE_PAID')
+    expect(conflictFromMysql(mk(1213))?.code).toBe('RETRY')
+    expect(conflictFromMysql(mk(1205))?.code).toBe('RETRY')
   })
 })

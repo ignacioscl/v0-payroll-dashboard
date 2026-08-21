@@ -27,6 +27,16 @@ const toOptionalInt = ({ value }: { value: unknown }) => {
 export const INVOICE_LIST_MAX_PAGE_SIZE = 200
 export const INVOICE_LIST_DEFAULT_PAGE_SIZE = 25
 
+export type InvoiceDeletedMode = 'hide' | 'only' | 'all'
+
+export function parseDeletedMode(
+  deleted?: string,
+  showDeletedFallback?: boolean,
+): InvoiceDeletedMode {
+  if (deleted === 'hide' || deleted === 'only' || deleted === 'all') return deleted
+  return showDeletedFallback ? 'only' : 'hide'
+}
+
 /**
  * Query de GET /srs/billing/invoices. Extiende la query KPI compartida
  * (fechaDesde/fechaHasta/idDealer requeridos) y agrega paginación + filtros
@@ -149,10 +159,47 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @Transform(({ value }) => parseFlag01(value))
   dueOn?: boolean
 
-  @ApiPropertyOptional({ description: 'Show deleted statements (estado=0)' })
+  @ApiPropertyOptional({
+    description:
+      "Deleted statements: hide (estado=1, default), only (estado=0), all (IN (0,1)). " +
+      'Replaces showDeleted. The API does not infer this from search.',
+    enum: ['hide', 'only', 'all'],
+  })
+  @IsOptional()
+  @IsIn(['hide', 'only', 'all'])
+  deleted?: InvoiceDeletedMode
+
+  /** @deprecated Use `deleted=only`. Mapped only when `deleted` is omitted. */
+  @ApiPropertyOptional({ description: 'Deprecated: use deleted=only', deprecated: true })
   @IsOptional()
   @Transform(({ value }) => parseFlag01(value))
   showDeleted?: boolean
+
+  @ApiPropertyOptional({
+    description:
+      'Employee who worked ids CSV (TTK_EMPLOYEE_WORK.id_author on invoice lines). ' +
+      'Restricts to statement_type 5/6. Provider comes from JWT, not this param.',
+  })
+  @IsOptional()
+  @IsString()
+  employeeWorkedIn?: string
+
+  /** @deprecated Prefer employeeWorkedIn. Mapped when the CSV is empty. */
+  @ApiPropertyOptional({ description: 'Deprecated: use employeeWorkedIn' })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  @Min(1)
+  employeeWorkedId?: number
+
+  @ApiPropertyOptional({
+    description:
+      'When 1: skip header fecha_desde/fecha_hasta on the list WHERE. ' +
+      'Dates stay required on the request. Front sends this from the Ignore date range switch.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseFlag01(value))
+  ignorePeriod?: boolean
 
   @ApiPropertyOptional({ description: 'Server-side sort column', enum: ['invoiceNro', 'dateFrom'] })
   @IsOptional()
@@ -197,7 +244,10 @@ export interface InvoiceListFilter {
   createdBySystem: boolean
   exactMatch: boolean
   dueOn: boolean
-  showDeleted: boolean
+  deleted: InvoiceDeletedMode
+  employeeWorkedIds: number[]
+  /** When true, do not add fecha_desde/fecha_hasta to the list WHERE. */
+  ignorePeriod: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir: 'asc' | 'desc'
 }
@@ -257,7 +307,13 @@ export function buildInvoiceListFilter(
     createdBySystem: parseFlag01(query.createdBySystem),
     exactMatch: parseFlag01(query.exactMatch),
     dueOn: parseFlag01(query.dueOn),
-    showDeleted: parseFlag01(query.showDeleted),
+    deleted: parseDeletedMode(query.deleted, parseFlag01(query.showDeleted)),
+    employeeWorkedIds: (() => {
+      const ids = parseCsvPositiveInts(query.employeeWorkedIn)
+      if (query.employeeWorkedId && query.employeeWorkedId > 0) ids.push(query.employeeWorkedId)
+      return [...new Set(ids)]
+    })(),
+    ignorePeriod: parseFlag01(query.ignorePeriod),
     orderBy: query.orderBy,
     orderDir: query.orderDir === 'asc' ? 'asc' : 'desc',
   }
@@ -320,6 +376,8 @@ export class InvoiceSummaryDto {
   @ApiProperty() subtotal!: number
   @ApiProperty() discount!: number
   @ApiProperty() total!: number
+  @ApiProperty({ description: 'Rows in the list WHERE with estado=0 (deleted)' })
+  deletedInList!: number
 }
 
 export class InvoiceListResponseDto {

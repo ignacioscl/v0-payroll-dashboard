@@ -15,6 +15,32 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import type { LookupOption } from '@/lib/invoice-advanced-filters'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { userAvatarUrl } from '@/lib/face/face-proxy-url'
+
+function LookupPhoto({
+  option,
+  name,
+  size = 'md',
+}: {
+  option?: LookupOption
+  name: string
+  size?: 'sm' | 'md'
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={userAvatarUrl({
+        thumbnailUuid: option?.thumbnailUuid,
+        logoImg: option?.logoImg,
+      })}
+      alt={name}
+      className={cn(
+        'shrink-0 rounded-full border border-border bg-muted object-cover',
+        size === 'sm' ? 'size-5' : 'size-6',
+      )}
+    />
+  )
+}
 
 function RowCheckbox({ checked }: { checked: boolean }) {
   return (
@@ -41,6 +67,8 @@ interface LookupMultiSelectProps {
   disabled?: boolean
   className?: string
   onOpenChange?: (open: boolean) => void
+  /** Employee thumbnails (usuarios.thumbnail_uuid / logo_img). */
+  withPhotos?: boolean
 }
 
 export function LookupMultiSelect({
@@ -54,11 +82,28 @@ export function LookupMultiSelect({
   disabled = false,
   className,
   onOpenChange,
+  withPhotos = false,
 }: LookupMultiSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<number[]>([])
   const [search, setSearch] = useState('')
+  const [known, setKnown] = useState<Record<number, LookupOption>>({})
+
+  useEffect(() => {
+    if (options.length === 0) return
+    setKnown((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const o of options) {
+        if (next[o.id] !== o) {
+          next[o.id] = o
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [options])
 
   useEffect(() => {
     if (!open) return
@@ -69,13 +114,21 @@ export function LookupMultiSelect({
   const label = useMemo(() => {
     if (value.length === 0) return placeholder ?? t('common.searchPlaceholder')
     if (value.length === 1) {
-      const hit = options.find((o) => o.id === value[0])
+      const hit = options.find((o) => o.id === value[0]) ?? known[value[0]]
       return hit?.label ?? t('invoices.filterOneSelected')
     }
     return t('invoices.filterManySelected', { count: value.length })
-  }, [options, placeholder, t, value])
+  }, [known, options, placeholder, t, value])
 
   const visibleIds = useMemo(() => options.map((o) => o.id), [options])
+  const listOptions = useMemo(() => {
+    const visible = new Set(visibleIds)
+    const extras = draft
+      .filter((id) => !visible.has(id))
+      .map((id) => known[id])
+      .filter((o): o is LookupOption => Boolean(o))
+    return extras.length ? [...extras, ...options] : options
+  }, [draft, known, options, visibleIds])
   const isFiltering = search.trim().length > 0
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => draft.includes(id))
@@ -134,8 +187,15 @@ export function LookupMultiSelect({
             className,
           )}
         >
-          <span className="min-w-0 truncate text-foreground">
-            {loading && open ? t('common.loading') : label}
+          <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-foreground">
+            {withPhotos && value.length === 1 ? (
+              <LookupPhoto
+                option={options.find((o) => o.id === value[0]) ?? known[value[0]]}
+                name={label}
+                size="sm"
+              />
+            ) : null}
+            <span className="min-w-0 truncate">{loading && open ? t('common.loading') : label}</span>
           </span>
           {loading && open ? (
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin opacity-50" />
@@ -170,7 +230,7 @@ export function LookupMultiSelect({
           <CommandList className="max-h-[240px]">
             <CommandEmpty>{emptyLabel ?? t('common.noRecords')}</CommandEmpty>
             <CommandGroup>
-              {options.map((opt) => {
+              {listOptions.map((opt) => {
                 const checked = draft.includes(opt.id)
                 return (
                   <CommandItem
@@ -178,9 +238,10 @@ export function LookupMultiSelect({
                     value={String(opt.id)}
                     onSelect={() => {}}
                     onMouseDown={handleRowMouseDown(() => toggle(opt.id))}
-                    className="cursor-pointer text-xs data-[selected=true]:text-foreground"
+                    className="cursor-pointer items-center gap-2 text-xs data-[selected=true]:text-foreground"
                   >
                     <RowCheckbox checked={checked} />
+                    {withPhotos ? <LookupPhoto option={opt} name={opt.label} /> : null}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{opt.label}</span>
                       {opt.sublabel ? (

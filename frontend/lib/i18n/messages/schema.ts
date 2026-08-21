@@ -467,6 +467,28 @@ export interface Messages {
     filterCheckNumberChip: string
     filterOverdueLabel: string
     filterShowDeletedLabel: string
+    filterCreatedByLabel: string
+    filterCreatedByPlaceholder: string
+    filterEmployeeWorkedLabel: string
+    filterEmployeeWorkedPlaceholder: string
+    filterEmployeeWorkedChip: string
+    filterDeletedLabel: string
+    filterDeletedHide: string
+    filterDeletedOnly: string
+    filterDeletedAll: string
+    filterDeletedHideTooltip: string
+    filterDeletedOnlyTooltip: string
+    filterDeletedAllTooltip: string
+    filterDeletedForced: string
+    filterDeletedOnlyChip: string
+    filterDeletedAllChip: string
+    filterIgnoreDatesLabel: string
+    filterIgnoreDatesTooltip: string
+    filterIgnoreDatesForced: string
+    filterIgnoreDatesChip: string
+    filterSearchLockHint: string
+    summaryExcludesDeleted: string
+    rowDeletedBadge: string
     filterOneSelected: string
     filterManySelected: string
     generic: {
@@ -527,6 +549,23 @@ export interface Messages {
       deleteCatalogSuccess: string
       deleteCatalogError: string
       catalogEmpty: string
+      titleEdit: string
+      save: string
+      saving: string
+      saved: string
+      saveError: string
+      loadError: string
+      addTtk: string
+      onlyTimecard: string
+      paidLocked: string
+      ttkTitle: string
+      ttkSearch: string
+      ttkEmpty: string
+      ttkHours: string
+      ttkAmount: string
+      ttkFooter: string
+      hoursUnbilledBanner: string
+      discount: string
     }
   }
   sidebar: {

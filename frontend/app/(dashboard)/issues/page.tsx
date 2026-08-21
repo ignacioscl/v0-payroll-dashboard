@@ -6,14 +6,12 @@ import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { GroupedIssuesDataTable } from '@/components/ttk/grouped-issues-table'
 import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
-import { AddPunchDialog } from '@/components/ttk/add-punch-dialog'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAddOrEditPunch, canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
-import { useSrsDealers } from '@/hooks/use-srs-dealers'
+import { canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import {
   PAYMENT_TYPE_FILTER_ALL,
@@ -27,13 +25,11 @@ import {
   Hand,
   Trash2,
   DollarSign,
-  PlusCircle,
   CheckCheck,
   Coffee,
   LayoutList,
   Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
@@ -81,7 +77,6 @@ const ISSUE_CARD_META: Record<
 export default function IssuesPage() {
   const { t } = useTranslation()
   const [viewMode, setViewMode] = useState<IssuesViewMode>('individual')
-  const [addPunchOpen, setAddPunchOpen] = useState(false)
   const [punchMinHoursRaw, setPunchMinHoursRaw] = useState('')
   const [punchMaxHoursRaw, setPunchMaxHoursRaw] = useState('')
   const [paymentTypeFilter, setPaymentTypeFilter] =
@@ -98,8 +93,6 @@ export default function IssuesPage() {
   } = useFilters()
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
-  const { dealers } = useSrsDealers()
-  const canAdd = canAddOrEditPunch(hasPermission, user?.isSystemAdmin)
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
   const isExternal = Boolean(user?.isCompanyTypeCompany)
@@ -136,17 +129,6 @@ export default function IssuesPage() {
       setSelectedType('all')
     }
   }
-
-  const singleDealerId = useMemo(() => {
-    if (selectedDealers.length !== 1) return null
-    const id = Number(selectedDealers[0])
-    return Number.isFinite(id) && id > 0 ? id : null
-  }, [selectedDealers])
-
-  const singleDealerName = useMemo(() => {
-    if (!singleDealerId) return undefined
-    return dealers.find((d) => String(d.id) === String(singleDealerId))?.label
-  }, [dealers, singleDealerId])
 
   const visibleIssueCards = useMemo((): IssueCardConfig[] => {
     return ISSUE_CARD_TYPES.filter((type) => type !== 'only_deletes' || canViewDeleted).map(
@@ -199,22 +181,6 @@ export default function IssuesPage() {
     return null
   }
 
-  const handleAddPunchClick = () => {
-    if (selectedDealers.length === 0) {
-      toast.error(t('dealer.selectOneInHeader'))
-      return
-    }
-    if (selectedDealers.length > 1) {
-      toast.error(t('dealer.selectOnlyOneInHeader'))
-      return
-    }
-    if (singleDealerId == null) {
-      toast.error(t('dealer.invalidSelected'))
-      return
-    }
-    setAddPunchOpen(true)
-  }
-
   return (
     <div className="space-y-8">
       <PageHeading
@@ -223,26 +189,14 @@ export default function IssuesPage() {
         icon={<AlertTriangle />}
         variant="warning"
         actions={
-          <>
-            {!meLoading && canAdd && (
-              <Button
-                size="sm"
-                className="gap-1.5 cursor-pointer"
-                onClick={handleAddPunchClick}
-              >
-                <PlusCircle className="h-4 w-4" />
-                {t('punch.add')}
-              </Button>
-            )}
-            <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
-              <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-              <span className="font-medium tabular-nums">
-                {loading
-                  ? '…'
-                  : t('punch.withErrorsCount', { count: totalPending })}
-              </span>
-            </Badge>
-          </>
+          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+            <span className="font-medium tabular-nums">
+              {loading
+                ? '…'
+                : t('punch.withErrorsCount', { count: totalPending })}
+            </span>
+          </Badge>
         }
       />
 
@@ -326,14 +280,6 @@ export default function IssuesPage() {
         />
       )}
 
-      {canAdd && (
-        <AddPunchDialog
-          open={addPunchOpen}
-          onOpenChange={setAddPunchOpen}
-          idDealer={singleDealerId}
-          dealerName={singleDealerName}
-        />
-      )}
     </div>
   )
 }

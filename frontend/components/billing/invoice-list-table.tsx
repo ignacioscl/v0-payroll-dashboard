@@ -17,6 +17,7 @@ import {
   Wallet,
 } from 'lucide-react'
 
+import { GenericInvoiceDialog } from '@/components/billing/generic-invoice-dialog'
 import { InvoiceExportDialog } from '@/components/billing/invoice-export-dialog'
 import { InvoiceGeneralStatementDialog } from '@/components/billing/invoice-general-statement-dialog'
 import { InvoicePoRoDialog } from '@/components/billing/invoice-po-ro-dialog'
@@ -38,6 +39,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useGenericInvoiceConfig } from '@/hooks/use-generic-invoice'
 import { useDeleteInvoiceStatements, useRemoveWoFromInvoice } from '@/hooks/use-invoice-statement-mutations'
 import {
   canDeleteInvoice,
@@ -296,21 +298,53 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const { hasPermission, user } = useSrsMe()
+  const genericConfig = useGenericInvoiceConfig()
   const removeWo = useRemoveWoFromInvoice()
   const [pendingRelId, setPendingRelId] = React.useState<number | null>(null)
   const [ttkDetailOpen, setTtkDetailOpen] = React.useState(false)
+  const [genericEditOpen, setGenericEditOpen] = React.useState(false)
   const token = typeTokenOf(row.statementType)
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const canRemove =
     !isExternal &&
     row.estado !== 0 &&
     canRemoveWoFromInvoice(hasPermission, user?.isSystemAdmin)
+  const canEditGeneric =
+    Boolean(genericConfig.data?.canCreate) &&
+    row.statementType === 6 &&
+    row.estado !== 0 &&
+    row.isBilled !== 1
 
   const detail = useQuery({
     queryKey: ['srs-invoice-detail', row.id],
     queryFn: () => fetchInvoiceDetail(row.id),
     staleTime: 5 * 60 * 1000,
   })
+
+  const genericEditButton = canEditGeneric ? (
+    <>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            setGenericEditOpen(true)
+          }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t('invoices.generic.edit')}
+        </Button>
+      </div>
+      <GenericInvoiceDialog
+        open={genericEditOpen}
+        onOpenChange={setGenericEditOpen}
+        statementId={row.id}
+      />
+    </>
+  ) : null
 
   const ttkDetailButton =
     token === 'ttk' ? (
@@ -340,6 +374,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     return (
       <div className="space-y-3">
         {ttkDetailButton}
+        {genericEditButton}
         <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           {t('invoices.detailLoading')}
@@ -351,6 +386,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     return (
       <div className="space-y-3">
         {ttkDetailButton}
+        {genericEditButton}
         <div className="flex items-center gap-2 py-2 text-xs text-destructive">
           <AlertTriangle className="h-4 w-4" />
           {t('invoices.detailError')}
@@ -366,6 +402,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     return (
       <div className="space-y-3">
         {ttkDetailButton}
+        {genericEditButton}
         <div className="py-2 text-xs text-muted-foreground">{t('invoices.detailEmpty')}</div>
       </div>
     )
@@ -380,6 +417,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
   return (
     <div className="space-y-4">
       {ttkDetailButton}
+      {genericEditButton}
       {woRows.length > 0 ? (
         <DetailSection title={t('invoices.detailWoTitle')}>
           <DetailTable>
@@ -498,9 +536,12 @@ function TotalsBar({
   subtotal,
   discount,
   grandTotal,
+  showExcludesDeleted,
 }: {
   shown: number
   total: number
+  /** Same flag as the top summary strip: deleted=all and there are deleted rows listed. */
+  showExcludesDeleted?: boolean
   subtotal: number
   discount: number
   grandTotal: number
@@ -515,6 +556,11 @@ function TotalsBar({
         <span className="text-xs text-muted-foreground tabular-nums">
           {t('invoices.totalsShowing', { shown, total })}
         </span>
+        {showExcludesDeleted ? (
+          <span className="text-[11px] text-muted-foreground">
+            {t('invoices.summaryExcludesDeleted')}
+          </span>
+        ) : null}
       </div>
       <div className="flex items-center gap-6 tabular-nums">
         <div className="hidden items-baseline gap-2 sm:flex">
@@ -561,9 +607,12 @@ export function InvoiceListTable({
   showDealerSubline,
   idDealer,
   payedFilter,
+  showExcludesDeleted,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
+  /** Computed once in the page and shared with the top summary strip. */
+  showExcludesDeleted?: boolean
   hydrated: boolean
   hasDealer: boolean
   hasDates: boolean
@@ -622,9 +671,23 @@ export function InvoiceListTable({
   )
 
   const selectedRows = React.useMemo(
-    () => rows.filter((r) => selectedIds.includes(r.id)),
+    () => rows.filter((r) => selectedIds.includes(r.id) && r.estado !== 0),
     [rows, selectedIds],
   )
+
+  React.useEffect(() => {
+    setRowSelection((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const r of rows) {
+        if (r.estado === 0 && next[String(r.id)]) {
+          delete next[String(r.id)]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [rows])
 
   const requireSelection = React.useCallback(() => {
     if (selectedRows.length === 0) {
@@ -655,29 +718,39 @@ export function InvoiceListTable({
               maxSize: 44,
               enableSorting: false,
               enableHiding: false,
-              header: ({ table }) => (
-                <Checkbox
-                  checked={
-                    table.getIsAllPageRowsSelected()
-                      ? true
-                      : table.getIsSomePageRowsSelected()
-                        ? 'indeterminate'
-                        : false
-                  }
-                  onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                  aria-label={t('invoices.bulkSelectAll')}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ),
-              cell: ({ row }) => (
-                <Checkbox
-                  checked={row.getIsSelected()}
-                  disabled={!row.getCanSelect()}
-                  onCheckedChange={(value) => row.toggleSelected(!!value)}
-                  aria-label={t('invoices.bulkSelectRow')}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ),
+              header: ({ table }) => {
+                const selectable = table.getRowModel().rows.filter((r) => r.getCanSelect())
+                const noneSelectable = selectable.length === 0
+                return (
+                  <Checkbox
+                    checked={
+                      table.getIsAllPageRowsSelected()
+                        ? true
+                        : table.getIsSomePageRowsSelected()
+                          ? 'indeterminate'
+                          : false
+                    }
+                    disabled={noneSelectable}
+                    onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                    aria-label={t('invoices.bulkSelectAll')}
+                    className={noneSelectable ? 'cursor-not-allowed' : 'cursor-pointer'}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )
+              },
+              cell: ({ row }) => {
+                const canSelect = row.getCanSelect()
+                return (
+                  <Checkbox
+                    checked={row.getIsSelected()}
+                    disabled={!canSelect}
+                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    aria-label={t('invoices.bulkSelectRow')}
+                    className={canSelect ? 'cursor-pointer' : 'cursor-not-allowed'}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )
+              },
               meta: {
                 label: t('invoices.bulkSelectRow'),
                 pin: 'left',
@@ -705,7 +778,7 @@ export function InvoiceListTable({
             }}
             aria-expanded={row.getIsExpanded()}
             aria-label={t('invoices.viewDetail')}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           >
             {row.getIsExpanded() ? (
               <ChevronDown className="h-4 w-4 transition-transform duration-150" />
@@ -732,9 +805,26 @@ export function InvoiceListTable({
         ),
         cell: ({ row }) => {
           const r = row.original
+          const deleted = r.estado === 0
           return (
-            <div className="flex flex-col">
-              <span className="font-semibold text-foreground">{r.fullNro || `#${r.id}`}</span>
+            <div className="flex flex-col gap-0.5">
+              <span
+                className={cn(
+                  'font-semibold text-foreground',
+                  deleted && 'text-muted-foreground line-through',
+                )}
+              >
+                {r.fullNro || `#${r.id}`}
+              </span>
+              {deleted ? (
+                <Badge
+                  variant="outline"
+                  className="w-fit gap-1 border-destructive/40 px-1.5 py-0 text-[10px] font-medium text-destructive"
+                >
+                  <Trash2 className="size-3" />
+                  {t('invoices.rowDeletedBadge')}
+                </Badge>
+              ) : null}
               {showDealerSubline && r.dealer ? (
                 <span className="text-[11px] text-muted-foreground">{r.dealer}</span>
               ) : null}
@@ -931,7 +1021,14 @@ export function InvoiceListTable({
           <DataTableColumnHeader column={column} title={t('invoices.colSubtotal')} />
         ),
         cell: ({ row }) => (
-          <span className="text-muted-foreground">{fmtMoney(row.original.subtotal)}</span>
+          <span
+            className={cn(
+              'text-muted-foreground',
+              row.original.estado === 0 && 'line-through',
+            )}
+          >
+            {fmtMoney(row.original.subtotal)}
+          </span>
         ),
         meta: {
           label: t('invoices.colSubtotal'),
@@ -974,7 +1071,14 @@ export function InvoiceListTable({
           <DataTableColumnHeader column={column} title={t('invoices.colTotal')} />
         ),
         cell: ({ row }) => (
-          <span className="font-semibold text-foreground">{fmtMoney(row.original.total)}</span>
+          <span
+            className={cn(
+              'font-semibold text-foreground',
+              row.original.estado === 0 && 'text-muted-foreground line-through',
+            )}
+          >
+            {fmtMoney(row.original.total)}
+          </span>
         ),
         meta: {
           label: t('invoices.colTotal'),
@@ -1187,7 +1291,7 @@ export function InvoiceListTable({
         showPageSizeInInfiniteScroll
         pageSizeOptions={[25, 50, 100]}
         includeAllPageSize
-        enableRowSelection={enableSelection}
+        enableRowSelection={(row) => row.original.estado !== 0}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         sorting={sorting}
@@ -1221,6 +1325,7 @@ export function InvoiceListTable({
               subtotal={summary.subtotal}
               discount={summary.discount}
               grandTotal={summary.total}
+              showExcludesDeleted={showExcludesDeleted}
             />
           ) : undefined
         }

@@ -21,17 +21,28 @@ export function providerLogoUrl(
   return legacyLogoUrl(user?.providerLogoImg)
 }
 
-export function userAvatarUrl(user: {
+/**
+ * Employee photo: v0 face thumbnail (`thumbnail_uuid`) first, then legacy
+ * `usuarios.logo_img`. Null when neither exists — callers can fall back to initials.
+ */
+export function employeePhotoUrl(user: {
   thumbnailUuid?: string | null
   logoImg?: string | null
-} | null | undefined): string {
+} | null | undefined): string | null {
   if (!user) {
-    return DEFAULT_EMPLOYEE_AVATAR_URL
+    return null
   }
   if (user.thumbnailUuid) {
     return employeeThumbnailUrl(user.thumbnailUuid)
   }
-  return legacyLogoUrl(user.logoImg) ?? DEFAULT_EMPLOYEE_AVATAR_URL
+  return legacyLogoUrl(user.logoImg)
+}
+
+export function userAvatarUrl(user: {
+  thumbnailUuid?: string | null
+  logoImg?: string | null
+} | null | undefined): string {
+  return employeePhotoUrl(user) ?? DEFAULT_EMPLOYEE_AVATAR_URL
 }
 
 export function employeeThumbnailUrl(thumbnailUuid: string | null | undefined): string {

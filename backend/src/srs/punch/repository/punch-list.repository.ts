@@ -82,7 +82,14 @@ function liveStatusSql(status?: PunchListLiveStatus): string {
   }
 }
 
-const SELECT_FIELDS = `
+/** Dealer display name for the logged provider (DEALER_REL.dealer_name → fallback razon_social). */
+function dealerNameByProviderExpr(idDealerProvider: number): string {
+  const providerId = Number.isFinite(idDealerProvider) ? Math.trunc(idDealerProvider) : 0
+  return `GET_DEALER_NAME_BY_PROVIDER(${providerId}, c.id)`
+}
+
+function buildSelectFields(idDealerProvider: number): string {
+  return `
   tew.id                                   AS id,
   tew.estado                               AS estado,
   tew.manual_create                        AS manual_create,
@@ -121,7 +128,7 @@ const SELECT_FIELDS = `
   u.thumbnail_uuid                         AS thumbnail_uuid,
   uf.nombre                                AS fixed_by_nombre,
   c.id                                     AS id_dealer,
-  c.razon_social                           AS razon_social,
+  ${dealerNameByProviderExpr(idDealerProvider)} AS razon_social,
   gd.id                                    AS id_payment_type,
   gd.name                                  AS payment_type_name,
 
@@ -134,6 +141,7 @@ const SELECT_FIELDS = `
     WHERE urr.id_usuario = tew.id_author
       AND urr.id_dealer_asigned = tew.id_dealer)                          AS rol_dpto
 `
+}
 
 function parseJson<T>(raw: unknown): T | null {
   if (raw == null || raw === '') return null
@@ -235,7 +243,7 @@ export class PunchListRepository {
     // Se pide una fila de más para saber si hay siguiente sin depender del total
     // (el total del período cambia mientras la gente poncha; el cursor no).
     const rows: Record<string, unknown>[] = await this.srs.query(
-      `SELECT ${SELECT_FIELDS} ${baseFrom} ${cursorSql} ${orderSql} LIMIT ?`,
+      `SELECT ${buildSelectFields(idDealerProvider)} ${baseFrom} ${cursorSql} ${orderSql} LIMIT ?`,
       [...baseParams, ...cursorParams, opts.pageSize + 1],
     )
 

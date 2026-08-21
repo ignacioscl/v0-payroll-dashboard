@@ -374,7 +374,7 @@ export interface DataTableProps<TData, TValue = unknown> {
   enableColumnResizing?: boolean
 
   // ---------- Selection ----------
-  enableRowSelection?: boolean
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean)
   rowSelection?: Record<string, boolean>
   onRowSelectionChange?: (s: Record<string, boolean>) => void
   getRowId?: (row: TData, index: number) => string

@@ -10,6 +10,8 @@ export type TtkEmployeeOption = {
   nombre: string
   role?: string
   department?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
 }
 
 type TtkEmployeesResponse = {

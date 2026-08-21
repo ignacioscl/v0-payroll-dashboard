@@ -13,7 +13,7 @@ export type InvGenericStored = {
   tax: string
 }
 
-function parseYmd(raw: string | undefined): Date | undefined {
+export function parseYmd(raw: string | undefined): Date | undefined {
   if (!raw) return undefined
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim())
   if (!m) return undefined

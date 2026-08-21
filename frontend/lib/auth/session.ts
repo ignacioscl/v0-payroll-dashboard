@@ -39,8 +39,11 @@ export function buildSessionCookies(session: SrsSession) {
 }
 
 export function buildClearSessionCookies() {
+  const secure = process.env.NODE_ENV === 'production'
   const base = {
     httpOnly: true,
+    secure,
+    sameSite: 'lax' as const,
     path: '/',
     maxAge: 0,
   }

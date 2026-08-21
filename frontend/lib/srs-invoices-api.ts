@@ -51,6 +51,7 @@ export interface InvoiceSummary {
   subtotal: number
   discount: number
   total: number
+  deletedInList: number
 }
 
 export interface InvoiceListResponse {
@@ -131,7 +132,9 @@ export interface InvoiceListParams {
   createdBySystem?: 0 | 1
   exactMatch?: boolean
   dueOn?: boolean
-  showDeleted?: boolean
+  deleted?: 'hide' | 'only' | 'all'
+  employeeWorkedIn?: string
+  ignorePeriod?: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir?: 'asc' | 'desc'
   page: number
@@ -142,6 +145,8 @@ export type InvoiceLookupOption = {
   id: number
   label: string
   sublabel?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
 }
 
 export interface InvoiceLookupResponse {
@@ -176,7 +181,9 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.createdBySystem === 1) qs.set('createdBySystem', '1')
   if (params.exactMatch) qs.set('exactMatch', 'true')
   if (params.dueOn) qs.set('dueOn', 'true')
-  if (params.showDeleted) qs.set('showDeleted', 'true')
+  if (params.deleted) qs.set('deleted', params.deleted)
+  if (params.employeeWorkedIn) qs.set('employeeWorkedIn', params.employeeWorkedIn)
+  if (params.ignorePeriod) qs.set('ignorePeriod', 'true')
   if (params.orderBy) qs.set('orderBy', params.orderBy)
   if (params.orderDir) qs.set('orderDir', params.orderDir)
   return `?${qs.toString()}`
@@ -252,6 +259,20 @@ export async function fetchInvoiceAuthors(params: {
     { cache: 'no-store' },
   )
   if (!res.ok) throw new Error(`Invoice authors (${res.status})`)
+  const data = (await res.json()) as InvoiceLookupResponse
+  return data.results ?? []
+}
+
+export async function fetchInvoiceWorkers(params: {
+  idDealer: string
+  search?: string
+  limit?: number
+}): Promise<InvoiceLookupOption[]> {
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/lookups/workers${buildLookupQuery(params)}`,
+    { cache: 'no-store' },
+  )
+  if (!res.ok) throw new Error(`Invoice workers (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
 }

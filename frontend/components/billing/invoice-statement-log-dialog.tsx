@@ -10,7 +10,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useInvoiceStatementLog } from '@/hooks/use-invoice-statement-log'
-import type { InvoiceStatementLogEntry } from '@/hooks/use-invoice-statement-log'
+import type {
+  InvoiceStatementLogAge,
+  InvoiceStatementLogEntry,
+} from '@/hooks/use-invoice-statement-log'
 import { InvoiceStatementLogSnapshotView } from '@/lib/billing/invoice-statement-log-snapshot'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
@@ -29,8 +32,27 @@ function formatLogDate(value?: string): string {
   })
 }
 
+/** Mirrors legacy `formatLogAge` in app.binvoice_main.js */
+function formatLogAge(age?: InvoiceStatementLogAge | string | null): string {
+  if (!age) return ''
+  if (typeof age === 'string') return age
+  if (typeof age !== 'object') return ''
+  const y = parseInt(String(age.year ?? ''), 10) || 0
+  const m = parseInt(String(age.month ?? ''), 10) || 0
+  const d = parseInt(String(age.day ?? ''), 10) || 0
+  const h = parseInt(String(age.hour ?? ''), 10) || 0
+  const mi = parseInt(String(age.minute ?? ''), 10) || 0
+  const parts: string[] = []
+  if (y) parts.push(`${y}y`)
+  if (m) parts.push(`${m}mo`)
+  if (d) parts.push(`${d}d`)
+  if (h || mi) parts.push(`${h}h ${mi}m`)
+  return parts.length ? `${parts.join(' ')} after previous entry` : ''
+}
+
 function LogCard({ entry }: { entry: InvoiceStatementLogEntry }) {
   const author = entry.autor?.nombre?.trim()
+  const ageLabel = formatLogAge(entry.age)
   return (
     <div className="rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -47,10 +69,10 @@ function LogCard({ entry }: { entry: InvoiceStatementLogEntry }) {
               {entry.origen}
             </span>
           ) : null}
-          {entry.age ? <div className="mt-1 text-[10px]">{entry.age}</div> : null}
+          {ageLabel ? <div className="mt-1 text-[10px]">{ageLabel}</div> : null}
         </div>
       </div>
-      <InvoiceStatementLogSnapshotView descJson={entry.descJson} />
+      <InvoiceStatementLogSnapshotView descJson={entry.descJson} descCambio={entry.descCambio} />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
 } from '../../shared/kpi/srs-kpi-zero-filter'
 import { StatementType, statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
 import {
+  InvoiceDeletedMode,
   InvoiceListFilter,
   InvoiceRowDto,
   InvoiceSummaryDto,
@@ -21,6 +22,13 @@ import {
   InvoiceDetailGenericRowDto,
   InvoiceDetailWoRowDto,
 } from '../dto/invoice-detail.dto'
+
+/** Values come from InvoiceDeletedMode (parsed enum), never from the raw query string. */
+function deletedEstadoSql(mode: InvoiceDeletedMode): string {
+  if (mode === 'only') return ' AND s.estado = 0'
+  if (mode === 'all') return ' AND s.estado IN (0, 1)'
+  return ' AND s.estado = 1'
+}
 
 /**
  * Listado de la solapa Invoice (INVOICE_STATEMENT) — read-only.
@@ -38,11 +46,15 @@ export class InvoiceRepository {
    */
   private buildWhere(f: InvoiceListFilter): { join: string; where: string; params: any[] } {
     const stmt = buildDealerFilterSql('statement', f.idUsuario, f.dealerIds, f.skipDealerRestriction)
-    const estado = f.showDeleted ? 0 : 1
-    let where = ` WHERE s.estado = ${estado} AND s.id_dealer_provider = ?${stmt.and}`
-    // Legacy billing list: statement period fully inside [fechaDesde, fechaHasta].
-    where += ' AND s.fecha_desde >= ? AND s.fecha_hasta <= ?'
-    const params: any[] = [f.idDealerProvider, ...stmt.params, f.fechaDesde, f.fechaHasta]
+    let where = ` WHERE s.id_dealer_provider = ?${stmt.and}`
+    where += deletedEstadoSql(f.deleted)
+    const params: any[] = [f.idDealerProvider, ...stmt.params]
+    // Legacy: statement period fully inside [fechaDesde, fechaHasta].
+    // ignorePeriod comes from the Ignore date range switch (manual or forced by search).
+    if (!f.ignorePeriod) {
+      where += ' AND s.fecha_desde >= ? AND s.fecha_hasta <= ?'
+      params.push(f.fechaDesde, f.fechaHasta)
+    }
 
     if (f.statementTypes.length) {
       // Valores de enum whitelisteados → inline seguro (mismo patrón que billing-kpi).
@@ -86,6 +98,22 @@ export class InvoiceRepository {
     } else if (f.idAuthor) {
       where += ' AND s.id_author = ?'
       params.push(f.idAuthor)
+    }
+
+    if (f.employeeWorkedIds.length) {
+      // Types 5/6 only — Work Orders are out of scope even when the type pills
+      // are all on (the list default). Do not filter tew.estado: this matches
+      // the invoice line, not whether the punch is still active.
+      const ids = sqlInInts(f.employeeWorkedIds)
+      where += ` AND s.statement_type IN (${StatementType.TTK}, ${StatementType.GENERIC})
+        AND EXISTS (
+          SELECT 1 FROM INVOICE_STATEMENT_INV_REL isir
+          INNER JOIN TTK_EMPLOYEE_WORK tew ON tew.id = isir.id_employee_work
+          WHERE isir.id_statement = s.id
+            AND tew.id_author IN (${ids})
+            AND tew.id_dealer_provider = ?
+        )`
+      params.push(f.idDealerProvider)
     }
 
     if (f.departmentIds.length) {
@@ -305,17 +333,25 @@ export class InvoiceRepository {
     }))
   }
 
-  /** Count + totales (subtotal/discount/total) sobre TODO el filtro, en una sola pasada. */
+  /**
+   * Count + money over the list WHERE.
+   * `total` (row count / hasMore) always uses the list estado.
+   * Money totals in deleted=all include only estado=1 — that is the only
+   * intentional split between list and money. Hide/only use the same estado.
+   */
   async summary(f: InvoiceListFilter): Promise<{ total: number; summary: InvoiceSummaryDto }> {
     const { join, where, params } = this.buildWhere(f)
+    // deleted=all: list is IN (0,1); money is activas only (s.estado = 1).
+    const moneyPred = f.deleted === 'all' ? 's.estado = 1' : '1=1'
     const [row] = await this.srs.query(
       `SELECT COUNT(*) AS cnt,
-              ROUND(IFNULL(SUM(GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)), 0), 2) AS subtotal,
-              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS total,
-              ROUND(IFNULL(SUM(
+              SUM(CASE WHEN s.estado = 0 THEN 1 ELSE 0 END) AS deleted_in_list,
+              ROUND(IFNULL(SUM(CASE WHEN ${moneyPred} THEN GET_SUBTOTAL_BY_STATEMENT(s.id, NULL) ELSE 0 END), 0), 2) AS subtotal,
+              ROUND(IFNULL(SUM(CASE WHEN ${moneyPred} THEN GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) ELSE 0 END), 0), 2) AS total,
+              ROUND(IFNULL(SUM(CASE WHEN ${moneyPred} THEN (
                 GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)
                 - GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)
-              ), 0), 2) AS discount
+              ) ELSE 0 END), 0), 2) AS discount
        FROM INVOICE_STATEMENT s
        ${join}
        ${where}`,
@@ -329,6 +365,7 @@ export class InvoiceRepository {
         subtotal: Number(row?.subtotal ?? 0),
         discount: Number(row?.discount ?? 0),
         total: Number(row?.total ?? 0),
+        deletedInList: Number(row?.deleted_in_list ?? 0),
       },
     }
   }
@@ -447,9 +484,9 @@ export class InvoiceRepository {
                  t.hours_decimal AS generic_qty,
                  t.amount_dealer AS service_price,
                  IS_STATEMENT_BILLED(t.id_statement) AS is_statement_full_billed,
-                 b.check_number AS check_number,
-                 b.amount AS amount,
-                 b.fecha AS fecha_pago,
+                 CASE WHEN b.check_number IS NULL THEN b2.check_number ELSE b.check_number END AS check_number,
+                 CASE WHEN b.amount IS NULL THEN b2.amount ELSE b.amount END AS amount,
+                 CASE WHEN b.fecha IS NULL THEN b2.fecha ELSE b.fecha END AS fecha_pago,
                  t.id_author AS id_author_ttk,
                  t.rol_name,
                  t.dpto_name,
@@ -460,7 +497,7 @@ export class InvoiceRepository {
                    u.nombre AS nombre,
                    tew.id_author,
                    (SUM(TTK_CALCULATE_TIME_DAY(1, punch_out, punch_in, break_end, break_start, 1)) * 3600) / 3600 AS hours_decimal,
-                   tew.amount_dealer AS amount_dealer,
+                   SUM(tew.amount_line) AS amount_dealer,
                    (SELECT MAX(r.nombre) FROM USUARIO_ROL_REL urr
                      INNER JOIN ROL r ON r.id_rol = urr.id_rol
                      WHERE urr.id_dealer_asigned = tew.id_dealer AND urr.id_usuario = u.id_usuario) AS rol_name,
@@ -472,20 +509,24 @@ export class InvoiceRepository {
             FROM (
               SELECT tew.id, tew.id_author, tew.id_dealer, tew.punch_in, tew.punch_out,
                      tew.break_start, tew.break_end,
-                     (isir.amount / TTK_CALCULATE_TIME_DAY(1, punch_out, punch_in, break_end, break_start, 1)) AS amount_dealer,
+                     isir.amount AS amount_line,
                      isir.id AS id_statement_inv_rel,
                      _is.id AS id_statement,
                      isir.only_timecard AS only_timecard
               FROM TTK_EMPLOYEE_WORK tew
               INNER JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_employee_work = tew.id AND isir.id_statement = ?
-              INNER JOIN INVOICE_STATEMENT _is ON _is.id = isir.id_statement AND _is.estado = 1
+              -- No _is.estado = 1: this is the expander for one statement id (incl. deleted).
+              -- List/summary/billing still filter estado. Scope stays id + provider.
+              INNER JOIN INVOICE_STATEMENT _is ON _is.id = isir.id_statement
               WHERE tew.estado = 1 AND _is.id = ? AND _is.id_dealer_provider = ?
             ) tew
             INNER JOIN usuarios u ON u.id_usuario = tew.id_author
             GROUP BY tew.id_author
           ) t
-          LEFT JOIN BILLING_WO_REL bwr ON bwr.id_statement_inv_rel = t.id_statement_inv_rel
-          LEFT JOIN BILLING b ON b.id = bwr.id_billing AND b.estado = 1
+          LEFT JOIN BILLING_WO_REL bwr ON bwr.id_statement_inv_rel = t.id_statement_inv_rel AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
+          LEFT JOIN BILLING b ON b.id = bwr.id_billing AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
+          LEFT JOIN BILLING_WO_REL bwr_inv ON bwr_inv.id_statement = t.id_statement AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
+          LEFT JOIN BILLING b2 ON b2.id = bwr_inv.id_billing AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
         )
       ) u
       ORDER BY u.id`,
@@ -646,6 +687,64 @@ export class InvoiceRepository {
     return rows.map((r: any) => ({
       id: Number(r.id),
       label: String(r.label ?? ''),
+    }))
+  }
+
+  /**
+   * Employees who appear on TTK/Generic invoice lines (id_employee_work → punch author).
+   * Copied from lookupAuthors: same dealer restriction, provider, is_empleado, LIMIT, LIKE.
+   */
+  async lookupWorkers(f: {
+    idDealerProvider: number
+    idUsuario: number
+    dealerIds: number[]
+    skipDealerRestriction: boolean
+    search?: string
+    limit: number
+  }): Promise<InvoiceLookupOptionDto[]> {
+    if (f.dealerIds.length === 0) return []
+    const restrict = buildDealerRestrictionClause(
+      f.idUsuario,
+      f.dealerIds,
+      f.skipDealerRestriction,
+    )
+    const params: any[] = [
+      f.idDealerProvider,
+      f.idDealerProvider,
+      f.idDealerProvider,
+      ...restrict.params,
+    ]
+    let extra = ''
+    if (f.search) {
+      extra += ' AND u.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    const rows = await this.srs.query(
+      `SELECT DISTINCT u.id_usuario AS id, u.nombre AS label,
+              u.thumbnail_uuid AS thumbnail_uuid, u.logo_img AS logo_img
+       FROM INVOICE_STATEMENT s
+       INNER JOIN CONTRATISTA c ON c.id = s.id_dealer
+       INNER JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = s.id
+       INNER JOIN TTK_EMPLOYEE_WORK tew ON tew.id = isir.id_employee_work
+       INNER JOIN usuarios u ON u.id_usuario = tew.id_author
+       WHERE s.estado = 1
+         AND s.statement_type IN (${StatementType.TTK}, ${StatementType.GENERIC})
+         AND s.id_dealer_provider = ?
+         AND tew.id_dealer_provider = ?
+         AND u.is_empleado = 1
+         AND u.estado = 1
+         AND u.id_contratista_owner = ?
+         ${restrict.and}
+         ${extra}
+       ORDER BY u.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+      thumbnailUuid: r.thumbnail_uuid ? String(r.thumbnail_uuid) : null,
+      logoImg: r.logo_img ? String(r.logo_img) : null,
     }))
   }
 

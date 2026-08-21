@@ -16,6 +16,7 @@ import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DatePicker } from '@/components/filters/date-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
+import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -69,6 +70,7 @@ export function Header() {
   const showStatusFilter = pathname === '/schedule'
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
+  const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
   const showDateFilter = !isRolesPage
 
   // Count active filters for mobile badge
@@ -156,6 +158,8 @@ export function Header() {
 
         {/* Right side */}
         <div className="flex shrink-0 items-center gap-2">
+          {isIssuesPage ? <IssuesAddPunchHeaderButton /> : null}
+
           {/* Mobile: filter button */}
           <button
             className="relative flex md:hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
