@@ -359,6 +359,9 @@ export interface Messages {
     actionNotesError: string
     actionNotesInvalid: string
     actionRemoveWoTitle: string
+    actionRemoveWoConfirmTitle: string
+    actionRemoveWoConfirmBody: string
+    actionRemoveWoConfirmCta: string
     actionRemoveWoSuccess: string
     actionRemoveWoError: string
     colPo: string

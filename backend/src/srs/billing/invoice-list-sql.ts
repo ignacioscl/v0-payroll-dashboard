@@ -173,7 +173,10 @@ function buildBranchWhere(
     parts.push('IS_STATEMENT_FULL_BILLED(s.id) = 0')
   }
 
-  if (!f.ignorePeriod) {
+  // Buscar por número manda sobre el período: el que escribe un número no sabe de qué mes es
+  // la invoice. El front ya fuerza `ignorePeriod`, pero la regla vive acá para que también
+  // valga si el pedido entra por la API sin ese flag.
+  if (!f.ignorePeriod && !f.search) {
     parts.push('s.fecha_desde >= ? AND s.fecha_hasta <= ?')
     params.push(f.fechaDesde, f.fechaHasta)
   }
@@ -343,13 +346,20 @@ function buildBranchWhere(
     params.push(...lineParams)
   }
 
-  if (kind === 1) {
+  // Una invoice que se quedó sin líneas devuelve 0 acá y se cae de la rama del saldo; como
+  // tampoco está cobrada, ninguna rama la trae y queda inalcanzable desde la pantalla (hay
+  // 324 así en la base). Legacy tiene el mismo filtro (HelperDao.php:433 y :643), pero
+  // buscar un número concreto y que la grilla diga que no existe es peor que la divergencia:
+  // cuando el usuario busca por número, la invoice aparece igual.
+  if (kind === 1 && !f.search) {
     parts.push('EXISTS_SERVICES_IN_INV_STATEMENT(s.id, s.statement_type) = 1')
   }
 
+  // Mismo criterio que el período: buscando por número no se esconde nada por valer $0 — y
+  // una invoice con descuento mayor al subtotal da negativo, que tampoco pasa el `> 0`.
   parts.push(
     applyZeroFilter(
-      f.includeZero,
+      f.includeZero || Boolean(f.search),
       'GET_TOTAL_BY_STATEMENT(s.id, 0, 0, s.discount_type, NULL) > 0',
     ).replace(/^\s+AND /, '') || '1=1',
   )

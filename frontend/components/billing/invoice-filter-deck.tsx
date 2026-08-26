@@ -239,10 +239,13 @@ export function InvoiceFilterDeck({
         onRemove: () => onPayedChange('0'),
       })
     } else if (payed === 'all') {
+      // Mientras se busca por número queda trabado, igual que fechas y $0: el hint promete
+      // "pagas e impagas" y sacar el chip volvería a Impagas, escondiendo la que se busca.
       list.push({
         key: 'payed',
         label: t('invoices.paymentAll'),
-        onRemove: () => onPayedChange('0'),
+        locked: searchLock,
+        onRemove: searchLock ? undefined : () => onPayedChange('0'),
       })
     }
 
@@ -599,12 +602,13 @@ export function InvoiceFilterDeck({
                   <Select
                     value={payed}
                     onValueChange={(v) => onPayedChange(v as TriState)}
-                    disabled={disabled}
+                    disabled={disabled || searchLock}
                   >
                     <SelectTrigger
                       id="invoice-payed-filter"
                       size="sm"
                       className="h-8 w-full text-xs"
+                      title={searchLock ? t('invoices.filterSearchLockHint') : undefined}
                     >
                       <SelectValue />
                     </SelectTrigger>

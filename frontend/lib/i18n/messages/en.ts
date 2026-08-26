@@ -367,6 +367,10 @@ export const en: Messages = {
     actionNotesError: 'Could not save note.',
     actionNotesInvalid: 'Status and note text are required.',
     actionRemoveWoTitle: 'Remove WO from invoice',
+    actionRemoveWoConfirmTitle: 'Remove this work order?',
+    actionRemoveWoConfirmBody:
+      'The work order {wo} will be taken off invoice {invoice} and the invoice total will change. This cannot be undone from here.',
+    actionRemoveWoConfirmCta: 'Remove work order',
     actionRemoveWoSuccess: 'Work order removed from invoice',
     actionRemoveWoError: 'Could not remove work order.',
     colPo: 'PO',
@@ -497,7 +501,7 @@ export const en: Messages = {
     filterIgnoreDatesForced: 'Forced while searching by invoice # or employee',
     filterIgnoreDatesChip: 'Date range ignored',
     filterSearchLockHint:
-      'Searching by invoice # or employee: including $0 invoices and all dates. Deleted starts on Show all — you can change it.',
+      'Searching by invoice # or employee: paid and unpaid, including $0 invoices and all dates. Deleted starts on Show all — you can change it.',
     summaryExcludesDeleted: 'Does not include deleted',
     rowDeletedBadge: 'Deleted',
     filterOneSelected: '1 selected',

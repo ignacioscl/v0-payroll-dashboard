@@ -311,6 +311,8 @@ function InvoiceDetailBody({
   const genericConfig = useGenericInvoiceConfig()
   const removeWo = useRemoveWoFromInvoice()
   const [pendingRelId, setPendingRelId] = React.useState<number | null>(null)
+  /** WO que el usuario tocó para quitar. Nada se borra hasta que confirme en el diálogo. */
+  const [woToRemove, setWoToRemove] = React.useState<{ id: number; woNro: string } | null>(null)
   const [ttkDetailOpen, setTtkDetailOpen] = React.useState(false)
   const [genericEditOpen, setGenericEditOpen] = React.useState(false)
   const token = typeTokenOf(row.statementType)
@@ -481,28 +483,9 @@ function InvoiceDetailBody({
                           className="h-7 w-7 text-destructive hover:bg-destructive/10"
                           disabled={removeWo.isPending && pendingRelId === r.id}
                           aria-label={t('invoices.actionRemoveWoTitle')}
-                          onClick={() => {
-                            setPendingRelId(r.id)
-                            void removeWo
-                              .mutateAsync({
-                                id_statement: row.id,
-                                id_service_rel: r.id,
-                              })
-                              .then(() => {
-                                toast({ title: t('invoices.actionRemoveWoSuccess') })
-                              })
-                              .catch((err) => {
-                                toast({
-                                  variant: 'destructive',
-                                  title: t('invoices.actionRemoveWoError'),
-                                  description: getSrsErrorMessage(
-                                    err,
-                                    t('invoices.actionRemoveWoError'),
-                                  ),
-                                })
-                              })
-                              .finally(() => setPendingRelId(null))
-                          }}
+                          // Sólo abre el diálogo. Borrar es destructivo y cambia el total de la
+                          // factura: nunca se ejecuta con un click suelto.
+                          onClick={() => setWoToRemove({ id: r.id, woNro: r.woNro ?? '—' })}
                         >
                           {removeWo.isPending && pendingRelId === r.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -552,6 +535,43 @@ function InvoiceDetailBody({
           </DetailTable>
         </DetailSection>
       ) : null}
+
+      <ConfirmActionDialog
+        open={woToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setWoToRemove(null)
+        }}
+        tone="danger"
+        title={t('invoices.actionRemoveWoConfirmTitle')}
+        description={t('invoices.actionRemoveWoConfirmBody', {
+          wo: woToRemove?.woNro ?? '—',
+          invoice: row.displayFullNro || row.fullNro || String(row.id),
+        })}
+        confirmLabel={t('invoices.actionRemoveWoConfirmCta')}
+        confirmIcon={Trash2}
+        pending={removeWo.isPending}
+        onConfirm={() => {
+          const target = woToRemove
+          if (!target) return
+          setPendingRelId(target.id)
+          void removeWo
+            .mutateAsync({ id_statement: row.id, id_service_rel: target.id })
+            .then(() => {
+              toast({ title: t('invoices.actionRemoveWoSuccess') })
+            })
+            .catch((err) => {
+              toast({
+                variant: 'destructive',
+                title: t('invoices.actionRemoveWoError'),
+                description: getSrsErrorMessage(err, t('invoices.actionRemoveWoError')),
+              })
+            })
+            .finally(() => {
+              setPendingRelId(null)
+              setWoToRemove(null)
+            })
+        }}
+      />
     </div>
   )
 }

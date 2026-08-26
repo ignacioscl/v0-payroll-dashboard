@@ -139,17 +139,24 @@ export default function InvoicesPage() {
   const ignorePeriodEffective = searchLock || ignorePeriod
   const includeZeroEffective = searchLock || !hideZero
   const deletedBeforeSearchLock = useRef<InvoiceDeletedMode>('hide')
+  const payedBeforeSearchLock = useRef<TriState>('0')
   const wasSearchLock = useRef(false)
 
   useEffect(() => {
     if (searchLock && !wasSearchLock.current) {
       deletedBeforeSearchLock.current = deleted
       if (deleted !== 'all') setDeleted('all')
+      // Buscar por número de invoice tiene que traerla esté paga o impaga, como legacy:
+      // si no, buscás un número que existe y la grilla te dice que no hay nada sólo porque
+      // el filtro de pago quedó de la búsqueda anterior.
+      payedBeforeSearchLock.current = payed
+      if (payed !== 'all') setPayed('all')
     } else if (!searchLock && wasSearchLock.current) {
       setDeleted(deletedBeforeSearchLock.current)
+      setPayed(payedBeforeSearchLock.current)
     }
     wasSearchLock.current = searchLock
-    // Snapshot only on the lock edge; `deleted` must not re-trigger the snap.
+    // Snapshot only on the lock edge; `deleted`/`payed` must not re-trigger the snap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchLock])
   const hasDealer = selectedDealers.length > 0

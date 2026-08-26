@@ -367,6 +367,10 @@ export const es: Messages = {
     actionNotesError: 'No se pudo guardar la nota.',
     actionNotesInvalid: 'Estado y texto de la nota son obligatorios.',
     actionRemoveWoTitle: 'Quitar WO de la factura',
+    actionRemoveWoConfirmTitle: '¿Quitar esta work order?',
+    actionRemoveWoConfirmBody:
+      'La work order {wo} se saca de la factura {invoice} y el total de la factura cambia. Desde acá no se puede deshacer.',
+    actionRemoveWoConfirmCta: 'Quitar work order',
     actionRemoveWoSuccess: 'Work order quitada de la factura',
     actionRemoveWoError: 'No se pudo quitar la work order.',
     colPo: 'PO',
@@ -497,7 +501,7 @@ export const es: Messages = {
     filterIgnoreDatesForced: 'Forzado al buscar por número de factura o empleado',
     filterIgnoreDatesChip: 'Rango de fechas ignorado',
     filterSearchLockHint:
-      'Al buscar por número o empleado: se incluyen las de $0 y todas las fechas. Eliminadas arranca en Ver todas — lo podés cambiar.',
+      'Al buscar por número o empleado: pagas e impagas, se incluyen las de $0 y todas las fechas. Eliminadas arranca en Ver todas — lo podés cambiar.',
     summaryExcludesDeleted: 'No incluye eliminadas',
     rowDeletedBadge: 'Eliminada',
     filterOneSelected: '1 seleccionado',
