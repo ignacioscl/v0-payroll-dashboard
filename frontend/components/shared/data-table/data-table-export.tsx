@@ -32,6 +32,8 @@ interface DataTableExportProps<TData> {
    * via the table; the caller is responsible for fetching every page.
    */
   fetchAllRows?: () => Promise<TData[]>
+  /** Defaults to both xlsx and csv. */
+  formats?: Array<'xlsx' | 'csv'>
 }
 
 function todayStamp(): string {
@@ -85,6 +87,7 @@ export function DataTableExport<TData>({
   fileName = 'export',
   exportAllColumns = true,
   fetchAllRows,
+  formats = ['xlsx', 'csv'],
 }: DataTableExportProps<TData>) {
   const { t } = useTranslation()
   const [busy, setBusy] = React.useState<'csv' | 'xlsx' | null>(null)
@@ -182,17 +185,19 @@ export function DataTableExport<TData>({
           )}
           {t('dataTable.exportExcel')}
         </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={busy !== null}
-          onClick={() => void handleExport('csv')}
-        >
-          {busy === 'csv' ? (
-            <Loader2 className="mr-2 size-3.5 animate-spin text-primary" />
-          ) : (
-            <FileText className="mr-2 size-3.5 text-primary" />
-          )}
-          {t('dataTable.exportCsv')}
-        </DropdownMenuItem>
+        {formats.includes('csv') ? (
+          <DropdownMenuItem
+            disabled={busy !== null}
+            onClick={() => void handleExport('csv')}
+          >
+            {busy === 'csv' ? (
+              <Loader2 className="mr-2 size-3.5 animate-spin text-primary" />
+            ) : (
+              <FileText className="mr-2 size-3.5 text-primary" />
+            )}
+            {t('dataTable.exportCsv')}
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )

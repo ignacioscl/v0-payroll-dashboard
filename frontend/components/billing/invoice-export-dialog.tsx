@@ -4,7 +4,6 @@ import * as React from 'react'
 import * as XLSX from 'xlsx'
 import {
   FileSpreadsheet,
-  FileText,
   Grid3x3,
   Inbox,
   List,
@@ -38,6 +37,7 @@ import {
   persistInvoiceEmailPrefsAfterSend,
 } from '@/lib/billing/invoice-email-prefs'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 
 const TTK_TYPE = 5
@@ -76,7 +76,6 @@ export function InvoiceExportDialog({
 
   const [kind, setKind] = React.useState<ExportKind>('grid')
   const [delivery, setDelivery] = React.useState<Delivery>('download')
-  const [format, setFormat] = React.useState<'xlsx' | 'csv'>('xlsx')
   const [busyClient, setBusyClient] = React.useState(false)
 
   const [emailTo, setEmailTo] = React.useState('')
@@ -95,7 +94,6 @@ export function InvoiceExportDialog({
     if (!open) return
     setKind('grid')
     setDelivery('download')
-    setFormat('xlsx')
     setBusyClient(false)
     setAttachTimeCard(false)
     setFileName('')
@@ -107,7 +105,7 @@ export function InvoiceExportDialog({
     setReplyTo(prefs.replyTo)
   }, [open])
 
-  const idsCsv = rows.map((r) => r.id).join(',')
+  const idsCsv = uniqueStatementIds(rows).join(',')
   const exportType: InvoiceExportType = kind === 'wo' ? 2 : 1
 
   const baseServerPayload = () => ({
@@ -135,29 +133,26 @@ export function InvoiceExportDialog({
     setBusyClient(true)
     try {
       const data = rows.map((r) => ({
-        [t('invoices.colInvoice')]: r.fullNro || `#${r.id}`,
+        [t('invoices.colInvoice')]: r.displayFullNro || r.fullNro || `#${r.id}`,
         [t('invoices.colType')]: r.statementType,
         [t('invoices.colPeriod')]: [r.fechaDesde, r.fechaHasta].filter(Boolean).join(' – '),
         [t('invoices.colAuthor')]: r.author ?? '',
         [t('invoices.colDetail')]:
           r.invoiceServiceSelRel || r.invoiceService || r.invoiceServicesByWo || '',
         [t('invoices.colSubtotal')]: r.subtotal,
-        [t('invoices.colDiscount')]: r.discount ?? '',
+        [t('invoices.colDiscount')]: r.nroBilled == null ? (r.discount ?? '') : '',
         [t('invoices.colTotal')]: r.total,
+        [t('invoices.colCheckAmount')]: r.amount ?? '',
+        [t('invoices.colCheckNumber')]: r.checkNumber ?? '',
         [t('invoices.colPo')]: r.po ?? '',
         [t('invoices.colRo')]: r.ro ?? '',
-        [t('invoices.colPaid')]:
-          r.isBilled === 1 ? 'Yes' : r.isPartialBilled === 1 ? 'Partial' : 'No',
+        [t('invoices.colPaid')]: r.isBilled === 1 ? 'Yes' : 'No',
       }))
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices')
-      const name = `invoices_${stamp()}.${format}`
-      if (format === 'csv') {
-        XLSX.writeFile(wb, name, { bookType: 'csv' })
-      } else {
-        XLSX.writeFile(wb, name)
-      }
+      const name = `invoices_${stamp()}.xlsx`
+      XLSX.writeFile(wb, name)
       toast({ title: t('invoices.bulkExportDownloadSuccess'), description: name })
       onOpenChange(false)
     } catch {
@@ -315,28 +310,7 @@ export function InvoiceExportDialog({
         </div>
       </BillingActionSection>
 
-      {!isServer ? (
-        <BillingActionSection title={t('invoices.bulkExportFormat')}>
-          <div className="grid gap-2">
-            <BillingOptionTile
-              selected={format === 'xlsx'}
-              onSelect={() => setFormat('xlsx')}
-              title="Excel (.xlsx)"
-              description={t('invoices.bulkExportXlsxHint')}
-              icon={FileSpreadsheet}
-              disabled={busy}
-            />
-            <BillingOptionTile
-              selected={format === 'csv'}
-              onSelect={() => setFormat('csv')}
-              title="CSV (.csv)"
-              description={t('invoices.bulkExportCsvHint')}
-              icon={FileText}
-              disabled={busy}
-            />
-          </div>
-        </BillingActionSection>
-      ) : (
+      {!isServer ? null : (
         <>
           <BillingActionSection title={t('invoices.bulkExportDelivery')}>
             <div className="grid gap-1.5 sm:grid-cols-2">

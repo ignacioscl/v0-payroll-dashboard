@@ -4,9 +4,13 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 
 import { InvoiceService } from '../service/invoice.service'
-import { InvoiceListQueryDto, InvoiceListResponseDto } from '../dto/invoice-list.dto'
+import {
+  InvoiceListQueryDto,
+  InvoiceListResponseDto,
+  InvoiceSummaryResponseDto,
+} from '../dto/invoice-list.dto'
 import { InvoiceLookupQueryDto, InvoiceLookupResponseDto } from '../dto/invoice-lookup.dto'
-import { InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
+import { InvoiceDetailQueryDto, InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/billing')
@@ -22,6 +26,15 @@ export class InvoiceController {
     @Query() query: InvoiceListQueryDto,
   ): Promise<InvoiceListResponseDto> {
     return this.service.list(request.srsContext, query)
+  }
+
+  @Get('/invoices/summary')
+  @ApiOkResponse({ type: InvoiceSummaryResponseDto })
+  async summary(
+    @Req() request: any,
+    @Query() query: InvoiceListQueryDto,
+  ): Promise<InvoiceSummaryResponseDto> {
+    return this.service.summary(request.srsContext, query)
   }
 
   @Get('/invoices/lookups/departments')
@@ -73,7 +86,8 @@ export class InvoiceController {
   async detail(
     @Req() request: any,
     @Param('id', ParseIntPipe) id: number,
+    @Query() query: InvoiceDetailQueryDto,
   ): Promise<InvoiceDetailResponseDto> {
-    return this.service.detail(request.srsContext, id)
+    return this.service.detail(request.srsContext, id, query)
   }
 }

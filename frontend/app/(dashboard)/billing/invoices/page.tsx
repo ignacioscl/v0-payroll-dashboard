@@ -26,6 +26,7 @@ import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
+import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
 
@@ -225,7 +226,8 @@ export default function InvoicesPage() {
   ])
 
   const query = useInvoiceList(input, pageSize)
-  const summary = query.data?.pages[0]?.summary
+  const summaryQuery = useInvoiceSummary(input)
+  const summary = summaryQuery.data?.summary
   // Money excludes deleted only in `all` (F.6): in `hide` there are none, and in
   // `only` the amounts ARE the deleted ones, so the note would be misleading.
   // Shared by the top strip and the table footer so the rule lives in one place.
@@ -284,7 +286,7 @@ export default function InvoicesPage() {
       {showSummary ? (
         <InvoiceSummaryStrip
           summary={summary}
-          isLoading={query.isFetching && !summary}
+          isLoading={summaryQuery.isFetching && !summary}
           showExcludesDeleted={excludesDeleted}
         />
       ) : null}
@@ -307,6 +309,9 @@ export default function InvoicesPage() {
         }
         payedFilter={payed === 'all' ? undefined : payed}
         showExcludesDeleted={excludesDeleted}
+        summary={summary}
+        summaryTotal={summaryQuery.data?.total}
+        summaryLoading={summaryQuery.isFetching}
       />
     </div>
   )

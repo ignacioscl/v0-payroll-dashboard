@@ -39,6 +39,7 @@ import {
 } from '@/lib/auth/billing-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { isInvoiceRemainder } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
@@ -125,7 +126,7 @@ export function InvoiceRowActions({
     !isExternal && (logCount > 0 || isDeleted || row.statementType === GENERIC_STATEMENT_TYPE)
   const showPrint = !isDeleted && canPrintInvoice(hasPermission, user?.isSystemAdmin)
   const showEmail = !isDeleted && canSendInvoiceEmail(hasPermission, user?.isSystemAdmin)
-  const showDiscount = !isDeleted && !isExternal
+  const showDiscount = !isDeleted && !isExternal && isInvoiceRemainder(row)
   const showDelete =
     !isDeleted &&
     !isExternal &&

@@ -55,7 +55,13 @@ import {
   fetchInvoiceDetail,
   fetchInvoiceList,
   type InvoiceRow,
+  type InvoiceSummary,
 } from '@/lib/srs-invoices-api'
+import {
+  invoiceRowKey,
+  isInvoiceRemainder,
+  uniqueStatementIds,
+} from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -138,16 +144,14 @@ function paidMeta(row: InvoiceRow, t: TranslateFn): { label: string; className: 
       className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
     }
   }
-  if (row.isPartialBilled === 1) {
-    return {
-      label: t('invoices.statusPartial'),
-      className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    }
-  }
   return {
     label: t('invoices.statusUnpaid'),
     className: 'border-border bg-muted/60 text-muted-foreground',
   }
+}
+
+function rowDisplayNro(row: InvoiceRow): string {
+  return row.displayFullNro || row.fullNro || `#${row.id}`
 }
 
 function authorDisplay(row: InvoiceRow, t: TranslateFn): string {
@@ -294,7 +298,13 @@ function DetailTable({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
+function InvoiceDetailBody({
+  row,
+  listInput,
+}: {
+  row: InvoiceRow
+  listInput: InvoiceListInput | null
+}) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const { hasPermission, user } = useSrsMe()
@@ -316,8 +326,23 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
     row.isBilled !== 1
 
   const detail = useQuery({
-    queryKey: ['srs-invoice-detail', row.id],
-    queryFn: () => fetchInvoiceDetail(row.id),
+    queryKey: [
+      'srs-invoice-detail',
+      row.id,
+      row.idBilling ?? 0,
+      row.isBilled,
+      listInput?.idDepartment,
+      listInput?.idInvoiceService,
+      listInput?.stock,
+    ],
+    queryFn: () =>
+      fetchInvoiceDetail(row.id, {
+        idBilling: row.idBilling ?? 0,
+        payed: row.isBilled === 1 ? '1' : undefined,
+        idDepartment: listInput?.idDepartment,
+        idInvoiceService: listInput?.idInvoiceService,
+        stock: listInput?.stock,
+      }),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -365,7 +390,8 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
           open={ttkDetailOpen}
           onOpenChange={setTtkDetailOpen}
           statementId={row.id}
-          invoiceLabel={row.fullNro ? `#${row.fullNro}` : String(row.id)}
+          invoiceLabel={row.displayFullNro ? `#${row.displayFullNro}` : row.fullNro ? `#${row.fullNro}` : String(row.id)}
+          idBilling={row.idBilling}
         />
       </>
     ) : null
@@ -429,7 +455,7 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
                 <Th>{t('invoices.colService')}</Th>
                 <Th align="right">{t('invoices.colQty')}</Th>
                 <Th align="right">{t('invoices.colPrice')}</Th>
-                {canRemove ? <Th align="right">{t('invoices.colActions')}</Th> : null}
+                {canRemove && row.isBilled !== 1 ? <Th align="right">{t('invoices.colActions')}</Th> : null}
               </tr>
             </thead>
             <tbody>
@@ -443,9 +469,11 @@ function InvoiceDetailBody({ row }: { row: InvoiceRow }) {
                   <td className="px-3 py-2">{r.service ?? '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.qty ?? '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(r.price)}</td>
-                  {canRemove ? (
+                  {canRemove && row.isBilled !== 1 ? (
                     <td className="px-3 py-2 text-right">
-                      {lineUnpaid(r) ? (
+                      {row.isBilled !== 1 &&
+                      r.isStatementFullBilled !== 1 &&
+                      lineUnpaid(r) ? (
                         <Button
                           type="button"
                           variant="ghost"
@@ -537,16 +565,19 @@ function TotalsBar({
   discount,
   grandTotal,
   showExcludesDeleted,
+  isLoading,
 }: {
   shown: number
-  total: number
+  total: number | null
   /** Same flag as the top summary strip: deleted=all and there are deleted rows listed. */
   showExcludesDeleted?: boolean
-  subtotal: number
-  discount: number
-  grandTotal: number
+  isLoading?: boolean
+  subtotal: number | null
+  discount: number | null
+  grandTotal: number | null
 }) {
   const { t } = useTranslation()
+  const money = (n: number | null) => (isLoading || n == null ? '—' : fmtMoney(n))
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border bg-muted/50 px-4 py-2.5">
       <div className="flex items-baseline gap-3">
@@ -554,7 +585,9 @@ function TotalsBar({
           {t('invoices.totalsLabel')}
         </span>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {t('invoices.totalsShowing', { shown, total })}
+          {isLoading || total == null
+            ? t('invoices.totalsShowing', { shown, total: '—' })
+            : t('invoices.totalsShowing', { shown, total })}
         </span>
         {showExcludesDeleted ? (
           <span className="text-[11px] text-muted-foreground">
@@ -567,14 +600,18 @@ function TotalsBar({
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsSubtotal')}
           </span>
-          <span className="text-xs font-medium text-foreground">{fmtMoney(subtotal)}</span>
+          <span className="text-xs font-medium text-foreground">{money(subtotal)}</span>
         </div>
         <div className="hidden items-baseline gap-2 sm:flex">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsDiscount')}
           </span>
           <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-            {discount > 0 ? `−${fmtMoney(discount)}` : fmtMoney(0)}
+            {isLoading || discount == null
+              ? '—'
+              : discount > 0
+                ? `−${fmtMoney(discount)}`
+                : fmtMoney(0)}
           </span>
         </div>
         <div className="flex items-baseline gap-2 border-l border-border/80 pl-4">
@@ -582,7 +619,7 @@ function TotalsBar({
             {t('invoices.totalsTotal')}
           </span>
           <span className="text-base font-bold text-accent dark:text-accent">
-            {fmtMoney(grandTotal)}
+            {money(grandTotal)}
           </span>
         </div>
       </div>
@@ -608,11 +645,17 @@ export function InvoiceListTable({
   idDealer,
   payedFilter,
   showExcludesDeleted,
+  summary,
+  summaryTotal,
+  summaryLoading,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
   /** Computed once in the page and shared with the top summary strip. */
   showExcludesDeleted?: boolean
+  summary?: InvoiceSummary
+  summaryTotal?: number
+  summaryLoading?: boolean
   hydrated: boolean
   hasDealer: boolean
   hasDates: boolean
@@ -658,21 +701,16 @@ export function InvoiceListTable({
   } = query
 
   const rows = React.useMemo(() => data?.pages.flatMap((p) => p.results) ?? [], [data])
-  const summary = data?.pages[0]?.summary
-  const total = data?.pages[0]?.total ?? 0
 
-  const selectedIds = React.useMemo(
+  const selectedSliceRows = React.useMemo(
     () =>
-      Object.entries(rowSelection)
-        .filter(([, on]) => on)
-        .map(([id]) => Number(id))
-        .filter((id) => id > 0),
-    [rowSelection],
+      rows.filter((r) => rowSelection[invoiceRowKey(r)] && r.estado !== 0),
+    [rows, rowSelection],
   )
 
-  const selectedRows = React.useMemo(
-    () => rows.filter((r) => selectedIds.includes(r.id) && r.estado !== 0),
-    [rows, selectedIds],
+  const selectedStatementIds = React.useMemo(
+    () => uniqueStatementIds(selectedSliceRows),
+    [selectedSliceRows],
   )
 
   React.useEffect(() => {
@@ -680,8 +718,9 @@ export function InvoiceListTable({
       let changed = false
       const next = { ...prev }
       for (const r of rows) {
-        if (r.estado === 0 && next[String(r.id)]) {
-          delete next[String(r.id)]
+        const key = invoiceRowKey(r)
+        if (r.estado === 0 && next[key]) {
+          delete next[key]
           changed = true
         }
       }
@@ -690,12 +729,12 @@ export function InvoiceListTable({
   }, [rows])
 
   const requireSelection = React.useCallback(() => {
-    if (selectedRows.length === 0) {
+    if (selectedSliceRows.length === 0) {
       sonnerToast.error(t('invoices.bulkSelectRequired'))
       return false
     }
     return true
-  }, [selectedRows.length, t])
+  }, [selectedSliceRows.length, t])
 
   const gateReady = hydrated && hasDealer && hasDates
 
@@ -814,7 +853,7 @@ export function InvoiceListTable({
                   deleted && 'text-muted-foreground line-through',
                 )}
               >
-                {r.fullNro || `#${r.id}`}
+                {rowDisplayNro(r)}
               </span>
               {deleted ? (
                 <Badge
@@ -834,7 +873,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colInvoice'),
           pin: 'left',
-          exportValue: (r) => r.fullNro || `#${r.id}`,
+          exportValue: (r) => rowDisplayNro(r),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1047,7 +1086,7 @@ export function InvoiceListTable({
           <DataTableColumnHeader column={column} title={t('invoices.colDiscount')} />
         ),
         cell: ({ row }) => {
-          const d = row.original.discount
+          const d = isInvoiceRemainder(row.original) ? row.original.discount : null
           return (
             <span className="text-amber-600 dark:text-amber-400">
               {d && d > 0 ? `−${fmtMoney(d)}` : '—'}
@@ -1057,7 +1096,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,
-          exportValue: (r) => r.discount ?? 0,
+          exportValue: (r) => (isInvoiceRemainder(r) ? (r.discount ?? 0) : ''),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1103,6 +1142,8 @@ export function InvoiceListTable({
               <Badge variant="outline" className={paid.className}>
                 {paid.label}
               </Badge>
+              {/* Sólo la fecha de cobro, y sólo si la hay. Sin pago no va nada: el badge de
+                  arriba ya dice Unpaid. */}
               {row.original.fechaPago ? (
                 <span className="text-[11px] text-muted-foreground tabular-nums">
                   {fmtDate(row.original.fechaPago)}
@@ -1114,6 +1155,47 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colPaid'),
           exportValue: (r) => paidMeta(r, t).label,
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
+      {
+        id: 'checkNumber',
+        accessorFn: (row) => row.checkNumber ?? '',
+        size: 110,
+        minSize: 88,
+        maxSize: 140,
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('invoices.colCheckNumber')} />
+        ),
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">
+            {row.original.checkNumber?.trim() || '—'}
+          </span>
+        ),
+        meta: {
+          label: t('invoices.colCheckNumber'),
+          exportValue: (r) => r.checkNumber ?? '',
+        } satisfies DataTableColumnMeta<InvoiceRow>,
+      },
+      {
+        id: 'checkAmount',
+        accessorFn: (row) => row.amount ?? 0,
+        size: 88,
+        minSize: 72,
+        maxSize: 110,
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('invoices.colCheckAmount')} />
+        ),
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">
+            {row.original.amount == null ? '—' : fmtMoney(row.original.amount)}
+          </span>
+        ),
+        meta: {
+          label: t('invoices.colCheckAmount'),
+          numeric: true,
+          exportValue: (r) => r.amount ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1144,7 +1226,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection],
+    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -1185,7 +1267,7 @@ export function InvoiceListTable({
     />
   )
 
-  const showFooter = gateReady && !isError && rows.length > 0 && Boolean(summary)
+  const showFooter = gateReady && !isError && rows.length > 0
 
   const toolbarTrailing = enableSelection ? (
       <TooltipProvider delayDuration={250}>
@@ -1199,7 +1281,7 @@ export function InvoiceListTable({
                 className="h-8 gap-1.5 px-2"
                 onClick={() => {
                   if (!requireSelection()) return
-                  setExportRows(selectedRows)
+                  setExportRows(selectedSliceRows)
                 }}
               >
                 <FileSpreadsheet className="size-3.5" />
@@ -1221,7 +1303,7 @@ export function InvoiceListTable({
                     className="h-8 gap-1.5 px-2"
                     onClick={() => {
                       if (!requireSelection()) return
-                      setGsRows(selectedRows)
+                      setGsRows(selectedSliceRows)
                     }}
                   >
                     <Printer className="size-3.5" />
@@ -1242,7 +1324,7 @@ export function InvoiceListTable({
                     className="h-8 gap-1.5 px-2"
                     onClick={() => {
                       if (!requireSelection()) return
-                      setPrintRows(selectedRows)
+                      setPrintRows(selectedSliceRows)
                     }}
                   >
                     <Printer className="size-3.5" />
@@ -1263,7 +1345,7 @@ export function InvoiceListTable({
 
   return (
     <>
-      {canBulkDelete && selectedIds.length > 0 ? (
+      {canBulkDelete && selectedStatementIds.length > 0 ? (
         <div className="mb-2 flex items-center gap-2">
           <Button
             type="button"
@@ -1272,7 +1354,7 @@ export function InvoiceListTable({
             onClick={() => setBulkDeleteOpen(true)}
           >
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            {t('invoices.actionDeleteBulk', { count: selectedIds.length })}
+            {t('invoices.actionDeleteBulk', { count: selectedStatementIds.length })}
           </Button>
         </div>
       ) : null}
@@ -1280,11 +1362,11 @@ export function InvoiceListTable({
         tableId="billing-invoices-v7"
         columns={columns}
         data={rows}
-        getRowId={(row) => String(row.id)}
+        getRowId={(row) => invoiceRowKey(row)}
         isLoading={gateReady && isFetching && rows.length === 0}
         emptyState={emptyState}
         enableGlobalFilter={false}
-        recordsCount={gateReady ? total : 0}
+        recordsCount={gateReady && summaryTotal != null ? summaryTotal : undefined}
         recordsCountLabel={t('nav.invoices')}
         pageSize={pageSize}
         onPageSizeChange={onPageSizeChange}
@@ -1313,23 +1395,25 @@ export function InvoiceListTable({
           const rail = TYPE_RAIL[typeTokenOf(row.original.statementType)]
           return (
             <div className={cn('border-l-[3px] bg-muted/20 px-4 py-3', rail)}>
-              <InvoiceDetailBody row={row.original} />
+              <InvoiceDetailBody row={row.original} listInput={input} />
             </div>
           )
         }}
         footer={
-          showFooter && summary ? (
+          showFooter ? (
             <TotalsBar
               shown={rows.length}
-              total={total}
-              subtotal={summary.subtotal}
-              discount={summary.discount}
-              grandTotal={summary.total}
+              total={summaryTotal ?? null}
+              subtotal={summary?.subtotal ?? null}
+              discount={summary?.discount ?? null}
+              grandTotal={summary?.total ?? null}
               showExcludesDeleted={showExcludesDeleted}
+              isLoading={Boolean(summaryLoading && !summary)}
             />
           ) : undefined
         }
         enableExport
+        exportFormats={['xlsx']}
         exportFileName="invoices"
         fetchAllRowsForExport={fetchAllRowsForExport}
         tableScrollHeight="calc(100dvh - 22rem)"
@@ -1353,13 +1437,13 @@ export function InvoiceListTable({
         onOpenChange={setBulkDeleteOpen}
         tone="danger"
         title={t('invoices.actionDeleteBulkTitle')}
-        description={t('invoices.actionDeleteBulkConfirm', { count: selectedIds.length })}
+        description={t('invoices.actionDeleteBulkConfirm', { count: selectedStatementIds.length })}
         confirmLabel={t('invoices.actionDeleteConfirmBtn')}
         cancelLabel={t('common.cancel')}
         pending={deleteMutation.isPending}
         onConfirm={async () => {
           try {
-            await deleteMutation.mutateAsync({ ids_statement: selectedIds })
+            await deleteMutation.mutateAsync({ ids_statement: selectedStatementIds })
             toast({ title: t('invoices.actionDeleteSuccess') })
             setRowSelection({})
             setBulkDeleteOpen(false)

@@ -44,6 +44,9 @@ export interface InvoiceRow {
   fechaPago?: string
   checkNumber?: string
   amount?: number
+  nroBilled?: number | null
+  idBillingWoRel?: number | null
+  displayFullNro?: string
 }
 
 export interface InvoiceSummary {
@@ -58,8 +61,11 @@ export interface InvoiceListResponse {
   results: InvoiceRow[]
   page: number
   pageSize: number
-  total: number
   hasMore: boolean
+}
+
+export interface InvoiceSummaryResponse {
+  total: number
   summary: InvoiceSummary
 }
 
@@ -199,8 +205,46 @@ export async function fetchInvoiceList(params: InvoiceListParams): Promise<Invoi
   return res.json() as Promise<InvoiceListResponse>
 }
 
-export async function fetchInvoiceDetail(id: number): Promise<InvoiceDetailResponse> {
-  const res = await fetch(`/api/srs-kpis/billing/invoices/${id}/detail`, { cache: 'no-store' })
+export async function fetchInvoiceSummary(
+  params: Omit<InvoiceListParams, 'page' | 'pageSize'> & { page?: number; pageSize?: number },
+): Promise<InvoiceSummaryResponse> {
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/summary${buildInvoiceQuery({
+      ...params,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? INVOICE_PAGE_SIZE,
+    })}`,
+    { cache: 'no-store' },
+  )
+  if (!res.ok) {
+    throw new Error(`Invoice summary (${res.status})`)
+  }
+  return res.json() as Promise<InvoiceSummaryResponse>
+}
+
+export type InvoiceDetailParams = {
+  idBilling?: number
+  payed?: '0' | '1'
+  idDepartment?: string
+  idInvoiceService?: string
+  stock?: string
+}
+
+export async function fetchInvoiceDetail(
+  id: number,
+  params: InvoiceDetailParams = {},
+): Promise<InvoiceDetailResponse> {
+  const qs = new URLSearchParams()
+  if (params.idBilling != null) qs.set('idBilling', String(params.idBilling))
+  if (params.payed === '0' || params.payed === '1') qs.set('payed', params.payed)
+  if (params.idDepartment) qs.set('idDepartment', params.idDepartment)
+  if (params.idInvoiceService) qs.set('idInvoiceService', params.idInvoiceService)
+  if (params.stock) qs.set('stock', params.stock)
+  const q = qs.toString()
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/${id}/detail${q ? `?${q}` : ''}`,
+    { cache: 'no-store' },
+  )
   if (!res.ok) {
     throw new Error(`Invoice detail (${res.status})`)
   }

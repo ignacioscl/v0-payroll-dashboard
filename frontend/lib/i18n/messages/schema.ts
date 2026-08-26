@@ -223,6 +223,8 @@ export interface Messages {
     colDiscount: string
     colTotal: string
     colPaid: string
+    colCheckNumber: string
+    colCheckAmount: string
     colActions: string
     actionLogTitle: string
     actionLogEmpty: string

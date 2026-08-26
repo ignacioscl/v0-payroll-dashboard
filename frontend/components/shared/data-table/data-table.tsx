@@ -426,6 +426,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   enableViewOptions?: boolean
   enableExport?: boolean
   exportFileName?: string
+  /** Formats offered in the toolbar export menu. Default both. */
+  exportFormats?: Array<'xlsx' | 'csv'>
   fetchAllRowsForExport?: () => Promise<TData[]>
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
@@ -511,6 +513,7 @@ export function DataTable<TData, TValue = unknown>({
   enableViewOptions = true,
   enableExport = true,
   exportFileName,
+  exportFormats,
   fetchAllRowsForExport,
   toolbarLeading,
   toolbarTrailing,
@@ -1036,6 +1039,7 @@ export function DataTable<TData, TValue = unknown>({
         enableViewOptions={enableViewOptions}
         enableExport={enableExport}
         exportFileName={exportFileName}
+        exportFormats={exportFormats}
         fetchAllRowsForExport={fetchAllRowsForExport}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}
