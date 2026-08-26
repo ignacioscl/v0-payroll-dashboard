@@ -996,10 +996,14 @@ export function DataTable<TData, TValue = unknown>({
       {renderSubComponent && isExpanded ? (
         <TableRow className="border-b border-border/50 hover:bg-transparent">
           <TableCell colSpan={visibleColCount} className="overflow-visible bg-muted/20 p-0">
-            {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally. */}
+            {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally.
+                z-[1] = banda del BODY: por encima de las celdas sin pin y a la par de las
+                pinneadas, pero DEBAJO de la cabecera (2 no pinneada / 4 pinneada). Con z-[2]
+                empataba con la cabecera y, al ir después en el DOM, el panel se dibujaba encima
+                de ella al scrollear verticalmente. */}
             <div
               className={cn(
-                'sticky left-0 z-[2]',
+                'sticky left-0 z-[1]',
                 subComponentLayout === 'full'
                   ? 'w-[100cqw] min-w-0 max-w-[100cqw]'
                   : 'w-max max-w-[min(100vw-3rem,56rem)]',
