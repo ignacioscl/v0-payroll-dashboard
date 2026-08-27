@@ -12,7 +12,11 @@ export interface SrsKpiDealerFilterSql {
   params: number[]
 }
 
-/** Legacy usuarios.id_rol — Admin General / Admin Company skip RESTRICTION_DEALER_V2 (PHP reports). */
+/**
+ * Rol efectivo (PHP `$usr->rol`): Admin General / Admin Company skip RESTRICTION_DEALER_V2.
+ * No abre otras compañías: el tenant sigue siendo `idDealerProvider`
+ * (session para Admin General, `id_contratista_owner` para Admin Company).
+ */
 export const SRS_ROL_ADMIN_GENERAL = 1
 export const SRS_ROL_ADMIN_COMPANY = 2
 

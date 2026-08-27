@@ -49,7 +49,8 @@ export class SrsPermissionRepository {
     const id = Number(accionId)
     if (!Number.isFinite(id) || id < 1) return false
 
-    // Paridad con isSystemAdmin PHP: Admin General (1) / Admin Company (2).
+    // Paridad isSystemAdmin PHP. ctx.idRol ya es el rol efectivo:
+    // 1 Admin General (todas las compañías), 2 Admin Company (sólo su owner).
     if (ctx.idRol === 1 || ctx.idRol === 2) return true
 
     // Mirror RolDao::loadRolAccion with idRolLeftJoin: EXISTS on ROL_ACCION_REL
