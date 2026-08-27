@@ -25,6 +25,7 @@ export interface GroupedPunchOptions {
   issueType?: string
   /** Frontera superior congelada (`punch_in <= ?`) para que todas las páginas vean la misma foto. */
   snapshotAt?: string
+  includePaymentTypeName?: boolean
 }
 
 const SORTABLE_COLUMNS: Record<string, string> = {
@@ -153,7 +154,7 @@ export class GroupedPunchRepository {
 
     const ids = rows.map((r: { idUsuario: number }) => Number(r.idUsuario))
     let byType: Record<number, PunchGroupedPaymentTypeRowDto[]> = {}
-    if (ids.length > 0) {
+    if (ids.length > 0 && opts.includePaymentTypeName === true) {
       const placeholders = ids.map(() => '?').join(',')
       const typeRows = await this.srs.query(
         `SELECT

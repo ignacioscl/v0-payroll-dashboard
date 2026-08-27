@@ -374,7 +374,7 @@ export interface DataTableProps<TData, TValue = unknown> {
   enableColumnResizing?: boolean
 
   // ---------- Selection ----------
-  enableRowSelection?: boolean
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean)
   rowSelection?: Record<string, boolean>
   onRowSelectionChange?: (s: Record<string, boolean>) => void
   getRowId?: (row: TData, index: number) => string
@@ -426,6 +426,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   enableViewOptions?: boolean
   enableExport?: boolean
   exportFileName?: string
+  /** Formats offered in the toolbar export menu. Default both. */
+  exportFormats?: Array<'xlsx' | 'csv'>
   fetchAllRowsForExport?: () => Promise<TData[]>
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
@@ -511,6 +513,7 @@ export function DataTable<TData, TValue = unknown>({
   enableViewOptions = true,
   enableExport = true,
   exportFileName,
+  exportFormats,
   fetchAllRowsForExport,
   toolbarLeading,
   toolbarTrailing,
@@ -993,10 +996,14 @@ export function DataTable<TData, TValue = unknown>({
       {renderSubComponent && isExpanded ? (
         <TableRow className="border-b border-border/50 hover:bg-transparent">
           <TableCell colSpan={visibleColCount} className="overflow-visible bg-muted/20 p-0">
-            {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally. */}
+            {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally.
+                z-[1] = banda del BODY: por encima de las celdas sin pin y a la par de las
+                pinneadas, pero DEBAJO de la cabecera (2 no pinneada / 4 pinneada). Con z-[2]
+                empataba con la cabecera y, al ir después en el DOM, el panel se dibujaba encima
+                de ella al scrollear verticalmente. */}
             <div
               className={cn(
-                'sticky left-0 z-[2]',
+                'sticky left-0 z-[1]',
                 subComponentLayout === 'full'
                   ? 'w-[100cqw] min-w-0 max-w-[100cqw]'
                   : 'w-max max-w-[min(100vw-3rem,56rem)]',
@@ -1036,6 +1043,7 @@ export function DataTable<TData, TValue = unknown>({
         enableViewOptions={enableViewOptions}
         enableExport={enableExport}
         exportFileName={exportFileName}
+        exportFormats={exportFormats}
         fetchAllRowsForExport={fetchAllRowsForExport}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}

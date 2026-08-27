@@ -2,6 +2,8 @@ export type LookupOption = {
   id: number
   label: string
   sublabel?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
 }
 
 export type InvoiceAdvancedFilterState = {
@@ -22,7 +24,6 @@ export type InvoiceAdvancedFilterState = {
   employeeId: number | null
   employeeLabel: string | null
   overdue: boolean
-  showDeleted: boolean
 }
 
 export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
@@ -40,7 +41,6 @@ export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
   employeeId: null,
   employeeLabel: null,
   overdue: false,
-  showDeleted: false,
 }
 
 /** Comma/whitespace-separated WO numbers (letters + digits allowed, e.g. LFT9750). */
@@ -77,7 +77,6 @@ export function hasAdvancedFilters(f: InvoiceAdvancedFilterState): boolean {
     f.createdBySystem ||
     f.exactMatch ||
     f.employeeId != null ||
-    f.overdue ||
-    f.showDeleted
+    f.overdue
   )
 }

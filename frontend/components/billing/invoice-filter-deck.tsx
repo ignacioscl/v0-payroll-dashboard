@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronDown, Filter, Search, X } from 'lucide-react'
+import { ChevronDown, Filter, Lock, Search, X } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,13 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { InvoiceTypeFilter, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
 import { InvoiceAdvancedFilters } from '@/components/billing/invoice-advanced-filters'
+import { InvoiceDeletedFilter } from '@/components/billing/invoice-deleted-filter'
+import { LookupMultiSelect } from '@/components/billing/lookup-multi-select'
+import { useInvoiceWorkerLookup } from '@/hooks/use-invoice-lookups'
 import {
   EMPTY_ADVANCED_FILTERS,
   type InvoiceAdvancedFilterState,
   woNumbersToInput,
 } from '@/lib/invoice-advanced-filters'
+import { type InvoiceDeletedMode } from '@/lib/invoice-search-lock'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -39,17 +44,22 @@ type FilterChip = {
   key: string
   label: string
   onRemove?: () => void
+  locked?: boolean
 }
 
 function FilterChipBadge({ chip, clearLabel }: { chip: FilterChip; clearLabel: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1',
-        'text-[11px] font-medium text-foreground',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1',
+        'text-[11px] font-medium',
+        chip.locked
+          ? 'border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200'
+          : 'border-border bg-background text-foreground',
         chip.onRemove && 'pr-1.5',
       )}
     >
+      {chip.locked ? <Lock className="size-2.5 shrink-0" aria-hidden /> : null}
       {chip.label}
       {chip.onRemove ? (
         <button
@@ -67,8 +77,56 @@ function FilterChipBadge({ chip, clearLabel }: { chip: FilterChip; clearLabel: s
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
 
+const FILTER_FIELD_LABEL =
+  'text-[11px] font-medium uppercase tracking-wide text-muted-foreground'
+
 function typesDifferFromDefault(types: InvoiceTypeState): boolean {
   return !types.wo || !types.ttk || !types.generic
+}
+
+function LockableSwitchRow({
+  id,
+  checked,
+  onCheckedChange,
+  disabled,
+  locked,
+  label,
+  tooltip,
+}: {
+  id: string
+  checked: boolean
+  onCheckedChange: (next: boolean) => void
+  disabled?: boolean
+  locked?: boolean
+  label: string
+  tooltip: string
+}) {
+  const frozen = Boolean(disabled || locked)
+  const row = (
+    <div className={cn('flex items-center gap-3', locked && 'opacity-70')}>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={frozen}
+      />
+      <Label
+        htmlFor={id}
+        className={cn('inline-flex items-center gap-1.5 text-sm font-normal', frozen ? 'cursor-not-allowed' : 'cursor-pointer')}
+      >
+        {locked ? <Lock className="size-3.5 shrink-0" aria-hidden /> : null}
+        {label}
+      </Label>
+    </div>
+  )
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{row}</span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 /**
@@ -85,6 +143,13 @@ export function InvoiceFilterDeck({
   onSendedChange,
   hideZero,
   onHideZeroChange,
+  ignorePeriod,
+  onIgnorePeriodChange,
+  deleted,
+  onDeletedChange,
+  employeeWorkedIds,
+  onEmployeeWorkedChange,
+  searchLock,
   advanced,
   onAdvancedChange,
   idDealer,
@@ -101,16 +166,34 @@ export function InvoiceFilterDeck({
   /** When true (default), exclude $0 invoices from the list. */
   hideZero: boolean
   onHideZeroChange: (value: boolean) => void
+  ignorePeriod: boolean
+  onIgnorePeriodChange: (value: boolean) => void
+  deleted: InvoiceDeletedMode
+  onDeletedChange: (value: InvoiceDeletedMode) => void
+  employeeWorkedIds: number[]
+  onEmployeeWorkedChange: (next: number[]) => void
+  searchLock: boolean
   advanced: InvoiceAdvancedFilterState
   onAdvancedChange: (next: InvoiceAdvancedFilterState) => void
   idDealer: string
   disabled?: boolean
 }) {
   const { t } = useTranslation()
-  /** Closed by default; sessionStorage can reopen after the user expands it. */
   const [open, setOpen] = React.useState(false)
   const [hydrated, setHydrated] = React.useState(false)
   const prevActiveKeyRef = React.useRef('')
+  const [workerOpen, setWorkerOpen] = React.useState(false)
+  const [workerSearch, setWorkerSearch] = React.useState('')
+
+  const showEmployeeWorked = types.ttk || types.generic
+  const workerQuery = useInvoiceWorkerLookup(
+    idDealer,
+    workerSearch,
+    workerOpen && showEmployeeWorked,
+  )
+
+  const effectiveIgnorePeriod = searchLock || ignorePeriod
+  const effectiveHideZero = searchLock ? false : hideZero
 
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
@@ -120,6 +203,20 @@ export function InvoiceFilterDeck({
         key: 'search',
         label: t('invoices.filterInvoiceChip', { value: searchInput.trim() }),
         onRemove: () => onSearchChange(''),
+      })
+    }
+
+    if (employeeWorkedIds.length) {
+      const one =
+        employeeWorkedIds.length === 1
+          ? (workerQuery.data ?? []).find((o) => o.id === employeeWorkedIds[0])?.label
+          : undefined
+      list.push({
+        key: 'worked',
+        label: t('invoices.filterEmployeeWorkedChip', {
+          value: one ?? t('invoices.filterManySelected', { count: employeeWorkedIds.length }),
+        }),
+        onRemove: () => onEmployeeWorkedChange([]),
       })
     }
 
@@ -142,10 +239,13 @@ export function InvoiceFilterDeck({
         onRemove: () => onPayedChange('0'),
       })
     } else if (payed === 'all') {
+      // Mientras se busca por número queda trabado, igual que fechas y $0: el hint promete
+      // "pagas e impagas" y sacar el chip volvería a Impagas, escondiendo la que se busca.
       list.push({
         key: 'payed',
         label: t('invoices.paymentAll'),
-        onRemove: () => onPayedChange('0'),
+        locked: searchLock,
+        onRemove: searchLock ? undefined : () => onPayedChange('0'),
       })
     }
 
@@ -157,11 +257,35 @@ export function InvoiceFilterDeck({
       })
     }
 
-    if (!hideZero) {
+    if (!effectiveHideZero) {
       list.push({
         key: 'zero',
         label: t('invoices.includeZeroInvoices'),
-        onRemove: () => onHideZeroChange(true),
+        locked: searchLock,
+        onRemove: searchLock ? undefined : () => onHideZeroChange(true),
+      })
+    }
+
+    if (effectiveIgnorePeriod) {
+      list.push({
+        key: 'dates',
+        label: t('invoices.filterIgnoreDatesChip'),
+        locked: searchLock,
+        onRemove: searchLock ? undefined : () => onIgnorePeriodChange(false),
+      })
+    }
+
+    if (deleted === 'only') {
+      list.push({
+        key: 'deleted',
+        label: t('invoices.filterDeletedOnlyChip'),
+        onRemove: () => onDeletedChange('hide'),
+      })
+    } else if (deleted === 'all') {
+      list.push({
+        key: 'deleted',
+        label: t('invoices.filterDeletedAllChip'),
+        onRemove: () => onDeletedChange('hide'),
       })
     }
 
@@ -254,13 +378,10 @@ export function InvoiceFilterDeck({
       })
     }
 
-    // District has no chip: the combo lives in the header next to the dealer filter
-    // and shows its own selection.
-
     if (advanced.employeeId != null) {
       list.push({
         key: 'emp',
-        label: advanced.employeeLabel ?? t('invoices.filterEmployeeLabel'),
+        label: advanced.employeeLabel ?? t('invoices.filterCreatedByLabel'),
         onRemove: () =>
           onAdvancedChange({ ...advanced, employeeId: null, employeeLabel: null }),
       })
@@ -274,27 +395,27 @@ export function InvoiceFilterDeck({
       })
     }
 
-    if (advanced.showDeleted) {
-      list.push({
-        key: 'deleted',
-        label: t('invoices.filterShowDeletedLabel'),
-        onRemove: () => onAdvancedChange({ ...advanced, showDeleted: false }),
-      })
-    }
-
     return list
   }, [
     searchInput,
+    employeeWorkedIds,
+    workerQuery.data,
     types,
     payed,
     sended,
-    hideZero,
+    effectiveHideZero,
+    effectiveIgnorePeriod,
+    deleted,
+    searchLock,
     advanced,
     onSearchChange,
+    onEmployeeWorkedChange,
     onTypesChange,
     onPayedChange,
     onSendedChange,
     onHideZeroChange,
+    onIgnorePeriodChange,
+    onDeletedChange,
     onAdvancedChange,
     t,
   ])
@@ -308,6 +429,9 @@ export function InvoiceFilterDeck({
     onPayedChange('0')
     onSendedChange('all')
     onHideZeroChange(true)
+    onIgnorePeriodChange(false)
+    onDeletedChange('hide')
+    onEmployeeWorkedChange([])
     onAdvancedChange(EMPTY_ADVANCED_FILTERS)
   }, [
     onSearchChange,
@@ -315,6 +439,9 @@ export function InvoiceFilterDeck({
     onPayedChange,
     onSendedChange,
     onHideZeroChange,
+    onIgnorePeriodChange,
+    onDeletedChange,
+    onEmployeeWorkedChange,
     onAdvancedChange,
   ])
 
@@ -356,7 +483,7 @@ export function InvoiceFilterDeck({
         <button
           type="button"
           className={cn(
-            'flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors',
+            'flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 text-left transition-colors',
             'hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
           )}
         >
@@ -408,15 +535,28 @@ export function InvoiceFilterDeck({
 
       <CollapsibleContent className="border-t border-border">
         <Card className="gap-0 rounded-none border-0 py-0 shadow-none">
-          <div className="flex flex-col gap-4 px-4 py-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-              <InvoiceTypeFilter value={types} onChange={onTypesChange} disabled={disabled} />
+          {/* Container query: los cortes de adentro miden el ancho de ESTE panel, no el de
+              la pantalla. Con el menú lateral abierto la ventana puede ser ancha y el panel
+              angosto, y ahí un breakpoint de viewport se equivoca. */}
+          <div className="@container/deck flex flex-col gap-4 px-4 py-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-4">
+              <div className="flex shrink-0 flex-col gap-1">
+                <Label className={FILTER_FIELD_LABEL}>{t('invoices.typesLabel')}</Label>
+                <InvoiceTypeFilter value={types} onChange={onTypesChange} disabled={disabled} />
+              </div>
 
-              <Separator orientation="vertical" className="hidden h-8 lg:block" />
+              <Separator orientation="vertical" className="hidden h-8 self-end xl:block" />
 
-              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 lg:justify-end">
-                <div className="flex min-w-[12rem] flex-1 flex-col gap-1 sm:max-w-xs">
-                  <Label htmlFor="invoice-nro-search" className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {/* Dos subgrupos en vez de un flex-wrap suelto: los campos de texto y los
+                  dos selects bajan como bloque y arrancan alineados a la izquierda. Con
+                  flex-wrap + justify-end, "Sent" caía solo a una segunda línea pegado a la
+                  derecha, con un hueco al lado. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-end xl:justify-end">
+                {/* Invoice # y Employee: uno debajo del otro cuando el panel baja de 530px,
+                    que es donde los dos juntos dejan de entrar. Los demás campos no. */}
+                <div className="flex min-w-0 flex-1 flex-col gap-3 @[530px]/deck:flex-row @[530px]/deck:items-end">
+                <div className="flex min-w-0 flex-1 flex-col gap-1 xl:max-w-xs">
+                  <Label htmlFor="invoice-nro-search" className={FILTER_FIELD_LABEL}>
                     {t('invoices.filterInvoiceLabel')}
                   </Label>
                   <div className="relative">
@@ -432,67 +572,130 @@ export function InvoiceFilterDeck({
                   </div>
                 </div>
 
-                <Select
-                  value={payed}
-                  onValueChange={(v) => onPayedChange(v as TriState)}
-                  disabled={disabled}
-                >
-                  <SelectTrigger
-                    className="h-8 w-[130px] text-xs"
-                    aria-label={t('invoices.paymentLabel')}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('invoices.paymentAll')}</SelectItem>
-                    <SelectItem value="1">{t('invoices.paymentPaid')}</SelectItem>
-                    <SelectItem value="0">{t('invoices.paymentUnpaid')}</SelectItem>
-                  </SelectContent>
-                </Select>
+                {showEmployeeWorked ? (
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 xl:max-w-xs">
+                    <Label className={FILTER_FIELD_LABEL}>
+                      {t('invoices.filterEmployeeWorkedLabel')}
+                    </Label>
+                    <LookupMultiSelect
+                      options={workerQuery.data ?? []}
+                      value={employeeWorkedIds}
+                      onChange={onEmployeeWorkedChange}
+                      onSearchChange={setWorkerSearch}
+                      onOpenChange={setWorkerOpen}
+                      placeholder={t('invoices.filterEmployeeWorkedPlaceholder')}
+                      loading={workerQuery.isFetching}
+                      disabled={disabled}
+                      withPhotos
+                    />
+                  </div>
+                ) : null}
+                </div>
 
-                <Select
-                  value={sended}
-                  onValueChange={(v) => onSendedChange(v as TriState)}
-                  disabled={disabled}
-                >
-                  <SelectTrigger
-                    className="h-8 w-[130px] text-xs"
-                    aria-label={t('invoices.sentLabel')}
+                {/* Los dos selects: reparten el ancho por igual cuando bajan de línea,
+                    y vuelven a 130px fijos cuando entran todos en una fila. */}
+                <div className="flex items-end gap-3 xl:shrink-0">
+                <div className="flex flex-1 flex-col gap-1 xl:w-[130px] xl:flex-none">
+                  <Label htmlFor="invoice-payed-filter" className={FILTER_FIELD_LABEL}>
+                    {t('invoices.paymentLabel')}
+                  </Label>
+                  <Select
+                    value={payed}
+                    onValueChange={(v) => onPayedChange(v as TriState)}
+                    disabled={disabled || searchLock}
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('invoices.sentAll')}</SelectItem>
-                    <SelectItem value="1">{t('invoices.sentYes')}</SelectItem>
-                    <SelectItem value="0">{t('invoices.sentNo')}</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      id="invoice-payed-filter"
+                      size="sm"
+                      className="h-8 w-full text-xs"
+                      title={searchLock ? t('invoices.filterSearchLockHint') : undefined}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('invoices.paymentAll')}</SelectItem>
+                      <SelectItem value="1">{t('invoices.paymentPaid')}</SelectItem>
+                      <SelectItem value="0">{t('invoices.paymentUnpaid')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-1 flex-col gap-1 xl:w-[130px] xl:flex-none">
+                  <Label htmlFor="invoice-sended-filter" className={FILTER_FIELD_LABEL}>
+                    {t('invoices.sentLabel')}
+                  </Label>
+                  <Select
+                    value={sended}
+                    onValueChange={(v) => onSendedChange(v as TriState)}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger
+                      id="invoice-sended-filter"
+                      size="sm"
+                      className="h-8 w-full text-xs"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('invoices.sentAll')}</SelectItem>
+                      <SelectItem value="1">{t('invoices.sentYes')}</SelectItem>
+                      <SelectItem value="0">{t('invoices.sentNo')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                </div>
               </div>
             </div>
 
             <div
-              className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3"
+              className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/60 pt-3"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <Switch
+              <LockableSwitchRow
                 id="invoice-hide-zero"
-                checked={hideZero}
+                checked={effectiveHideZero}
                 onCheckedChange={onHideZeroChange}
                 disabled={disabled}
+                locked={searchLock}
+                label={t('invoices.hideZeroInvoices')}
+                tooltip={
+                  searchLock
+                    ? t('invoices.filterSearchLockHint')
+                    : t('invoices.hideZeroInvoices')
+                }
               />
-              <Label htmlFor="invoice-hide-zero" className="cursor-pointer text-sm font-normal">
-                {t('invoices.hideZeroInvoices')}
-              </Label>
+              <LockableSwitchRow
+                id="invoice-ignore-period"
+                checked={effectiveIgnorePeriod}
+                onCheckedChange={onIgnorePeriodChange}
+                disabled={disabled}
+                locked={searchLock}
+                label={t('invoices.filterIgnoreDatesLabel')}
+                tooltip={
+                  searchLock
+                    ? t('invoices.filterIgnoreDatesForced')
+                    : t('invoices.filterIgnoreDatesTooltip')
+                }
+              />
+              <InvoiceDeletedFilter
+                value={deleted}
+                onChange={onDeletedChange}
+                disabled={disabled}
+              />
             </div>
+
+            {searchLock ? (
+              <p className="text-[11px] text-amber-800 dark:text-amber-200">
+                {t('invoices.filterSearchLockHint')}
+              </p>
+            ) : null}
 
             <InvoiceAdvancedFilters
               value={advanced}
               onChange={onAdvancedChange}
               idDealer={idDealer}
               disabled={disabled}
-              invoiceSearch={searchInput}
-              onInvoiceSearchChange={onSearchChange}
             />
           </div>
         </Card>

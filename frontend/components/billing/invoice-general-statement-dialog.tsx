@@ -19,6 +19,7 @@ import {
   type GeneralStatementReportType,
 } from '@/hooks/use-print-general-statement-pdf'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 import { useToast } from '@/hooks/use-toast'
@@ -78,7 +79,7 @@ export function InvoiceGeneralStatementDialog({
     setQueueFileName('')
   }, [open])
 
-  const idsCsv = rows.map((r) => r.id).join(',')
+  const idsCsv = uniqueStatementIds(rows).join(',')
 
   const onPrint = async () => {
     if (!singleDealerId) {

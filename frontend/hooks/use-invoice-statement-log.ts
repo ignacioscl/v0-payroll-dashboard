@@ -6,12 +6,21 @@ import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
 import { SrsPhpPath } from '@/types/enum-url'
 
+/** From PHP `GeneralUtils::parseDateDiff` — not a display string. */
+export type InvoiceStatementLogAge = {
+  year?: string | number
+  month?: string | number
+  day?: string | number
+  hour?: string | number
+  minute?: string | number
+}
+
 export type InvoiceStatementLogEntry = {
   descCambio?: string
   descJson?: string | Record<string, unknown>
   fecha?: string
   origen?: string
-  age?: string
+  age?: InvoiceStatementLogAge | string | null
   autor?: { nombre?: string }
 }
 

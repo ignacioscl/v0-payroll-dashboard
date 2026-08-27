@@ -8,18 +8,18 @@ import {
 } from '../../auth/srs-permission.repository'
 import { skipDealerRestrictionForRol } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { InvoiceRepository } from '../repository/invoice.repository'
+import { InvoiceListQueryDto, InvoiceListResponseDto, InvoiceSummaryResponseDto, buildInvoiceListFilter } from '../dto/invoice-list.dto'
 import {
-  InvoiceListQueryDto,
-  InvoiceListResponseDto,
-  buildInvoiceListFilter,
-} from '../dto/invoice-list.dto'
+  InvoiceDetailQueryDto,
+  InvoiceDetailResponseDto,
+  buildInvoiceDetailSlice,
+} from '../dto/invoice-detail.dto'
 import {
   InvoiceLookupQueryDto,
   InvoiceLookupResponseDto,
   buildDepartmentLookupFilter,
   buildServiceLookupFilter,
 } from '../dto/invoice-lookup.dto'
-import { InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
 
 @Injectable()
 export class InvoiceService {
@@ -38,21 +38,29 @@ export class InvoiceService {
     if (filter.dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer to list invoices')
     }
-    const [results, { total, summary }] = await Promise.all([
-      this.repository.listPage(filter),
-      this.repository.summary(filter),
-    ])
+    const { results, hasMore } = await this.repository.listPage(filter)
     return {
       results,
       page: filter.page,
       pageSize: filter.pageSize,
-      total,
-      hasMore: filter.pageSize === -1 ? false : filter.page * filter.pageSize < total,
-      summary,
+      hasMore,
     }
   }
 
-  async detail(ctx: SrsContext, idStatement: number): Promise<InvoiceDetailResponseDto> {
+  async summary(ctx: SrsContext, query: InvoiceListQueryDto): Promise<InvoiceSummaryResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
+    const filter = buildInvoiceListFilter(ctx, query)
+    if (filter.dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer to list invoices')
+    }
+    return this.repository.summary(filter)
+  }
+
+  async detail(
+    ctx: SrsContext,
+    idStatement: number,
+    query: InvoiceDetailQueryDto,
+  ): Promise<InvoiceDetailResponseDto> {
     await this.assertInvoicesModuleAccess(ctx)
     const { inScope, statementType } = await this.repository.isStatementInScope({
       idStatement,
@@ -69,13 +77,14 @@ export class InvoiceService {
     // filtra id_invoice IS NULL), por eso ramificamos por tipo.
     const isWo = statementType !== 5 && statementType !== 6
     const idDealerProvider = ctx.idDealerProvider
+    const slice = buildInvoiceDetailSlice(query)
     const [woRows, genericRows] = await Promise.all([
       isWo
-        ? this.repository.detailWoRows(idStatement, idDealerProvider)
+        ? this.repository.detailWoRows(idStatement, idDealerProvider, slice)
         : Promise.resolve([]),
       isWo
         ? Promise.resolve([])
-        : this.repository.detailGenericRows(idStatement, idDealerProvider),
+        : this.repository.detailGenericRows(idStatement, idDealerProvider, slice),
     ])
     return { idStatement, statementType, woRows, genericRows }
   }
@@ -131,6 +140,26 @@ export class InvoiceService {
       throw new BadRequestException('Select at least one dealer')
     }
     const results = await this.repository.lookupAuthors({
+      idDealerProvider: ctx.idDealerProvider,
+      idUsuario: ctx.idUsuario,
+      dealerIds,
+      skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      search,
+      limit,
+    })
+    return { results }
+  }
+
+  async lookupWorkers(
+    ctx: SrsContext,
+    query: InvoiceLookupQueryDto,
+  ): Promise<InvoiceLookupResponseDto> {
+    await this.assertInvoicesModuleAccess(ctx)
+    const { dealerIds, search, limit } = buildDepartmentLookupFilter(query)
+    if (dealerIds.length === 0) {
+      throw new BadRequestException('Select at least one dealer')
+    }
+    const results = await this.repository.lookupWorkers({
       idDealerProvider: ctx.idDealerProvider,
       idUsuario: ctx.idUsuario,
       dealerIds,

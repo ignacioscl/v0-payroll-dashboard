@@ -223,6 +223,8 @@ export interface Messages {
     colDiscount: string
     colTotal: string
     colPaid: string
+    colCheckNumber: string
+    colCheckAmount: string
     colActions: string
     actionLogTitle: string
     actionLogEmpty: string
@@ -357,6 +359,9 @@ export interface Messages {
     actionNotesError: string
     actionNotesInvalid: string
     actionRemoveWoTitle: string
+    actionRemoveWoConfirmTitle: string
+    actionRemoveWoConfirmBody: string
+    actionRemoveWoConfirmCta: string
     actionRemoveWoSuccess: string
     actionRemoveWoError: string
     colPo: string
@@ -467,8 +472,106 @@ export interface Messages {
     filterCheckNumberChip: string
     filterOverdueLabel: string
     filterShowDeletedLabel: string
+    filterCreatedByLabel: string
+    filterCreatedByPlaceholder: string
+    filterEmployeeWorkedLabel: string
+    filterEmployeeWorkedPlaceholder: string
+    filterEmployeeWorkedChip: string
+    filterDeletedLabel: string
+    filterDeletedHide: string
+    filterDeletedOnly: string
+    filterDeletedAll: string
+    filterDeletedHideTooltip: string
+    filterDeletedOnlyTooltip: string
+    filterDeletedAllTooltip: string
+    filterDeletedForced: string
+    filterDeletedOnlyChip: string
+    filterDeletedAllChip: string
+    filterIgnoreDatesLabel: string
+    filterIgnoreDatesTooltip: string
+    filterIgnoreDatesForced: string
+    filterIgnoreDatesChip: string
+    filterSearchLockHint: string
+    summaryExcludesDeleted: string
+    rowDeletedBadge: string
     filterOneSelected: string
     filterManySelected: string
+    generic: {
+      newButton: string
+      title: string
+      dealer: string
+      dealerPlaceholder: string
+      dealerSearch: string
+      pickDealerFirst: string
+      dateFrom: string
+      dateTo: string
+      invoiceNote: string
+      headerNote: string
+      headerNotePlaceholder: string
+      tax: string
+      description: string
+      descriptionPlaceholder: string
+      qty: string
+      unitAmount: string
+      addItem: string
+      addItemHint: string
+      servicePeriod: string
+      itemsEmptyTitle: string
+      itemsEmptyBody: string
+      subtotal: string
+      taxRow: string
+      colItem: string
+      colRate: string
+      colQty: string
+      colAmount: string
+      edit: string
+      remove: string
+      removeConfirmTitle: string
+      removeConfirm: string
+      total: string
+      create: string
+      creating: string
+      created: string
+      createError: string
+      dealerRequired: string
+      datesRequired: string
+      dateOrder: string
+      itemsRequired: string
+      duplicateItem: string
+      descriptionRequired: string
+      descriptionTooLong: string
+      draftDiscarded: string
+      discardTitle: string
+      discardConfirm: string
+      discardAction: string
+      amountRequired: string
+      qtyInvalid: string
+      taxInvalid: string
+      useCustom: string
+      deleteCatalogTitle: string
+      deleteCatalogAction: string
+      deleteCatalogConfirm: string
+      deleteCatalogSuccess: string
+      deleteCatalogError: string
+      catalogEmpty: string
+      titleEdit: string
+      save: string
+      saving: string
+      saved: string
+      saveError: string
+      loadError: string
+      addTtk: string
+      onlyTimecard: string
+      paidLocked: string
+      ttkTitle: string
+      ttkSearch: string
+      ttkEmpty: string
+      ttkHours: string
+      ttkAmount: string
+      ttkFooter: string
+      hoursUnbilledBanner: string
+      discount: string
+    }
   }
   sidebar: {
     appSubtitle: string
@@ -708,6 +811,8 @@ export interface Messages {
     exportGroupedWithDetailHint: string
     exportGroupedDetailWarning: string
     exportGroupedGenerating: string
+    exportGenerating: string
+    exportFrameTitle: string
     exportGroupedSheetName: string
     exportSheetSubtitle: string
     exportDetailSheetTitle: string
@@ -838,7 +943,6 @@ export interface Messages {
     afterDate: string
     onOrAfterDate: string
     exportExcel: string
-    exportCsv: string
     generatingExport: string
   }
   employeeSearch: {
@@ -1406,6 +1510,7 @@ export interface Messages {
     resultPlural: string
     ofTotal: string
     clearSelection: string
+    deleteItem: string
     clearSearch: string
     navigateHint: string
   }

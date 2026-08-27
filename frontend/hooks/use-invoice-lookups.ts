@@ -7,6 +7,7 @@ import {
   fetchInvoiceDepartments,
   fetchInvoiceDistricts,
   fetchInvoiceServices,
+  fetchInvoiceWorkers,
   type InvoiceDistrictOption,
   type InvoiceLookupOption,
 } from '@/lib/srs-invoices-api'
@@ -54,6 +55,19 @@ export function useInvoiceAuthorLookup(
   return useQuery({
     queryKey: ['invoice-author-lookup', idDealer, search],
     queryFn: () => fetchInvoiceAuthors({ idDealer, search: search || undefined }),
+    enabled: enabled && idDealer.length > 0,
+    staleTime: 60_000,
+  })
+}
+
+export function useInvoiceWorkerLookup(
+  idDealer: string,
+  search: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['invoice-worker-lookup', idDealer, search],
+    queryFn: () => fetchInvoiceWorkers({ idDealer, search: search || undefined }),
     enabled: enabled && idDealer.length > 0,
     staleTime: 60_000,
   })

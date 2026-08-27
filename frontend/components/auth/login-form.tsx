@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -19,9 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { RoleSelectionDialog } from '@/components/auth/role-selection-dialog'
 import { Logo } from '@/components/brand/logo'
-import type { SrsLoginRoleOption } from '@/lib/auth/types'
 
 const FEATURE_KEYS = [
   { icon: Clock, titleKey: 'auth.featureTimeTitle', descKey: 'auth.featureTimeDesc' },
@@ -34,7 +32,7 @@ interface LoginFormProps {
   srsPublicUrl: string
 }
 
-export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
+export function LoginForm({ phpLoginUrl }: LoginFormProps) {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -42,7 +40,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [roleOptions, setRoleOptions] = useState<SrsLoginRoleOption[] | null>(null)
+  const inFlight = useRef(false)
 
   useEffect(() => {
     if (searchParams.get('error') !== 'forbidden') return
@@ -63,51 +61,41 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
     if (!res.ok || json.status !== 'success') {
       throw new Error(json?.error?.message || t('auth.invalidCredentials'))
     }
-    if (json.needsRoleSelection && Array.isArray(json.rolesRel) && json.rolesRel.length > 0) {
-      setRoleOptions(json.rolesRel)
-      return
+    // Non-admin with several USUARIO_ROL_REL: auto-pick the first (v0 role is idRolSystemV2).
+    // Admin Company never gets needsRoleSelection from PHP.
+    if (
+      !payload.idUsuarioRolrel &&
+      json.needsRoleSelection &&
+      Array.isArray(json.rolesRel) &&
+      json.rolesRel.length > 0
+    ) {
+      const firstId = Number(json.rolesRel[0]?.id)
+      if (firstId > 0) {
+        await completeLogin({ ...payload, idUsuarioRolrel: firstId })
+        return
+      }
     }
-    setRoleOptions(null)
     router.replace('/')
     router.refresh()
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (inFlight.current) return
+    inFlight.current = true
     setError(null)
     setLoading(true)
     try {
       await completeLogin({ email, password })
     } catch (err) {
+      inFlight.current = false
       setError(err instanceof Error ? err.message : t('auth.loginFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleRoleSelect(idUsuarioRolrel: number) {
-    setError(null)
-    setLoading(true)
-    try {
-      await completeLogin({ email, password, idUsuarioRolrel })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.loginFailed'))
-    } finally {
       setLoading(false)
     }
   }
 
   return (
-    <>
-      <RoleSelectionDialog
-        open={roleOptions !== null && roleOptions.length > 0}
-        roles={roleOptions ?? []}
-        srsPublicUrl={srsPublicUrl}
-        loading={loading}
-        onSelect={handleRoleSelect}
-      />
-
-      <div className="relative flex min-h-screen flex-col lg:flex-row">
+    <div className="relative flex min-h-screen flex-col lg:flex-row">
         <motion.div
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
@@ -203,7 +191,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    disabled={loading || roleOptions !== null}
+                    disabled={loading}
                     className="h-11 pl-10"
                   />
                 </div>
@@ -221,7 +209,7 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    disabled={loading || roleOptions !== null}
+                    disabled={loading}
                     className="h-11 pl-10"
                   />
                 </div>
@@ -242,20 +230,16 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
               <Button
                 type="submit"
                 size="lg"
-                disabled={loading || roleOptions !== null}
+                disabled={loading}
+                aria-busy={loading}
                 className="h-11 w-full text-base font-semibold shadow-md shadow-primary/20"
               >
-                {loading && !roleOptions ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('auth.signingIn')}
-                  </>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    {t('auth.signIn')}
-                    <ArrowRight className="h-4 w-4" />
-                  </>
+                  <ArrowRight className="h-4 w-4" />
                 )}
+                {t('auth.signIn')}
               </Button>
             </form>
 
@@ -274,6 +258,5 @@ export function LoginForm({ phpLoginUrl, srsPublicUrl }: LoginFormProps) {
           </motion.div>
         </div>
       </div>
-    </>
   )
 }

@@ -17,11 +17,28 @@ export class I18nErrorFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>()
     const request = ctx.getRequest<Request>()
 
-    const message = exception?.message ?? exception.message
-    const i18nKey = exception?.i18nKey ?? exception.i18nKey
-    const replacements = exception?.replacements ?? exception.replacements
-    const validations = (exception as any).validationErrors ?? ''
-    const httpStatus = exception.httpStatus || (exception as any).status || 500
+    const anyEx = exception as unknown as {
+      message?: string
+      i18nKey?: string
+      replacements?: string[]
+      validationErrors?: unknown
+      httpStatus?: number
+      status?: number
+      code?: string
+      meta?: Record<string, unknown>
+      getStatus?: () => number
+    }
+    const message = anyEx?.message ?? exception.message
+    const i18nKey = anyEx?.i18nKey ?? exception.i18nKey
+    const replacements = anyEx?.replacements ?? exception.replacements
+    const validations = anyEx.validationErrors ?? ''
+    const httpStatus =
+      exception.httpStatus ||
+      (typeof anyEx.getStatus === 'function' ? anyEx.getStatus() : undefined) ||
+      anyEx.status ||
+      500
+    const code = anyEx.code
+    const meta = anyEx.meta
 
     /*Sentry.addBreadcrumb({
       message: exception.message,
@@ -38,6 +55,9 @@ export class I18nErrorFilter implements ExceptionFilter {
       validationErrors: validations,
       body: request.body ?? undefined,
       method: request.method ?? undefined,
+      statusCode: httpStatus,
+      ...(code ? { code } : {}),
+      ...(meta ? { meta } : {}),
     } as I18nErrorDto)
   }
 }

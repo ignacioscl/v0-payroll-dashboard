@@ -39,6 +39,8 @@ export interface InvoiceLookupOptionDto {
   id: number
   label: string
   sublabel?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
 }
 
 export class InvoiceLookupResponseDto {

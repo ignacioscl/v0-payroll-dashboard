@@ -3,11 +3,8 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
-import { buildDealerFilterSql, buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
-import {
-  applyZeroFilter,
-} from '../../shared/kpi/srs-kpi-zero-filter'
-import { StatementType, statementTypesSqlIn } from '../entity/invoice-statement.srsentity'
+import { buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
+import { StatementType } from '../entity/invoice-statement.srsentity'
 import {
   InvoiceListFilter,
   InvoiceRowDto,
@@ -19,307 +16,144 @@ import {
 } from '../dto/invoice-lookup.dto'
 import {
   InvoiceDetailGenericRowDto,
+  InvoiceDetailSlice,
   InvoiceDetailWoRowDto,
 } from '../dto/invoice-detail.dto'
+import {
+  buildUnionBranches,
+  concatBranches,
+  identityTupleSql,
+  mapIdentityRow,
+  mapInvoiceListRow,
+  orderBySql,
+  summarySelectSql,
+  type InvoiceRowIdentity,
+} from '../invoice-list-sql'
+
+function effectiveDetailPayed(slice: InvoiceDetailSlice): '0' | '1' | undefined {
+  if (slice.payed === '0' || slice.payed === '1') return slice.payed
+  if (slice.idBilling <= 0) return '0'
+  return undefined
+}
+
+function detailMembershipSql(): string {
+  return ` AND ( EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                 WHERE bx.id_statement_inv_rel = isir.id AND bx.id_billing = ?)
+        OR EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                   INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                    WHERE bx.id_statement = isir.id_statement AND bx.id_billing = ?) )`
+}
+
+function detailPayedWoSql(payed: '0' | '1'): string {
+  if (payed === '0') {
+    return ` AND IS_SERVICE_FROM_STATEMENT_BILLED(isir.id_statement, i.id, _is.id) = 0`
+  }
+  return ` AND ( EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                 WHERE bx.id_statement_inv_rel = isir.id)
+        OR EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                   INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                    WHERE bx.id_statement = isir.id_statement) )`
+}
+
+function detailPayedGenericSql(payed: '0' | '1'): string {
+  if (payed === '0') {
+    return ` AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                  INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                   WHERE bx.id_statement_inv_rel = isir.id)
+  AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                  INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                   WHERE bx.id_statement = isir.id_statement)`
+  }
+  return ` AND ( EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                 WHERE bx.id_statement_inv_rel = isir.id)
+        OR EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                   INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                    WHERE bx.id_statement = isir.id_statement) )`
+}
+
+function detailScreenFiltersSql(slice: InvoiceDetailSlice, opts: { wo: boolean }): string {
+  let sql = ''
+  if (opts.wo && slice.invoiceServiceIds.length) {
+    sql += ` AND isr.id_service_invoice IN (${sqlInInts(slice.invoiceServiceIds)})`
+  }
+  if (opts.wo && slice.departmentIds.length) {
+    sql += ` AND dpto.id IN (${sqlInInts(slice.departmentIds)})`
+  }
+  if (opts.wo && slice.stock) {
+    sql += ' AND (i.stock_number LIKE ? OR c.vin = ? OR c.vin LIKE ?)'
+  }
+  return sql
+}
 
 /**
  * Listado de la solapa Invoice (INVOICE_STATEMENT) — read-only.
- * Espeja InvoiceStatementDao::load() / loadStatementRel() / loadStatementRelGenerics()
- * del legacy, con paginación server-side y totales sobre todo el filtro.
+ * UNION de clones por lote (HelperDao) con paginación en dos fases (T.10.2.bis).
  */
 @Injectable()
 export class InvoiceRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
-  /**
-   * WHERE + params compartidos por lista y summary, así ambos bindean idéntico.
-   * NO agrega joins de billing → una fila por statement (paginación correcta).
-   * El detalle de pago se resuelve con un LEFT JOIN a la última billing activa.
-   */
-  private buildWhere(f: InvoiceListFilter): { join: string; where: string; params: any[] } {
-    const stmt = buildDealerFilterSql('statement', f.idUsuario, f.dealerIds, f.skipDealerRestriction)
-    const estado = f.showDeleted ? 0 : 1
-    let where = ` WHERE s.estado = ${estado} AND s.id_dealer_provider = ?${stmt.and}`
-    // Legacy billing list: statement period fully inside [fechaDesde, fechaHasta].
-    where += ' AND s.fecha_desde >= ? AND s.fecha_hasta <= ?'
-    const params: any[] = [f.idDealerProvider, ...stmt.params, f.fechaDesde, f.fechaHasta]
+  async listPage(
+    f: InvoiceListFilter,
+  ): Promise<{ results: InvoiceRowDto[]; hasMore: boolean }> {
+    const identityBranches = concatBranches(buildUnionBranches(f, 'identity'))
+    const pageSize = f.pageSize
+    const unlimited = pageSize === -1
+    const fetchSize = unlimited ? 0 : Math.trunc(pageSize) + 1
+    const offset = unlimited ? 0 : Math.trunc((f.page - 1) * pageSize)
+    const limitClause = unlimited ? '' : ' LIMIT ? OFFSET ?'
+    const identityParams = unlimited
+      ? identityBranches.params
+      : [...identityBranches.params, fetchSize, offset]
 
-    if (f.statementTypes.length) {
-      // Valores de enum whitelisteados → inline seguro (mismo patrón que billing-kpi).
-      where += ` AND s.statement_type IN (${statementTypesSqlIn(f.statementTypes)})`
-    }
-    if (f.search) {
-      if (f.exactMatch) {
-        where += ' AND s.full_nro = ?'
-        params.push(f.search)
-      } else {
-        where += ` AND s.full_nro LIKE CONCAT('%', ?, '%')`
-        params.push(f.search)
-      }
-    }
-    if (f.sended === '0' || f.sended === '1') {
-      where += ' AND s.sended = ?'
-      params.push(Number(f.sended))
-    }
-    if (f.payed === '0') where += ' AND IS_STATEMENT_BILLED(s.id) = 0'
-    else if (f.payed === '1') where += ' AND IS_STATEMENT_BILLED(s.id) = 1'
-
-    // Statements not authored by a person: batch/cron runs (schedule billing) and
-    // system accounts such as Administrator, which is not an employee of any detailer
-    // but authors thousands of statements. Those are hidden from the employee combo
-    // (legacy `isEmployee=1`), so this is the only way to filter them.
-    const systemAuthored = `(s.id_invoice_statement_schedule > 0 OR EXISTS (
-      SELECT 1 FROM usuarios ua WHERE ua.id_usuario = s.id_author AND ua.is_empleado <> 1
-    ))`
-
-    if (f.authorIds.length) {
-      const ids = sqlInInts(f.authorIds)
-      const byAuthor = f.authorsExclude
-        ? `s.id_author NOT IN (${ids})`
-        : `s.id_author IN (${ids})`
-      // Combined with employees it widens the set: those employees OR system/schedule.
-      where += f.createdBySystem
-        ? ` AND (${byAuthor} OR ${systemAuthored})`
-        : ` AND ${byAuthor}`
-    } else if (f.createdBySystem) {
-      where += ` AND ${systemAuthored}`
-    } else if (f.idAuthor) {
-      where += ' AND s.id_author = ?'
-      params.push(f.idAuthor)
-    }
-
-    if (f.departmentIds.length) {
-      const ids = sqlInInts(f.departmentIds)
-      where += ` AND (EXISTS (
-        SELECT issr.id FROM INVOICE_STATEMENT_SEL_SER_REL issr
-        INNER JOIN INVOICE_SERVICE _lis ON _lis.id = issr.id_inv_service
-        WHERE issr.id_statement = s.id AND _lis.id_department IN (${ids})
-      ) OR s.id_department IN (${ids}))`
-    }
-
-    if (f.invoiceServiceIds.length) {
-      const ids = sqlInInts(f.invoiceServiceIds)
-      const serviceMatch = `(s.id_invoice_service IN (${ids}) OR EXISTS (
-          SELECT isir.id FROM INVOICE_STATEMENT_INV_REL isir
-          INNER JOIN INVOICE i ON i.id = isir.id_invoice AND i.estado = 1
-          WHERE isir.id_statement = s.id AND isir.id_invoice_service IN (${ids})
-        ) OR EXISTS (
-          SELECT issr.id FROM INVOICE_STATEMENT_SEL_SER_REL issr
-          WHERE issr.id_statement = s.id AND issr.id_inv_service IN (${ids})
-        ))`
-      // Legacy: OR statement_type only for TTK/Generic toggles — never WO types (1–4),
-      // or the service filter is bypassed when all type pills are active.
-      const ttkGenericTypes = f.statementTypes.filter(
-        (t) => t === StatementType.TTK || t === StatementType.GENERIC,
-      )
-      if (ttkGenericTypes.length) {
-        where += ` AND (${serviceMatch} OR s.statement_type IN (${statementTypesSqlIn(ttkGenericTypes)}))`
-      } else {
-        where += ` AND ${serviceMatch}`
-      }
-    }
-
-    if (f.dueOn) {
-      where += ` AND IS_STATEMENT_BILLED(s.id) = 0
-        AND EXISTS (
-          SELECT dr.id FROM DEALER_REL dr
-          WHERE dr.id_dealer_customer = s.id_dealer
-            AND dr.id_dealer_provider = s.id_dealer_provider
-            AND dr.fecha_end IS NULL
-            AND dr.due_on IS NOT NULL
-            AND dr.due_on > 0
-            AND DATEDIFF(CURDATE(), s.fecha_hasta) > dr.due_on
-        )`
-    }
-
-    if (f.checkDate || f.checkNumber) {
-      const billingParts: string[] = []
-      if (f.checkDate) {
-        billingParts.push('b.fecha = ?')
-        params.push(f.checkDate)
-      }
-      if (f.checkNumber) {
-        billingParts.push('b.check_number LIKE ?')
-        params.push(`%${f.checkNumber}%`)
-      }
-      where += ` AND EXISTS (
-        SELECT 1 FROM BILLING_WO_REL bwr
-        INNER JOIN BILLING b ON b.id = bwr.id_billing AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
-        WHERE (bwr.id_statement = s.id
-          OR bwr.id_statement_inv_rel IN (
-            SELECT isir.id FROM INVOICE_STATEMENT_INV_REL isir WHERE isir.id_statement = s.id
-          ))
-        AND ${billingParts.join(' AND ')}
-      )`
-    }
-
-    const lineSubParts: string[] = []
-    const lineParams: any[] = []
-    if (f.woNumbers.length) {
-      // Match display WO (INVOICE.full_nro, e.g. LFT9750) and numeric wo_nro.
-      const woOr = f.woNumbers
-        .map(() => '(i.full_nro = ? OR i.wo_nro = ?)')
-        .join(' OR ')
-      lineSubParts.push(`(${woOr})`)
-      for (const wo of f.woNumbers) {
-        lineParams.push(wo, wo)
-      }
-    }
-    if (f.roPo) {
-      lineSubParts.push('(i.ro = ? OR i.po = ?)')
-      lineParams.push(f.roPo, f.roPo)
-    }
-    if (f.stock) {
-      lineSubParts.push('(i.stock_number LIKE ? OR c.vin = ? OR c.vin LIKE ?)')
-      const like = `%${f.stock}%`
-      lineParams.push(like, f.stock, like)
-    }
-    if (lineSubParts.length) {
-      where += ` AND EXISTS (
-        SELECT isir.id
-        FROM INVOICE_STATEMENT_INV_REL isir
-        INNER JOIN INVOICE_SERVICE_REL isr
-          ON isr.id_invoice = isir.id_invoice AND isr.id_service_invoice = isir.id_invoice_service
-        INNER JOIN INVOICE i ON i.id = isir.id_invoice AND i.estado = 1
-        INNER JOIN CAR c ON c.id = i.id_car
-        WHERE isir.id_statement = s.id AND ${lineSubParts.join(' AND ')}
-      )`
-      params.push(...lineParams)
-    }
-
-    // "Hide $0 invoices": legacy evaluates the total with discount = 0
-    // (InvoiceStatementHelperDao:144), i.e. "does this statement have billable
-    // services?", not "is the final amount positive?". Using the real discount here
-    // hid statements whose discount exceeds the subtotal (negative total) — e.g.
-    // CHV33871: subtotal 85, discount 100 → -15 → legacy lists it, v0 dropped it.
-    where += applyZeroFilter(
-      f.includeZero,
-      ' AND GET_TOTAL_BY_STATEMENT(s.id, 0, 0, s.discount_type, NULL) > 0',
+    const identityRows = await this.srs.query(
+      `SELECT t.id, t.id_billing, t.nro_billed, t.id_billing_wo_rel
+       FROM (
+         ${identityBranches.sql}
+       ) t
+       ${orderBySql(f)}${limitClause}`,
+      identityParams,
     )
 
-    return { join: stmt.join, where, params }
-  }
-
-  /** Página de statements (una fila por statement). */
-  async listPage(f: InvoiceListFilter): Promise<InvoiceRowDto[]> {
-    const { join, where, params } = this.buildWhere(f)
-    const limitClause =
-      f.pageSize === -1
-        ? ''
-        : ` LIMIT ${Math.trunc(f.pageSize)} OFFSET ${Math.trunc((f.page - 1) * f.pageSize)}`
-
-    // Whitelist only — never interpolate client values into ORDER BY.
-    const ORDER_COLUMNS: Record<'invoiceNro' | 'dateFrom', string> = {
-      invoiceNro: 's.full_nro',
-      dateFrom: 's.fecha_desde',
+    const mappedIdentities: InvoiceRowIdentity[] = identityRows.map(mapIdentityRow)
+    const hasMore = unlimited ? false : mappedIdentities.length > pageSize
+    const pageIdentities = hasMore ? mappedIdentities.slice(0, pageSize) : mappedIdentities
+    if (pageIdentities.length === 0) {
+      return { results: [], hasMore: false }
     }
-    const dir = f.orderDir === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = f.orderBy
-      ? `${ORDER_COLUMNS[f.orderBy]} ${dir}, s.id ${dir}`
-      : 's.fecha_desde DESC, s.fecha_create, s.id DESC'
 
+    const statementIds = [...new Set(pageIdentities.map((r) => r.id))]
+    const fullBranches = concatBranches(buildUnionBranches(f, 'full', statementIds))
+    const tuples = identityTupleSql(pageIdentities)
     const rows = await this.srs.query(
-      `SELECT s.id, s.full_nro, s.statement_type, s.estado, s.sended,
-              s.emails_sended, s.last_sended,
-              s.fecha_create, s.fecha_desde, s.fecha_hasta,
-              s.po, s.ro, s.discount, s.discount_type, s.discount_detail, ROUND(s.tax, 2) AS tax,
-              s.invoice_service_sel_rel, s.invoice_note,
-              s.id_invoice_statement_schedule,
-              d.nombre        AS department,
-              inv_serv.nombre AS invoice_service,
-              u.nombre        AS author,
-              c.razon_social  AS dealer,
-              s.id_dealer     AS id_dealer,
-              GET_NRO_WO_FROM_INVOICE(s.id)                                         AS wo,
-              CASE
-                WHEN s.statement_type = 1
-                THEN GET_SERVICES_NAMES_BY_WO(GET_ID_WO_FROM_INVOICE(s.id))
-                ELSE NULL
-              END                                                                   AS services_by_wo,
-              GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)                                 AS sub_total,
-              GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total,
-              IS_STATEMENT_BILLED(s.id)                                             AS is_billed,
-              IS_STATEMENT_PARTIAL_OR_FULL_BILLED(s.id)                             AS is_partial_billed,
-              (SELECT COUNT(*) FROM INVOICE_STATEMENT_NOTE isn
-                WHERE isn.id_statement = s.id AND isn.estado = 1)                    AS notes_count,
-              (SELECT COUNT(*) FROM LOG_CHANGE lc
-                WHERE lc.id_invoice_statement = s.id)                               AS log_count,
-              lb.id_billing                                                         AS id_billing,
-              b.fecha                                                               AS fecha_pago,
-              b.check_number                                                        AS check_number,
-              b.amount                                                              AS amount
-       FROM INVOICE_STATEMENT s
-       ${join}
-       LEFT JOIN DEPARTMENT d           ON d.id = s.id_department
-       LEFT JOIN INVOICE_SERVICE inv_serv ON inv_serv.id = s.id_invoice_service
-       LEFT JOIN usuarios u             ON u.id_usuario = s.id_author
-       LEFT JOIN (
-         SELECT bwr.id_statement, MAX(bwr.id_billing) AS id_billing
-         FROM BILLING_WO_REL bwr
-         WHERE IS_BILLING_ACTIVE(bwr.id_billing) = 1
-         GROUP BY bwr.id_statement
-       ) lb ON lb.id_statement = s.id
-       LEFT JOIN BILLING b ON b.id = lb.id_billing
-       ${where}
-       ORDER BY ${orderBy}${limitClause}`,
-      params,
+      `SELECT t.*
+       FROM (
+         ${fullBranches.sql}
+       ) t
+       INNER JOIN (
+         ${tuples}
+       ) a
+          ON t.id <=> a.id
+         AND t.id_billing <=> a.id_billing
+         AND t.nro_billed <=> a.nro_billed
+         AND t.id_billing_wo_rel <=> a.id_billing_wo_rel
+       ${orderBySql(f)}`,
+      fullBranches.params,
     )
-
-    return rows.map((r: any) => ({
-      id: Number(r.id),
-      fullNro: r.full_nro,
-      statementType: Number(r.statement_type),
-      estado: Number(r.estado ?? 1),
-      wo: r.wo ?? undefined,
-      department: r.department ?? undefined,
-      invoiceService: r.invoice_service ?? undefined,
-      invoiceServiceSelRel: r.invoice_service_sel_rel ?? undefined,
-      invoiceServicesByWo: r.services_by_wo ?? undefined,
-      invoiceNote: r.invoice_note ?? undefined,
-      author: r.author ?? undefined,
-      createdBySchedule: Number(r.id_invoice_statement_schedule ?? 0) > 0,
-      dealer: r.dealer ?? undefined,
-      idDealer: r.id_dealer != null ? Number(r.id_dealer) : undefined,
-      fechaCreate: r.fecha_create,
-      fechaDesde: r.fecha_desde ?? undefined,
-      fechaHasta: r.fecha_hasta ?? undefined,
-      subtotal: Number(r.sub_total ?? 0),
-      discount: r.discount == null ? undefined : Number(r.discount),
-      discountType: r.discount_type == null ? undefined : Number(r.discount_type),
-      discountDetail: r.discount_detail ?? undefined,
-      total: Number(r.total ?? 0),
-      tax: Number(r.tax ?? 0),
-      po: r.po ?? undefined,
-      ro: r.ro ?? undefined,
-      sended: Number(r.sended ?? 0),
-      emailsSended: r.emails_sended ?? undefined,
-      lastSended: r.last_sended ?? undefined,
-      isBilled: Number(r.is_billed ?? 0),
-      isPartialBilled: Number(r.is_partial_billed ?? 0),
-      notesCount: Number(r.notes_count ?? 0),
-      logCount: Number(r.log_count ?? 0),
-      idBilling: r.id_billing ? Number(r.id_billing) : undefined,
-      fechaPago: r.fecha_pago ?? undefined,
-      checkNumber: r.check_number ?? undefined,
-      amount: r.amount == null ? undefined : Number(r.amount),
-    }))
+    return { results: rows.map(mapInvoiceListRow), hasMore }
   }
 
-  /** Count + totales (subtotal/discount/total) sobre TODO el filtro, en una sola pasada. */
   async summary(f: InvoiceListFilter): Promise<{ total: number; summary: InvoiceSummaryDto }> {
-    const { join, where, params } = this.buildWhere(f)
+    const branches = concatBranches(buildUnionBranches(f, 'full'))
     const [row] = await this.srs.query(
-      `SELECT COUNT(*) AS cnt,
-              ROUND(IFNULL(SUM(GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)), 0), 2) AS subtotal,
-              ROUND(IFNULL(SUM(GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)), 0), 2) AS total,
-              ROUND(IFNULL(SUM(
-                GET_SUBTOTAL_BY_STATEMENT(s.id, NULL)
-                - GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL)
-              ), 0), 2) AS discount
-       FROM INVOICE_STATEMENT s
-       ${join}
-       ${where}`,
-      params,
+      `${summarySelectSql(f.deleted)}
+       FROM (
+         ${branches.sql}
+       ) t`,
+      branches.params,
     )
     const count = Number(row?.cnt ?? 0)
     return {
@@ -329,6 +163,7 @@ export class InvoiceRepository {
         subtotal: Number(row?.subtotal ?? 0),
         discount: Number(row?.discount ?? 0),
         total: Number(row?.total ?? 0),
+        deletedInList: Number(row?.deleted_in_list ?? 0),
       },
     }
   }
@@ -363,18 +198,33 @@ export class InvoiceRepository {
   async detailWoRows(
     idStatement: number,
     idDealerProvider: number,
+    slice: InvoiceDetailSlice,
   ): Promise<InvoiceDetailWoRowDto[]> {
+    const payed = effectiveDetailPayed(slice)
+    const params: any[] = [slice.idBilling, idDealerProvider, idStatement, idDealerProvider]
+    let extra = ''
+    if (slice.idBilling > 0) {
+      extra += detailMembershipSql()
+      params.push(slice.idBilling, slice.idBilling)
+    }
+    if (payed === '0' || payed === '1') extra += detailPayedWoSql(payed)
+    extra += detailScreenFiltersSql(slice, { wo: true })
+    if (slice.stock) {
+      const like = `%${slice.stock}%`
+      params.push(like, slice.stock, like)
+    }
     const rows = await this.srs.query(
       `SELECT isir.id, isir.id_statement,
-              isr.price, isr.qty, isr.comentario,
+              IF(isr.qty > 0, isr.qty * isr.price, isr.price) AS price,
+              isr.qty, isr.comentario,
               _is.nombre AS servicio,
               i.full_nro, i.ro, i.po, i.stock_number, i.fecha_alta, i.observation,
               c.vin,
               dpto.nombre AS department,
               IS_STATEMENT_BILLED(isir.id_statement) AS is_statement_full_billed,
-              CASE WHEN b.fecha IS NULL THEN b2.fecha ELSE b.fecha END AS fecha_pago,
-              CASE WHEN b.check_number IS NULL THEN b2.check_number ELSE b.check_number END AS check_number,
-              CASE WHEN b.amount IS NULL THEN b2.amount ELSE b.amount END AS amount
+              b.fecha AS fecha_pago,
+              b.check_number AS check_number,
+              b.amount AS amount
        FROM INVOICE_STATEMENT_INV_REL isir
        INNER JOIN INVOICE_STATEMENT istat ON istat.id = isir.id_statement
        INNER JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = isir.id_invoice
@@ -383,13 +233,11 @@ export class InvoiceRepository {
        INNER JOIN DEPARTMENT dpto ON dpto.id = _is.id_department
        INNER JOIN INVOICE i ON i.id = isir.id_invoice
        INNER JOIN CAR c ON c.id = i.id_car
-       LEFT JOIN BILLING_WO_REL bwr ON bwr.id_statement_inv_rel = isir.id AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
-       LEFT JOIN BILLING b ON b.id = bwr.id_billing AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
-       LEFT JOIN BILLING_WO_REL bwr_inv ON bwr_inv.id_statement = isir.id_statement AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
-       LEFT JOIN BILLING b2 ON b2.id = bwr_inv.id_billing AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
+       LEFT JOIN BILLING b ON b.id = ? AND b.id_dealer_provider = ?
        WHERE i.estado = 1 AND isir.id_statement = ? AND istat.id_dealer_provider = ?
-       ORDER BY isir.id`,
-      [idStatement, idDealerProvider],
+       ${extra}
+       ORDER BY i.wo_nro`,
+      params,
     )
     return rows.map((r: any) => ({
       id: Number(r.id),
@@ -416,7 +264,26 @@ export class InvoiceRepository {
   async detailGenericRows(
     idStatement: number,
     idDealerProvider: number,
+    slice: InvoiceDetailSlice,
   ): Promise<InvoiceDetailGenericRowDto[]> {
+    const payed = effectiveDetailPayed(slice)
+    const genericParams: any[] = [slice.idBilling, idDealerProvider, idStatement, idDealerProvider]
+    let genericExtra = ''
+    if (slice.idBilling > 0) {
+      genericExtra += detailMembershipSql()
+      genericParams.push(slice.idBilling, slice.idBilling)
+    }
+    if (payed === '0' || payed === '1') genericExtra += detailPayedGenericSql(payed)
+
+    const ttkInnerParams: any[] = [idStatement, idStatement, idDealerProvider]
+    let ttkInnerExtra = ''
+    if (slice.idBilling > 0) {
+      ttkInnerExtra += detailMembershipSql()
+      ttkInnerParams.push(slice.idBilling, slice.idBilling)
+    }
+    if (payed === '0' || payed === '1') ttkInnerExtra += detailPayedGenericSql(payed)
+    const ttkOuterParams = [slice.idBilling, idDealerProvider]
+
     const rows = await this.srs.query(
       `SELECT * FROM (
         (
@@ -426,18 +293,16 @@ export class InvoiceRepository {
                  ROUND(isir.generic_qty, 2) AS generic_qty,
                  isir.amount AS service_price,
                  IS_STATEMENT_BILLED(isir.id_statement) AS is_statement_full_billed,
-                 CASE WHEN b.check_number IS NULL THEN b2.check_number ELSE b.check_number END AS check_number,
-                 CASE WHEN b.amount IS NULL THEN b2.amount ELSE b.amount END AS amount,
-                 CASE WHEN b.fecha IS NULL THEN b2.fecha ELSE b.fecha END AS fecha_pago,
+                 b.check_number AS check_number,
+                 b.amount AS amount,
+                 b.fecha AS fecha_pago,
                  NULL AS id_author_ttk, NULL AS rol_name, NULL AS dpto_name,
                  IFNULL(isir.only_timecard, 0) AS only_timecard
           FROM INVOICE_STATEMENT_INV_REL isir
           INNER JOIN INVOICE_STATEMENT istat ON istat.id = isir.id_statement
-          LEFT JOIN BILLING_WO_REL bwr ON bwr.id_statement_inv_rel = isir.id AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
-          LEFT JOIN BILLING b ON b.id = bwr.id_billing AND IS_BILLING_ACTIVE(bwr.id_billing) = 1
-          LEFT JOIN BILLING_WO_REL bwr_inv ON bwr_inv.id_statement = isir.id_statement AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
-          LEFT JOIN BILLING b2 ON b2.id = bwr_inv.id_billing AND IS_BILLING_ACTIVE(bwr_inv.id_billing) = 1
+          LEFT JOIN BILLING b ON b.id = ? AND b.id_dealer_provider = ?
           WHERE isir.id_employee_work IS NULL AND isir.id_statement = ? AND istat.id_dealer_provider = ?
+          ${genericExtra}
         )
         UNION
         (
@@ -460,7 +325,7 @@ export class InvoiceRepository {
                    u.nombre AS nombre,
                    tew.id_author,
                    (SUM(TTK_CALCULATE_TIME_DAY(1, punch_out, punch_in, break_end, break_start, 1)) * 3600) / 3600 AS hours_decimal,
-                   tew.amount_dealer AS amount_dealer,
+                   SUM(tew.amount_line) AS amount_dealer,
                    (SELECT MAX(r.nombre) FROM USUARIO_ROL_REL urr
                      INNER JOIN ROL r ON r.id_rol = urr.id_rol
                      WHERE urr.id_dealer_asigned = tew.id_dealer AND urr.id_usuario = u.id_usuario) AS rol_name,
@@ -472,24 +337,24 @@ export class InvoiceRepository {
             FROM (
               SELECT tew.id, tew.id_author, tew.id_dealer, tew.punch_in, tew.punch_out,
                      tew.break_start, tew.break_end,
-                     (isir.amount / TTK_CALCULATE_TIME_DAY(1, punch_out, punch_in, break_end, break_start, 1)) AS amount_dealer,
+                     isir.amount AS amount_line,
                      isir.id AS id_statement_inv_rel,
                      _is.id AS id_statement,
                      isir.only_timecard AS only_timecard
               FROM TTK_EMPLOYEE_WORK tew
               INNER JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_employee_work = tew.id AND isir.id_statement = ?
-              INNER JOIN INVOICE_STATEMENT _is ON _is.id = isir.id_statement AND _is.estado = 1
+              INNER JOIN INVOICE_STATEMENT _is ON _is.id = isir.id_statement
               WHERE tew.estado = 1 AND _is.id = ? AND _is.id_dealer_provider = ?
+              ${ttkInnerExtra}
             ) tew
             INNER JOIN usuarios u ON u.id_usuario = tew.id_author
             GROUP BY tew.id_author
           ) t
-          LEFT JOIN BILLING_WO_REL bwr ON bwr.id_statement_inv_rel = t.id_statement_inv_rel
-          LEFT JOIN BILLING b ON b.id = bwr.id_billing AND b.estado = 1
+          LEFT JOIN BILLING b ON b.id = ? AND b.id_dealer_provider = ?
         )
       ) u
       ORDER BY u.id`,
-      [idStatement, idDealerProvider, idStatement, idStatement, idDealerProvider],
+      [...genericParams, ...ttkInnerParams, ...ttkOuterParams],
     )
     return rows.map((r: any) => ({
       id: r.id == null ? undefined : Number(r.id),
@@ -646,6 +511,64 @@ export class InvoiceRepository {
     return rows.map((r: any) => ({
       id: Number(r.id),
       label: String(r.label ?? ''),
+    }))
+  }
+
+  /**
+   * Employees who appear on TTK/Generic invoice lines (id_employee_work → punch author).
+   * Copied from lookupAuthors: same dealer restriction, provider, is_empleado, LIMIT, LIKE.
+   */
+  async lookupWorkers(f: {
+    idDealerProvider: number
+    idUsuario: number
+    dealerIds: number[]
+    skipDealerRestriction: boolean
+    search?: string
+    limit: number
+  }): Promise<InvoiceLookupOptionDto[]> {
+    if (f.dealerIds.length === 0) return []
+    const restrict = buildDealerRestrictionClause(
+      f.idUsuario,
+      f.dealerIds,
+      f.skipDealerRestriction,
+    )
+    const params: any[] = [
+      f.idDealerProvider,
+      f.idDealerProvider,
+      f.idDealerProvider,
+      ...restrict.params,
+    ]
+    let extra = ''
+    if (f.search) {
+      extra += ' AND u.nombre LIKE CONCAT(\'%\', ?, \'%\')'
+      params.push(f.search)
+    }
+    const rows = await this.srs.query(
+      `SELECT DISTINCT u.id_usuario AS id, u.nombre AS label,
+              u.thumbnail_uuid AS thumbnail_uuid, u.logo_img AS logo_img
+       FROM INVOICE_STATEMENT s
+       INNER JOIN CONTRATISTA c ON c.id = s.id_dealer
+       INNER JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = s.id
+       INNER JOIN TTK_EMPLOYEE_WORK tew ON tew.id = isir.id_employee_work
+       INNER JOIN usuarios u ON u.id_usuario = tew.id_author
+       WHERE s.estado = 1
+         AND s.statement_type IN (${StatementType.TTK}, ${StatementType.GENERIC})
+         AND s.id_dealer_provider = ?
+         AND tew.id_dealer_provider = ?
+         AND u.is_empleado = 1
+         AND u.estado = 1
+         AND u.id_contratista_owner = ?
+         ${restrict.and}
+         ${extra}
+       ORDER BY u.nombre
+       LIMIT ${Math.trunc(f.limit)}`,
+      params,
+    )
+    return rows.map((r: any) => ({
+      id: Number(r.id),
+      label: String(r.label ?? ''),
+      thumbnailUuid: r.thumbnail_uuid ? String(r.thumbnail_uuid) : null,
+      logoImg: r.logo_img ? String(r.logo_img) : null,
     }))
   }
 

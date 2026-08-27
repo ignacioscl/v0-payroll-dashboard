@@ -44,6 +44,9 @@ export interface InvoiceRow {
   fechaPago?: string
   checkNumber?: string
   amount?: number
+  nroBilled?: number | null
+  idBillingWoRel?: number | null
+  displayFullNro?: string
 }
 
 export interface InvoiceSummary {
@@ -51,14 +54,18 @@ export interface InvoiceSummary {
   subtotal: number
   discount: number
   total: number
+  deletedInList: number
 }
 
 export interface InvoiceListResponse {
   results: InvoiceRow[]
   page: number
   pageSize: number
-  total: number
   hasMore: boolean
+}
+
+export interface InvoiceSummaryResponse {
+  total: number
   summary: InvoiceSummary
 }
 
@@ -131,7 +138,9 @@ export interface InvoiceListParams {
   createdBySystem?: 0 | 1
   exactMatch?: boolean
   dueOn?: boolean
-  showDeleted?: boolean
+  deleted?: 'hide' | 'only' | 'all'
+  employeeWorkedIn?: string
+  ignorePeriod?: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir?: 'asc' | 'desc'
   page: number
@@ -142,6 +151,8 @@ export type InvoiceLookupOption = {
   id: number
   label: string
   sublabel?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
 }
 
 export interface InvoiceLookupResponse {
@@ -176,7 +187,9 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.createdBySystem === 1) qs.set('createdBySystem', '1')
   if (params.exactMatch) qs.set('exactMatch', 'true')
   if (params.dueOn) qs.set('dueOn', 'true')
-  if (params.showDeleted) qs.set('showDeleted', 'true')
+  if (params.deleted) qs.set('deleted', params.deleted)
+  if (params.employeeWorkedIn) qs.set('employeeWorkedIn', params.employeeWorkedIn)
+  if (params.ignorePeriod) qs.set('ignorePeriod', 'true')
   if (params.orderBy) qs.set('orderBy', params.orderBy)
   if (params.orderDir) qs.set('orderDir', params.orderDir)
   return `?${qs.toString()}`
@@ -192,8 +205,46 @@ export async function fetchInvoiceList(params: InvoiceListParams): Promise<Invoi
   return res.json() as Promise<InvoiceListResponse>
 }
 
-export async function fetchInvoiceDetail(id: number): Promise<InvoiceDetailResponse> {
-  const res = await fetch(`/api/srs-kpis/billing/invoices/${id}/detail`, { cache: 'no-store' })
+export async function fetchInvoiceSummary(
+  params: Omit<InvoiceListParams, 'page' | 'pageSize'> & { page?: number; pageSize?: number },
+): Promise<InvoiceSummaryResponse> {
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/summary${buildInvoiceQuery({
+      ...params,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? INVOICE_PAGE_SIZE,
+    })}`,
+    { cache: 'no-store' },
+  )
+  if (!res.ok) {
+    throw new Error(`Invoice summary (${res.status})`)
+  }
+  return res.json() as Promise<InvoiceSummaryResponse>
+}
+
+export type InvoiceDetailParams = {
+  idBilling?: number
+  payed?: '0' | '1'
+  idDepartment?: string
+  idInvoiceService?: string
+  stock?: string
+}
+
+export async function fetchInvoiceDetail(
+  id: number,
+  params: InvoiceDetailParams = {},
+): Promise<InvoiceDetailResponse> {
+  const qs = new URLSearchParams()
+  if (params.idBilling != null) qs.set('idBilling', String(params.idBilling))
+  if (params.payed === '0' || params.payed === '1') qs.set('payed', params.payed)
+  if (params.idDepartment) qs.set('idDepartment', params.idDepartment)
+  if (params.idInvoiceService) qs.set('idInvoiceService', params.idInvoiceService)
+  if (params.stock) qs.set('stock', params.stock)
+  const q = qs.toString()
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/${id}/detail${q ? `?${q}` : ''}`,
+    { cache: 'no-store' },
+  )
   if (!res.ok) {
     throw new Error(`Invoice detail (${res.status})`)
   }
@@ -252,6 +303,20 @@ export async function fetchInvoiceAuthors(params: {
     { cache: 'no-store' },
   )
   if (!res.ok) throw new Error(`Invoice authors (${res.status})`)
+  const data = (await res.json()) as InvoiceLookupResponse
+  return data.results ?? []
+}
+
+export async function fetchInvoiceWorkers(params: {
+  idDealer: string
+  search?: string
+  limit?: number
+}): Promise<InvoiceLookupOption[]> {
+  const res = await fetch(
+    `/api/srs-kpis/billing/invoices/lookups/workers${buildLookupQuery(params)}`,
+    { cache: 'no-store' },
+  )
+  if (!res.ok) throw new Error(`Invoice workers (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
 }

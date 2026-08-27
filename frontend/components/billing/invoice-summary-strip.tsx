@@ -46,9 +46,11 @@ function StatCell({
 export function InvoiceSummaryStrip({
   summary,
   isLoading,
+  showExcludesDeleted,
 }: {
   summary: InvoiceSummary | undefined
   isLoading?: boolean
+  showExcludesDeleted?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -71,11 +73,16 @@ export function InvoiceSummaryStrip({
     summary.discount > 0 ? `−${fmtMoney(summary.discount)}` : fmtMoney(0)
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <StatCell label={t('invoices.summaryStatements')} value={String(summary.count)} />
-      <StatCell label={t('invoices.summaryFilteredTotal')} value={fmtMoney(summary.total)} highlight="total" />
-      <StatCell label={t('invoices.totalsSubtotal')} value={fmtMoney(summary.subtotal)} />
-      <StatCell label={t('invoices.totalsDiscount')} value={discountDisplay} highlight="discount" />
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCell label={t('invoices.summaryStatements')} value={String(summary.count)} />
+        <StatCell label={t('invoices.summaryFilteredTotal')} value={fmtMoney(summary.total)} highlight="total" />
+        <StatCell label={t('invoices.totalsSubtotal')} value={fmtMoney(summary.subtotal)} />
+        <StatCell label={t('invoices.totalsDiscount')} value={discountDisplay} highlight="discount" />
+      </div>
+      {showExcludesDeleted ? (
+        <p className="text-[11px] text-muted-foreground">{t('invoices.summaryExcludesDeleted')}</p>
+      ) : null}
     </div>
   )
 }

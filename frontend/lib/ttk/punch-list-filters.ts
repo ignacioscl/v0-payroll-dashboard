@@ -110,3 +110,32 @@ export function punchListParamsToSearchParams(params: PunchListQueryParams): URL
   if (params.todayLiveStatus) qs.set('todayLiveStatus', params.todayLiveStatus)
   return qs
 }
+
+export type PunchExportPrepareBody = {
+  fechaDesde: string
+  fechaHasta: string
+  idDealer: string
+  minHours?: number
+  maxHours?: number
+  idPaymentType?: number
+  search?: string
+  idEmployee?: number
+  issueType?: string
+  todayLiveStatus?: string
+}
+
+/** Filters for POST /srs/punch/list/export/prepare — no pagination, cursor, sort, or dir. */
+export function punchExportBodyFromListParams(params: PunchListQueryParams): PunchExportPrepareBody {
+  return {
+    fechaDesde: params.fechaDesde,
+    fechaHasta: params.fechaHasta,
+    idDealer: params.idDealer,
+    minHours: params.minHours,
+    maxHours: params.maxHours,
+    idPaymentType: params.idPaymentType,
+    search: params.search,
+    idEmployee: params.idEmployee,
+    issueType: params.issueType,
+    todayLiveStatus: params.todayLiveStatus,
+  }
+}

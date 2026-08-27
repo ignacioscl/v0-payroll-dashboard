@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Save, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -102,12 +102,11 @@ export function InvoicePoRoDialog({
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <X />
               {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
+              {mutation.isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t('common.save')}
             </Button>
           </DialogFooter>

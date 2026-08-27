@@ -14,6 +14,10 @@ import { GroupedPunchRepository } from './repository/punch-grouped.repository'
 import { PunchListController } from './controller/punch-list.controller'
 import { PunchListService } from './service/punch-list.service'
 import { PunchListRepository } from './repository/punch-list.repository'
+import { PunchAccessPolicyService } from './punch-access-policy'
+import { PunchExportService } from './service/punch-export.service'
+import { PunchExportTicketStore } from './punch-export-ticket.store'
+import { PunchExportSemaphore } from './punch-export-semaphore'
 
 @Module({
   imports: [SrsAuthModule, TypeOrmModule.forFeature([TtkEmployeeWork], SRS_CONNECTION)],
@@ -24,6 +28,10 @@ import { PunchListRepository } from './repository/punch-list.repository'
     GroupedPunchService,
     PunchListRepository,
     PunchListService,
+    PunchAccessPolicyService,
+    PunchExportTicketStore,
+    PunchExportSemaphore,
+    PunchExportService,
   ],
   controllers: [PunchKpiController, GroupedPunchController, PunchListController],
   exports: [PunchKpiService, GroupedPunchService, PunchListService],

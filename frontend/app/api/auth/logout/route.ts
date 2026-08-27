@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { appPublicUrl } from '@/lib/app-public-url'
-import { buildClearSessionCookies } from '@/lib/auth/session'
+import { buildClearSessionCookies, getSrsSession } from '@/lib/auth/session'
+import { buildLegacyLogoutUrl } from '@/lib/legacy-origin'
 
-function redirectToV0Login(request?: NextRequest) {
-  const response = NextResponse.redirect(appPublicUrl('/login', request))
+export const dynamic = 'force-dynamic'
+
+async function redirectToLegacyLogout(request: NextRequest) {
+  const session = await getSrsSession()
+  const v0Login = appPublicUrl('/login', request).toString()
+  const response = NextResponse.redirect(
+    buildLegacyLogoutUrl(session?.user.legacyOrigin, v0Login),
+  )
   for (const cookie of buildClearSessionCookies()) {
     response.cookies.set(cookie)
   }
@@ -11,17 +18,22 @@ function redirectToV0Login(request?: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  return redirectToV0Login(request)
+  return redirectToLegacyLogout(request)
 }
 
 export async function POST(request: NextRequest) {
   const accept = request.headers.get('accept') ?? ''
   if (accept.includes('application/json')) {
-    const response = NextResponse.json({ ok: true })
+    const session = await getSrsSession()
+    const v0Login = appPublicUrl('/login', request).toString()
+    const response = NextResponse.json({
+      ok: true,
+      legacyLogoutUrl: buildLegacyLogoutUrl(session?.user.legacyOrigin, v0Login).toString(),
+    })
     for (const cookie of buildClearSessionCookies()) {
       response.cookies.set(cookie)
     }
     return response
   }
-  return redirectToV0Login(request)
+  return redirectToLegacyLogout(request)
 }

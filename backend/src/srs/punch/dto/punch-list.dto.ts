@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { SrsCursorDto, SrsCursorPagedResponseDto } from '../../shared/dto/srs-paged-response.dto'
+import { IsValidPunchDateRange } from '../punch-date-range'
+import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 
 /** Columnas por las que se puede ordenar el listado (whitelist). */
 export const PUNCH_LIST_SORTS = ['punchIn', 'employee'] as const
@@ -14,6 +16,12 @@ export const PUNCH_LIST_LIVE_STATUS = ['working', 'on_lunch', 'out'] as const
 export type PunchListLiveStatus = (typeof PUNCH_LIST_LIVE_STATUS)[number]
 
 export class PunchListQueryDto extends SrsKpiQueryDto {
+  @ApiProperty({ description: 'Fecha hasta (YYYY-MM-DD)', example: '2026-04-30' })
+  @IsDateString()
+  @IsNotEmpty()
+  @IsValidPunchDateRange()
+  declare fechaHasta: string
+
   @ApiPropertyOptional({ example: 25, description: 'Tamaño del lote' })
   @IsOptional()
   @Type(() => Number)
@@ -82,12 +90,11 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   idEmployee?: number
 
   @ApiPropertyOptional({
+    enum: PUNCH_ISSUE_TYPES,
     example: 'only_error',
-    description:
-      'all | only_error | only_error_clockout | only_error_break | manual_punch | only_deletes | without_salary | only_fixed',
   })
   @IsOptional()
-  @IsString()
+  @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
 
   @ApiPropertyOptional({

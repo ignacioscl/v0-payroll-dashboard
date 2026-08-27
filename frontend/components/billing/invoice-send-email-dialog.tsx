@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Inbox, Loader2, Mail } from 'lucide-react'
+import { History, Inbox, Loader2, Mail, X } from 'lucide-react'
 
 import { InvoiceEmailQueueFields, useInvoiceEmailQueuePanelState } from '@/components/billing/invoice-email-queue-fields'
 import { InvoiceStatementEmailAuditDialog } from '@/components/billing/invoice-statement-email-audit-dialog'
@@ -298,10 +298,12 @@ export function InvoiceSendEmailDialog({
               disabled={!statementId}
               onClick={() => setAuditOpen(true)}
             >
+              <History />
               {t('invoices.actionEmailAuditTitle')}
             </Button>
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+                <X />
                 {t('common.cancel')}
               </Button>
               <Button

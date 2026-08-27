@@ -110,14 +110,20 @@ export function InvoiceTtkDetailDialog({
   onOpenChange,
   statementId,
   invoiceLabel,
+  idBilling,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   statementId: number | null
   invoiceLabel: string
+  idBilling?: number | null
 }) {
   const { t } = useTranslation()
-  const { data, isLoading, isError, error } = useInvoiceTtkDetail(statementId, open)
+  const { data, isLoading, isError, error } = useInvoiceTtkDetail(
+    statementId,
+    open,
+    idBilling,
+  )
   const rows = data ?? []
 
   return (

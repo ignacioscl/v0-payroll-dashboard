@@ -1,9 +1,17 @@
+import { BadRequestException } from '@nestjs/common'
+
+import { isPunchIssueType } from '../punch-issue-types'
+
 /** Maps Issues page `selectedType` → punch-level SQL (mirrors TTKEmployeeDao::getWhere). */
 export function resolveGroupedIssueFilter(issueType?: string): {
   estado: number
   extraSql: string
 } {
-  const type = (issueType ?? 'all').trim()
+  const type = (issueType ?? 'all').trim() || 'all'
+
+  if (!isPunchIssueType(type)) {
+    throw new BadRequestException(`Invalid issueType: ${type}`)
+  }
 
   if (type === 'only_deletes') {
     return { estado: 0, extraSql: '' }

@@ -8,8 +8,29 @@ import { SrsContext } from './srs-auth-context.service'
 /** Legacy ROL_ACCION: Invoices module access (`show-rol-action-15`). */
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
 
+/** Legacy ROL_ACCION: Invoices > Create Invoice (`show-rol-action-16`). */
+export const ROL_ACCION_INVOICE_CREATE = 16
+
 /** Legacy ROL_ACCION: District filter in billing (`show-rol-action-69`). */
 export const ROL_ACCION_BILLING_DISTRICT = 69
+
+/** Invoices > Delete Generic Service — catalog soft-delete from the generic invoice modal. */
+export const ROL_ACCION_GENERIC_SERVICE_DELETE = 145
+
+/** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
+export const ROL_ACCION_TTK_ADMIN_HOURS = 65
+
+/** Delete / view deleted punches (legacy show-rol-action-68). */
+export const ROL_ACCION_DELETE_PUNCH = 68
+
+/** Edit payment type (legacy 105). */
+export const ROL_ACCION_EDIT_PAYMENT_TYPE = 105
+
+/** View payment type name (legacy 130). */
+export const ROL_ACCION_VIEW_PAYMENT_TYPE = 130
+
+/** Edit payment type without viewing amounts (legacy 136). */
+export const ROL_ACCION_EDIT_PAYMENT_TYPE_ALT = 136
 
 /**
  * Port parcial de `PayrollPermissionService::userHasRolAccion` /
@@ -17,12 +38,11 @@ export const ROL_ACCION_BILLING_DISTRICT = 69
  * con `idRolLeftJoin` + `existe === 1`.
  *
  * No lista todas las acciones: sólo responde si el usuario tiene UNA acción.
+ * Sin cache de instancia: este provider es singleton, un Map acá no es "por
+ * request" y un permiso recién asignado no tomaría efecto hasta reiniciar Nest.
  */
 @Injectable()
 export class SrsPermissionRepository {
-  /** Cache por request (mismo idUsuario + accionId). */
-  private readonly cache = new Map<string, boolean>()
-
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
   async userHasRolAccion(ctx: SrsContext, accionId: number): Promise<boolean> {
@@ -31,10 +51,6 @@ export class SrsPermissionRepository {
 
     // Paridad con isSystemAdmin PHP: Admin General (1) / Admin Company (2).
     if (ctx.idRol === 1 || ctx.idRol === 2) return true
-
-    const key = `${ctx.idUsuario}:${id}`
-    const hit = this.cache.get(key)
-    if (hit !== undefined) return hit
 
     // Mirror RolDao::loadRolAccion with idRolLeftJoin: EXISTS on ROL_ACCION_REL
     // plus the role `tipo` filter (ra.tipo = r.tipo OR ra.tipo IS NULL).
@@ -51,9 +67,7 @@ export class SrsPermissionRepository {
        LIMIT 1`,
       [id, ctx.idUsuario],
     )
-    const ok = rows.length > 0
-    this.cache.set(key, ok)
-    return ok
+    return rows.length > 0
   }
 
   async assertRolAccion(ctx: SrsContext, accionId: number): Promise<void> {

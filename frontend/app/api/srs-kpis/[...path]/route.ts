@@ -4,6 +4,8 @@ import { fetchBackend } from '@/lib/backend-upstream'
 
 type RouteContext = { params: Promise<{ path: string[] }> }
 
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
 /**
  * Proxy server-side al backend NestJS (KPIs). El browser pega acá (mismo origen),
  * y esta ruta reenvía a http://srs-backend:3020/api/srs/<path> con el token de PHP.
@@ -37,12 +39,29 @@ async function handle(request: NextRequest, context: RouteContext) {
     method: request.method,
     headers,
     body: hasBody ? await request.arrayBuffer() : undefined,
+    signal: request.signal,
   })
+
+  const contentType = upstream.headers.get('content-type') ?? 'application/json'
+  const contentDisposition = upstream.headers.get('content-disposition')
+  const isBinary =
+    contentType.includes('spreadsheetml') ||
+    contentType.includes(XLSX_MIME) ||
+    Boolean(contentDisposition)
+
+  if (isBinary && upstream.body) {
+    const out = new Headers()
+    out.set('Content-Type', contentType)
+    if (contentDisposition) out.set('Content-Disposition', contentDisposition)
+    const contentLength = upstream.headers.get('content-length')
+    if (contentLength) out.set('Content-Length', contentLength)
+    return new NextResponse(upstream.body, { status: upstream.status, headers: out })
+  }
 
   const buf = await upstream.arrayBuffer()
   return new NextResponse(buf, {
     status: upstream.status,
-    headers: { 'Content-Type': upstream.headers.get('content-type') ?? 'application/json' },
+    headers: { 'Content-Type': contentType },
   })
 }
 

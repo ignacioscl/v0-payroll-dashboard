@@ -4,12 +4,17 @@ import { SrsContext } from '../../auth/srs-auth-context.service'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PunchGroupedQueryDto, PunchGroupedResponseDto } from '../dto/punch-grouped.dto'
 import { GroupedPunchRepository } from '../repository/punch-grouped.repository'
+import { PunchAccessPolicyService } from '../punch-access-policy'
 
 @Injectable()
 export class GroupedPunchService {
-  constructor(@Inject(GroupedPunchRepository) private readonly repository: GroupedPunchRepository) {}
+  constructor(
+    @Inject(GroupedPunchRepository) private readonly repository: GroupedPunchRepository,
+    @Inject(PunchAccessPolicyService) private readonly policy: PunchAccessPolicyService,
+  ) {}
 
   async getGrouped(ctx: SrsContext, query: PunchGroupedQueryDto): Promise<PunchGroupedResponseDto> {
+    const access = await this.policy.assertAndResolve(ctx, query)
     const filter = buildSrsKpiFilter(ctx, query)
     return this.repository.getGrouped(filter, {
       page: query.page ?? 1,
@@ -23,6 +28,7 @@ export class GroupedPunchService {
       idEmployee: query.idEmployee,
       issueType: query.issueType,
       snapshotAt: query.snapshotAt,
+      includePaymentTypeName: access.canViewPaymentTypeName,
     })
   }
 }

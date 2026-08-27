@@ -46,11 +46,18 @@ export type InvoiceTtkDetailParams = {
   payed?: number | string | null
 }
 
-export function invoiceTtkDetailQueryKey(id: number | null) {
-  return ['invoice-ttk-detail', id] as const
+export function invoiceTtkDetailQueryKey(
+  id: number | null,
+  idBilling?: number | string | null,
+) {
+  return ['invoice-ttk-detail', id, idBilling ?? 0] as const
 }
 
-export function useInvoiceTtkDetail(id: number | null, enabled: boolean) {
+export function useInvoiceTtkDetail(
+  id: number | null,
+  enabled: boolean,
+  idBilling?: number | string | null,
+) {
   const apiRequest = useSrsApiRequest<
     undefined,
     InvoiceTtkDetailParams,
@@ -58,12 +65,13 @@ export function useInvoiceTtkDetail(id: number | null, enabled: boolean) {
   >(SrsPhpPath.INVOICE_TTK_DETAIL)
 
   return useQuery<InvoiceTtkDetailRow[]>({
-    queryKey: invoiceTtkDetailQueryKey(id),
+    queryKey: invoiceTtkDetailQueryKey(id, idBilling),
     enabled: enabled && id != null && id > 0,
     staleTime: 30_000,
     queryFn: async () => {
       const raw = await apiRequest.getCustom('', undefined, {
         id_invoice_statement: id!,
+        id_billing: idBilling ?? 0,
       })
       return assertSrsSuccess<InvoiceTtkDetailRow[]>(
         raw,

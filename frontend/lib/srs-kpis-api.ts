@@ -7,6 +7,7 @@ import {
 } from '@/lib/ttk/punch-grouped-filters'
 import {
   punchListParamsToSearchParams,
+  type PunchExportPrepareBody,
   type PunchListCursor,
   type PunchListQueryParams,
 } from '@/lib/ttk/punch-list-filters'
@@ -187,15 +188,49 @@ export const fetchCollectionsByMonth = (params: KpiQueryParams) =>
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)
 export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)
 
+async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
+  const text = await res.text()
+  let parsed: unknown = null
+  if (text) {
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      if (!res.ok) throw new Error(fallback)
+      throw new Error(fallback)
+    }
+  }
+  if (!res.ok) {
+    const obj =
+      parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+    const raw = obj?.message
+    let message = fallback
+    if (typeof raw === 'string' && raw.trim()) message = raw
+    else if (Array.isArray(raw) && raw.length) {
+      message = raw.filter(Boolean).join(', ')
+    }
+    const validations = obj?.validationErrors
+    if (Array.isArray(validations) && validations.length) {
+      const parts = validations
+        .map((item) => {
+          if (item && typeof item === 'object' && 'message' in item) {
+            return String((item as { message: unknown }).message ?? '')
+          }
+          return ''
+        })
+        .filter((part) => part.trim())
+      if (parts.length) message = parts.join(', ')
+    }
+    throw new Error(message)
+  }
+  return parsed as T
+}
+
 export async function fetchPunchGrouped(
   params: PunchGroupedQueryParams,
 ): Promise<PunchGroupedResponse> {
   const qs = punchGroupedParamsToSearchParams(params)
   const res = await fetch(`/api/srs-kpis/punch/grouped?${qs.toString()}`, { cache: 'no-store' })
-  if (!res.ok) {
-    throw new Error(`punch/grouped (${res.status})`)
-  }
-  return res.json() as Promise<PunchGroupedResponse>
+  return readNestJson<PunchGroupedResponse>(res, `punch/grouped (${res.status})`)
 }
 
 /**
@@ -218,8 +253,33 @@ export async function fetchPunchList(
 ): Promise<PunchListResponse> {
   const qs = punchListParamsToSearchParams(params)
   const res = await fetch(`/api/srs-kpis/punch/list?${qs.toString()}`, { cache: 'no-store' })
-  if (!res.ok) {
-    throw new Error(`punch/list (${res.status})`)
-  }
-  return res.json() as Promise<PunchListResponse>
+  return readNestJson<PunchListResponse>(res, `punch/list (${res.status})`)
+}
+
+export async function fetchPunchExportPrepare(
+  body: PunchExportPrepareBody,
+): Promise<{ ticket: string; expiresAt: string }> {
+  const res = await fetch('/api/srs-kpis/punch/list/export/prepare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify(body),
+  })
+  return readNestJson<{ ticket: string; expiresAt: string }>(
+    res,
+    `punch/list/export/prepare (${res.status})`,
+  )
+}
+
+export async function fetchPunchExportStatus(
+  ticket: string,
+): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string }> {
+  const qs = new URLSearchParams({ ticket })
+  const res = await fetch(`/api/srs-kpis/punch/list/export/status?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  return readNestJson<{
+    status: 'pending' | 'running' | 'done' | 'error'
+    errorMessage?: string
+  }>(res, `punch/list/export/status (${res.status})`)
 }

@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SortingState } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { ReceiptText } from 'lucide-react'
+import { Plus, ReceiptText } from 'lucide-react'
 
-import { PageHeading } from '@/components/layout/page-heading'
+import { GenericInvoiceDialog } from '@/components/billing/generic-invoice-dialog'
 import { InvoiceFilterDeck } from '@/components/billing/invoice-filter-deck'
+import { PageHeading } from '@/components/layout/page-heading'
+import { Button } from '@/components/ui/button'
+import { useGenericInvoiceConfig } from '@/hooks/use-generic-invoice'
 import { InvoiceSummaryStrip } from '@/components/billing/invoice-summary-strip'
 import { InvoiceListTable } from '@/components/billing/invoice-list-table'
 import { typesToCsv, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
@@ -15,10 +18,15 @@ import {
   idsToCsv,
   type InvoiceAdvancedFilterState,
 } from '@/lib/invoice-advanced-filters'
+import {
+  isInvoiceSearchLock,
+  type InvoiceDeletedMode,
+} from '@/lib/invoice-search-lock'
 import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
+import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
 
@@ -43,6 +51,8 @@ function formatUsDateRange(from: Date | undefined, to: Date | undefined): string
 
 export default function InvoicesPage() {
   const { t } = useTranslation()
+  const genericConfig = useGenericInvoiceConfig()
+  const [genericOpen, setGenericOpen] = useState(false)
   const {
     invoiceDateFrom,
     invoiceDateTo,
@@ -55,6 +65,9 @@ export default function InvoicesPage() {
   const [payed, setPayed] = useState<TriState>('0')
   const [sended, setSended] = useState<TriState>('all')
   const [hideZero, setHideZero] = useState(true)
+  const [ignorePeriod, setIgnorePeriod] = useState(false)
+  const [deleted, setDeleted] = useState<InvoiceDeletedMode>('hide')
+  const [employeeWorkedIds, setEmployeeWorkedIds] = useState<number[]>([])
   const [advanced, setAdvanced] = useState<InvoiceAdvancedFilterState>(EMPTY_ADVANCED_FILTERS)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -114,6 +127,38 @@ export default function InvoicesPage() {
     [invoiceDateFrom, invoiceDateTo],
   )
 
+  useEffect(() => {
+    if (!types.ttk && !types.generic) setEmployeeWorkedIds([])
+  }, [types.ttk, types.generic])
+
+  const searchLock = isInvoiceSearchLock({
+    search,
+    exactMatch: advanced.exactMatch,
+    employeeWorkedIds,
+  })
+  const ignorePeriodEffective = searchLock || ignorePeriod
+  const includeZeroEffective = searchLock || !hideZero
+  const deletedBeforeSearchLock = useRef<InvoiceDeletedMode>('hide')
+  const payedBeforeSearchLock = useRef<TriState>('0')
+  const wasSearchLock = useRef(false)
+
+  useEffect(() => {
+    if (searchLock && !wasSearchLock.current) {
+      deletedBeforeSearchLock.current = deleted
+      if (deleted !== 'all') setDeleted('all')
+      // Buscar por número de invoice tiene que traerla esté paga o impaga, como legacy:
+      // si no, buscás un número que existe y la grilla te dice que no hay nada sólo porque
+      // el filtro de pago quedó de la búsqueda anterior.
+      payedBeforeSearchLock.current = payed
+      if (payed !== 'all') setPayed('all')
+    } else if (!searchLock && wasSearchLock.current) {
+      setDeleted(deletedBeforeSearchLock.current)
+      setPayed(payedBeforeSearchLock.current)
+    }
+    wasSearchLock.current = searchLock
+    // Snapshot only on the lock edge; `deleted`/`payed` must not re-trigger the snap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchLock])
   const hasDealer = selectedDealers.length > 0
   const hasDates = Boolean(headerRange.fechaDesde && headerRange.fechaHasta)
   const ready = filtersHydrated && hasDealer && hasDates
@@ -142,7 +187,7 @@ export default function InvoicesPage() {
       // G8: check date implies Paid=Yes (legacy parity)
       payed: checkDate ? '1' : payed === 'all' ? undefined : payed,
       sended: sended === 'all' ? undefined : sended,
-      includeZero: !hideZero,
+      includeZero: includeZeroEffective,
       idDepartment: idsToCsv(advanced.departmentIds),
       idInvoiceService: idsToCsv(advanced.serviceIds),
       wo: advanced.woNumbers.length ? advanced.woNumbers.join(',') : undefined,
@@ -155,7 +200,9 @@ export default function InvoicesPage() {
       createdBySystem: advanced.createdBySystem ? 1 : undefined,
       exactMatch: advanced.exactMatch || undefined,
       dueOn: advanced.overdue || undefined,
-      showDeleted: advanced.showDeleted || undefined,
+      deleted,
+      employeeWorkedIn: idsToCsv(employeeWorkedIds),
+      ignorePeriod: ignorePeriodEffective || undefined,
       ...sortParams,
     }
   }, [
@@ -166,7 +213,10 @@ export default function InvoicesPage() {
     search,
     payed,
     sended,
-    hideZero,
+    includeZeroEffective,
+    deleted,
+    ignorePeriodEffective,
+    employeeWorkedIds,
     advanced.departmentIds,
     advanced.serviceIds,
     advanced.woNumbers,
@@ -176,7 +226,6 @@ export default function InvoicesPage() {
     advanced.createdBySystem,
     advanced.exactMatch,
     advanced.overdue,
-    advanced.showDeleted,
     roPo,
     stock,
     checkNumber,
@@ -184,7 +233,13 @@ export default function InvoicesPage() {
   ])
 
   const query = useInvoiceList(input, pageSize)
-  const summary = query.data?.pages[0]?.summary
+  const summaryQuery = useInvoiceSummary(input)
+  const summary = summaryQuery.data?.summary
+  // Money excludes deleted only in `all` (F.6): in `hide` there are none, and in
+  // `only` the amounts ARE the deleted ones, so the note would be misleading.
+  // Shared by the top strip and the table footer so the rule lives in one place.
+  const excludesDeleted =
+    deleted === 'all' && (summary?.deletedInList ?? 0) > 0
   const showSummary = ready
 
   return (
@@ -200,7 +255,16 @@ export default function InvoicesPage() {
         }
         icon={<ReceiptText />}
         variant="info"
+        actions={
+          genericConfig.data?.canCreate ? (
+            <Button type="button" onClick={() => setGenericOpen(true)}>
+              <Plus />
+              {t('invoices.generic.newButton')}
+            </Button>
+          ) : null
+        }
       />
+      <GenericInvoiceDialog open={genericOpen} onOpenChange={setGenericOpen} />
 
       <InvoiceFilterDeck
         types={types}
@@ -213,6 +277,13 @@ export default function InvoicesPage() {
         onSendedChange={setSended}
         hideZero={hideZero}
         onHideZeroChange={setHideZero}
+        ignorePeriod={ignorePeriod}
+        onIgnorePeriodChange={setIgnorePeriod}
+        deleted={deleted}
+        onDeletedChange={setDeleted}
+        employeeWorkedIds={employeeWorkedIds}
+        onEmployeeWorkedChange={setEmployeeWorkedIds}
+        searchLock={searchLock}
         advanced={advanced}
         onAdvancedChange={handleAdvancedChange}
         idDealer={idDealer}
@@ -222,7 +293,8 @@ export default function InvoicesPage() {
       {showSummary ? (
         <InvoiceSummaryStrip
           summary={summary}
-          isLoading={query.isFetching && !summary}
+          isLoading={summaryQuery.isFetching && !summary}
+          showExcludesDeleted={excludesDeleted}
         />
       ) : null}
 
@@ -243,6 +315,10 @@ export default function InvoicesPage() {
             : (idDealer.split(',')[0] ?? '')
         }
         payedFilter={payed === 'all' ? undefined : payed}
+        showExcludesDeleted={excludesDeleted}
+        summary={summary}
+        summaryTotal={summaryQuery.data?.total}
+        summaryLoading={summaryQuery.isFetching}
       />
     </div>
   )

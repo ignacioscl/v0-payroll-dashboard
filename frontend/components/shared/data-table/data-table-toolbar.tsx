@@ -39,6 +39,7 @@ interface DataTableToolbarProps<TData> {
   enableViewOptions?: boolean
   enableExport?: boolean
   exportFileName?: string
+  exportFormats?: Array<'xlsx' | 'csv'>
   fetchAllRowsForExport?: () => Promise<TData[]>
 
   pageSizeOptions?: number[]
@@ -72,6 +73,7 @@ export function DataTableToolbar<TData>({
   enableViewOptions = true,
   enableExport = true,
   exportFileName,
+  exportFormats,
   fetchAllRowsForExport,
   pageSizeOptions = [10, 25, 50, 100],
   includeAllPageSize = false,
@@ -305,6 +307,7 @@ export function DataTableToolbar<TData>({
             table={table}
             fileName={exportFileName}
             fetchAllRows={fetchAllRowsForExport}
+            formats={exportFormats}
           />
         )}
       </div>
