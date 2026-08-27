@@ -151,7 +151,11 @@ export function Header() {
                 />
               </div>
             ) : (
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                maxRangeYears={isIssuesPage ? 1 : undefined}
+              />
             )
           ) : null}
         </div>
@@ -250,7 +254,11 @@ export function Header() {
               ) : (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
-                  <DateRangePicker value={dateRange} onChange={setDateRange} />
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    maxRangeYears={isIssuesPage ? 1 : undefined}
+                  />
                 </div>
               )
             ) : null}

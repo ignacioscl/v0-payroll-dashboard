@@ -1,10 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+import { IsValidPunchDateRange } from '../punch-date-range'
+import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 
 export class PunchGroupedQueryDto extends SrsKpiQueryDto {
+  @ApiProperty({ description: 'Fecha hasta (YYYY-MM-DD)', example: '2026-04-30' })
+  @IsDateString()
+  @IsNotEmpty()
+  @IsValidPunchDateRange()
+  declare fechaHasta: string
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -65,12 +73,11 @@ export class PunchGroupedQueryDto extends SrsKpiQueryDto {
   idEmployee?: number
 
   @ApiPropertyOptional({
+    enum: PUNCH_ISSUE_TYPES,
     example: 'only_error',
-    description:
-      'all | only_error | only_error_clockout | only_error_break | manual_punch | only_deletes | without_salary | only_fixed',
   })
   @IsOptional()
-  @IsString()
+  @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
 
   /**

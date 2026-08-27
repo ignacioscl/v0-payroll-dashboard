@@ -3,19 +3,11 @@
 import * as React from 'react'
 import * as XLSX from 'xlsx'
 import type { Table } from '@tanstack/react-table'
-import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TOAST_DURATION_MS } from '@/lib/toast-config'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
 interface DataTableExportProps<TData> {
   table: Table<TData>
@@ -32,7 +24,7 @@ interface DataTableExportProps<TData> {
    * via the table; the caller is responsible for fetching every page.
    */
   fetchAllRows?: () => Promise<TData[]>
-  /** Defaults to both xlsx and csv. */
+  /** Kept for call-site compatibility. CSV was removed; only xlsx is written. */
   formats?: Array<'xlsx' | 'csv'>
 }
 
@@ -87,27 +79,23 @@ export function DataTableExport<TData>({
   fileName = 'export',
   exportAllColumns = true,
   fetchAllRows,
-  formats = ['xlsx', 'csv'],
 }: DataTableExportProps<TData>) {
   const { t } = useTranslation()
-  const [busy, setBusy] = React.useState<'csv' | 'xlsx' | null>(null)
+  const [busy, setBusy] = React.useState(false)
 
   const getRows = async (): Promise<TData[]> => {
     if (fetchAllRows) return fetchAllRows()
-    // Client-side: prefer filtered rows (sorted as currently visible).
     return table.getSortedRowModel().rows.map((r) => r.original)
   }
 
-  const handleExport = async (format: 'csv' | 'xlsx') => {
-    setBusy(format)
-    const formatLabel = format === 'xlsx' ? 'Excel' : 'CSV'
-    const toastId = toast(t('dataTable.generatingExport', { format: formatLabel }), {
-        duration: Infinity,
-        dismissible: true,
-        closeButton: true,
-        icon: <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />,
-      },
-    )
+  const handleExport = async () => {
+    setBusy(true)
+    const toastId = toast(t('dataTable.generatingExport', { format: 'Excel' }), {
+      duration: Infinity,
+      dismissible: true,
+      closeButton: true,
+      icon: <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />,
+    })
     try {
       const rows = await getRows()
       const records = rows.map((row) => rowToRecord(table, row, exportAllColumns))
@@ -116,7 +104,6 @@ export function DataTableExport<TData>({
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Data')
 
-      // Auto-fit column widths (bounded to a sane max)
       if (records.length > 0) {
         const headers = Object.keys(records[0]!)
         ws['!cols'] = headers.map((h) => ({
@@ -131,11 +118,7 @@ export function DataTableExport<TData>({
       }
 
       const stamp = todayStamp()
-      if (format === 'csv') {
-        XLSX.writeFile(wb, `${fileName}-${stamp}.csv`, { bookType: 'csv' })
-      } else {
-        XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`)
-      }
+      XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`)
       toast.success(t('common.exportSuccess', { count: records.length }), {
         id: toastId,
         duration: TOAST_DURATION_MS,
@@ -148,57 +131,26 @@ export function DataTableExport<TData>({
       // eslint-disable-next-line no-console
       console.error('[DataTableExport]', e)
     } finally {
-      setBusy(null)
+      setBusy(false)
     }
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1 px-2 text-[11px]"
-          disabled={busy !== null}
-          aria-label={busy ? t('common.exportInProgress') : t('common.export')}
-          aria-busy={busy !== null}
-        >
-          {busy ? (
-            <Loader2 className="size-3 animate-spin text-emerald-600" />
-          ) : (
-            <FileSpreadsheet className="size-3 text-emerald-600" />
-          )}
-          {busy ? t('common.exporting') : t('common.export')}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[180px]">
-        <DropdownMenuLabel className="text-xs">{t('common.download')}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={busy !== null}
-          onClick={() => void handleExport('xlsx')}
-        >
-          {busy === 'xlsx' ? (
-            <Loader2 className="mr-2 size-3.5 animate-spin text-emerald-600" />
-          ) : (
-            <FileSpreadsheet className="mr-2 size-3.5 text-emerald-600" />
-          )}
-          {t('dataTable.exportExcel')}
-        </DropdownMenuItem>
-        {formats.includes('csv') ? (
-          <DropdownMenuItem
-            disabled={busy !== null}
-            onClick={() => void handleExport('csv')}
-          >
-            {busy === 'csv' ? (
-              <Loader2 className="mr-2 size-3.5 animate-spin text-primary" />
-            ) : (
-              <FileText className="mr-2 size-3.5 text-primary" />
-            )}
-            {t('dataTable.exportCsv')}
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 gap-1 px-2 text-[11px]"
+      disabled={busy}
+      onClick={() => void handleExport()}
+      aria-label={busy ? t('common.exportInProgress') : t('common.export')}
+      aria-busy={busy}
+    >
+      {busy ? (
+        <Loader2 className="size-3 animate-spin text-emerald-600" />
+      ) : (
+        <FileSpreadsheet className="size-3 text-emerald-600" />
+      )}
+      {busy ? t('common.exporting') : t('common.export')}
+    </Button>
   )
 }

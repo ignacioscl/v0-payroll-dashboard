@@ -811,6 +811,8 @@ export interface Messages {
     exportGroupedWithDetailHint: string
     exportGroupedDetailWarning: string
     exportGroupedGenerating: string
+    exportGenerating: string
+    exportFrameTitle: string
     exportGroupedSheetName: string
     exportSheetSubtitle: string
     exportDetailSheetTitle: string
@@ -941,7 +943,6 @@ export interface Messages {
     afterDate: string
     onOrAfterDate: string
     exportExcel: string
-    exportCsv: string
     generatingExport: string
   }
   employeeSearch: {

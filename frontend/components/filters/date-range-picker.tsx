@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { Calendar } from 'lucide-react'
+import { Calendar, Check, X } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
 import { enUS as enUSDayPicker, es as esDayPicker } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,15 @@ import {
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getDateRangePresets } from '@/lib/i18n/label-helpers'
 
+/** Inclusive max `to` for a 1-year cap: day before the next anniversary of `from`. */
+export function maxInclusiveHastaFromDesde(from: Date): Date {
+  const anniversary = new Date(from.getFullYear() + 1, from.getMonth(), from.getDate())
+  const max = new Date(anniversary)
+  max.setDate(max.getDate() - 1)
+  max.setHours(23, 59, 59, 999)
+  return max
+}
+
 interface DateRangePickerProps {
   value?: DateRange
   onChange?: (range: DateRange | undefined) => void
@@ -29,6 +38,11 @@ interface DateRangePickerProps {
   numberOfMonths?: number
   /** Presets que se muestran en el panel lateral. Pasar [] para ocultarlos. */
   presets?: DateRangePreset[]
+  /**
+   * When 1, the user cannot pick a `to` after the day before the anniversary of `from`
+   * (Punch Report D8). Inherited ranges wider than that still display as-is.
+   */
+  maxRangeYears?: number
 }
 
 export function DateRangePicker({
@@ -38,6 +52,7 @@ export function DateRangePicker({
   className,
   numberOfMonths = 2,
   presets,
+  maxRangeYears,
 }: DateRangePickerProps) {
   const { t, locale } = useTranslation()
   const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
@@ -135,6 +150,11 @@ export function DateRangePicker({
               defaultMonth={draft?.from}
               numberOfMonths={numberOfMonths}
               locale={dayPickerLocale}
+              disabled={
+                maxRangeYears === 1 && draft?.from
+                  ? { after: maxInclusiveHastaFromDesde(draft.from) }
+                  : undefined
+              }
             />
             <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">
               <Button
@@ -143,9 +163,11 @@ export function DateRangePicker({
                 className="text-muted-foreground"
                 onClick={handleClear}
               >
+                <X />
                 {t('common.clear')}
               </Button>
               <Button size="sm" onClick={handleApply} disabled={!draft?.from}>
+                <Check />
                 {t('common.apply')}
               </Button>
             </div>

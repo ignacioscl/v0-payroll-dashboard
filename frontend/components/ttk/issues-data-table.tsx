@@ -19,10 +19,8 @@ import {
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
-import { fetchPunchList, type PunchListResponse } from '@/lib/srs-kpis-api'
 import {
   buildPunchListParams,
-  type PunchListCursor,
   type PunchListSort,
 } from '@/lib/ttk/punch-list-filters'
 import {
@@ -54,6 +52,7 @@ import { EditPunchDialog } from '@/components/ttk/edit-punch-dialog'
 import { PunchLogDialog } from '@/components/ttk/punch-log-dialog'
 import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
 import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
+import { PunchListExportButton } from '@/components/ttk/punch-list-export-button'
 import { PaymentTypeCell } from '@/components/ttk/payment-type-cell'
 import { EditPaymentTypeDialog, type EditPaymentTypeTarget } from '@/components/ttk/edit-payment-type-dialog'
 import { Button } from '@/components/ui/button'
@@ -748,29 +747,6 @@ export function IssuesDataTable({
     [isWideScreen, showActions],
   )
 
-  const fetchAllRowsForExport = React.useCallback(async (): Promise<TtkListRow[]> => {
-    if (!queryEnabled) return []
-
-    // Export por CURSOR, no por offset: si paginara por posición, exportar durante
-    // el pico de ponchado devolvería filas repetidas o faltantes, igual que la lista.
-    const exportPageSize = 500
-    const collected: TtkListRow[] = []
-    let cursor: PunchListCursor | null = null
-
-    do {
-      const page: PunchListResponse = await fetchPunchList({
-        ...listParams,
-        pageSize: exportPageSize,
-        afterValue: cursor?.value,
-        afterId: cursor?.id,
-      })
-      collected.push(...page.results)
-      cursor = page.hasMore ? page.nextCursor : null
-    } while (cursor)
-
-    return collected
-  }, [listParams, queryEnabled])
-
   const listQuery = usePunchListInfinite({
     queryKey: [
       'punch-list',
@@ -898,9 +874,13 @@ export function IssuesDataTable({
             ) : undefined
           }
           enableViewOptions
-          enableExport={enableExport}
+          enableExport={false}
+          toolbarTrailing={
+            enableExport ? (
+              <PunchListExportButton params={listParams} enabled={queryEnabled} />
+            ) : undefined
+          }
           exportFileName={exportFileName}
-          fetchAllRowsForExport={fetchAllRowsForExport}
           manualSorting
           sorting={sorting}
           onSortingChange={setSorting}

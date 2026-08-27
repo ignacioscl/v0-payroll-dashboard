@@ -17,6 +17,21 @@ export const ROL_ACCION_BILLING_DISTRICT = 69
 /** Invoices > Delete Generic Service — catalog soft-delete from the generic invoice modal. */
 export const ROL_ACCION_GENERIC_SERVICE_DELETE = 145
 
+/** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
+export const ROL_ACCION_TTK_ADMIN_HOURS = 65
+
+/** Delete / view deleted punches (legacy show-rol-action-68). */
+export const ROL_ACCION_DELETE_PUNCH = 68
+
+/** Edit payment type (legacy 105). */
+export const ROL_ACCION_EDIT_PAYMENT_TYPE = 105
+
+/** View payment type name (legacy 130). */
+export const ROL_ACCION_VIEW_PAYMENT_TYPE = 130
+
+/** Edit payment type without viewing amounts (legacy 136). */
+export const ROL_ACCION_EDIT_PAYMENT_TYPE_ALT = 136
+
 /**
  * Port parcial de `PayrollPermissionService::userHasRolAccion` /
  * `getPermissionIds` → `loadAssignedRolAccionesForRole` → `RolDao::loadRolAccion`

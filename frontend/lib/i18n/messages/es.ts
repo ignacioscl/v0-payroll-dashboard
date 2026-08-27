@@ -826,6 +826,8 @@ export const es: Messages = {
     exportGroupedDetailWarning:
       'Esta exportación descarga todas las ponchadas de cada empleado y puede tardar bastante más con equipos grandes.',
     exportGroupedGenerating: 'Generando exportación Excel…',
+    exportGenerating: 'Generando exportación…',
+    exportFrameTitle: 'Descarga del Punch Report',
     exportGroupedSheetName: 'Agrupado',
     exportSheetSubtitle: '{count} empleados',
     exportDetailSheetTitle: 'Ponchadas — {name}',
@@ -956,7 +958,6 @@ export const es: Messages = {
     afterDate: '> después de',
     onOrAfterDate: '≥ en o después de',
     exportExcel: 'Excel (.xlsx)',
-    exportCsv: 'CSV (.csv)',
     generatingExport: 'Generando exportación {format}…',
   },
   employeeSearch: {
