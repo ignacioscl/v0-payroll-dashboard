@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -38,6 +38,7 @@ import { PageHeading } from '@/components/layout/page-heading'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { TodayStatusSection } from '@/components/dashboard/today-status-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DashboardYesterdayIssuesTable } from '@/components/dashboard/dashboard-yesterday-issues-table'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkDashboardSummary } from '@/hooks/use-ttk-dashboard-summary'
@@ -45,6 +46,31 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getDashboardKpiTitle } from '@/lib/i18n/label-helpers'
+
+/**
+ * Claves que dibuja cada posición del toggle. Fuera del componente para que la
+ * referencia sea estable entre renders: el toggle sólo intercambia dataKeys, no
+ * vuelve a pedir datos.
+ */
+const TREND_DATA_KEYS = {
+  pending: {
+    clockOut: 'clock_out_missing',
+    breakMissing: 'break_missing',
+    shift20h: 'shift_20h_plus',
+  },
+  all: {
+    clockOut: 'clock_out_missing_all',
+    breakMissing: 'break_missing_all',
+    shift20h: 'shift_20h_plus_all',
+  },
+  solved: {
+    clockOut: 'clock_out_missing_fixed',
+    breakMissing: 'break_missing_fixed',
+    shift20h: 'shift_20h_plus_fixed',
+  },
+} as const
+
+type TrendMode = keyof typeof TREND_DATA_KEYS
 
 const COLORS = ['#ef4444', '#f59e0b', '#8b5cf6']
 
@@ -203,6 +229,9 @@ export default function DashboardPage() {
     return cards
   }, [canViewDeleted, t])
 
+  const [trendMode, setTrendMode] = useState<TrendMode>('pending')
+  const trendKeys = TREND_DATA_KEYS[trendMode]
+
   const trendData = useMemo(
     () =>
       summary.error_trend.map((point) => ({
@@ -320,12 +349,37 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-white to-primary/5">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-              {t('dashboard.errorTrend')}
-            </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                {t('dashboard.errorTrend')}
+              </CardTitle>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={trendMode}
+                onValueChange={(value) => {
+                  // Radix entrega '' al intentar destildar la opción activa:
+                  // se ignora para que siempre haya una posición elegida.
+                  if (value === 'pending' || value === 'all' || value === 'solved') {
+                    setTrendMode(value)
+                  }
+                }}
+              >
+                <ToggleGroupItem value="pending" className="cursor-pointer px-3 text-xs">
+                  {t('dashboard.errorTrendPending')}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="all" className="cursor-pointer px-3 text-xs">
+                  {t('dashboard.errorTrendAll')}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="solved" className="cursor-pointer px-3 text-xs">
+                  {t('dashboard.errorTrendSolved')}
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -375,7 +429,7 @@ export default function DashboardPage() {
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Area
                       type="monotone"
-                      dataKey="clock_out_missing"
+                      dataKey={trendKeys.clockOut}
                       name={t('dashboard.withoutClockOutChart')}
                       stroke="#ef4444"
                       strokeWidth={2}
@@ -383,7 +437,7 @@ export default function DashboardPage() {
                     />
                     <Area
                       type="monotone"
-                      dataKey="break_missing"
+                      dataKey={trendKeys.breakMissing}
                       name={t('dashboard.breakMissingChart')}
                       stroke="#f59e0b"
                       strokeWidth={2}
@@ -391,7 +445,7 @@ export default function DashboardPage() {
                     />
                     <Area
                       type="monotone"
-                      dataKey="shift_20h_plus"
+                      dataKey={trendKeys.shift20h}
                       name={t('dashboard.shift20hChart')}
                       stroke="#8b5cf6"
                       strokeWidth={2}

@@ -846,6 +846,9 @@ export interface Messages {
     withoutClockOutChart: string
     breakMissingChart: string
     shift20hChart: string
+    errorTrendPending: string
+    errorTrendAll: string
+    errorTrendSolved: string
     today: string
     todayStatus: string
     todayStatusSubtitle: string
