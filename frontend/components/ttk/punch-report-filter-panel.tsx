@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFilters } from '@/lib/filter-context'
+import { errorTypeLabel, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
 import {
   getDefaultDateRange,
   matchPreset,
@@ -127,6 +128,9 @@ export function PunchReportFilterPanel({
     setSelectedTodayLiveStatus,
     dateRange,
     setDateRange,
+    excludedErrorTypes,
+    toggleErrorType,
+    resetErrorTypes,
   } = useFilters()
 
   const [open, setOpen] = React.useState(true)
@@ -154,6 +158,19 @@ export function PunchReportFilterPanel({
 
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
+
+    // Un chip por tipo destildado. Sin esto el filtro queda activo, invisible y
+    // no removible: este panel arma sus propios chips y su propio Clear all, y
+    // `hasClearableFilters` sale justamente de esta lista.
+    for (const code of excludedErrorTypes) {
+      list.push({
+        key: `error-type-${code}`,
+        label: t('punch.errorTypeExcludedChip', {
+          type: errorTypeLabel(t, code as ErrorTypeCode),
+        }),
+        onRemove: () => toggleErrorType(code),
+      })
+    }
 
     const dateLabel = formatDateRangeLabel(dateRange?.from, dateRange?.to, t('common.today'))
     if (dateLabel && !isDefaultDateRange) {
@@ -238,6 +255,8 @@ export function PunchReportFilterPanel({
     selectedEmployee,
     selectedDealers.length,
     selectedType,
+    excludedErrorTypes,
+    toggleErrorType,
     selectedTodayLiveStatus,
     punchMinHours,
     punchMaxHours,
@@ -260,6 +279,9 @@ export function PunchReportFilterPanel({
     setSearch('')
     setSelectedEmployee(null)
     setSelectedType('all')
+    // Restaura los tres tipos incluidos de una. `clearFilters()` del contexto no
+    // se usa en ningún lado: el reset que el usuario ve es éste.
+    resetErrorTypes()
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     setDateRange(getDefaultDateRange())
     onPunchMinHoursChange('')
@@ -274,6 +296,7 @@ export function PunchReportFilterPanel({
     onPunchMinHoursChange,
     onPunchMaxHoursChange,
     onPaymentTypeFilterChange,
+    resetErrorTypes,
   ])
 
   React.useEffect(() => {

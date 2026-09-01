@@ -5,6 +5,7 @@ import {
   PAYMENT_TYPE_FILTER_ALL,
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
+import { errorTypesParam } from '@/lib/filters/error-types-cookie'
 
 export type PunchGroupedQueryParams = {
   fechaDesde: string
@@ -20,6 +21,8 @@ export type PunchGroupedQueryParams = {
   search?: string
   idEmployee?: number
   issueType?: string
+  /** CSV canónico de tipos incluidos. */
+  errorTypes?: string
   /**
    * Frontera superior congelada (`punch_in <= snapshotAt`).
    *
@@ -54,6 +57,7 @@ export function buildPunchGroupedParams(input: {
   maxHoursTotal?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
   snapshotAt?: string
+  includedErrorTypes?: readonly number[]
 }): PunchGroupedQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
@@ -87,6 +91,7 @@ export function buildPunchGroupedParams(input: {
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
+    errorTypes: errorTypesParam(input.includedErrorTypes),
     snapshotAt: input.snapshotAt,
   }
 }
@@ -109,6 +114,7 @@ export function punchGroupedParamsToSearchParams(
   if (params.search) qs.set('search', params.search)
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
+  if (params.errorTypes) qs.set('errorTypes', params.errorTypes)
   if (params.snapshotAt) qs.set('snapshotAt', params.snapshotAt)
   return qs
 }

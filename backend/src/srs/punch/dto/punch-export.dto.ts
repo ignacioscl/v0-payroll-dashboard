@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
 } from 'class-validator'
 
@@ -70,6 +71,16 @@ export class PunchExportPrepareDto {
   @IsOptional()
   @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
+
+  @ApiPropertyOptional({
+    description: 'Lista blanca de tipos de error (1,2,3). Ausente = 1,2,3.',
+    example: '1,3',
+  })
+  @IsOptional()
+  @Matches(/^[123](,[123]){0,2}$/, {
+    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  })
+  errorTypes?: string
 
   @ApiPropertyOptional({ enum: PUNCH_LIST_LIVE_STATUS })
   @IsOptional()

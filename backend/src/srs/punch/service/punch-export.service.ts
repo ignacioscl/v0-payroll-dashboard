@@ -30,6 +30,7 @@ import {
 } from '../punch-export-labels'
 import { writePunchExportWorkbook, type PunchExportMetaRow } from '../punch-export-xlsx'
 import { isPunchIssueType } from '../punch-issue-types'
+import { isDefaultErrorTypes, parseErrorTypes } from '../repository/punch-error-types'
 import type { PunchListRowDto } from '../dto/punch-list.dto'
 
 function ymdToUs(ymd: string): string {
@@ -64,7 +65,8 @@ export class PunchExportService {
       )
     }
     try {
-      await this.policy.assertAndResolve(ctx, body)
+      const errorTypes = parseErrorTypes(body.errorTypes).values
+      await this.policy.assertAndResolve(ctx, { ...body, errorTypes })
       return this.tickets.createPending(ctx.idUsuario, { ...body }, () => this.semaphore.release())
     } catch (e) {
       this.semaphore.release()
@@ -107,7 +109,11 @@ export class PunchExportService {
     })
 
     try {
-      const access = await this.policy.assertAndResolve(ctx, filters)
+      // Misma lista que se validó en `prepare`: sale del ticket, no de un re-parseo
+      // de un raw distinto. Si esto se salteara, el xlsx tendría otro filtro que
+      // la pantalla y ningún test lo detectaría.
+      const errorTypes = parseErrorTypes(filters.errorTypes).values
+      const access = await this.policy.assertAndResolve(ctx, { ...filters, errorTypes })
       const filter = buildSrsKpiFilter(ctx, filters)
       const sqlOpts = {
         minHours: filters.minHours,
@@ -116,6 +122,8 @@ export class PunchExportService {
         search: filters.search,
         idEmployee: filters.idEmployee,
         issueType: filters.issueType,
+        errorTypes,
+        includeErrorType: access.includeErrorType,
         todayLiveStatus: filters.todayLiveStatus,
         includeAmounts: false,
         includePaymentTypeName: access.canViewPaymentTypeName,
@@ -217,6 +225,12 @@ export class PunchExportService {
       ? labels.issueTypeLabels[issueType]
       : issueType
 
+    // Nombres visibles de los tipos incluidos; "All" cuando están los tres.
+    const includedErrorTypes = parseErrorTypes(filters.errorTypes).values
+    const errorTypesLabel = isDefaultErrorTypes(includedErrorTypes)
+      ? labels.all
+      : includedErrorTypes.map((t) => labels.errorTypeNames[t as 1 | 2 | 3]).join(', ')
+
     const liveLabel = filters.todayLiveStatus
       ? labels.liveStatusLabels[filters.todayLiveStatus] ?? filters.todayLiveStatus
       : labels.all
@@ -243,6 +257,7 @@ export class PunchExportService {
       { field: labels.dealers, value: dealerNames.length ? dealerNames.join(', ') : labels.all },
       { field: labels.employee, value: metaAll(labels, employeeName) },
       { field: labels.issueType, value: issueLabel },
+      { field: labels.errorTypes, value: errorTypesLabel },
       { field: labels.liveStatus, value: liveLabel },
       {
         field: labels.minHours,

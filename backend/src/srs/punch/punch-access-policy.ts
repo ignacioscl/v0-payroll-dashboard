@@ -13,12 +13,15 @@ import {
   SrsPermissionRepository,
 } from '../auth/srs-permission.repository'
 import { parseDealerIds, skipDealerRestrictionForRol } from '../shared/kpi/srs-kpi-dealer-filter'
+import { DEFAULT_ERROR_TYPES, isDefaultErrorTypes } from './repository/punch-error-types'
 
 export type PunchAccessQuery = {
   idDealer: string
   issueType?: string
   idPaymentType?: number
   idEmployee?: number
+  /** Forma canónica ya parseada (parseErrorTypes), no el string crudo. */
+  errorTypes?: readonly number[]
 }
 
 export type PunchAccessPolicy = {
@@ -26,6 +29,8 @@ export type PunchAccessPolicy = {
   canViewPaymentAmounts: boolean
   dealerIds: number[]
   skipDealerRestriction: boolean
+  /** `interno && lista parcial` — ver T.0.5 del plan. */
+  includeErrorType: boolean
 }
 
 @Injectable()
@@ -52,6 +57,15 @@ export class PunchAccessPolicyService {
       throw new ForbiddenException('External users can only view all punches.')
     }
 
+    const errorTypes = query.errorTypes ?? DEFAULT_ERROR_TYPES
+    const defaultErrorTypes = isDefaultErrorTypes(errorTypes)
+    if (ctx.isUserDealer && !defaultErrorTypes) {
+      throw new ForbiddenException('External users can only view all punches.')
+    }
+    // El código de error por fila sólo existe cuando hay algo que re-decidir, y
+    // nunca para un externo (que ni siquiera puede filtrar por tipo).
+    const includeErrorType = !ctx.isUserDealer && !defaultErrorTypes
+
     const canViewPaymentTypeName =
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_VIEW_PAYMENT_TYPE)) ||
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE)) ||
@@ -75,7 +89,13 @@ export class PunchAccessPolicyService {
       await this.assertEmployeeInScope(ctx, query.idEmployee, dealerIds, skipDealerRestriction)
     }
 
-    return { canViewPaymentTypeName, canViewPaymentAmounts, dealerIds, skipDealerRestriction }
+    return {
+      canViewPaymentTypeName,
+      canViewPaymentAmounts,
+      dealerIds,
+      skipDealerRestriction,
+      includeErrorType,
+    }
   }
 
   /**

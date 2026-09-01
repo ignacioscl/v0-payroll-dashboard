@@ -27,9 +27,11 @@ import {
   DollarSign,
   CheckCheck,
   Coffee,
+  Timer,
   LayoutList,
   Users,
 } from 'lucide-react'
+import { ERROR_TYPE_META } from '@/lib/ttk/error-type-meta'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
@@ -51,15 +53,35 @@ interface IssueCardConfig {
   variant: KPICardVariant
 }
 
+/**
+ * Tarjetas que siguen siendo filtro radio de un clic.
+ *
+ * Los tres tipos de error salieron de acá: ahora son incluir/excluir y se
+ * renderizan aparte (ERROR_TYPE_META). El 20h+ NUNCA entra a la unión
+ * `IssueType`: si entrara, rompe el `Record<IssueType,...>` exhaustivo de
+ * ISSUE_CARD_META y en runtime `counts[card.type].pending` sería
+ * `undefined.pending`, porque TtkIssueCountsData no tiene ese bucket.
+ */
 const ISSUE_CARD_TYPES: IssueType[] = [
   'only_error',
-  'only_error_clockout',
-  'only_error_break',
   'manual_punch',
   'only_deletes',
   'without_salary',
   'only_fixed',
 ]
+
+/** Ícono y variante de cada tipo de error, por código (no por posición). */
+const ERROR_TYPE_ICONS: Record<1 | 2 | 3, React.ReactNode> = {
+  1: <LogOut className="h-5 w-5" />,
+  2: <Coffee className="h-5 w-5" />,
+  3: <Timer className="h-5 w-5" />,
+}
+
+const ERROR_TYPE_VARIANTS: Record<1 | 2 | 3, KPICardVariant> = {
+  1: 'danger',
+  2: 'warning',
+  3: 'violet',
+}
 
 const ISSUE_CARD_META: Record<
   IssueType,
@@ -90,6 +112,10 @@ export default function IssuesPage() {
     setSelectedType,
     setSelectedTodayLiveStatus,
     filtersHydrated,
+    excludedErrorTypes,
+    includedErrorTypes,
+    toggleErrorType,
+    errorTypesReady,
   } = useFilters()
 
   const { user, hasPermission, loading: meLoading } = useSrsMe()
@@ -140,13 +166,21 @@ export default function IssuesPage() {
     )
   }, [canViewDeleted, t])
 
+  // Los contadores se piden SIEMPRE, incluso con los tres tipos destildados: son
+  // la única fuente del número real que muestra cada tarjeta tachada.
   const { counts, loading } = useTtkIssueCounts({
     search,
     selectedDealers,
     dateRange,
     selectedEmployeeId: selectedEmployee?.id ?? null,
     filtersHydrated,
+    includedErrorTypes,
+    errorTypesReady,
   })
+
+  const noErrorTypes = includedErrorTypes.length === 0
+
+  const isExcluded = (code: number) => excludedErrorTypes.includes(code)
 
   const selectFilter = (type: string) => {
     const next = selectedType === type ? 'all' : type
@@ -156,7 +190,14 @@ export default function IssuesPage() {
     }
   }
 
-  const totalPending = counts.only_error.pending
+  /**
+   * Con los tres tipos destildados el front NO manda `error_types` (un CSV vacío
+   * sería un 400), así que el backend devuelve los agregados COMPLETOS. La
+   * proyección a cero la hace el cliente: los contadores se siguen pidiendo
+   * porque `by_type` es la única fuente del número real que muestra cada
+   * tarjeta tachada.
+   */
+  const totalPending = noErrorTypes ? 0 : counts.only_error.pending
 
   const renderSubtitle = (type: IssueType): React.ReactNode => {
     if (type === 'only_error' && counts.only_error.by_type) {
@@ -223,7 +264,12 @@ export default function IssuesPage() {
                   <KPICard
                     key={card.type}
                     title={card.title}
-                    value={counts[card.type].pending}
+                    value={
+                      // "Only with errors" es el único agregado de esta lista que
+                      // depende de los tipos: con los tres destildados va a 0.
+                      // Los otros cuatro no miran tipo de error.
+                      card.type === 'only_error' ? totalPending : counts[card.type].pending
+                    }
                     icon={card.icon}
                     variant={card.variant}
                     loading={loading}
@@ -233,6 +279,28 @@ export default function IssuesPage() {
                     subtitle={renderSubtitle(card.type)}
                   />
                 ))}
+                {/*
+                  Las tres tarjetas de tipo de error ya NO filtran: incluyen o
+                  excluyen. El número que muestran es el real (by_type crudo),
+                  tachado cuando el tipo está destildado.
+                */}
+                {ERROR_TYPE_META.map((meta) => {
+                  const excluded = isExcluded(meta.code)
+                  return (
+                    <KPICard
+                      key={`error-type-${meta.code}`}
+                      title={t(meta.labelKey)}
+                      value={counts.only_error.by_type?.[meta.byTypeKey] ?? 0}
+                      icon={ERROR_TYPE_ICONS[meta.code]}
+                      variant={ERROR_TYPE_VARIANTS[meta.code]}
+                      loading={loading}
+                      filterCard
+                      onClick={() => toggleErrorType(meta.code)}
+                      active={!excluded}
+                      excluded={excluded}
+                    />
+                  )
+                })}
               </div>
             )
         }

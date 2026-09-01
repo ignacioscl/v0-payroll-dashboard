@@ -43,12 +43,32 @@ export function toPayrollScopeUser(
   }
 }
 
+/**
+ * Agrega `error_types` sólo cuando la lista es parcial.
+ *
+ * Va como helper explícito y NO adentro de `buildTtkScopeParams`: ese builder lo
+ * comparten counts, dashboard summary y `useTtkTodayStatus()`, que no tiene nada
+ * que ver con tipos de error — heredarlo le mandaría un parámetro ajeno y le
+ * ensuciaría la cache key.
+ */
+export function appendErrorTypesParam(
+  params: Record<string, string | number>,
+  includedErrorTypes?: readonly number[],
+): void {
+  if (!includedErrorTypes) return
+  // Lista completa => no se manda (compatibilidad). Lista vacía => tampoco: en ese
+  // caso el front directamente no pide filas, y un CSV vacío sería un 400.
+  if (includedErrorTypes.length === 0 || includedErrorTypes.length === 3) return
+  params.error_types = includedErrorTypes.join(',')
+}
+
 /** Maps header "issue type" filter to TTK datatable flags (ttk_main without group). */
 export function mapIssueTypeToTtkFlags(selectedType: string) {
   return {
     only_error: selectedType === 'only_error' ? 1 : 0,
     only_error_clockout: selectedType === 'only_error_clockout' ? 1 : 0,
     only_error_break: selectedType === 'only_error_break' ? 1 : 0,
+    only_error_20h: selectedType === 'only_error_20h' ? 1 : 0,
     manual_punch: selectedType === 'manual_punch' ? 1 : 0,
     only_deletes: selectedType === 'only_deletes' ? 1 : 0,
     without_salary: selectedType === 'without_salary' ? 1 : 0,
@@ -73,6 +93,8 @@ export function buildTtkListFilterExtra(input: {
   paymentTypeFilter?: PaymentTypeFilterValue
   todayLiveStatus?: string
   scopeUser?: PayrollScopeUser | null
+  /** Tipos incluidos (derivado de las exclusiones). Omitir = los tres. */
+  includedErrorTypes?: readonly number[]
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
@@ -96,6 +118,7 @@ export function buildTtkListFilterExtra(input: {
     only_error: flags.only_error,
     only_error_clockout: flags.only_error_clockout,
     only_error_break: flags.only_error_break,
+    only_error_20h: flags.only_error_20h,
     manual_punch: flags.manual_punch,
     only_deletes: flags.only_deletes,
     without_salary: withoutSalary,
@@ -105,6 +128,7 @@ export function buildTtkListFilterExtra(input: {
   }
 
   appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
+  appendErrorTypesParam(params, input.includedErrorTypes)
   if (employeeId != null) {
     params.id_employee = employeeId
   }

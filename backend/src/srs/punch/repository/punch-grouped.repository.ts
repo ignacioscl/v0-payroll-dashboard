@@ -26,6 +26,8 @@ export interface GroupedPunchOptions {
   /** Frontera superior congelada (`punch_in <= ?`) para que todas las páginas vean la misma foto. */
   snapshotAt?: string
   includePaymentTypeName?: boolean
+  /** Lista blanca de tipos de error. Default `[1,2,3]` = comportamiento de siempre. */
+  errorTypes?: readonly number[]
 }
 
 const SORTABLE_COLUMNS: Record<string, string> = {
@@ -42,7 +44,7 @@ export class GroupedPunchRepository {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
       filter
     const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
-    const issue = resolveGroupedIssueFilter(opts.issueType)
+    const issue = resolveGroupedIssueFilter(opts.issueType, opts.errorTypes)
 
     const paymentTypeFilterSql = opts.idPaymentType ? ' AND tew.id_payment_type = ?' : ''
     const paymentTypeParams = opts.idPaymentType ? [opts.idPaymentType] : []
@@ -119,11 +121,11 @@ export class GroupedPunchRepository {
          u.nombre                                                                  AS nombreEmployee,
          SUM(TTK_CALCULATE_TIME_DAY(1, tew.punch_out, tew.punch_in, tew.break_end, tew.break_start, 1)) AS hoursNumber,
          SUM(TTK_CALCULATE_TIME_DAY(1, tew.break_end, tew.break_start, NULL, NULL, 1))                  AS breakNumber,
-         MAX(CASE WHEN TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1, 2, 3) THEN 1 ELSE 0 END)          AS hasError,
+         MAX(CASE WHEN ${issue.markSql} THEN 1 ELSE 0 END)          AS hasError,
          NULLIF(
            GROUP_CONCAT(
              DISTINCT CASE
-               WHEN TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1, 2, 3)
+               WHEN ${issue.markSql}
                THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(TTK_PUNCH_WITH_ERROR(tew.id), '$.res')), '')
                ELSE NULL
              END
@@ -170,6 +172,7 @@ export class GroupedPunchRepository {
            AND tew.id_dealer_provider = ?
            ${ttk.and}
            AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+           ${snapshotSql}
            ${issue.extraSql}
            ${paymentTypeFilterSql}
            ${employeeSql}

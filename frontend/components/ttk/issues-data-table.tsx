@@ -18,6 +18,8 @@ import {
 } from '@/components/shared/data-table'
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
+import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { punchErrorVisible } from '@/lib/ttk/error-type-meta'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import {
   buildPunchListParams,
@@ -81,6 +83,9 @@ import type { DateRange } from 'react-day-picker'
 /** Pin Employee / Actions only at this width and above. */
 const TABLE_PIN_MIN_WIDTH = 1200
 
+/** Referencia estable para el vacío: evita re-render por identidad nueva. */
+const EMPTY_ROWS: TtkListRow[] = []
+
 export type IssuesDataTableProps = {
   /** Overrides header date range (e.g. dashboard yesterday-only). */
   dateRangeOverride?: DateRange
@@ -133,9 +138,15 @@ function roleLabel(row: TtkListRow): string {
   return parts.join(' / ')
 }
 
-function punchErrorLabel(row: TtkListRow): string | null {
-  const res = row.badPunch?.res?.trim()
-  return res ? res : null
+/**
+ * Texto del ⚠, o null si esta fila no debe marcarse.
+ *
+ * Con lista parcial el backend manda `errorType` y la marca se apaga para el
+ * tipo excluido: la ponchada sigue en el listado sin filtro, pero sin triángulo.
+ */
+function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
+  if (!punchErrorVisible(row, includedErrorTypes)) return null
+  return row.badPunch?.res?.trim() || null
 }
 
 function formatTimeWorkBreak(
@@ -206,7 +217,12 @@ export function IssuesDataTable({
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
+    includedErrorTypes,
+    errorTypesReady,
   } = useFilters()
+
+  // Con los tres tipos destildados no hay filas que pedir.
+  const noErrorTypes = includedErrorTypes.length === 0
 
   const effectiveDateRange = dateRangeOverride ?? dateRange
   const effectiveSelectedType = issueTypeOverride ?? selectedType
@@ -320,6 +336,7 @@ export function IssuesDataTable({
         maxHours: punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
         todayLiveStatus: selectedTodayLiveStatus,
+        includedErrorTypes,
       }),
     [
       effectiveSearch,
@@ -334,11 +351,14 @@ export function IssuesDataTable({
       punchMaxHours,
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
+      includedErrorTypes,
     ],
   )
 
   const queryEnabled =
     filtersHydrated &&
+    errorTypesReady &&
+    !noErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listParams.fechaDesde) &&
     Boolean(listParams.fechaHasta)
@@ -387,8 +407,8 @@ export function IssuesDataTable({
                   <span className="truncate font-medium">
                     {r.usuario?.nombre ?? '—'}
                   </span>
-                  {punchErrorLabel(r) ? (
-                    <PunchErrorIndicator errorText={punchErrorLabel(r)!} />
+                  {punchErrorLabel(r, includedErrorTypes) ? (
+                    <PunchErrorIndicator errorText={punchErrorLabel(r, includedErrorTypes)!} />
                   ) : null}
                   {Number(r.manualCreate) === 1 ? <PunchManualIndicator /> : null}
                   {r.fixedAt ? (
@@ -736,6 +756,8 @@ export function IssuesDataTable({
     getThumbnailUuid,
     handleThumbnailSaved,
     groupedHoursFormat,
+    // Sin esto las celdas quedan con el closure viejo y el ⚠ no se apaga.
+    includedErrorTypes,
     t,
   ])
 
@@ -765,15 +787,19 @@ export function IssuesDataTable({
       pageSize,
       listParams.sort,
       listParams.dir,
+      errorTypesQueryKey(includedErrorTypes),
     ],
     enabled: queryEnabled,
     params: listParams,
     staleTime: 2 * 60 * 1000,
   })
 
-  const rows = listQuery.rows
-  const total = listQuery.total
-  const isFetching = listQuery.isFetching
+  // Deshabilitar la query NO alcanza: `useDataTableQuery`/react-query conservan
+  // `placeholderData: keepPreviousData`, así que sin descartar el resultado acá
+  // quedarían pintadas las filas del universo anterior.
+  const rows = noErrorTypes ? EMPTY_ROWS : listQuery.rows
+  const total = noErrorTypes ? 0 : listQuery.total
+  const isFetching = noErrorTypes ? false : listQuery.isFetching
   const error =
     listQuery.error instanceof Error
       ? listQuery.error.message

@@ -709,6 +709,11 @@ export interface Messages {
     errorRate: string
     withoutClockOut: string
     withoutBreak: string
+    shift20h: string
+    excluded: string
+    clickToInclude: string
+    errorTypeExcludedChip: string
+    noErrorTypesIncluded: string
     withoutSalary: string
     deletedPlural: string
     correctedPlural: string

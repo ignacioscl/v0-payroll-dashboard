@@ -5,6 +5,7 @@ import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PunchListQueryDto, PunchListResponseDto } from '../dto/punch-list.dto'
 import { PunchListRepository } from '../repository/punch-list.repository'
 import { PunchAccessPolicyService } from '../punch-access-policy'
+import { parseErrorTypes } from '../repository/punch-error-types'
 
 @Injectable()
 export class PunchListService {
@@ -14,9 +15,14 @@ export class PunchListService {
   ) {}
 
   async getList(ctx: SrsContext, query: PunchListQueryDto): Promise<PunchListResponseDto> {
-    const access = await this.policy.assertAndResolve(ctx, query)
+    // Se parsea UNA vez, antes de la policy: de acá en adelante circula sólo la
+    // forma canónica; ningún consumidor vuelve a mirar el string crudo.
+    const errorTypes = parseErrorTypes(query.errorTypes).values
+    const access = await this.policy.assertAndResolve(ctx, { ...query, errorTypes })
     const filter = buildSrsKpiFilter(ctx, query)
     return this.repository.getList(filter, {
+      errorTypes,
+      includeErrorType: access.includeErrorType,
       pageSize: query.pageSize ?? 25,
       sort: query.sort,
       dir: query.dir,

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { IsValidPunchDateRange } from '../punch-date-range'
@@ -79,6 +79,16 @@ export class PunchGroupedQueryDto extends SrsKpiQueryDto {
   @IsOptional()
   @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
+
+  @ApiPropertyOptional({
+    description: 'Lista blanca de tipos de error (1,2,3). Ausente = 1,2,3.',
+    example: '1,3',
+  })
+  @IsOptional()
+  @Matches(/^[123](,[123]){0,2}$/, {
+    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  })
+  errorTypes?: string
 
   /**
    * Congela la frontera superior del período: `punch_in <= snapshotAt`.

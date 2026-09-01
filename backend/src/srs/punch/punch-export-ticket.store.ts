@@ -18,6 +18,8 @@ export type PunchExportStoredFilters = {
   search?: string
   idEmployee?: number
   issueType?: string
+  /** CSV canónico de la lista blanca; se guarda tal cual llegó al `prepare`. */
+  errorTypes?: string
   todayLiveStatus?: string
 }
 

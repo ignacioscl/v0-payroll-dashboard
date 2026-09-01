@@ -52,6 +52,38 @@ describe('PunchAccessPolicyService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
+  it('usuario externo con lista de tipos parcial da 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    await expect(
+      svc.assertAndResolve(ctx({ isUserDealer: true }), { ...BASE_QUERY, errorTypes: [1, 3] }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('usuario externo con lista default pasa, pero sin errorType en la fila', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const access = await svc.assertAndResolve(ctx({ isUserDealer: true }), {
+      ...BASE_QUERY,
+      errorTypes: [1, 2, 3],
+    })
+    expect(access.includeErrorType).toBe(false)
+  })
+
+  it('interno: includeErrorType sólo con lista parcial', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+
+    const withDefault = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, errorTypes: [1, 2, 3] })
+    expect(withDefault.includeErrorType).toBe(false)
+
+    const withoutParam = await svc.assertAndResolve(ctx(), BASE_QUERY)
+    expect(withoutParam.includeErrorType).toBe(false)
+
+    const partial = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, errorTypes: [1, 3] })
+    expect(partial.includeErrorType).toBe(true)
+  })
+
   it('idPaymentType o without_salary sin ver payment type da 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)

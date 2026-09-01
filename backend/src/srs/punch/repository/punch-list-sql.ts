@@ -13,6 +13,14 @@ export type PunchListSqlOpts = {
   todayLiveStatus?: PunchListLiveStatus
   includeAmounts?: boolean
   includePaymentTypeName?: boolean
+  /** Lista blanca de tipos de error. Default `[1,2,3]` = comportamiento de siempre. */
+  errorTypes?: readonly number[]
+  /**
+   * `interno && lista parcial`. Gobierna el campo `errorType` de la fila: con
+   * lista default la respuesta queda byte-idéntica a la de hoy, y a los externos
+   * nunca se les serializa la clasificación de error.
+   */
+  includeErrorType?: boolean
 }
 
 export type PunchListPageSqlOpts = PunchListSqlOpts & {
@@ -70,10 +78,15 @@ function dealerNameByProviderExpr(idDealerProvider: number): string {
 
 export function buildPunchListSelectFields(
   idDealerProvider: number,
-  opts: Pick<PunchListSqlOpts, 'includeAmounts' | 'includePaymentTypeName'>,
+  opts: Pick<PunchListSqlOpts, 'includeAmounts' | 'includePaymentTypeName' | 'includeErrorType'>,
 ): string {
   const includeAmounts = opts.includeAmounts === true
   const includePaymentTypeName = opts.includePaymentTypeName === true
+  // V2 hace un SELECT interno por invocación: sólo se paga cuando hace falta.
+  const errorTypeField =
+    opts.includeErrorType === true
+      ? `TTK_PUNCH_WITH_ERROR_V2(tew.id,'')       AS error_type,`
+      : ''
   const amountFields = includeAmounts
     ? `tew.hourly_rate                          AS hourly_rate,
   tew.type_payment                         AS type_payment,`
@@ -108,6 +121,7 @@ export function buildPunchListSelectFields(
   TTK_CALCULATE_TIME_DAY(1, tew.break_end, tew.break_start, NULL, NULL, 1)         AS number_break,
 
   TTK_PUNCH_WITH_ERROR(tew.id)             AS bad_punch,
+  ${errorTypeField}
 
   tew.id_punch_in_log_validation           AS id_punch_in_log_validation,
   tew.id_break_start_log_validation        AS id_break_start_log_validation,
@@ -152,7 +166,7 @@ export function buildPunchListFromWhere(
   const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
     filter
   const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
-  const issue = resolveGroupedIssueFilter(opts.issueType)
+  const issue = resolveGroupedIssueFilter(opts.issueType, opts.errorTypes)
 
   const paymentTypeSql = opts.idPaymentType ? ' AND tew.id_payment_type = ?' : ''
   const paymentTypeParams = opts.idPaymentType ? [opts.idPaymentType] : []

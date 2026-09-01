@@ -11,6 +11,10 @@ import {
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { useFilters } from '@/lib/filter-context'
+import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+
+/** Referencia estable para el vacío. */
+const EMPTY_GROUPED_ROWS: PunchGroupedRow[] = []
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
@@ -105,7 +109,11 @@ export function GroupedIssuesDataTable({
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
+    includedErrorTypes,
+    errorTypesReady,
   } = useFilters()
+
+  const noErrorTypes = includedErrorTypes.length === 0
 
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
@@ -161,6 +169,7 @@ export function GroupedIssuesDataTable({
         page: pageIndex + 1,
         pageSize,
         snapshotAt: pageIndex > 0 ? snapshotAtRef.current : undefined,
+        includedErrorTypes,
         sort:
           sortCol === 'employee'
             ? 'nombreEmployee'
@@ -185,11 +194,14 @@ export function GroupedIssuesDataTable({
       minHoursTotal,
       maxHoursTotal,
       paymentTypeFilter,
+      includedErrorTypes,
     ],
   )
 
   const queryEnabled =
     filtersHydrated &&
+    errorTypesReady &&
+    !noErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listExtra.fechaDesde) &&
     Boolean(listExtra.fechaHasta)
@@ -243,6 +255,10 @@ export function GroupedIssuesDataTable({
   React.useEffect(() => {
     setPageIndex(0)
     setRowSelection({})
+    // El snapshot congela la frontera superior de la paginación: si no se
+    // descarta al cambiar el filtro, la página 2 se pagina con la foto del
+    // universo anterior y mezcla dos conjuntos de datos.
+    snapshotAtRef.current = undefined
   }, [
     debouncedEmployeeSearch,
     debouncedDealers,
@@ -252,6 +268,7 @@ export function GroupedIssuesDataTable({
     maxHoursTotal,
     paymentTypeFilter,
     selectedEmployee?.id,
+    includedErrorTypes,
   ])
 
   const columns = React.useMemo<ColumnDef<PunchGroupedRow>[]>(
@@ -429,7 +446,13 @@ export function GroupedIssuesDataTable({
     [t, useHoursFormat],
   )
 
-  const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
+  const {
+    rows: rawRows,
+    total: rawTotal,
+    pageCount: rawPageCount,
+    isFetching: rawIsFetching,
+    error,
+  } = useDataTableQuery({
     adapter: groupedAdapter,
     queryKey: [
       'punch-grouped',
@@ -445,6 +468,9 @@ export function GroupedIssuesDataTable({
       maxHoursTotal,
       paymentTypeFilter,
       selectedEmployee?.id,
+      // Obligatorio: esta tabla pasa `extra: {}` a useDataTableQuery, así que el
+      // escape hatch que mete `extra` en la key no aplica acá.
+      errorTypesQueryKey(includedErrorTypes),
     ],
     queryFn: async () => {
       const res = await fetchPunchGrouped(listExtra)
@@ -462,6 +488,14 @@ export function GroupedIssuesDataTable({
     columns,
     extra: {},
   })
+
+  // `useDataTableQuery` fija `placeholderData: keepPreviousData`, así que
+  // `enabled:false` deja pintadas las filas del universo anterior. Con los tres
+  // tipos destildados hay que descartar el resultado en el borde de render.
+  const rows = noErrorTypes ? EMPTY_GROUPED_ROWS : rawRows
+  const total = noErrorTypes ? 0 : rawTotal
+  const pageCount = noErrorTypes ? 1 : rawPageCount
+  const isFetching = noErrorTypes ? false : rawIsFetching
 
   const paymentTypeLabels = React.useMemo(() => {
     const labels = new Set<string>()

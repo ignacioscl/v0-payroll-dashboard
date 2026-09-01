@@ -25,6 +25,9 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 
 const ttkListAdapter = createTtkListAdapter<TtkListRow>(mapTtkOrderBy)
 
+/** Referencia estable para el vacío. */
+const EMPTY_ROWS: TtkListRow[] = []
+
 function mapTtkOrderBy(): string {
   return 'tew.punch_in DESC'
 }
@@ -35,7 +38,8 @@ export function DashboardYesterdayIssuesTable() {
   const { user } = useSrsMe()
   const scopeUser = toPayrollScopeUser(user)
   const dateFnsLocale = locale === 'es' ? es : enUS
-  const { selectedDealers, filtersHydrated } = useFilters()
+  const { selectedDealers, filtersHydrated, includedErrorTypes, errorTypesReady } = useFilters()
+  const noErrorTypes = includedErrorTypes.length === 0
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
   const yesterdayRange = React.useMemo(() => getYesterdayOnlyDateRange(), [])
   const yesterdayLabel = React.useMemo(() => {
@@ -148,17 +152,26 @@ export function DashboardYesterdayIssuesTable() {
         dateRange: yesterdayRange,
         selectedType: 'only_error',
         scopeUser,
+        includedErrorTypes,
       }),
-    [debouncedDealers, yesterdayRange, scopeUser],
+    [debouncedDealers, yesterdayRange, scopeUser, includedErrorTypes],
   )
 
   const queryEnabled =
     filtersHydrated &&
+    errorTypesReady &&
+    !noErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listExtra.fecha_desde) &&
     Boolean(listExtra.fecha_hasta)
 
-  const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
+  const {
+    rows: rawRows,
+    total: rawTotal,
+    pageCount: rawPageCount,
+    isFetching: rawIsFetching,
+    error,
+  } = useDataTableQuery({
     adapter: ttkListAdapter,
     queryKey: [
       'ttk-list',
@@ -180,6 +193,12 @@ export function DashboardYesterdayIssuesTable() {
     columns,
     extra: listExtra,
   })
+
+  // keepPreviousData deja pintadas las filas viejas al deshabilitar la query.
+  const rows = noErrorTypes ? EMPTY_ROWS : rawRows
+  const total = noErrorTypes ? 0 : rawTotal
+  const pageCount = noErrorTypes ? 1 : rawPageCount
+  const isFetching = noErrorTypes ? false : rawIsFetching
 
   const emptyState = !filtersHydrated ? (
     <span className="text-xs text-muted-foreground">{t('common.loading')}</span>

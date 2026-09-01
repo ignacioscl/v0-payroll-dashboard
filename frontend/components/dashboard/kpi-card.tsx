@@ -41,6 +41,11 @@ interface KPICardProps {
   help?: ReactNode
   /** Valor completo al hacer click cuando `value` está abreviado (p. ej. $40.2k → $40,162). */
   valueFull?: string
+  /**
+   * Tipo de error destildado: borde punteado del color del tipo y número tachado.
+   * NO es "deshabilitada": la tarjeta sigue clickeable para volver a incluirlo.
+   */
+  excluded?: boolean
   className?: string
 }
 
@@ -59,6 +64,7 @@ export function KPICard({
   filterCard = false,
   help,
   valueFull,
+  excluded = false,
   className,
 }: KPICardProps) {
   const { t } = useTranslation()
@@ -183,7 +189,17 @@ export function KPICard({
         className,
       )}
     >
-      {active && filterCard ? (
+      {excluded ? (
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0 rounded-[14px] border-2 border-dashed',
+            config.activeBorder,
+          )}
+          aria-hidden
+        />
+      ) : null}
+
+      {active && filterCard && !excluded ? (
         <div
           className={cn(
             'absolute inset-x-0 top-0 h-[3px] rounded-t-[14px]',
@@ -269,13 +285,25 @@ export function KPICard({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className={cn(
-                  'font-bold text-foreground tracking-tight tabular-nums',
+                  'font-bold tracking-tight tabular-nums',
+                  // Tachado, NO 0: la tarjeta excluida sigue mostrando su número real.
+                  excluded ? 'text-muted-foreground line-through' : 'text-foreground',
                   filterCard ? 'text-[34px] leading-none' : compact ? 'text-3xl' : 'text-4xl',
                 )}
               >
                 {value}
               </motion.span>
             )}
+            {excluded ? (
+              <span className="ml-2 inline-flex flex-col leading-tight">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t('punch.excluded')}
+                </span>
+                <span className="mt-0.5 text-[10px] text-muted-foreground">
+                  {t('punch.clickToInclude')}
+                </span>
+              </span>
+            ) : null}
           </div>
 
           {(trend || subtitle) && (

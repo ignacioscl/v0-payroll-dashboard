@@ -41,6 +41,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DashboardYesterdayIssuesTable } from '@/components/dashboard/dashboard-yesterday-issues-table'
 import { useFilters } from '@/lib/filter-context'
+import { errorTypesWithState } from '@/lib/ttk/error-type-meta'
 import { useTtkDashboardSummary } from '@/hooks/use-ttk-dashboard-summary'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canDeletePunch } from '@/lib/auth/ttk-permissions'
@@ -74,6 +75,9 @@ type TrendMode = keyof typeof TREND_DATA_KEYS
 
 const COLORS = ['#ef4444', '#f59e0b', '#8b5cf6']
 
+/** Referencia estable para el ranking vacío. */
+const EMPTY_TOP_DEALERS: never[] = []
+
 type IssueType =
   | 'only_error'
   | 'only_error_clockout'
@@ -91,10 +95,13 @@ interface DashboardKpiConfig {
   getValue: (args: {
     totalPunches: number
     errorRate: number
+    /** Ya proyectado a 0 cuando no hay tipos incluidos. */
+    totalErrors: number
     counts: ReturnType<typeof useTtkDashboardSummary>['summary']['counts']
   }) => string | number
   subtitle?: (args: {
     totalPunches: number
+    totalErrors: number
     counts: ReturnType<typeof useTtkDashboardSummary>['summary']['counts']
   }) => React.ReactNode
 }
@@ -116,11 +123,21 @@ export default function DashboardPage() {
   const router = useRouter()
   const { t, locale } = useTranslation()
   const dateFnsLocale = locale === 'es' ? es : enUS
-  const { search, selectedDealers, dateRange, filtersHydrated, setSelectedType } = useFilters()
+  const {
+    search,
+    selectedDealers,
+    dateRange,
+    filtersHydrated,
+    setSelectedType,
+    includedErrorTypes,
+    errorTypesReady,
+  } = useFilters()
   const { user, hasPermission } = useSrsMe()
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
 
   const { summary, loading } = useTtkDashboardSummary({
+    includedErrorTypes,
+    errorTypesReady,
     search,
     selectedDealers,
     dateRange,
@@ -129,9 +146,15 @@ export default function DashboardPage() {
 
   const { counts } = summary
   const totalPunches = counts.total_punches ?? 0
-  const totalErrors = counts.only_error.pending
+  // Ver comentario en issues/page.tsx: con la lista vacía el backend responde con
+  // los agregados completos y la proyección a cero la hace el cliente.
+  const noErrorTypes = includedErrorTypes.length === 0
+  const totalErrors = noErrorTypes ? 0 : counts.only_error.pending
   const errorRate =
-    totalPunches > 0 ? Math.round((totalErrors / totalPunches) * 1000) / 10 : 0
+    !noErrorTypes && totalPunches > 0
+      ? Math.round((totalErrors / totalPunches) * 1000) / 10
+      : 0
+  const topDealers = noErrorTypes ? EMPTY_TOP_DEALERS : summary.top_dealers
 
   const kpiCards: DashboardKpiConfig[] = useMemo(() => {
     const cards: DashboardKpiConfig[] = [
@@ -141,8 +164,9 @@ export default function DashboardPage() {
         icon: <Hash className="h-7 w-7" />,
         variant: 'default',
         getValue: ({ totalPunches }) => totalPunches,
-        subtitle: ({ counts }) =>
-          t('punch.withErrorsInPeriod', { count: counts.only_error.pending }),
+        // Proyectado: con los tres tipos destildados el backend responde con el
+        // agregado completo y el cero lo pone el cliente.
+        subtitle: ({ totalErrors }) => t('punch.withErrorsInPeriod', { count: totalErrors }),
       },
       {
         key: 'only_error',
@@ -150,7 +174,7 @@ export default function DashboardPage() {
         icon: <AlertTriangle className="h-7 w-7" />,
         variant: 'warning',
         issueType: 'only_error',
-        getValue: ({ counts }) => counts.only_error.pending,
+        getValue: ({ totalErrors }) => totalErrors,
         subtitle: ({ counts }) => {
           const bt = counts.only_error.by_type
           if (!bt) return null
@@ -186,7 +210,11 @@ export default function DashboardPage() {
         title: getDashboardKpiTitle(t, 'only_error_clockout'),
         icon: <LogOut className="h-7 w-7" />,
         variant: 'danger',
-        issueType: 'only_error_clockout',
+        // Antes dejaba `only_error_clockout`: un filtro radio de un tipo que el
+        // usuario puede tener destildado. Se lleva a `only_error`, que sigue
+        // siendo un filtro valido, y asi la tarjeta conserva su accion (y con
+        // ella role=button, tabIndex, aria-pressed y el handler de teclado).
+        issueType: 'only_error',
         getValue: ({ counts }) => counts.only_error_clockout.pending,
       },
       {
@@ -231,6 +259,7 @@ export default function DashboardPage() {
 
   const [trendMode, setTrendMode] = useState<TrendMode>('pending')
   const trendKeys = TREND_DATA_KEYS[trendMode]
+  const isErrorTypeIncluded = (code: number) => includedErrorTypes.includes(code)
 
   const trendData = useMemo(
     () =>
@@ -243,32 +272,29 @@ export default function DashboardPage() {
     [summary.error_trend, dateFnsLocale],
   )
 
-  const issueDistribution = useMemo(() => {
+  /**
+   * Los tres tipos con su número REAL (by_type viene crudo) y su estado.
+   * Alimenta la leyenda, que conserva los tres y tacha el excluido: una leyenda
+   * automática no puede mostrar lo que no es slice.
+   */
+  const errorTypeSlices = useMemo(() => {
     const bt = counts.only_error.by_type
-    if (!bt || totalErrors === 0) return []
-    return [
-      {
-        type: 'clock_out_missing',
-        label: t('dashboard.withoutClockOutChart'),
-        count: bt.clock_out_missing,
-      },
-      {
-        type: 'break_missing',
-        label: t('dashboard.breakMissingChart'),
-        count: bt.break_missing,
-      },
-      {
-        type: 'shift_20h_plus',
-        label: t('dashboard.shift20hChart'),
-        count: bt.shift_20h_plus,
-      },
-    ]
-      .filter((d) => d.count > 0)
+    return errorTypesWithState(includedErrorTypes).map((meta) => ({
+      ...meta,
+      label: t(meta.chartLabelKey),
+      count: bt ? bt[meta.byTypeKey] : 0,
+    }))
+  }, [counts.only_error.by_type, includedErrorTypes, t])
+
+  const issueDistribution = useMemo(() => {
+    if (totalErrors === 0) return []
+    return errorTypeSlices
+      .filter((d) => d.included && d.count > 0)
       .map((d) => ({
         ...d,
         percentage: Math.round((d.count / totalErrors) * 100),
       }))
-  }, [counts.only_error.by_type, totalErrors, t])
+  }, [errorTypeSlices, totalErrors])
 
   const goToIssues = (issueType: IssueType) => {
     setSelectedType(issueType)
@@ -332,18 +358,27 @@ export default function DashboardPage() {
           kpiCards.length >= 8 ? '2xl:grid-cols-4' : ''
         }`}
       >
-        {kpiCards.map((card) => (
-          <KPICard
-            key={card.key}
-            title={card.title}
-            value={card.getValue({ totalPunches, errorRate, counts })}
-            subtitle={card.subtitle?.({ totalPunches, counts })}
-            icon={card.icon}
-            variant={card.variant}
-            loading={loading}
-            onClick={card.issueType ? () => goToIssues(card.issueType!) : undefined}
-          />
-        ))}
+        {kpiCards.map((card) => {
+          // La tarjeta de un tipo destildado muestra su número REAL (sale de
+          // by_type crudo) pero tachado y sin acción: si no, contradice al resto
+          // del tablero, que sí respeta la exclusión.
+          const cardExcluded = card.key === 'only_error_clockout' && !isErrorTypeIncluded(1)
+          return (
+            <KPICard
+              key={card.key}
+              title={card.title}
+              value={card.getValue({ totalPunches, errorRate, totalErrors, counts })}
+              subtitle={card.subtitle?.({ totalPunches, totalErrors, counts })}
+              icon={card.icon}
+              variant={card.variant}
+              loading={loading}
+              excluded={cardExcluded}
+              onClick={
+                card.issueType && !cardExcluded ? () => goToIssues(card.issueType!) : undefined
+              }
+            />
+          )
+        })}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -427,30 +462,40 @@ export default function DashboardPage() {
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Area
-                      type="monotone"
-                      dataKey={trendKeys.clockOut}
-                      name={t('dashboard.withoutClockOutChart')}
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      fill="url(#colorClockOut)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey={trendKeys.breakMissing}
-                      name={t('dashboard.breakMissingChart')}
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      fill="url(#colorBreak)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey={trendKeys.shift20h}
-                      name={t('dashboard.shift20hChart')}
-                      stroke="#8b5cf6"
-                      strokeWidth={2}
-                      fill="url(#color20h)"
-                    />
+                    {/*
+                      Sólo se dibujan las series de los tipos incluidos; el color
+                      y el gradiente salen del tipo, no del orden.
+                    */}
+                    {isErrorTypeIncluded(1) && (
+                      <Area
+                        type="monotone"
+                        dataKey={trendKeys.clockOut}
+                        name={t('dashboard.withoutClockOutChart')}
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        fill="url(#colorClockOut)"
+                      />
+                    )}
+                    {isErrorTypeIncluded(2) && (
+                      <Area
+                        type="monotone"
+                        dataKey={trendKeys.breakMissing}
+                        name={t('dashboard.breakMissingChart')}
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        fill="url(#colorBreak)"
+                      />
+                    )}
+                    {isErrorTypeIncluded(3) && (
+                      <Area
+                        type="monotone"
+                        dataKey={trendKeys.shift20h}
+                        name={t('dashboard.shift20hChart')}
+                        stroke="#8b5cf6"
+                        strokeWidth={2}
+                        fill="url(#color20h)"
+                      />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -493,8 +538,13 @@ export default function DashboardPage() {
                       labelLine={false}
                       strokeWidth={0}
                     >
-                      {issueDistribution.map((entry, index) => (
-                        <Cell key={entry.type} fill={COLORS[index % COLORS.length]} />
+                      {/*
+                        El color sale del TIPO, no de la posición: antes era
+                        COLORS[index] sobre el array ya filtrado, así que al
+                        excluir clock-out el break se volvía rojo.
+                      */}
+                      {issueDistribution.map((entry) => (
+                        <Cell key={entry.code} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip
@@ -533,11 +583,11 @@ export default function DashboardPage() {
           <CardContent>
             {loading ? (
               <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-            ) : summary.top_dealers.length === 0 ? (
+            ) : topDealers.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('common.noDataToDisplay')}</p>
             ) : (
               <div className="space-y-4">
-                {summary.top_dealers.map((dealerItem, index) => (
+                {topDealers.map((dealerItem, index) => (
                   <motion.div
                     key={dealerItem.id_dealer}
                     className="flex items-center justify-between rounded-xl bg-muted/30 p-3 transition-colors hover:bg-muted/50"

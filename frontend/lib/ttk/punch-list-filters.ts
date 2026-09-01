@@ -6,6 +6,7 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
+import { errorTypesParam } from '@/lib/filters/error-types-cookie'
 
 /** Cursor keyset devuelto por el backend; el cliente lo reenvía tal cual. */
 export type PunchListCursor = {
@@ -31,6 +32,8 @@ export type PunchListQueryParams = {
   search?: string
   idEmployee?: number
   issueType?: string
+  /** CSV canónico de tipos incluidos. String ya joineado, nunca number[]. */
+  errorTypes?: string
   todayLiveStatus?: string
 }
 
@@ -53,6 +56,7 @@ export function buildPunchListParams(input: {
   maxHours?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
   todayLiveStatus?: string
+  includedErrorTypes?: readonly number[]
 }): PunchListQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
@@ -83,6 +87,7 @@ export function buildPunchListParams(input: {
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
+    errorTypes: errorTypesParam(input.includedErrorTypes),
     todayLiveStatus:
       input.todayLiveStatus && input.todayLiveStatus !== TODAY_LIVE_STATUS_ALL
         ? input.todayLiveStatus
@@ -107,6 +112,7 @@ export function punchListParamsToSearchParams(params: PunchListQueryParams): URL
   if (params.search) qs.set('search', params.search)
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
+  if (params.errorTypes) qs.set('errorTypes', params.errorTypes)
   if (params.todayLiveStatus) qs.set('todayLiveStatus', params.todayLiveStatus)
   return qs
 }
@@ -121,6 +127,8 @@ export type PunchExportPrepareBody = {
   search?: string
   idEmployee?: number
   issueType?: string
+  /** CSV canónico de tipos incluidos. String ya joineado, nunca number[]. */
+  errorTypes?: string
   todayLiveStatus?: string
 }
 
@@ -136,6 +144,7 @@ export function punchExportBodyFromListParams(params: PunchListQueryParams): Pun
     search: params.search,
     idEmployee: params.idEmployee,
     issueType: params.issueType,
+    errorTypes: params.errorTypes,
     todayLiveStatus: params.todayLiveStatus,
   }
 }

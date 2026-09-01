@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { SrsCursorDto, SrsCursorPagedResponseDto } from '../../shared/dto/srs-paged-response.dto'
@@ -98,6 +98,18 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   issueType?: string
 
   @ApiPropertyOptional({
+    description:
+      'Lista blanca de tipos de error (1=sin salida, 2=sin descanso, 3=turno 20h+). ' +
+      'Ausente = 1,2,3. Duplicados o tokens fuera de {1,2,3} => 400.',
+    example: '1,3',
+  })
+  @IsOptional()
+  @Matches(/^[123](,[123]){0,2}$/, {
+    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  })
+  errorTypes?: string
+
+  @ApiPropertyOptional({
     enum: PUNCH_LIST_LIVE_STATUS,
     description: 'Estado en vivo del día (tarjetas del Dashboard)',
   })
@@ -171,6 +183,14 @@ export class PunchListRowDto {
   dealer!: PunchListDealerDto | null
   @ApiPropertyOptional({ type: PunchListBadPunchDto, nullable: true })
   badPunch!: PunchListBadPunchDto | null
+
+  /**
+   * Codigo de TTK_PUNCH_WITH_ERROR_V2 (1 sin salida, 2 sin descanso, 3 turno 20h+).
+   * Sólo viaja cuando hay lista blanca parcial y el usuario es interno
+   * (`includeErrorType`); con lista default la respuesta queda como siempre.
+   */
+  @ApiPropertyOptional({ nullable: true, example: 2 })
+  errorType?: number | null
   @ApiPropertyOptional({ type: PunchListPaymentTypeDto, nullable: true })
   objPaymentType!: PunchListPaymentTypeDto | null
 

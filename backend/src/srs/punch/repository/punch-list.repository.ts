@@ -37,6 +37,8 @@ export interface PunchListOptions {
   todayLiveStatus?: PunchListLiveStatus
   includeAmounts: boolean
   includePaymentTypeName: boolean
+  errorTypes?: readonly number[]
+  includeErrorType?: boolean
 }
 
 @Injectable()
@@ -47,6 +49,7 @@ export class PunchListRepository {
     const flags = {
       includeAmounts: opts.includeAmounts,
       includePaymentTypeName: opts.includePaymentTypeName,
+      includeErrorType: opts.includeErrorType === true,
     }
     const page = buildPunchListPageSql(filter, opts)
 
@@ -124,6 +127,7 @@ export class PunchListRepository {
     return mapPunchListRow(raw, {
       includeAmounts: Boolean(opts.includeAmounts),
       includePaymentTypeName: Boolean(opts.includePaymentTypeName),
+      includeErrorType: Boolean(opts.includeErrorType),
     })
   }
 }
