@@ -21,11 +21,21 @@ import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
 import { formatGroupedHoursDisplay } from '@/lib/ttk/format-grouped-hours'
 import { buildPunchListParams } from '@/lib/ttk/punch-list-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
-import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
+import {
+  PAYMENT_TYPE_FILTER_ALL,
+  PAYMENT_TYPE_FILTER_WITHOUT,
+  type PaymentTypeFilterValue,
+} from '@/lib/ttk/payment-type-filter'
+import { useSrsDealers } from '@/hooks/use-srs-dealers'
+import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { GroupedPunchExportButton } from '@/components/ttk/grouped-punch-export-button'
-import type { PunchGroupedExportLabels } from '@/lib/ttk/punch-grouped-export'
+import type {
+  PunchGroupedExportLabels,
+  PunchGroupedReportInfo,
+} from '@/lib/ttk/punch-grouped-export'
+import { errorTypeLabel, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -117,6 +127,24 @@ export function GroupedIssuesDataTable({
 
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+
+  // Catálogos para los nombres VISIBLES del Report Info. Los dos hooks tienen
+  // query key fija, así que reusan lo que ya bajó el header: no piden de nuevo.
+  const { dealers } = useSrsDealers()
+  const { data: paymentTypeCatalog = [] } = usePaymentTypesCatalog(canViewPayment)
+
+  const dealerNameById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const d of dealers) map.set(String(d.id), d.label || String(d.id))
+    return map
+  }, [dealers])
+
+  const paymentTypeLabelForExport = React.useMemo(() => {
+    if (paymentTypeFilter === undefined || paymentTypeFilter === PAYMENT_TYPE_FILTER_ALL) return null
+    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) return t('punch.withoutPaymentType')
+    const opt = paymentTypeCatalog.find((o) => o.id === paymentTypeFilter)
+    return opt?.name ?? opt?.title ?? String(paymentTypeFilter)
+  }, [paymentTypeFilter, paymentTypeCatalog, t])
 
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
@@ -249,8 +277,60 @@ export function GroupedIssuesDataTable({
       exportingProgress: t('punch.exportGroupedGenerating'),
       exportSheetSubtitle: t('punch.exportSheetSubtitle'),
       exportDetailSheetTitle: t('punch.exportDetailSheetTitle'),
+      reportInfo: {
+        sheet: t('punch.exportReportInfoSheet'),
+        field: t('punch.exportField'),
+        value: t('punch.exportValue'),
+        report: t('punch.exportReport'),
+        generated: t('punch.exportGenerated'),
+        generatedBy: t('punch.exportGeneratedBy'),
+        screen: t('punch.exportScreen'),
+        screenValue: t('punch.exportScreenValue'),
+        mode: t('punch.exportMode'),
+        scope: t('punch.exportScope'),
+        period: t('punch.exportPeriod'),
+        until: t('punch.exportUntil'),
+        dealers: t('profile.dealer'),
+        employee: t('common.employee'),
+        paymentType: t('punch.paymentType'),
+        errorTypes: t('punch.errorTypesReportInfo'),
+        all: t('punch.exportAll'),
+      },
     }
   }, [t])
+
+  /**
+   * Nombres VISIBLES de los filtros, congelados al hacer clic en exportar.
+   * La regla prohíbe exportar ids o nombres técnicos, y esta grilla no tiene los
+   * catálogos: los baja la página y los pasa ya resueltos.
+   */
+  const buildReportInfo = React.useCallback((): PunchGroupedReportInfo => {
+    const all = t('punch.exportAll')
+    const dealerNames = selectedDealers
+      .map((id) => dealerNameById?.get(id) ?? id)
+      .filter(Boolean)
+    return {
+      generatedBy: user?.nombre ?? user?.email ?? '—',
+      // mode/scope los completa el botón, que es el que sabe qué eligió el usuario.
+      mode: '',
+      scope: '',
+      dealers: dealerNames.length > 0 ? dealerNames.join(', ') : all,
+      employee: selectedEmployee?.nombre ?? all,
+      paymentType: paymentTypeLabelForExport ?? all,
+      errorTypes:
+        includedErrorTypes.length === 3
+          ? all
+          : includedErrorTypes.map((c) => errorTypeLabel(t, c as ErrorTypeCode)).join(', '),
+    }
+  }, [
+    t,
+    user,
+    selectedDealers,
+    dealerNameById,
+    selectedEmployee,
+    paymentTypeLabelForExport,
+    includedErrorTypes,
+  ])
 
   React.useEffect(() => {
     setPageIndex(0)
@@ -630,12 +710,14 @@ export function GroupedIssuesDataTable({
               />
             </div>
             <GroupedPunchExportButton
-              disabled={!queryEnabled || rows.length === 0}
+              disabled={!queryEnabled || noErrorTypes || rows.length === 0}
               fileName="punch-grouped"
               groupedParamsBase={groupedParamsBase}
               punchListParams={punchListParams}
               includePaymentType={canViewPayment}
               buildLabels={buildExportLabels}
+              buildReportInfo={buildReportInfo}
+              includedErrorTypes={includedErrorTypes}
               selectedEmployeeIds={selectedEmployeeIds}
             />
           </>

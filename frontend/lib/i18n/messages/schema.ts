@@ -714,6 +714,23 @@ export interface Messages {
     clickToInclude: string
     errorTypeExcludedChip: string
     noErrorTypesIncluded: string
+    exportReportInfoSheet: string
+    exportField: string
+    exportValue: string
+    exportReport: string
+    exportGenerated: string
+    exportGeneratedBy: string
+    exportScreen: string
+    exportScreenValue: string
+    exportMode: string
+    exportScope: string
+    exportPeriod: string
+    exportUntil: string
+    exportAll: string
+    exportModeGrouped: string
+    exportModeDetail: string
+    exportInfoScopeAll: string
+    exportInfoScopeSelected: string
     withoutSalary: string
     deletedPlural: string
     correctedPlural: string

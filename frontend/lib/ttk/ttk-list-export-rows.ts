@@ -8,6 +8,8 @@ import {
 } from '@/lib/ttk/punch-method'
 import { formatDurationDisplay } from '@/lib/ttk/map-header-filters'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
+import { punchErrorVisible } from '@/lib/ttk/error-type-meta'
+import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 
 export type TtkListExportLabels = {
   employee: string
@@ -31,17 +33,23 @@ function roleLabel(row: TtkListRow): string {
   return [row.rolDpto.role, row.rolDpto.department].filter(Boolean).join(' / ')
 }
 
-function punchErrorLabel(row: TtkListRow): string | null {
-  const res = row.badPunch?.res?.trim()
-  return res ? res : null
+/**
+ * Misma regla que el ⚠ de la grilla (punchErrorVisible): con lista parcial el
+ * backend manda `errorType` y la marca se apaga para el tipo excluido. Sin esto
+ * la misma ponchada decía "No" en pantalla y "Yes" en el Excel.
+ */
+function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
+  if (!punchErrorVisible(row, includedErrorTypes)) return null
+  return row.badPunch?.res?.trim() || null
 }
 
 /** Flat row for XLS export — mirrors IssuesDataTable column export values. */
 export function ttkListRowToExportRecord(
   row: TtkListRow,
   labels: TtkListExportLabels,
-  options: { includePaymentType: boolean },
+  options: { includePaymentType: boolean; includedErrorTypes?: readonly number[] },
 ): Record<string, string | number> {
+  const included = options.includedErrorTypes ?? ALL_ERROR_TYPES
   const out: Record<string, string | number> = {
     [labels.employee]: row.usuario?.nombre ?? '',
     [labels.roleDept]: roleLabel(row),
@@ -65,7 +73,7 @@ export function ttkListRowToExportRecord(
     })(),
     [labels.timeWork]: formatDurationDisplay(row.timeWork),
     [labels.timeBreak]: formatDurationDisplay(row.timeBreak),
-    [labels.hasError]: punchErrorLabel(row) ? labels.yes : labels.no,
+    [labels.hasError]: punchErrorLabel(row, included) ? labels.yes : labels.no,
   }
 
   if (options.includePaymentType) {

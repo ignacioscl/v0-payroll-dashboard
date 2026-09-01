@@ -181,6 +181,46 @@ export function autoFitColumns(
   }
 }
 
+export type ReportInfoRow = { field: string; value: string }
+
+/**
+ * Hoja *Report Info*, PRIMERA del archivo (regla `xls-export-report-info`).
+ *
+ * Un archivo exportado circula por mail y se guarda meses: sin saber cuándo,
+ * quién y con qué filtros se generó, nadie puede verificarlo ni reproducirlo.
+ * Los filtros vacíos también van, como "All": que un filtro no aparezca es
+ * ambiguo, que diga "All" no lo es.
+ */
+export function writeReportInfoSheet(
+  workbook: ExcelJS.Workbook,
+  sheetName: string,
+  title: string,
+  columnLabels: { field: string; value: string },
+  rows: ReportInfoRow[],
+): void {
+  const ws = workbook.addWorksheet(sheetName, { views: [{ showGridLines: false }] })
+  const headerRow = applyTitleRow(ws, title, 2)
+
+  writeStyledDataRows(
+    ws,
+    [columnLabels.field, columnLabels.value],
+    rows.map((r) => [r.field, r.value]),
+    { headerRow },
+  )
+
+  // `addWorksheet` la agrega al final. ExcelJS ordena las hojas por `orderNo`
+  // (`get worksheets()` hace `.sort((a,b) => a.orderNo - b.orderNo)`), NO por el
+  // array que devuelve ese getter: mutar el array no cambia nada, porque el
+  // getter reconstruye y reordena en cada lectura. Se corren los orderNo.
+  // `orderNo` existe en runtime pero no está en los typings de exceljs.
+  type Ordered = { id: number; orderNo: number }
+  for (const other of workbook.worksheets) {
+    const o = other as unknown as Ordered
+    if (o.id !== ws.id) o.orderNo += 1
+  }
+  ;(ws as unknown as Ordered).orderNo = 0
+}
+
 export async function downloadExcelWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], {

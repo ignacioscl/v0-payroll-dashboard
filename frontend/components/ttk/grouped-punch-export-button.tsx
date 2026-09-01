@@ -30,7 +30,10 @@ import {
 } from '@/lib/ttk/punch-grouped-export'
 import type { PunchGroupedQueryParams } from '@/lib/ttk/punch-grouped-filters'
 import type { PunchListQueryParams } from '@/lib/ttk/punch-list-filters'
-import type { PunchGroupedExportLabels } from '@/lib/ttk/punch-grouped-export'
+import type {
+  PunchGroupedExportLabels,
+  PunchGroupedReportInfo,
+} from '@/lib/ttk/punch-grouped-export'
 
 export type GroupedPunchExportButtonProps = {
   disabled?: boolean
@@ -39,6 +42,10 @@ export type GroupedPunchExportButtonProps = {
   punchListParams: Omit<PunchListQueryParams, 'afterValue' | 'afterId' | 'idEmployee'>
   includePaymentType: boolean
   buildLabels: () => PunchGroupedExportLabels
+  /** Nombres visibles de los filtros para la hoja Report Info. */
+  buildReportInfo: () => PunchGroupedReportInfo
+  /** Tipos incluidos: gobierna la columna WITH ERRORS del detalle. */
+  includedErrorTypes?: readonly number[]
   selectedEmployeeIds: number[]
 }
 
@@ -100,6 +107,8 @@ export function GroupedPunchExportButton({
   punchListParams,
   includePaymentType,
   buildLabels,
+  buildReportInfo,
+  includedErrorTypes,
   selectedEmployeeIds,
 }: GroupedPunchExportButtonProps) {
   const { t } = useTranslation()
@@ -142,6 +151,14 @@ export function GroupedPunchExportButton({
       includePaymentType,
       labels: buildLabels(),
       fileName,
+      includedErrorTypes,
+      // El modo y el alcance los sabe este botón, no la grilla: se congelan acá,
+      // en el momento del clic, junto con el resto de los filtros.
+      reportInfo: {
+        ...buildReportInfo(),
+        mode: mode === 'detail' ? t('punch.exportModeDetail') : t('punch.exportModeGrouped'),
+        scope: scope === 'selected' ? t('punch.exportInfoScopeSelected') : t('punch.exportInfoScopeAll'),
+      },
       onProgress: (message) => {
         toast.loading(message, { id: toastId })
       },

@@ -8,8 +8,16 @@ import { ttkListRowToExportRecord, type TtkListExportLabels } from '@/lib/ttk/tt
 import {
   applyTitleRow,
   downloadExcelWorkbook,
+  writeReportInfoSheet,
   writeStyledDataRows,
+  type ReportInfoRow,
 } from '@/lib/excel/srs-xlsx-theme'
+import {
+  formatUsCalendarDate,
+  formatUsDateTimeForExport,
+  todayUsForFilename,
+} from '@/lib/format-us-datetime'
+import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 
 export type PunchGroupedExportLabels = TtkListExportLabels & {
   groupedSheet: string
@@ -18,6 +26,44 @@ export type PunchGroupedExportLabels = TtkListExportLabels & {
   exportSheetTitle?: string
   exportSheetSubtitle?: string
   exportDetailSheetTitle?: string
+  /** Etiquetas de la hoja Report Info. */
+  reportInfo: {
+    sheet: string
+    field: string
+    value: string
+    report: string
+    generated: string
+    generatedBy: string
+    screen: string
+    screenValue: string
+    mode: string
+    scope: string
+    period: string
+    until: string
+    dealers: string
+    employee: string
+    paymentType: string
+    errorTypes: string
+    all: string
+  }
+}
+
+/**
+ * Nombres VISIBLES de los filtros, congelados al hacer clic en exportar.
+ *
+ * La grilla no tiene los catálogos: los labels de dealer viven en el
+ * `useSrsDealers()` del header y el payment type llega como valor técnico. Por
+ * eso los baja la página y los pasa ya resueltos — la regla prohíbe exportar
+ * ids o nombres técnicos.
+ */
+export type PunchGroupedReportInfo = {
+  generatedBy: string
+  mode: string
+  scope: string
+  dealers: string
+  employee: string
+  paymentType: string
+  errorTypes: string
 }
 
 export type PunchGroupedExportMode = 'grouped' | 'detail'
@@ -34,6 +80,9 @@ export type PunchGroupedExportInput = {
   includePaymentType: boolean
   labels: PunchGroupedExportLabels
   fileName: string
+  reportInfo: PunchGroupedReportInfo
+  /** Tipos incluidos: gobierna la columna WITH ERRORS del detalle. */
+  includedErrorTypes?: readonly number[]
   onProgress?: (message: string) => void
 }
 
@@ -161,11 +210,55 @@ function buildGroupedSubtitle(
   fechaDesde?: string,
   fechaHasta?: string,
 ): string {
+  // Fechas US en TODO el archivo, no sólo en Report Info: con el formato ISO el
+  // subtítulo mezclaba convenciones dentro del mismo xlsx.
   const period =
-    fechaDesde && fechaHasta ? `${fechaDesde} → ${fechaHasta}` : undefined
+    fechaDesde && fechaHasta
+      ? `${formatUsCalendarDate(fechaDesde)} → ${formatUsCalendarDate(fechaHasta)}`
+      : undefined
   const countLabel = labels.exportSheetSubtitle?.replace('{count}', String(count)) ?? `${count}`
   const parts = [period, countLabel].filter(Boolean)
   return parts.join(' · ')
+}
+
+function buildStamp(
+  labels: PunchGroupedExportLabels,
+  info: PunchGroupedReportInfo,
+  generatedAt: Date,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+): string {
+  const period =
+    base.fechaDesde && base.fechaHasta
+      ? `${formatUsCalendarDate(base.fechaDesde)} ${labels.reportInfo.until} ${formatUsCalendarDate(base.fechaHasta)}`
+      : labels.reportInfo.all
+  return `${period} · ${info.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`
+}
+
+function buildReportInfoRows(
+  labels: PunchGroupedExportLabels,
+  info: PunchGroupedReportInfo,
+  generatedAt: Date,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+  employeeCount: number,
+): ReportInfoRow[] {
+  const r = labels.reportInfo
+  const period =
+    base.fechaDesde && base.fechaHasta
+      ? `${formatUsCalendarDate(base.fechaDesde)} ${r.until} ${formatUsCalendarDate(base.fechaHasta)}`
+      : r.all
+  return [
+    { field: r.report, value: `${labels.groupedSheet} (${employeeCount})` },
+    { field: r.generated, value: formatUsDateTimeForExport(generatedAt.toISOString()) },
+    { field: r.generatedBy, value: info.generatedBy },
+    { field: r.screen, value: r.screenValue },
+    { field: r.mode, value: info.mode },
+    { field: r.scope, value: info.scope },
+    { field: r.period, value: period },
+    { field: r.dealers, value: info.dealers },
+    { field: r.employee, value: info.employee },
+    { field: r.paymentType, value: info.paymentType },
+    { field: r.errorTypes, value: info.errorTypes },
+  ]
 }
 
 export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Promise<number> {
@@ -178,8 +271,12 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     includePaymentType,
     labels,
     fileName,
+    reportInfo,
+    includedErrorTypes = ALL_ERROR_TYPES,
     onProgress,
   } = input
+
+  const generatedAt = new Date()
 
   onProgress?.(labels.exportingProgress)
 
@@ -217,12 +314,18 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
   const title =
     labels.exportSheetTitle ??
     `${labels.groupedSheet} — ${groupedParamsBase.fechaDesde ?? ''} / ${groupedParamsBase.fechaHasta ?? ''}`
-  const subtitle = buildGroupedSubtitle(
-    labels,
-    groupedRows.length,
-    groupedParamsBase.fechaDesde,
-    groupedParamsBase.fechaHasta,
-  )
+  const subtitle = [
+    buildGroupedSubtitle(
+      labels,
+      groupedRows.length,
+      groupedParamsBase.fechaDesde,
+      groupedParamsBase.fechaHasta,
+    ),
+    // Sello corto también en la hoja principal.
+    `${reportInfo.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const headerRow = applyTitleRow(mainWs, title, headers.length, subtitle)
 
   const errorColIndex = headers.indexOf(labels.hasError) + 1
@@ -253,7 +356,7 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
 
       const punches = await fetchAllPunchesForEmployee(punchListParams, employee.idUsuario)
       const detailRecords = punches.map((p) =>
-        ttkListRowToExportRecord(p, labels, { includePaymentType }),
+        ttkListRowToExportRecord(p, labels, { includePaymentType, includedErrorTypes }),
       )
       const { headers: detailHeaders, rows: detailRows } = recordsToMatrix(
         detailRecords.length > 0
@@ -265,11 +368,15 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
       const detailTitle =
         labels.exportDetailSheetTitle?.replace('{name}', employee.nombreEmployee) ??
         employee.nombreEmployee
+      // Sello corto: la hoja tiene que sobrevivir a que alguien la copie sola.
       const detailHeaderRow = applyTitleRow(
         detailWs,
         detailTitle,
         Math.max(detailHeaders.length, 1),
-        `${punches.length} punches`,
+        [
+          `${punches.length} punches`,
+          buildStamp(labels, reportInfo, generatedAt, groupedParamsBase),
+        ].join(' · '),
       )
 
       const detailErrorCol = detailHeaders.indexOf(labels.hasError) + 1
@@ -281,8 +388,17 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     }
   }
 
-  const stamp = new Date().toISOString().slice(0, 10)
-  await downloadExcelWorkbook(workbook, `${fileName}-${stamp}.xlsx`)
+  writeReportInfoSheet(
+    workbook,
+    labels.reportInfo.sheet,
+    labels.reportInfo.sheet,
+    { field: labels.reportInfo.field, value: labels.reportInfo.value },
+    buildReportInfoRows(labels, reportInfo, generatedAt, groupedParamsBase, groupedRows.length),
+  )
+
+  // Filename en formato US: el ISO de toISOString() mezclaba convenciones y
+  // además usaba la fecha UTC, que de noche cae en el día siguiente.
+  await downloadExcelWorkbook(workbook, `${fileName}-${todayUsForFilename()}.xlsx`)
 
   return groupedRows.length
 }
