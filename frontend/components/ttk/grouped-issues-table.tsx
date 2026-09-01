@@ -11,7 +11,7 @@ import {
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { useFilters } from '@/lib/filter-context'
-import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
 
 /** Referencia estable para el vacío. */
 const EMPTY_GROUPED_ROWS: PunchGroupedRow[] = []
@@ -35,7 +35,7 @@ import type {
   PunchGroupedExportLabels,
   PunchGroupedReportInfo,
 } from '@/lib/ttk/punch-grouped-export'
-import { errorTypeLabel, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
+import { errorTypeLabel, isErrorIssueType, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -119,11 +119,16 @@ export function GroupedIssuesDataTable({
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
-    includedErrorTypes,
+    includedErrorTypes: storedIncludedErrorTypes,
     errorTypesReady,
   } = useFilters()
 
-  const noErrorTypes = includedErrorTypes.length === 0
+  // Ver comentario en issues-data-table: la lista blanca sólo rige bajo un filtro
+  // de error; con `all` la tabla trae todo y las tarjetas están inactivas.
+  const includedErrorTypes = isErrorIssueType(selectedType)
+    ? storedIncludedErrorTypes
+    : ALL_ERROR_TYPES
+  const emptyByErrorTypes = includedErrorTypes.length === 0
 
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
@@ -229,7 +234,7 @@ export function GroupedIssuesDataTable({
   const queryEnabled =
     filtersHydrated &&
     errorTypesReady &&
-    !noErrorTypes &&
+    !emptyByErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listExtra.fechaDesde) &&
     Boolean(listExtra.fechaHasta)
@@ -572,10 +577,10 @@ export function GroupedIssuesDataTable({
   // `useDataTableQuery` fija `placeholderData: keepPreviousData`, así que
   // `enabled:false` deja pintadas las filas del universo anterior. Con los tres
   // tipos destildados hay que descartar el resultado en el borde de render.
-  const rows = noErrorTypes ? EMPTY_GROUPED_ROWS : rawRows
-  const total = noErrorTypes ? 0 : rawTotal
-  const pageCount = noErrorTypes ? 1 : rawPageCount
-  const isFetching = noErrorTypes ? false : rawIsFetching
+  const rows = emptyByErrorTypes ? EMPTY_GROUPED_ROWS : rawRows
+  const total = emptyByErrorTypes ? 0 : rawTotal
+  const pageCount = emptyByErrorTypes ? 1 : rawPageCount
+  const isFetching = emptyByErrorTypes ? false : rawIsFetching
 
   const paymentTypeLabels = React.useMemo(() => {
     const labels = new Set<string>()
@@ -710,7 +715,7 @@ export function GroupedIssuesDataTable({
               />
             </div>
             <GroupedPunchExportButton
-              disabled={!queryEnabled || noErrorTypes || rows.length === 0}
+              disabled={!queryEnabled || rows.length === 0}
               fileName="punch-grouped"
               groupedParamsBase={groupedParamsBase}
               punchListParams={punchListParams}

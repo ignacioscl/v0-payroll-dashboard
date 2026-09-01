@@ -593,6 +593,7 @@ export interface Messages {
     systemAdmin: string
   }
   common: {
+    dontShowAgain: string
     cancel: string
     save: string
     apply: string
@@ -811,6 +812,13 @@ export interface Messages {
     filtersActive: string
     liveStatusToday: string
     filterByIssueType: string
+    errorTypesGroupTitle: string
+    errorTypesGroupHintOn: string
+    errorTypesGroupHintOff: string
+    onlyWithErrorsHint: string
+    errorTypeHintIncluded: string
+    errorTypeHintExcluded: string
+    errorTypeHintInactive: string
     clickCardToFilter: string
     withErrorsCount: string
     searchChip: string
@@ -871,6 +879,7 @@ export interface Messages {
     errorTrendPending: string
     errorTrendAll: string
     errorTrendSolved: string
+    errorTypesHint: string
     today: string
     todayStatus: string
     todayStatusSubtitle: string

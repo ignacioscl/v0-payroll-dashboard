@@ -18,8 +18,8 @@ import {
 } from '@/components/shared/data-table'
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
-import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
-import { punchErrorVisible } from '@/lib/ttk/error-type-meta'
+import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { isErrorIssueType, punchErrorVisible } from '@/lib/ttk/error-type-meta'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import {
   buildPunchListParams,
@@ -217,16 +217,25 @@ export function IssuesDataTable({
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
-    includedErrorTypes,
+    includedErrorTypes: storedIncludedErrorTypes,
     errorTypesReady,
   } = useFilters()
 
-  // Con los tres tipos destildados no hay filas que pedir.
-  const noErrorTypes = includedErrorTypes.length === 0
+
 
   const effectiveDateRange = dateRangeOverride ?? dateRange
   const effectiveSelectedType = issueTypeOverride ?? selectedType
   const effectiveSearch = ignoreSearch ? '' : search
+
+  /**
+   * La lista blanca sólo rige cuando el pedido filtra por error. Con `all` la
+   * tabla lista todas las ponchadas y las tres tarjetas están inactivas, así que
+   * no filtra ni apaga ningún ⚠.
+   */
+  const includedErrorTypes = isErrorIssueType(effectiveSelectedType)
+    ? storedIncludedErrorTypes
+    : ALL_ERROR_TYPES
+  const emptyByErrorTypes = includedErrorTypes.length === 0
 
   const [pageSize, setPageSize] = React.useState(defaultPageSize)
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -358,7 +367,7 @@ export function IssuesDataTable({
   const queryEnabled =
     filtersHydrated &&
     errorTypesReady &&
-    !noErrorTypes &&
+    !emptyByErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listParams.fechaDesde) &&
     Boolean(listParams.fechaHasta)
@@ -797,9 +806,9 @@ export function IssuesDataTable({
   // Deshabilitar la query NO alcanza: `useDataTableQuery`/react-query conservan
   // `placeholderData: keepPreviousData`, así que sin descartar el resultado acá
   // quedarían pintadas las filas del universo anterior.
-  const rows = noErrorTypes ? EMPTY_ROWS : listQuery.rows
-  const total = noErrorTypes ? 0 : listQuery.total
-  const isFetching = noErrorTypes ? false : listQuery.isFetching
+  const rows = emptyByErrorTypes ? EMPTY_ROWS : listQuery.rows
+  const total = emptyByErrorTypes ? 0 : listQuery.total
+  const isFetching = emptyByErrorTypes ? false : listQuery.isFetching
   const error =
     listQuery.error instanceof Error
       ? listQuery.error.message

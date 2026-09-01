@@ -17,6 +17,8 @@ import {
   LayoutDashboard,
   LogOut,
   Percent,
+  Coffee,
+  Timer,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -78,6 +80,19 @@ const COLORS = ['#ef4444', '#f59e0b', '#8b5cf6']
 /** Referencia estable para el ranking vacío. */
 const EMPTY_TOP_DEALERS: never[] = []
 
+/** Ícono y variante de cada tipo de error, por código (no por posición). */
+const DASH_ERROR_TYPE_ICONS: Record<1 | 2 | 3, React.ReactNode> = {
+  1: <LogOut className="h-5 w-5" />,
+  2: <Coffee className="h-5 w-5" />,
+  3: <Timer className="h-5 w-5" />,
+}
+
+const DASH_ERROR_TYPE_VARIANTS: Record<1 | 2 | 3, KPICardVariant> = {
+  1: 'danger',
+  2: 'warning',
+  3: 'violet',
+}
+
 type IssueType =
   | 'only_error'
   | 'only_error_clockout'
@@ -130,6 +145,7 @@ export default function DashboardPage() {
     filtersHydrated,
     setSelectedType,
     includedErrorTypes,
+    toggleErrorType,
     errorTypesReady,
   } = useFilters()
   const { user, hasPermission } = useSrsMe()
@@ -204,18 +220,6 @@ export default function DashboardPage() {
         issueType: 'only_error',
         getValue: ({ errorRate }) => `${errorRate}%`,
         subtitle: () => t('punch.errorsOverActive'),
-      },
-      {
-        key: 'only_error_clockout',
-        title: getDashboardKpiTitle(t, 'only_error_clockout'),
-        icon: <LogOut className="h-7 w-7" />,
-        variant: 'danger',
-        // Antes dejaba `only_error_clockout`: un filtro radio de un tipo que el
-        // usuario puede tener destildado. Se lleva a `only_error`, que sigue
-        // siendo un filtro valido, y asi la tarjeta conserva su accion (y con
-        // ella role=button, tabIndex, aria-pressed y el handler de teclado).
-        issueType: 'only_error',
-        getValue: ({ counts }) => counts.only_error_clockout.pending,
       },
       {
         key: 'manual_punch',
@@ -358,28 +362,65 @@ export default function DashboardPage() {
           kpiCards.length >= 8 ? '2xl:grid-cols-4' : ''
         }`}
       >
-        {kpiCards.map((card) => {
-          // La tarjeta de un tipo destildado muestra su número REAL (sale de
-          // by_type crudo) pero tachado y sin acción: si no, contradice al resto
-          // del tablero, que sí respeta la exclusión.
-          const cardExcluded = card.key === 'only_error_clockout' && !isErrorTypeIncluded(1)
-          return (
+        {/*
+          Estas siguen siendo deep-links a Issues. El filtro por tipo de error
+          vive en la fila de abajo, junto a los gráficos: acá no hay ninguna
+          tarjeta de un tipo puntual, así que no se pisan.
+        */}
+        {kpiCards.map((card) => (
+          <KPICard
+            key={card.key}
+            title={card.title}
+            value={card.getValue({ totalPunches, errorRate, totalErrors, counts })}
+            subtitle={card.subtitle?.({ totalPunches, totalErrors, counts })}
+            icon={card.icon}
+            variant={card.variant}
+            loading={loading}
+            onClick={card.issueType ? () => goToIssues(card.issueType!) : undefined}
+          />
+        ))}
+      </div>
+
+      {/*
+        Filtro del Dashboard, no un deep-link: estas tres NO navegan a Issues.
+        Clickearlas incluye/excluye el tipo y eso se refleja en las cards de
+        arriba y en los dos gráficos de abajo. Acá están siempre activas —a
+        diferencia de Punch Report, donde viven bajo `Only with errors`— porque
+        los widgets de error del Dashboard son siempre sobre errores.
+      */}
+      <section className="@container/dash-error-types">
+        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+          <h3 className="text-[13px] font-semibold text-foreground">
+            {t('punch.errorTypesGroupTitle')}
+          </h3>
+          <p className="text-[11px] text-muted-foreground">
+            {t('dashboard.errorTypesHint')}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 @[640px]/dash-error-types:grid-cols-3">
+          {errorTypeSlices.map((meta) => (
             <KPICard
-              key={card.key}
-              title={card.title}
-              value={card.getValue({ totalPunches, errorRate, totalErrors, counts })}
-              subtitle={card.subtitle?.({ totalPunches, totalErrors, counts })}
-              icon={card.icon}
-              variant={card.variant}
+              key={`dash-error-type-${meta.code}`}
+              title={t(meta.labelKey)}
+              value={meta.count}
+              icon={DASH_ERROR_TYPE_ICONS[meta.code]}
+              variant={DASH_ERROR_TYPE_VARIANTS[meta.code]}
               loading={loading}
-              excluded={cardExcluded}
-              onClick={
-                card.issueType && !cardExcluded ? () => goToIssues(card.issueType!) : undefined
+              filterCard
+              compact
+              onClick={() => toggleErrorType(meta.code)}
+              active={meta.included}
+              excluded={!meta.included}
+              hintKey="dashboard.error-types"
+              hint={
+                meta.included
+                  ? t('punch.errorTypeHintIncluded', { type: t(meta.labelKey) })
+                  : t('punch.errorTypeHintExcluded', { type: t(meta.labelKey) })
               }
             />
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-white to-primary/5">

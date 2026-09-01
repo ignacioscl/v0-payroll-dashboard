@@ -159,10 +159,12 @@ export function PunchReportFilterPanel({
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
 
-    // Un chip por tipo destildado. Sin esto el filtro queda activo, invisible y
-    // no removible: este panel arma sus propios chips y su propio Clear all, y
-    // `hasClearableFilters` sale justamente de esta lista.
-    for (const code of excludedErrorTypes) {
+    // Un chip por tipo destildado, SÓLO si la exclusión está aplicando: las tres
+    // tarjetas viven bajo `Only with errors` y sin ese filtro no hacen nada, así
+    // que un chip "X excluded" ahí sería un filtro que dice estar activo y no lo
+    // está. Sin el chip, en cambio, el filtro queda invisible y no removible:
+    // por eso va exactamente cuando aplica.
+    for (const code of selectedType === 'only_error' ? excludedErrorTypes : []) {
       list.push({
         key: `error-type-${code}`,
         label: t('punch.errorTypeExcludedChip', {

@@ -59,6 +59,24 @@ export function errorTypeLabel(t: TranslateFn, code: ErrorTypeCode): string {
 }
 
 /**
+ * ¿El pedido está filtrando POR error?
+ *
+ * Es lo que decide si "ningún tipo incluido" vacía la lista o no. Con `all` (o
+ * con un filtro que no es de error, como `manual_punch`) la lista sigue trayendo
+ * todas las ponchadas: excluir un tipo apaga el ⚠ y baja los contadores, pero
+ * **nunca saca filas**. El vacío sólo corresponde cuando pediste ver errores y
+ * no dejaste ninguno incluido.
+ */
+export function isErrorIssueType(issueType?: string): boolean {
+  return (
+    issueType === 'only_error' ||
+    issueType === 'only_error_clockout' ||
+    issueType === 'only_error_break' ||
+    issueType === 'only_error_20h'
+  )
+}
+
+/**
  * ¿Esta fila tiene que mostrar marca de error (⚠ / "Yes" en el export)?
  *
  * `errorType` sólo viaja cuando hay lista parcial y el usuario es interno

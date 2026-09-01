@@ -6,6 +6,9 @@ import { motion } from 'framer-motion'
 import { Check, HelpCircle, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { useDismissibleHint } from '@/lib/hooks/use-dismissible-hint'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 export type KPICardVariant =
@@ -46,6 +49,22 @@ interface KPICardProps {
    * NO es "deshabilitada": la tarjeta sigue clickeable para volver a incluirlo.
    */
   excluded?: boolean
+  /**
+   * Tarjeta grisada y sin acción: el control existe pero todavía no aplica.
+   * Los tipos de error viven bajo `Only with errors`; sin ese filtro no hacen
+   * nada, así que se muestran inactivos en vez de mentir que filtran.
+   */
+  inactive?: boolean
+  /**
+   * Texto que aparece al pasar el mouse por la tarjeta entera (no por un `?`).
+   * Es para explicar qué hace la tarjeta, que en las de filtro no es obvio.
+   */
+  hint?: ReactNode
+  /**
+   * Si viene, la ayuda trae un "no volver a mostrar" que se guarda en
+   * localStorage con esta clave. Sin `hintKey` la ayuda siempre se muestra.
+   */
+  hintKey?: string
   className?: string
 }
 
@@ -65,9 +84,13 @@ export function KPICard({
   help,
   valueFull,
   excluded = false,
+  inactive = false,
+  hint,
+  hintKey,
   className,
 }: KPICardProps) {
   const { t } = useTranslation()
+  const { dismissed: hintDismissed, dismiss: dismissHint } = useDismissibleHint(hintKey ?? '')
   const [valueExpanded, setValueExpanded] = useState(false)
 
   useEffect(() => {
@@ -153,7 +176,7 @@ export function KPICard({
 
   const isInteractive = typeof onClick === 'function'
 
-  return (
+  const card = (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -186,10 +209,11 @@ export function KPICard({
             : cn('border', config.border),
         !active && config.glow,
         isInteractive && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        inactive && 'pointer-events-none opacity-45 grayscale',
         className,
       )}
     >
-      {excluded ? (
+      {excluded && !inactive ? (
         <div
           className={cn(
             'pointer-events-none absolute inset-0 rounded-[14px] border-2 border-dashed',
@@ -199,7 +223,7 @@ export function KPICard({
         />
       ) : null}
 
-      {active && filterCard && !excluded ? (
+      {active && filterCard && !excluded && !inactive ? (
         <div
           className={cn(
             'absolute inset-x-0 top-0 h-[3px] rounded-t-[14px]',
@@ -287,14 +311,14 @@ export function KPICard({
                 className={cn(
                   'font-bold tracking-tight tabular-nums',
                   // Tachado, NO 0: la tarjeta excluida sigue mostrando su número real.
-                  excluded ? 'text-muted-foreground line-through' : 'text-foreground',
+                  excluded && !inactive ? 'text-muted-foreground line-through' : 'text-foreground',
                   filterCard ? 'text-[34px] leading-none' : compact ? 'text-3xl' : 'text-4xl',
                 )}
               >
                 {value}
               </motion.span>
             )}
-            {excluded ? (
+            {excluded && !inactive ? (
               <span className="ml-2 inline-flex flex-col leading-tight">
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {t('punch.excluded')}
@@ -389,5 +413,42 @@ export function KPICard({
         </div>
       )}
     </motion.div>
+  )
+
+  if (!hint) return card
+  if (hintKey && hintDismissed) return card
+
+  return (
+    // HoverCard y no Tooltip: un tooltip se cierra apenas el mouse sale del
+    // trigger, así que el "no volver a mostrar" sería inclickeable. HoverCard
+    // está pensado justamente para contenido interactivo en hover.
+    <HoverCard openDelay={250} closeDelay={120}>
+      {/* El trigger es la tarjeta entera, no un `?`. `inactive` la vuelve
+          pointer-events:none, así que ahí no abre — correcto: si no hace nada,
+          tampoco tiene que explicar que hace algo. */}
+      <HoverCardTrigger asChild>{card}</HoverCardTrigger>
+      <HoverCardContent
+        side="bottom"
+        align="start"
+        className="w-72 text-xs leading-relaxed text-muted-foreground"
+      >
+        <p className="mb-1 text-sm font-semibold text-foreground">{title}</p>
+        {hint}
+        {hintKey ? (
+          <label
+            className="mt-3 flex cursor-pointer items-center gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={false}
+              onCheckedChange={(v) => {
+                if (v) dismissHint()
+              }}
+            />
+            {t('common.dontShowAgain')}
+          </label>
+        ) : null}
+      </HoverCardContent>
+    </HoverCard>
   )
 }

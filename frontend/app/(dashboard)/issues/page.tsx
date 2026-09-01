@@ -32,6 +32,7 @@ import {
   Users,
 } from 'lucide-react'
 import { ERROR_TYPE_META } from '@/lib/ttk/error-type-meta'
+import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
@@ -166,6 +167,11 @@ export default function IssuesPage() {
     )
   }, [canViewDeleted, t])
 
+  const errorTypesActive = selectedType === 'only_error'
+  // La exclusión sólo cuenta bajo `Only with errors`; si no, los contadores
+  // muestran los números de siempre.
+  const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : ALL_ERROR_TYPES
+
   // Los contadores se piden SIEMPRE, incluso con los tres tipos destildados: son
   // la única fuente del número real que muestra cada tarjeta tachada.
   const { counts, loading } = useTtkIssueCounts({
@@ -174,13 +180,21 @@ export default function IssuesPage() {
     dateRange,
     selectedEmployeeId: selectedEmployee?.id ?? null,
     filtersHydrated,
-    includedErrorTypes,
+    includedErrorTypes: activeIncludedErrorTypes,
     errorTypesReady,
   })
 
-  const noErrorTypes = includedErrorTypes.length === 0
+  /**
+   * Las tres tarjetas de tipo viven DENTRO de `Only with errors`.
+   *
+   * Sin ese filtro la tabla lista todas las ponchadas, así que "excluir un tipo"
+   * no tiene sobre qué actuar: se muestran grisadas y sin efecto. Al prender
+   * `Only with errors` se activan, arrancan las tres tildadas (o con la
+   * exclusión guardada) y el usuario destilda la que no quiere ver.
+   */
+  const noErrorTypes = errorTypesActive && includedErrorTypes.length === 0
 
-  const isExcluded = (code: number) => excludedErrorTypes.includes(code)
+  const isExcluded = (code: number) => errorTypesActive && excludedErrorTypes.includes(code)
 
   const selectFilter = (type: string) => {
     const next = selectedType === type ? 'all' : type
@@ -259,7 +273,12 @@ export default function IssuesPage() {
           isExternal
             ? null
             : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              // Container queries, no media queries: lo que importa es el ancho
+              // del área de contenido, no el del viewport. Con el sidebar abierto
+              // el viewport puede tener 1540 y el panel sólo 1280.
+              // A partir de 1280 de ANCHO PROPIO las cinco entran en una fila.
+              <div className="@container/issue-cards space-y-5">
+              <div className="grid grid-cols-1 gap-3 @[640px]/issue-cards:grid-cols-2 @[900px]/issue-cards:grid-cols-4 @[1280px]/issue-cards:grid-cols-5">
                 {visibleIssueCards.map((card) => (
                   <KPICard
                     key={card.type}
@@ -277,13 +296,29 @@ export default function IssuesPage() {
                     onClick={() => selectFilter(card.type)}
                     active={selectedType === card.type}
                     subtitle={renderSubtitle(card.type)}
+                    hint={card.type === 'only_error' ? t('punch.onlyWithErrorsHint') : undefined}
+                    hintKey={card.type === 'only_error' ? 'issues.only-with-errors' : undefined}
                   />
                 ))}
-                {/*
-                  Las tres tarjetas de tipo de error ya NO filtran: incluyen o
-                  excluyen. El número que muestran es el real (by_type crudo),
-                  tachado cuando el tipo está destildado.
-                */}
+              </div>
+
+              {/*
+                Segundo grupo, con su propio encabezado: estas tres NO son un
+                filtro más de la lista, son un sub-filtro de `Only with errors`.
+                Sin ese filtro se ven grisadas, para que no parezca que filtran.
+              */}
+              <div>
+                <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                  <h4 className="text-[13px] font-semibold text-foreground">
+                    {t('punch.errorTypesGroupTitle')}
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    {errorTypesActive
+                      ? t('punch.errorTypesGroupHintOn')
+                      : t('punch.errorTypesGroupHintOff')}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 @[640px]/issue-cards:grid-cols-2 @[900px]/issue-cards:grid-cols-3">
                 {ERROR_TYPE_META.map((meta) => {
                   const excluded = isExcluded(meta.code)
                   return (
@@ -295,12 +330,23 @@ export default function IssuesPage() {
                       variant={ERROR_TYPE_VARIANTS[meta.code]}
                       loading={loading}
                       filterCard
-                      onClick={() => toggleErrorType(meta.code)}
-                      active={!excluded}
+                      onClick={errorTypesActive ? () => toggleErrorType(meta.code) : undefined}
+                      active={errorTypesActive && !excluded}
                       excluded={excluded}
+                      inactive={!errorTypesActive}
+                      hintKey="issues.error-types"
+                      hint={
+                        !errorTypesActive
+                          ? t('punch.errorTypeHintInactive')
+                          : excluded
+                            ? t('punch.errorTypeHintExcluded', { type: t(meta.labelKey) })
+                            : t('punch.errorTypeHintIncluded', { type: t(meta.labelKey) })
+                      }
                     />
                   )
                 })}
+                </div>
+              </div>
               </div>
             )
         }
