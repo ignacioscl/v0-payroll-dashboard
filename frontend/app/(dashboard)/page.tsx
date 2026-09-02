@@ -75,7 +75,8 @@ const TREND_DATA_KEYS = {
 
 type TrendMode = keyof typeof TREND_DATA_KEYS
 
-const COLORS = ['#ef4444', '#f59e0b', '#8b5cf6']
+// Los colores de los tipos de error viven en ERROR_TYPE_META, atados al código.
+// El array por posición que había acá era justo el que pintaba mal el donut.
 
 /** Referencia estable para el ranking vacío. */
 const EMPTY_TOP_DEALERS: never[] = []
@@ -91,6 +92,49 @@ const DASH_ERROR_TYPE_VARIANTS: Record<1 | 2 | 3, KPICardVariant> = {
   1: 'danger',
   2: 'warning',
   3: 'violet',
+}
+
+type ErrorTypeLegendSlice = {
+  code: number
+  label: string
+  color: string
+  included: boolean
+}
+
+/**
+ * Leyenda fija de los tres tipos, para el trend y el donut.
+ *
+ * La leyenda automática de recharts se arma con las series efectivamente
+ * dibujadas, así que el tipo excluido desaparecía del gráfico Y de la leyenda:
+ * quedaba un gráfico con menos cosas sin ninguna pista de que faltaba algo. Acá
+ * los tres quedan siempre y el excluido va tachado, que es lo mismo que hacen la
+ * tarjeta y el contador.
+ *
+ * Se pasa por `content` y no se renderiza suelto abajo para que recharts la siga
+ * midiendo y posicionando dentro del área del gráfico.
+ */
+function ErrorTypeLegend({ slices }: { slices: readonly ErrorTypeLegendSlice[] }) {
+  return (
+    <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px]">
+      {slices.map((s) => (
+        <li key={s.code} className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: s.color, opacity: s.included ? 1 : 0.3 }}
+          />
+          <span
+            className={
+              s.included
+                ? 'text-muted-foreground'
+                : 'text-muted-foreground/60 line-through decoration-1'
+            }
+          >
+            {s.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 type IssueType =
@@ -502,7 +546,10 @@ export default function DashboardPage() {
                         boxShadow: '0 10px 40px -10px rgb(0 0 0 / 0.15)',
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Legend
+                      content={<ErrorTypeLegend slices={errorTypeSlices} />}
+                      wrapperStyle={{ fontSize: '11px' }}
+                    />
                     {/*
                       Sólo se dibujan las series de los tipos incluidos; el color
                       y el gradiente salen del tipo, no del orden.
@@ -598,9 +645,7 @@ export default function DashboardPage() {
                       }}
                     />
                     <Legend
-                      formatter={(value) => (
-                        <span className="text-xs text-muted-foreground">{value}</span>
-                      )}
+                      content={<ErrorTypeLegend slices={errorTypeSlices} />}
                       wrapperStyle={{ fontSize: '11px' }}
                     />
                   </PieChart>

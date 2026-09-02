@@ -221,17 +221,28 @@ function buildGroupedSubtitle(
   return parts.join(' · ')
 }
 
+/**
+ * Período legible del reporte, en formato US.
+ *
+ * Único lugar donde se arma: título, sello y Report Info lo comparten. Antes el
+ * título tenía su propio fallback con las fechas ISO crudas, así que el mismo
+ * archivo mezclaba `2026-06-01` arriba y `06/01/2026` en la hoja de info.
+ */
+function periodLabel(
+  labels: PunchGroupedExportLabels,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+): string {
+  if (!base.fechaDesde || !base.fechaHasta) return labels.reportInfo.all
+  return `${formatUsCalendarDate(base.fechaDesde)} ${labels.reportInfo.until} ${formatUsCalendarDate(base.fechaHasta)}`
+}
+
 function buildStamp(
   labels: PunchGroupedExportLabels,
   info: PunchGroupedReportInfo,
   generatedAt: Date,
   base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
 ): string {
-  const period =
-    base.fechaDesde && base.fechaHasta
-      ? `${formatUsCalendarDate(base.fechaDesde)} ${labels.reportInfo.until} ${formatUsCalendarDate(base.fechaHasta)}`
-      : labels.reportInfo.all
-  return `${period} · ${info.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`
+  return `${periodLabel(labels, base)} · ${info.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`
 }
 
 function buildReportInfoRows(
@@ -242,10 +253,7 @@ function buildReportInfoRows(
   employeeCount: number,
 ): ReportInfoRow[] {
   const r = labels.reportInfo
-  const period =
-    base.fechaDesde && base.fechaHasta
-      ? `${formatUsCalendarDate(base.fechaDesde)} ${r.until} ${formatUsCalendarDate(base.fechaHasta)}`
-      : r.all
+  const period = periodLabel(labels, base)
   return [
     { field: r.report, value: `${labels.groupedSheet} (${employeeCount})` },
     { field: r.generated, value: formatUsDateTimeForExport(generatedAt.toISOString()) },
@@ -312,8 +320,7 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
   })
 
   const title =
-    labels.exportSheetTitle ??
-    `${labels.groupedSheet} — ${groupedParamsBase.fechaDesde ?? ''} / ${groupedParamsBase.fechaHasta ?? ''}`
+    labels.exportSheetTitle ?? `${labels.groupedSheet} — ${periodLabel(labels, groupedParamsBase)}`
   const subtitle = [
     buildGroupedSubtitle(
       labels,

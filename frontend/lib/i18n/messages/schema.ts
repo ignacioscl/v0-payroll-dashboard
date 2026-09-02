@@ -732,6 +732,7 @@ export interface Messages {
     exportModeDetail: string
     exportInfoScopeAll: string
     exportInfoScopeSelected: string
+    errorTypesReportInfo: string
     withoutSalary: string
     deletedPlural: string
     correctedPlural: string

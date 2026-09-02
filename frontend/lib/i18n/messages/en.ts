@@ -743,6 +743,7 @@ export const en: Messages = {
     exportModeDetail: 'Summary + detail per employee',
     exportInfoScopeAll: 'All employees',
     exportInfoScopeSelected: 'Selected employees',
+    errorTypesReportInfo: 'Error types',
     withoutSalary: 'Without salary',
     deletedPlural: 'Deleted punches',
     correctedPlural: 'Corrected punches',

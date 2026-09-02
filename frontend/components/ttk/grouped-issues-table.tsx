@@ -246,7 +246,14 @@ export function GroupedIssuesDataTable({
     return rest
   }, [listExtra])
 
-  /** Params del detalle por empleado del export (endpoint nuevo, paginado por cursor). */
+  /**
+   * Params del detalle por empleado del export (endpoint nuevo, paginado por cursor).
+   *
+   * La whitelist tiene que viajar acá también, no sólo en la query agrupada: sin
+   * ella el detalle traía las ponchadas de los tipos excluidos y, como el backend
+   * no serializa `errorType` con lista default, las marcaba WITH ERRORS = Yes.
+   * La pantalla decía 4 y el xlsx traía 6.
+   */
   const punchListParams = React.useMemo(
     () =>
       buildPunchListParams({
@@ -257,8 +264,9 @@ export function GroupedIssuesDataTable({
         selectedEmployeeId: null,
         pageSize: 500,
         todayLiveStatus: selectedTodayLiveStatus,
+        includedErrorTypes,
       }),
-    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus],
+    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus, includedErrorTypes],
   )
 
   const buildExportLabels = React.useCallback((): PunchGroupedExportLabels => {
