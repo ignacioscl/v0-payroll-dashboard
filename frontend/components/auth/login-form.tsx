@@ -13,6 +13,7 @@ import {
   BarChart3,
   AlertCircle,
   ExternalLink,
+  Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,9 +23,10 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 import { Logo } from '@/components/brand/logo'
 
 const FEATURE_KEYS = [
-  { icon: Clock, titleKey: 'auth.featureTimeTitle', descKey: 'auth.featureTimeDesc' },
+  { icon: Clock, titleKey: 'auth.featurePunchTitle', descKey: 'auth.featurePunchDesc' },
   { icon: Users, titleKey: 'auth.featureTeamTitle', descKey: 'auth.featureTeamDesc' },
-  { icon: BarChart3, titleKey: 'auth.featurePayrollTitle', descKey: 'auth.featurePayrollDesc' },
+  { icon: BarChart3, titleKey: 'auth.featureReportsTitle', descKey: 'auth.featureReportsDesc' },
+  { icon: Wallet, titleKey: 'auth.featureBillingTitle', descKey: 'auth.featureBillingDesc' },
 ] as const
 
 interface LoginFormProps {

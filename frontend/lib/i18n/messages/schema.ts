@@ -922,12 +922,14 @@ export interface Messages {
     appSubtitle: string
     heroTitle: string
     heroSubtitle: string
-    featureTimeTitle: string
-    featureTimeDesc: string
+    featurePunchTitle: string
+    featurePunchDesc: string
     featureTeamTitle: string
     featureTeamDesc: string
-    featurePayrollTitle: string
-    featurePayrollDesc: string
+    featureReportsTitle: string
+    featureReportsDesc: string
+    featureBillingTitle: string
+    featureBillingDesc: string
     welcomeBack: string
     signInPrompt: string
     usernameEmail: string
