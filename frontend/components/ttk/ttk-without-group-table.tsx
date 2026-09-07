@@ -289,12 +289,19 @@ export function TtkWithoutGroupTable() {
     })
     const csv = [headers, ...csvRows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
+    // Mismo recaudo que el resto de las bajadas: el anchor va al documento y el
+    // blob se suelta después, no en el mismo tick del click.
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = 'ttk-without-group.csv'
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => {
+      a.remove()
+      URL.revokeObjectURL(url)
+    }, 60_000)
   }
 
   const SortIcon = ({ field }: { field: SortField }) => {

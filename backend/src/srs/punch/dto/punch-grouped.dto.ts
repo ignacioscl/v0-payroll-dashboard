@@ -142,6 +142,15 @@ export class PunchGroupedRowDto {
   })
   errorSummary?: string | null
 
+  @ApiPropertyOptional({
+    example: [1, 2],
+    description:
+      'Corrected error types for this employee in the period (only_fixed mode). ' +
+      'Null in every other mode: there the column answers "does this employee have errors?", ' +
+      'and here it answers "what was corrected?".',
+  })
+  correctedTypes?: number[] | null
+
   @ApiProperty({ type: [PunchGroupedPaymentTypeRowDto] })
   byPaymentType!: PunchGroupedPaymentTypeRowDto[]
 }

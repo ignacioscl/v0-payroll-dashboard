@@ -48,12 +48,21 @@ export function ExportButton(props: ExportButtonProps) {
           ...rows,
         ].join('\n')
         const blob = new Blob([csv], { type: 'text/csv' })
+        // Anchor EN el documento y la URL del blob liberada después, no en el mismo
+        // tick: guardar el archivo es asíncrono y revocar enseguida deja la bajada
+        // a medio camino. Con un CSV chico casi nunca se nota; con un archivo
+        // grande el navegador recibe todos los bytes y no escribe nada.
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
         a.download = `${filename}.csv`
+        a.style.display = 'none'
+        document.body.appendChild(a)
         a.click()
-        URL.revokeObjectURL(url)
+        window.setTimeout(() => {
+          a.remove()
+          URL.revokeObjectURL(url)
+        }, 60_000)
       }
     } finally {
       setIsExporting(false)

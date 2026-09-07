@@ -14,6 +14,7 @@ import {
   DollarSign,
   Hand,
   Hash,
+  Info,
   LayoutDashboard,
   LogOut,
   Percent,
@@ -38,42 +39,92 @@ import {
 } from 'recharts'
 import { PageHeading } from '@/components/layout/page-heading'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
+import { ErrorStatusToggle } from '@/components/filters/error-status-toggle'
 import { TodayStatusSection } from '@/components/dashboard/today-status-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DashboardYesterdayIssuesTable } from '@/components/dashboard/dashboard-yesterday-issues-table'
 import { useFilters } from '@/lib/filter-context'
-import { errorTypesWithState } from '@/lib/ttk/error-type-meta'
+import { errorTypeMeta, errorTypesWithState } from '@/lib/ttk/error-type-meta'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTtkDashboardSummary } from '@/hooks/use-ttk-dashboard-summary'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getDashboardKpiTitle } from '@/lib/i18n/label-helpers'
+import { rangeStartsBeforeCorrectionsLog, type ErrorStatus } from '@/lib/ttk/error-status'
 
 /**
  * Claves que dibuja cada posición del toggle. Fuera del componente para que la
  * referencia sea estable entre renders: el toggle sólo intercambia dataKeys, no
  * vuelve a pedir datos.
  */
+/**
+ * El trend muestra SIEMPRE el total (pendientes + corregidos). El selector de tres
+ * posiciones se eliminó: el eje de estado es ahora el switch del header y gobierna
+ * cards y grillas, no la serie del gráfico.
+ *
+ * Las tres claves `_all` son las únicas que quedan dibujadas; las otras dos
+ * familias siguen viajando en la respuesta y alimentan el desglose del tooltip.
+ */
 const TREND_DATA_KEYS = {
-  pending: {
-    clockOut: 'clock_out_missing',
-    breakMissing: 'break_missing',
-    shift20h: 'shift_20h_plus',
-  },
-  all: {
-    clockOut: 'clock_out_missing_all',
-    breakMissing: 'break_missing_all',
-    shift20h: 'shift_20h_plus_all',
-  },
-  solved: {
-    clockOut: 'clock_out_missing_fixed',
-    breakMissing: 'break_missing_fixed',
-    shift20h: 'shift_20h_plus_fixed',
-  },
+  clockOut: 'clock_out_missing_all',
+  breakMissing: 'break_missing_all',
+  shift20h: 'shift_20h_plus_all',
 } as const
 
-type TrendMode = keyof typeof TREND_DATA_KEYS
+/** Las tres series del trend cuando hay más de un tipo incluido: total por tipo. */
+const TREND_SERIES = [
+  {
+    code: 1,
+    key: 'clockOut',
+    labelKey: 'dashboard.withoutClockOutChart',
+    stroke: '#ef4444',
+    gradient: 'colorClockOut',
+  },
+  {
+    code: 2,
+    key: 'breakMissing',
+    labelKey: 'dashboard.breakMissingChart',
+    stroke: '#f59e0b',
+    gradient: 'colorBreak',
+  },
+  {
+    code: 3,
+    key: 'shift20h',
+    labelKey: 'dashboard.shift20hChart',
+    stroke: '#8b5cf6',
+    gradient: 'color20h',
+  },
+] as const
+
+/** Gradientes del apilado de un solo tipo: sólido para corregidos, claro para pendientes. */
+const TREND_SOLO_GRADIENTS = {
+  1: { solid: 'colorClockOut', light: 'colorClockOutLight' },
+  2: { solid: 'colorBreak', light: 'colorBreakLight' },
+  3: { solid: 'color20h', light: 'color20hLight' },
+} as const
+
+/**
+ * Agregado de los tipos incluidos. El backend arma las tres con la misma lista
+ * blanca que las series por tipo, así que el apilado cierra con lo que se ve.
+ */
+const TREND_TOTAL_KEYS = {
+  all: 'total_errors_all',
+  pending: 'total_errors',
+  fixed: 'total_errors_fixed',
+} as const
+
+/** Por tipo: la clave del total, la de pendientes y la de corregidos. */
+const TREND_BREAKDOWN_KEYS = {
+  1: {
+    all: 'clock_out_missing_all',
+    pending: 'clock_out_missing',
+    fixed: 'clock_out_missing_fixed',
+  },
+  2: { all: 'break_missing_all', pending: 'break_missing', fixed: 'break_missing_fixed' },
+  3: { all: 'shift_20h_plus_all', pending: 'shift_20h_plus', fixed: 'shift_20h_plus_fixed' },
+} as const
 
 // Los colores de los tipos de error viven en ERROR_TYPE_META, atados al código.
 // El array por posición que había acá era justo el que pintaba mal el donut.
@@ -99,6 +150,8 @@ type ErrorTypeLegendSlice = {
   label: string
   color: string
   included: boolean
+  /** Punto hueco, para la mitad pendiente del apilado: en el gráfico va punteada. */
+  dashed?: boolean
 }
 
 /**
@@ -120,7 +173,11 @@ function ErrorTypeLegend({ slices }: { slices: readonly ErrorTypeLegendSlice[] }
         <li key={s.code} className="flex items-center gap-1.5">
           <span
             className="inline-block h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: s.color, opacity: s.included ? 1 : 0.3 }}
+            style={
+              s.dashed
+                ? { border: `1.5px dashed ${s.color}`, opacity: s.included ? 1 : 0.3 }
+                : { backgroundColor: s.color, opacity: s.included ? 1 : 0.3 }
+            }
           />
           <span
             className={
@@ -151,6 +208,8 @@ interface DashboardKpiConfig {
   icon: React.ReactNode
   variant: KPICardVariant
   issueType?: IssueType
+  /** Posición del switch que deja el deep-link. Default `pending`. */
+  errorStatus?: ErrorStatus
   getValue: (args: {
     totalPunches: number
     errorRate: number
@@ -163,6 +222,69 @@ interface DashboardKpiConfig {
     totalErrors: number
     counts: ReturnType<typeof useTtkDashboardSummary>['summary']['counts']
   }) => React.ReactNode
+}
+
+/**
+ * Tooltip del trend, con el desglose por tipo.
+ *
+ * Responde el caso de uso que perdió el selector de tres posiciones: "de los sin
+ * clock out, cuántos se corrigieron". Lee `payload[0].payload` —el punto crudo—
+ * porque recharts sólo pasa en `payload` los `dataKey` que efectivamente dibuja, y
+ * las series de pendientes y corregidos no se dibujan.
+ */
+function ErrorTrendTooltip({
+  active,
+  payload,
+  label,
+  includedTypes,
+  t,
+}: {
+  active?: boolean
+  payload?: { payload?: Record<string, unknown> }[]
+  label?: string
+  includedTypes: readonly number[]
+  t: (key: string, vars?: Record<string, string | number>) => string
+}) {
+  const point = payload?.[0]?.payload
+  if (!active || !point) return null
+
+  const rows = ([1, 2, 3] as const)
+    .filter((code) => includedTypes.includes(code))
+    .map((code) => {
+      const keys = TREND_BREAKDOWN_KEYS[code]
+      return {
+        code,
+        label: t(errorTypeMeta(code).chartLabelKey),
+        color: errorTypeMeta(code).color,
+        total: Number(point[keys.all] ?? 0),
+        pending: Number(point[keys.pending] ?? 0),
+        corrected: Number(point[keys.fixed] ?? 0),
+      }
+    })
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-[0_10px_40px_-10px_rgb(0_0_0/0.15)]">
+      <p className="mb-1.5 font-medium text-slate-900">{label}</p>
+      <div className="flex flex-col gap-1">
+        {rows.map((row) => (
+          <div key={row.code} className="flex items-baseline gap-2">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: row.color }}
+            />
+            <span className="text-slate-600">{row.label}:</span>
+            <span className="text-slate-900">
+              {t('dashboard.errorTrendTooltipBreakdown', {
+                total: row.total,
+                pending: row.pending,
+                corrected: row.corrected,
+              })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 const container = {
@@ -188,6 +310,8 @@ export default function DashboardPage() {
     dateRange,
     filtersHydrated,
     setSelectedType,
+    errorStatus,
+    setErrorStatus,
     includedErrorTypes,
     toggleErrorType,
     errorTypesReady,
@@ -214,7 +338,17 @@ export default function DashboardPage() {
     !noErrorTypes && totalPunches > 0
       ? Math.round((totalErrors / totalPunches) * 1000) / 10
       : 0
-  const topDealers = noErrorTypes ? EMPTY_TOP_DEALERS : summary.top_dealers
+  const isCorrected = errorStatus === 'corrected'
+  /**
+   * El ranking SÍ sigue al switch, y en corregidos sale del ledger. Leer el estado
+   * actual dejaría en cero a la sucursal que corrigió todo —la haría pasar por la
+   * más prolija cuando es la que más trabajo hizo—; el mismo criterio que el top
+   * de empleados. `?? EMPTY` porque una respuesta cacheada de antes de este cambio
+   * no trae la clave nueva.
+   */
+  const topDealers = noErrorTypes
+    ? EMPTY_TOP_DEALERS
+    : (isCorrected ? summary.top_dealers_fixed : summary.top_dealers) ?? EMPTY_TOP_DEALERS
 
   const kpiCards: DashboardKpiConfig[] = useMemo(() => {
     const cards: DashboardKpiConfig[] = [
@@ -286,8 +420,37 @@ export default function DashboardPage() {
         title: getDashboardKpiTitle(t, 'only_fixed'),
         icon: <CheckCheck className="h-7 w-7" />,
         variant: 'info',
-        issueType: 'only_fixed',
+        // El eje de estado salió del radio: se abre Punch Report en el tipo de
+        // error con el switch en Corrected, no en un `only_fixed` que ya no existe
+        // como posición del radio.
+        issueType: 'only_error',
+        errorStatus: 'corrected',
+        // Cuenta EVENTOS de corrección: una ponchada con dos correcciones suma dos.
         getValue: ({ counts }) => counts.only_fixed.pending,
+        subtitle: ({ counts }) => {
+          const bt = counts.only_fixed.by_type
+          const onDeleted = counts.only_fixed.on_deleted ?? 0
+          if (!bt) return null
+          return (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
+              <span>
+                {t('punch.clockOutBreakdown')}{' '}
+                <span className="font-medium text-foreground">{bt.clock_out_missing}</span>
+              </span>
+              <span>
+                {t('punch.breakBreakdown')}{' '}
+                <span className="font-medium text-foreground">{bt.break_missing}</span>
+              </span>
+              <span>
+                {t('punch.shift20hBreakdown')}{' '}
+                <span className="font-medium text-foreground">{bt.shift_20h_plus}</span>
+              </span>
+              {onDeleted > 0 ? (
+                <span>{t('punch.correctedOnDeletedPunches', { count: onDeleted })}</span>
+              ) : null}
+            </div>
+          )
+        },
       },
     ]
 
@@ -298,16 +461,123 @@ export default function DashboardPage() {
         icon: <Trash2 className="h-7 w-7" />,
         variant: 'violet',
         issueType: 'only_deletes',
+        // El número grande son TODAS las eliminadas del período, con o sin error:
+        // no lo mueve la lista de tipos ni el switch de estado (decisión D-A). Es
+        // lo que esta tarjeta ya cuenta hoy, así que no cambia de significado.
         getValue: ({ counts }) => counts.only_deletes.pending,
+        subtitle: ({ counts }) => {
+          const bt = counts.only_deletes.by_type
+          if (!bt) return null
+          const withError = bt.clock_out_missing + bt.break_missing + bt.shift_20h_plus
+          // Desglose por tipo, como el resto de las tarjetas (MEJORA-02). El
+          // backend ya lo devuelve; sólo se mostraba el total. La suma puede ser
+          // MENOR que el número grande —hay eliminadas sin error—, y se dice.
+          return (
+            <div className="flex flex-col gap-0.5 text-[11px]">
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                <span>
+                  {t('punch.clockOutBreakdown')}{' '}
+                  <span className="font-medium text-foreground">{bt.clock_out_missing}</span>
+                </span>
+                <span>
+                  {t('punch.breakBreakdown')}{' '}
+                  <span className="font-medium text-foreground">{bt.break_missing}</span>
+                </span>
+                <span>
+                  {t('punch.shift20hBreakdown')}{' '}
+                  <span className="font-medium text-foreground">{bt.shift_20h_plus}</span>
+                </span>
+              </div>
+              <span className="text-muted-foreground">
+                {t('punch.deletedWithError', { count: withError })}
+              </span>
+            </div>
+          )
+        },
       })
     }
 
     return cards
   }, [canViewDeleted, t])
 
-  const [trendMode, setTrendMode] = useState<TrendMode>('pending')
-  const trendKeys = TREND_DATA_KEYS[trendMode]
+  const trendKeys = TREND_DATA_KEYS
+  /** El único tipo incluido, o null si hay dos o tres. Gobierna el apilado. */
+  const soloType =
+    includedErrorTypes.length === 1 ? (includedErrorTypes[0] as 1 | 2 | 3) : null
   const isErrorTypeIncluded = (code: number) => includedErrorTypes.includes(code)
+
+  /**
+   * Las series del trend, como ARRAY — nunca envueltas en un fragmento.
+   *
+   * recharts no encuentra los `<Area>` que están dentro de un `<>...</>`: los
+   * ignora como si no existieran. El gráfico queda con la grilla y el eje X
+   * dibujados, sin eje Y y sin una sola área — que es exactamente lo que se veía.
+   * Verificado con recharts 2.15 renderizando el mismo chart de las dos formas:
+   * hijos directos ⇒ 3 áreas y eje Y; el mismo contenido dentro de un fragmento
+   * ⇒ 0 áreas y sin eje Y. Un array sí lo aplana, por eso van así.
+   */
+  const trendAreas = isCorrected && !soloType
+    ? // Corrected con dos o tres tipos: el techo sigue siendo el total del día, y
+      // abajo se rellena la parte corregida. Va agregado y no por tipo porque tres
+      // tipos × dos mitades son seis áreas apiladas, que no se leen.
+      [
+        <Area
+          key="total-fixed"
+          type="monotone"
+          stackId="trend"
+          dataKey={TREND_TOTAL_KEYS.fixed}
+          name={t('punch.errorStatusCorrected')}
+          stroke="#10b981"
+          strokeWidth={2}
+          fill="url(#colorTotalFixed)"
+        />,
+        <Area
+          key="total-pending"
+          type="monotone"
+          stackId="trend"
+          dataKey={TREND_TOTAL_KEYS.pending}
+          name={t('punch.errorStatusPending')}
+          stroke="#94a3b8"
+          strokeDasharray="4 3"
+          strokeWidth={2}
+          fill="url(#colorTotalPending)"
+        />,
+      ]
+    : soloType
+    ? [
+        <Area
+          key="fixed"
+          type="monotone"
+          stackId="trend"
+          dataKey={TREND_BREAKDOWN_KEYS[soloType].fixed}
+          name={t('punch.errorStatusCorrected')}
+          stroke={errorTypeMeta(soloType).color}
+          strokeWidth={2}
+          fill={`url(#${TREND_SOLO_GRADIENTS[soloType].solid})`}
+        />,
+        <Area
+          key="pending"
+          type="monotone"
+          stackId="trend"
+          dataKey={TREND_BREAKDOWN_KEYS[soloType].pending}
+          name={t('punch.errorStatusPending')}
+          stroke={errorTypeMeta(soloType).color}
+          strokeDasharray="4 3"
+          strokeWidth={2}
+          fill={`url(#${TREND_SOLO_GRADIENTS[soloType].light})`}
+        />,
+      ]
+    : TREND_SERIES.filter((serie) => isErrorTypeIncluded(serie.code)).map((serie) => (
+        <Area
+          key={serie.code}
+          type="monotone"
+          dataKey={trendKeys[serie.key]}
+          name={t(serie.labelKey)}
+          stroke={serie.stroke}
+          strokeWidth={2}
+          fill={`url(#${serie.gradient})`}
+        />
+      ))
 
   const trendData = useMemo(
     () =>
@@ -325,31 +595,88 @@ export default function DashboardPage() {
    * Alimenta la leyenda, que conserva los tres y tacha el excluido: una leyenda
    * automática no puede mostrar lo que no es slice.
    */
+  /**
+   * El bucket depende del estado: en corregidos son los tipos que se ARREGLARON,
+   * no los que la ponchada tiene hoy. Leer siempre `only_error.by_type` hacía que
+   * estas tarjetas —y el donut, que se alimenta de acá— mostraran pendientes con
+   * el switch en corregidos.
+   */
   const errorTypeSlices = useMemo(() => {
-    const bt = counts.only_error.by_type
+    const bt = isCorrected ? counts.only_fixed.by_type : counts.only_error.by_type
     return errorTypesWithState(includedErrorTypes).map((meta) => ({
       ...meta,
       label: t(meta.chartLabelKey),
       count: bt ? bt[meta.byTypeKey] : 0,
     }))
-  }, [counts.only_error.by_type, includedErrorTypes, t])
+  }, [counts.only_error.by_type, counts.only_fixed.by_type, isCorrected, includedErrorTypes, t])
 
+  /**
+   * Techo del eje Y, común a los dos estados: el día con más errores del período,
+   * contando pendientes y corregidos. Es el máximo que puede alcanzar cualquiera
+   * de las dos vistas, así que ninguna queda cortada y las dos se leen a la misma
+   * escala.
+   */
+  const trendYMax = useMemo(
+    () => summary.error_trend.reduce((max, p) => Math.max(max, p.total_errors_all ?? 0), 0),
+    [summary.error_trend],
+  )
+
+  /** Apilado = las áreas son Corregidos/Pendientes, no los tres tipos. */
+  const trendStacked = isCorrected || soloType !== null
+
+  /**
+   * La leyenda tiene que nombrar lo que está dibujado. Con el gráfico apilado,
+   * la leyenda de tipos ponía tres nombres que no eran ninguna de las dos áreas.
+   */
+  const trendLegendSlices: ErrorTypeLegendSlice[] = trendStacked
+    ? [
+        {
+          code: -1,
+          label: t('punch.errorStatusCorrected'),
+          color: soloType ? errorTypeMeta(soloType).color : '#10b981',
+          included: true,
+        },
+        {
+          code: -2,
+          label: t('punch.errorStatusPending'),
+          color: soloType ? errorTypeMeta(soloType).color : '#94a3b8',
+          included: true,
+          dashed: true,
+        },
+      ]
+    : errorTypeSlices
+
+  /**
+   * El denominador tiene que ser del MISMO estado que las porciones, si no los
+   * porcentajes no cierran: `totalErrors` es siempre el de pendientes y alimenta
+   * además el card With errors y el error rate, que no siguen al switch.
+   */
+  const donutTotal = isCorrected ? (noErrorTypes ? 0 : counts.only_fixed.pending) : totalErrors
   const issueDistribution = useMemo(() => {
-    if (totalErrors === 0) return []
+    if (donutTotal === 0) return []
     return errorTypeSlices
       .filter((d) => d.included && d.count > 0)
       .map((d) => ({
         ...d,
-        percentage: Math.round((d.count / totalErrors) * 100),
+        percentage: Math.round((d.count / donutTotal) * 100),
       }))
-  }, [errorTypeSlices, totalErrors])
+  }, [errorTypeSlices, donutTotal])
 
-  const goToIssues = (issueType: IssueType) => {
+  /**
+   * Cada deep-link fija LOS DOS ejes, explícito y nunca por omisión.
+   *
+   * `errorStatus` es global y sobrevive a la navegación: sin fijarlo, un acceso
+   * pensado para ver el estado actual abriría historial corregido (y con la tabla
+   * de verdad, `all` + `corrected` se convierte en `only_fixed`).
+   */
+  const goToIssues = (issueType: IssueType, status: ErrorStatus = 'pending') => {
     setSelectedType(issueType)
+    setErrorStatus(status)
     router.push('/issues')
   }
 
   const scopeReady = filtersHydrated && selectedDealers.length > 0
+  const showCorrectionsCoverageNotice = rangeStartsBeforeCorrectionsLog(dateRange?.from)
 
   const reportPeriodLabel = useMemo(() => {
     if (!dateRange?.from) return null
@@ -397,6 +724,19 @@ export default function DashboardPage() {
           <p className="mt-0.5 text-sm text-muted-foreground">{t('dashboard.reportUsesFilters')}</p>
         </div>
 
+        {/*
+          El registro de correcciones arrancó vacío el 27/08/2026 y no hubo backfill.
+          No promete un cero: `punch_date` es la fecha del PONCHE, así que una
+          corrección posterior puede caer en un rango anterior. Lo que se avisa es
+          cobertura parcial.
+        */}
+        {showCorrectionsCoverageNotice ? (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>{t('punch.correctionsCoverageNotice')}</AlertDescription>
+          </Alert>
+        ) : null}
+
       {!scopeReady ? (
         <p className="text-sm text-muted-foreground">{t('dashboard.selectDealersMetrics')}</p>
       ) : null}
@@ -420,7 +760,11 @@ export default function DashboardPage() {
             icon={card.icon}
             variant={card.variant}
             loading={loading}
-            onClick={card.issueType ? () => goToIssues(card.issueType!) : undefined}
+            onClick={
+              card.issueType
+                ? () => goToIssues(card.issueType!, card.errorStatus ?? 'pending')
+                : undefined
+            }
           />
         ))}
       </div>
@@ -433,19 +777,35 @@ export default function DashboardPage() {
         los widgets de error del Dashboard son siempre sobre errores.
       */}
       <section className="@container/dash-error-types">
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h3 className="text-[13px] font-semibold text-foreground">
-            {t('punch.errorTypesGroupTitle')}
-          </h3>
-          <p className="text-[11px] text-muted-foreground">
-            {t('dashboard.errorTypesHint')}
-          </p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h3 className="text-[13px] font-semibold text-foreground">
+              {t('punch.errorTypesGroupTitle')}
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              {t('dashboard.errorTypesHint')}
+            </p>
+          </div>
+          {/* El eje pendiente/corregido vive junto a lo que gobierna, no en el
+              header: allá competía por lugar con dealers, rango y el botón de
+              agregar hasta desbordarse encima de ellos. En el Dashboard no hay
+              radio de tipos, así que siempre aplica. */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('punch.errorStatus')}
+            </span>
+            <ErrorStatusToggle />
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-3 @[640px]/dash-error-types:grid-cols-3">
           {errorTypeSlices.map((meta) => (
             <KPICard
               key={`dash-error-type-${meta.code}`}
-              title={t(meta.labelKey)}
+              // El sufijo dice de qué estado es el número: sin él, "Break missing: 1"
+              // no distingue un break pendiente de uno corregido.
+              title={`${t(meta.labelKey)} · ${
+                isCorrected ? t('punch.errorStatusCorrected') : t('punch.errorStatusPending')
+              }`}
               value={meta.count}
               icon={DASH_ERROR_TYPE_ICONS[meta.code]}
               variant={DASH_ERROR_TYPE_VARIANTS[meta.code]}
@@ -476,30 +836,18 @@ export default function DashboardPage() {
                 </div>
                 {t('dashboard.errorTrend')}
               </CardTitle>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                size="sm"
-                value={trendMode}
-                onValueChange={(value) => {
-                  // Radix entrega '' al intentar destildar la opción activa:
-                  // se ignora para que siempre haya una posición elegida.
-                  if (value === 'pending' || value === 'all' || value === 'solved') {
-                    setTrendMode(value)
-                  }
-                }}
-              >
-                <ToggleGroupItem value="pending" className="cursor-pointer px-3 text-xs">
-                  {t('dashboard.errorTrendPending')}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="all" className="cursor-pointer px-3 text-xs">
-                  {t('dashboard.errorTrendAll')}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="solved" className="cursor-pointer px-3 text-xs">
-                  {t('dashboard.errorTrendSolved')}
-                </ToggleGroupItem>
-              </ToggleGroup>
             </div>
+            {/*
+              El techo de la curva es el mismo en los dos estados, así que sin
+              esta línea el gráfico parecía no enterarse del switch. Lo que cambia
+              es qué se rellena abajo, y en corregidos hay que decir además que el
+              eje es el día de la ponchada, no el día en que se corrigió.
+            */}
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              {isCorrected
+                ? t('dashboard.errorTrendNoteCorrected')
+                : t('dashboard.errorTrendNotePending')}
+            </p>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -527,6 +875,28 @@ export default function DashboardPage() {
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
                         <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                       </linearGradient>
+                      {/* Banda clara: la mitad "pendiente" del apilado de un solo tipo. */}
+                      <linearGradient id="colorClockOutLight" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorBreakLight" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="color20hLight" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                      {/* Apilado agregado de Corrected: corregidos abajo, pendientes arriba. */}
+                      <linearGradient id="colorTotalFixed" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="colorTotalPending" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis
@@ -536,54 +906,43 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <YAxis stroke="#64748b" fontSize={12} axisLine={false} tickLine={false} />
+                    {/*
+                      Techo fijo, el mismo en los dos estados. Sin esto el eje se
+                      reescala al mover el switch —en Pending el máximo es el tipo
+                      más alto, en Corrected es la SUMA de los tipos, porque el
+                      apilado agrega— y las dos vistas dejaban de ser comparables:
+                      la misma curva parecía el doble de alta.
+                    */}
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={12}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={trendYMax > 0 ? [0, trendYMax] : undefined}
+                      allowDecimals={false}
+                    />
+                    {/*
+                      Content propio: lee `payload[0].payload`, porque recharts sólo
+                      pasa los dataKey DIBUJADOS y el desglose no es uno de ellos.
+                    */}
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        color: '#0f172a',
-                        boxShadow: '0 10px 40px -10px rgb(0 0 0 / 0.15)',
-                      }}
+                      content={<ErrorTrendTooltip includedTypes={includedErrorTypes} t={t} />}
                     />
                     <Legend
-                      content={<ErrorTypeLegend slices={errorTypeSlices} />}
+                      content={<ErrorTypeLegend slices={trendLegendSlices} />}
                       wrapperStyle={{ fontSize: '11px' }}
                     />
                     {/*
-                      Sólo se dibujan las series de los tipos incluidos; el color
-                      y el gradiente salen del tipo, no del orden.
+                      Con UN solo tipo incluido el área se abre en dos: corregidos
+                      abajo sólido, pendientes arriba más claro, y el techo sigue
+                      siendo el total. Con 2 o 3 tipos son líneas de total, porque
+                      seis series apiladas no se leen.
+
+                      Va como array, armado arriba. Un fragmento acá deja el
+                      gráfico sin series y sin eje Y — ver el comentario de
+                      `trendAreas`.
                     */}
-                    {isErrorTypeIncluded(1) && (
-                      <Area
-                        type="monotone"
-                        dataKey={trendKeys.clockOut}
-                        name={t('dashboard.withoutClockOutChart')}
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        fill="url(#colorClockOut)"
-                      />
-                    )}
-                    {isErrorTypeIncluded(2) && (
-                      <Area
-                        type="monotone"
-                        dataKey={trendKeys.breakMissing}
-                        name={t('dashboard.breakMissingChart')}
-                        stroke="#f59e0b"
-                        strokeWidth={2}
-                        fill="url(#colorBreak)"
-                      />
-                    )}
-                    {isErrorTypeIncluded(3) && (
-                      <Area
-                        type="monotone"
-                        dataKey={trendKeys.shift20h}
-                        name={t('dashboard.shift20hChart')}
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                        fill="url(#color20h)"
-                      />
-                    )}
+                    {trendAreas}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -657,13 +1016,35 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="overflow-hidden border-red-100 bg-gradient-to-br from-white to-red-50/50">
+        {/*
+          Los dos rankings son widgets distintos con el mismo lugar: deuda
+          (errores vigentes) en pendientes, actividad (correcciones del ledger) en
+          corregidos. Cambia el título y el acento, porque un número verde bajo un
+          marco rojo se lee como problema.
+        */}
+        <Card
+          className={
+            isCorrected
+              ? 'overflow-hidden border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50'
+              : 'overflow-hidden border-red-100 bg-gradient-to-br from-white to-red-50/50'
+          }
+        >
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
-                <TrendingDown className="h-4 w-4 text-destructive" />
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                  isCorrected ? 'bg-emerald-500/10' : 'bg-destructive/10'
+                }`}
+              >
+                {isCorrected ? (
+                  <CheckCheck className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-destructive" />
+                )}
               </div>
-              {t('dashboard.dealersMostErrors')}
+              {isCorrected
+                ? t('dashboard.dealersMostCorrected')
+                : t('dashboard.dealersMostErrors')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -684,11 +1065,15 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       <span
                         className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold ${
-                          index === 0
-                            ? 'bg-destructive/20 text-destructive'
-                            : index === 1
-                              ? 'bg-warning/20 text-warning'
-                              : 'bg-muted text-muted-foreground'
+                          index > 1
+                            ? 'bg-muted text-muted-foreground'
+                            : isCorrected
+                              ? index === 0
+                                ? 'bg-emerald-500/20 text-emerald-700'
+                                : 'bg-emerald-500/10 text-emerald-600'
+                              : index === 0
+                                ? 'bg-destructive/20 text-destructive'
+                                : 'bg-warning/20 text-warning'
                         }`}
                       >
                         #{index + 1}
@@ -696,10 +1081,16 @@ export default function DashboardPage() {
                       <p className="text-sm font-medium text-foreground">{dealerItem.dealer_name}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold tabular-nums text-destructive">
+                      <span
+                        className={`text-2xl font-bold tabular-nums ${
+                          isCorrected ? 'text-emerald-600' : 'text-destructive'
+                        }`}
+                      >
                         {dealerItem.error_count}
                       </span>
-                      <span className="text-xs text-muted-foreground">{t('common.errors')}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {isCorrected ? t('common.corrections') : t('common.errors')}
+                      </span>
                     </div>
                   </motion.div>
                 ))}
@@ -715,11 +1106,24 @@ export default function DashboardPage() {
                 <AlertTriangle className="h-4 w-4 text-primary" />
               </div>
               {t('dashboard.yesterdayIssues')}
+              {/*
+                Tampoco sigue el switch: es "lo que quedó sin resolver ayer", y en
+                corregidos no significaría nada.
+              */}
+              {errorStatus === 'corrected' ? (
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t('punch.pendingOnlySuffix')}
+                </span>
+              ) : null}
             </CardTitle>
             <Link
               href="/issues"
               className="flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-              onClick={() => setSelectedType('only_error')}
+              // "Lo que quedó sin resolver ayer": el deep-link fija los dos ejes.
+              onClick={() => {
+                setSelectedType('only_error')
+                setErrorStatus('pending')
+              }}
             >
               {t('common.viewAll')}
               <ArrowRight className="h-4 w-4" />

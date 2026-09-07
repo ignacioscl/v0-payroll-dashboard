@@ -32,6 +32,7 @@ export class GroupedPunchService {
       idEmployee: query.idEmployee,
       issueType: query.issueType,
       snapshotAt: query.snapshotAt,
+      includeDeletedFixes: access.includeDeletedFixes,
       includePaymentTypeName: access.canViewPaymentTypeName,
     })
   }

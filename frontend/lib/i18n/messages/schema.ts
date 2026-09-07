@@ -609,6 +609,8 @@ export interface Messages {
     yesterday: string
     viewAll: string
     errors: string
+    /** Sustantivo suelto al lado de un número, como `errors`. */
+    corrections: string
     records: string
     record: string
     of: string
@@ -733,10 +735,43 @@ export interface Messages {
     exportInfoScopeAll: string
     exportInfoScopeSelected: string
     errorTypesReportInfo: string
+    /** Filas del Report Info del export agrupado que faltaban. */
+    issueTypeReportInfo: string
+    minHoursReportInfo: string
+    maxHoursReportInfo: string
     withoutSalary: string
     deletedPlural: string
     correctedPlural: string
     manualPlural: string
+    /* --- Eje de estado pendiente/corregido (switch del header) --- */
+    /** Etiqueta del control. */
+    errorStatus: string
+    errorStatusPending: string
+    errorStatusCorrected: string
+    /** Hint cuando el radio está en un tipo que no cruza con el estado. */
+    errorStatusNotApplicable: string
+    /** Sufijo gris de los widgets que NO siguen el switch. */
+    pendingOnlySuffix: string
+    /** Badge de doble cardinalidad: "{corrections} corrections · {punches} punches". */
+    correctionsAndPunches: string
+    viewingCorrectedNote: string
+    correctionsOne: string
+    correctionsMany: string
+    punchesOne: string
+    punchesMany: string
+    /** Subtítulo del card de corregidos. */
+    correctedOnDeletedPunches: string
+    /** Subtítulo del card de eliminadas. */
+    deletedWithError: string
+    /** Chip de fila cuya ponchada fue eliminada. */
+    deletedPunchChip: string
+    /** Cartel de cobertura parcial del registro de correcciones (R1). */
+    correctionsCoverageNotice: string
+    /** Hint de dónde quedó el eje al sacar "Corrected punches" del radio. */
+    /** Columna del grupo en modo Corrected. */
+    groupCorrectedColumn: string
+    /** Nota fija del ranking de offenders. */
+    offendersIncludesCorrected: string
     clockOutBreakdown: string
     breakBreakdown: string
     shift20hBreakdown: string
@@ -871,15 +906,19 @@ export interface Messages {
     reportUsesFilters: string
     selectDealersMetrics: string
     errorTrend: string
+    /** Qué muestra la curva en cada estado del switch. */
+    errorTrendNotePending: string
+    errorTrendNoteCorrected: string
     errorDistribution: string
     dealersMostErrors: string
+    /** Mismo widget con el switch en corregidos: ranking de actividad, no de deuda. */
+    dealersMostCorrected: string
     yesterdayIssues: string
     withoutClockOutChart: string
     breakMissingChart: string
     shift20hChart: string
-    errorTrendPending: string
-    errorTrendAll: string
-    errorTrendSolved: string
+    /** Desglose del tooltip del trend: total, pendientes y corregidos. */
+    errorTrendTooltipBreakdown: string
     errorTypesHint: string
     today: string
     todayStatus: string

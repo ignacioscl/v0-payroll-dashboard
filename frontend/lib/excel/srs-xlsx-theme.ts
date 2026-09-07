@@ -221,6 +221,9 @@ export function writeReportInfoSheet(
   ;(ws as unknown as Ordered).orderNo = 0
 }
 
+/** Cuánto se espera antes de soltar el blob. De sobra para un xlsx de unos MB. */
+const BLOB_URL_TTL_MS = 60_000
+
 export async function downloadExcelWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], {
@@ -230,6 +233,17 @@ export async function downloadExcelWorkbook(workbook: ExcelJS.Workbook, fileName
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = fileName
+  // El anchor tiene que estar EN el documento: un elemento suelto no dispara la
+  // bajada de forma confiable.
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
   anchor.click()
-  URL.revokeObjectURL(url)
+  // Y la URL del blob NO se revoca en el mismo tick. Guardar el archivo es
+  // asíncrono: revocarla enseguida deja la descarga a mitad de camino —Chrome
+  // muestra "recibidos N de N bytes" y nunca termina ni escribe el archivo—.
+  // Se suelta después, cuando el navegador ya leyó el blob.
+  window.setTimeout(() => {
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }, BLOB_URL_TTL_MS)
 }

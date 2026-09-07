@@ -17,6 +17,7 @@ import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
 } from '@/lib/ttk/today-live-status'
+import { DEFAULT_ERROR_STATUS, type ErrorStatus } from '@/lib/ttk/error-status'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 
 interface FilterContextType {
@@ -40,6 +41,16 @@ interface FilterContextType {
   setSelectedDistricts: (value: number[]) => void
   selectedType: string
   setSelectedType: (value: string) => void
+  /**
+   * Eje pendiente/corregido. Vive acá —y no en cada pantalla— porque es un filtro
+   * de la misma naturaleza que dealers y rango, y tiene que valer igual en las dos.
+   *
+   * Para un usuario externo vale siempre `pending`: la policy le prohíbe cualquier
+   * `issueType` distinto de `all`, y se resuelve en el MISMO render en que se
+   * conoce la identidad (no en un effect, que dejaría pasar un pedido con 403).
+   */
+  errorStatus: ErrorStatus
+  setErrorStatus: (value: ErrorStatus) => void
   /**
    * Tipos de error DESTILDADOS por el usuario (lo que se persiste).
    * `[]` = los tres visibles; `[1,2,3]` = los tres excluidos.
@@ -91,6 +102,9 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedDistricts, setSelectedDistricts] = useState<number[]>([])
   const [selectedDealer, setSelectedDealer] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
+  // SIN cookie a propósito: dealers y tipos sí persisten, el estado no. Nadie tiene
+  // que entrar al día siguiente viendo corregidos creyendo que ve pendientes.
+  const [errorStatusState, setErrorStatus] = useState<ErrorStatus>(DEFAULT_ERROR_STATUS)
   const [excludedErrorTypesState, setExcludedErrorTypesState] = useState<number[]>([])
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
@@ -135,6 +149,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   // El externo no puede filtrar por tipo de error: el valor EFECTIVO se resuelve
   // en la misma renderización en que se conoce la identidad, no en un effect.
   const excludedErrorTypes = isExternal ? EMPTY_EXCLUDED : excludedErrorTypesState
+  // Mismo patrón que la línea de arriba, por el mismo motivo.
+  const errorStatus: ErrorStatus = isExternal ? DEFAULT_ERROR_STATUS : errorStatusState
   const includedErrorTypes = useMemo(
     () => includedErrorTypesFrom(excludedErrorTypes),
     [excludedErrorTypes],
@@ -183,6 +199,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDealerIdAllowList(null)
     setSelectedDealer('all')
     setSelectedType('all')
+    setErrorStatus(DEFAULT_ERROR_STATUS)
     setExcludedErrorTypesState([])
     setSelectedStatus('all')
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
@@ -208,6 +225,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setDealerIdAllowList,
       selectedType,
       setSelectedType,
+      errorStatus,
+      setErrorStatus,
       excludedErrorTypes,
       includedErrorTypes,
       toggleErrorType,

@@ -36,6 +36,29 @@ export function formatNyTime(iso?: string | null): string {
   return `${p.hour}:${p.minute} ${nyPeriod(p.dayPeriod)}`
 }
 
+/**
+ * Fecha+hora de un DATETIME de la base ('YYYY-MM-DD HH:mm:ss'), en el formato del
+ * export. Nunca volcar el string crudo a una celda: sale `2026-09-06 17:37:12` en
+ * una planilla donde todo lo demás es `09/06/2026`.
+ *
+ * NO convierte de zona horaria, a diferencia de formatNyDate/Time. Esos reciben
+ * un ISO en GMT-0 (`punchInGmt0`) y lo pasan a NY; un DATETIME pelado como
+ * `fixed_at` no tiene zona, así que convertirlo le corre la hora contra nada.
+ * Se reformatean los componentes tal como los guardó la base.
+ */
+export function formatDbStampForExport(value?: string | null): string {
+  if (!value) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value)
+  if (!m) return ''
+  const [, year, month, day, hh, mm] = m
+  const hour24 = Number(hh)
+  const period = hour24 >= 12 ? 'PM' : 'AM'
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  // Con coma, igual que formatUsDateTimeForExport del front: los dos exports
+  // muestran la misma celda y no se pueden distinguir a ojo.
+  return `${month}/${day}/${year}, ${hour12}:${mm} ${period}`
+}
+
 export function formatNyStamp(date: Date = new Date()): string {
   const p = nyParts(date, {
     month: '2-digit',

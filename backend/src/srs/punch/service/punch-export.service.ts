@@ -124,6 +124,7 @@ export class PunchExportService {
         issueType: filters.issueType,
         errorTypes,
         includeErrorType: access.includeErrorType,
+        includeDeletedFixes: access.includeDeletedFixes,
         todayLiveStatus: filters.todayLiveStatus,
         includeAmounts: false,
         includePaymentTypeName: access.canViewPaymentTypeName,
@@ -157,6 +158,7 @@ export class PunchExportService {
         stream: res as unknown as Writable,
         locale,
         includePaymentType: access.canViewPaymentTypeName,
+        includeCorrected: filters.issueType === 'only_fixed',
         generatedBy,
         generatedAt,
         reportMeta: meta,
@@ -257,6 +259,15 @@ export class PunchExportService {
       { field: labels.dealers, value: dealerNames.length ? dealerNames.join(', ') : labels.all },
       { field: labels.employee, value: metaAll(labels, employeeName) },
       { field: labels.issueType, value: issueLabel },
+      // El eje pendiente/corregido salió de `issueType` y es un filtro propio: sin
+      // esta fila el archivo lista corregidos y dice que no hay filtro de estado.
+      {
+        field: labels.errorStatus,
+        value:
+          filters.issueType === 'only_fixed'
+            ? labels.errorStatusLabels.corrected
+            : labels.errorStatusLabels.pending,
+      },
       { field: labels.errorTypes, value: errorTypesLabel },
       { field: labels.liveStatus, value: liveLabel },
       {

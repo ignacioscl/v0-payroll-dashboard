@@ -72,7 +72,11 @@ export function isErrorIssueType(issueType?: string): boolean {
     issueType === 'only_error' ||
     issueType === 'only_error_clockout' ||
     issueType === 'only_error_break' ||
-    issueType === 'only_error_20h'
+    issueType === 'only_error_20h' ||
+    // El modo corregido TAMBIÉN filtra por error: su EXISTS respeta la lista blanca.
+    // Sin esto la tarjeta dice "Break excluido" y la grilla trae breaks corregidos,
+    // la misma divergencia que ya se arregló una vez para los tipos pendientes.
+    issueType === 'only_fixed'
   )
 }
 

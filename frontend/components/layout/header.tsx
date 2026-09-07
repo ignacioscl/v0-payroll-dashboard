@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Menu, SlidersHorizontal } from 'lucide-react'
+import { Check, Menu, SlidersHorizontal } from 'lucide-react'
 import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
 import {
   Select,
@@ -72,6 +72,9 @@ export function Header() {
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
   const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
   const showDateFilter = !isRolesPage
+  // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
+  // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
+  // derecha. Vive en cada pantalla, junto a lo que gobierna (ErrorStatusToggle).
 
   // Count active filters for mobile badge
   const activeFilterCount =
@@ -97,7 +100,7 @@ export function Header() {
       >
         {/* Mobile left: hamburger */}
         <button
-          className="flex md:hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className="flex md:hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           onClick={() => setMobileOpen(true)}
           aria-label={t('layout.openMenu')}
         >
@@ -158,6 +161,7 @@ export function Header() {
               />
             )
           ) : null}
+
         </div>
 
         {/* Right side */}
@@ -166,7 +170,7 @@ export function Header() {
 
           {/* Mobile: filter button */}
           <button
-            className="relative flex md:hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="relative flex md:hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             onClick={() => setFiltersOpen(true)}
             aria-label={t('filters.openFilters')}
           >
@@ -263,10 +267,12 @@ export function Header() {
               )
             ) : null}
 
+
             <Button
-              className="mt-2 w-full"
+              className="mt-2 w-full cursor-pointer"
               onClick={() => setFiltersOpen(false)}
             >
+              <Check className="h-4 w-4" />
               {t('common.apply')}
             </Button>
           </div>

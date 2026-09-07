@@ -28,6 +28,26 @@ export interface GroupedPunchOptions {
   includePaymentTypeName?: boolean
   /** Lista blanca de tipos de error. Default `[1,2,3]` = comportamiento de siempre. */
   errorTypes?: readonly number[]
+  /**
+   * Sale de la policy (`resolveDeletedVisibility`). Sólo pesa en `only_fixed`.
+   * Default seguro `false`.
+   */
+  includeDeletedFixes?: boolean
+}
+
+/**
+ * Los codigos de tipo corregido llegan doblemente concatenados: `GROUP_CONCAT` por
+ * ponchada los une con coma y el de afuera une las ponchadas con `<br/>`.
+ * Se aplanan a un set ordenado de {1,2,3}.
+ */
+function parseCorrectedTypes(raw: string | null): number[] {
+  if (!raw) return []
+  const seen = new Set<number>()
+  for (const token of raw.split(/<br\/>|,/)) {
+    const value = Number(token.trim())
+    if (value === 1 || value === 2 || value === 3) seen.add(value)
+  }
+  return [...seen].sort((a, b) => a - b)
 }
 
 const SORTABLE_COLUMNS: Record<string, string> = {
@@ -44,7 +64,6 @@ export class GroupedPunchRepository {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
       filter
     const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
-    const issue = resolveGroupedIssueFilter(opts.issueType, opts.errorTypes)
 
     const paymentTypeFilterSql = opts.idPaymentType ? ' AND tew.id_payment_type = ?' : ''
     const paymentTypeParams = opts.idPaymentType ? [opts.idPaymentType] : []
@@ -73,29 +92,60 @@ export class GroupedPunchRepository {
     const snapshotSql = snapshotAt ? ' AND tew.punch_in <= ?' : ''
     const snapshotParams = snapshotAt ? [snapshotAt] : []
 
+    // El filtro se resuelve DESPUES del sello, no antes: en modo Corrected necesita
+    // `snapshotAt` para congelar tambien el ledger (`f.fixed_at <= ?`). Construirlo
+    // arriba dejaba la primera pagina sin congelar nada.
+    const issue = resolveGroupedIssueFilter({
+      issueType: opts.issueType,
+      errorTypes: opts.errorTypes,
+      fechaDesde,
+      fechaHasta,
+      includeDeletedFixes: opts.includeDeletedFixes === true,
+      snapshotAt,
+      dealerIds,
+    })
+
+    // El JOIN de dealer no se omite nunca — solo su predicado (§T6). En Corrected la
+    // autorizacion por dealer se resuelve adentro, sobre `f.id_dealer`. El provider
+    // NO se omite nunca, ni afuera ni adentro.
+    const estadoSql = issue.estado === null ? '' : 'tew.estado = ? AND '
+    const estadoParams = issue.estado === null ? [] : [issue.estado]
+
+    const dealerAndSql = issue.skipOuterDealerPredicate ? '' : ttk.and
+    const dealerAndParams = issue.skipOuterDealerPredicate ? [] : ttk.params
+
+    const dateRangeSql = issue.skipOuterDateRange
+      ? ''
+      : ' AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)'
+    const dateRangeParams = issue.skipOuterDateRange ? [] : [fechaDesde, fechaHasta]
+
+    const outerEmployeeSql = issue.skipOuterEmployeeFilter ? '' : employeeSql
+    const outerEmployeeParams = issue.skipOuterEmployeeFilter ? [] : employeeParams
+
     const baseFrom = `
       FROM TTK_EMPLOYEE_WORK tew
       ${ttk.join}
       INNER JOIN usuarios u ON u.id_usuario = tew.id_author
-      WHERE tew.estado = ?
-        AND tew.id_dealer_provider = ?
-        ${ttk.and}
-        AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+      WHERE ${estadoSql}tew.id_dealer_provider = ?
+        ${dealerAndSql}
+        ${dateRangeSql}
         ${snapshotSql}
         ${issue.extraSql}
         ${paymentTypeFilterSql}
-        ${employeeSql}
+        ${outerEmployeeSql}
         ${searchSql}`
 
+    // Cada bloque aporta sus binds EN EL ORDEN EN QUE SU SQL APARECE EN EL TEXTO.
+    // El sello exterior se arma ANTES de issue.extraSql, asi que va antes.
     const baseParams = [
-      issue.estado,
+      ...estadoParams,
       idDealerProvider,
-      ...ttk.params,
-      fechaDesde,
-      fechaHasta,
+      ...dealerAndParams,
+      ...dateRangeParams,
       ...snapshotParams,
+      ...issue.extraParams,
       ...paymentTypeParams,
-      ...employeeParams,
+      ...outerEmployeeParams,
       ...searchParams,
     ]
 
@@ -124,22 +174,26 @@ export class GroupedPunchRepository {
          MAX(CASE WHEN ${issue.markSql} THEN 1 ELSE 0 END)          AS hasError,
          NULLIF(
            GROUP_CONCAT(
-             DISTINCT CASE
-               WHEN ${issue.markSql}
-               THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(TTK_PUNCH_WITH_ERROR(tew.id), '$.res')), '')
-               ELSE NULL
-             END
+             DISTINCT ${issue.markDetailSql}
              ORDER BY tew.punch_in
              SEPARATOR '<br/>'
            ),
            ''
-         )                                                                                            AS errorSummary
+         )                                                                                            AS errorDetail
        ${baseFrom}
        GROUP BY u.id_usuario, u.nombre
        ${havingSql}
        ORDER BY ${sortCol} ${sortDir}, u.id_usuario ${sortDir}
        LIMIT ? OFFSET ?`,
-      [...baseParams, ...havingParams, opts.pageSize, offset],
+      // markSql y markDetailSql viven en el SELECT: sus binds van ANTES que los del FROM.
+      [
+        ...issue.markParams,
+        ...issue.markDetailParams,
+        ...baseParams,
+        ...havingParams,
+        opts.pageSize,
+        offset,
+      ],
     )
 
     const countRows = await this.srs.query(
@@ -168,14 +222,13 @@ export class GroupedPunchRepository {
          ${ttk.join}
          INNER JOIN usuarios u ON u.id_usuario = tew.id_author
          LEFT JOIN GENERIC_DATA gd ON gd.id = tew.id_payment_type
-         WHERE tew.estado = ?
-           AND tew.id_dealer_provider = ?
-           ${ttk.and}
-           AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+         WHERE ${estadoSql}tew.id_dealer_provider = ?
+           ${dealerAndSql}
+           ${dateRangeSql}
            ${snapshotSql}
            ${issue.extraSql}
            ${paymentTypeFilterSql}
-           ${employeeSql}
+           ${outerEmployeeSql}
            ${searchSql}
            AND tew.id_author IN (${placeholders})
          GROUP BY tew.id_author, tew.id_payment_type, gd.name`,
@@ -196,15 +249,22 @@ export class GroupedPunchRepository {
       )
     }
 
-    const results: PunchGroupedRowDto[] = rows.map((r: Record<string, unknown>) => ({
-      idUsuario: Number(r.idUsuario),
-      nombreEmployee: String(r.nombreEmployee ?? ''),
-      hoursNumber: Math.round(Number(r.hoursNumber) * 100) / 100,
-      breakNumber: Math.round(Number(r.breakNumber) * 100) / 100,
-      hasError: Boolean(Number(r.hasError)),
-      errorSummary: r.errorSummary ? String(r.errorSummary) : null,
-      byPaymentType: byType[Number(r.idUsuario)] ?? [],
-    }))
+    // La misma columna SQL alimenta dos campos distintos del DTO, segun la fuente:
+    // en Pending trae el texto del error VIGENTE; en Corrected, los codigos de tipo
+    // que se CORRIGIERON. Nunca las dos cosas a la vez.
+    const results: PunchGroupedRowDto[] = rows.map((r: Record<string, unknown>) => {
+      const detail = r.errorDetail ? String(r.errorDetail) : null
+      return {
+        idUsuario: Number(r.idUsuario),
+        nombreEmployee: String(r.nombreEmployee ?? ''),
+        hoursNumber: Math.round(Number(r.hoursNumber) * 100) / 100,
+        breakNumber: Math.round(Number(r.breakNumber) * 100) / 100,
+        hasError: Boolean(Number(r.hasError)),
+        errorSummary: issue.marksCorrections ? null : detail,
+        correctedTypes: issue.marksCorrections ? parseCorrectedTypes(detail) : null,
+        byPaymentType: byType[Number(r.idUsuario)] ?? [],
+      }
+    })
 
     return {
       results,

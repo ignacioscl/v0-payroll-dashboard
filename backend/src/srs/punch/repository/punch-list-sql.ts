@@ -1,6 +1,7 @@
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { resolveGroupedIssueFilter } from './punch-grouped-issue-filter'
+import { DEFAULT_ERROR_TYPES, errorTypesInList } from './punch-error-types'
 import { PunchListLiveStatus, PunchListSort } from '../dto/punch-list.dto'
 
 export type PunchListSqlOpts = {
@@ -21,6 +22,17 @@ export type PunchListSqlOpts = {
    * nunca se les serializa la clasificación de error.
    */
   includeErrorType?: boolean
+  /**
+   * Sale de la policy (`resolveDeletedVisibility`). Sólo pesa en `only_fixed`:
+   * decide si las correcciones sobre ponchadas ya borradas entran a la lista.
+   * Default seguro `false`.
+   */
+  includeDeletedFixes?: boolean
+  /**
+   * Frontera superior congelada de Grouped, propagada al detalle expandido y a su
+   * export para que la expansión no muestre ponchadas que no estaban en el padre.
+   */
+  snapshotAt?: string
 }
 
 export type PunchListPageSqlOpts = PunchListSqlOpts & {
@@ -76,12 +88,43 @@ function dealerNameByProviderExpr(idDealerProvider: number): string {
   return `GET_DEALER_NAME_BY_PROVIDER(${providerId}, c.id)`
 }
 
+/**
+ * Dos columnas agregadas para el export Individual, que es UN SOLO stream con
+ * `mapRow` síncrono: una segunda consulta por página no lo puede completar, y un
+ * `GROUP_CONCAT` de longitud libre se trunca en `group_concat_max_len` sin avisar
+ * (acá son como mucho tres códigos de un dígito).
+ *
+ * El predicado es el mismo canónico del `EXISTS` que selecciona las filas.
+ */
+function correctedColumnsSql(types: string): string {
+  return `
+  (SELECT GROUP_CONCAT(DISTINCT fx.error_type ORDER BY fx.error_type SEPARATOR ',')
+     FROM TTK_PUNCH_ERROR_FIX fx
+    WHERE fx.id_ttk_employee_work = tew.id
+      AND fx.id_dealer_provider = tew.id_dealer_provider
+      AND fx.error_type IN (${types}))       AS corrected_types,
+  (SELECT DATE_FORMAT(MAX(fx.fixed_at), '%Y-%m-%d %H:%i:%s')
+     FROM TTK_PUNCH_ERROR_FIX fx
+    WHERE fx.id_ttk_employee_work = tew.id
+      AND fx.id_dealer_provider = tew.id_dealer_provider
+      AND fx.error_type IN (${types}))       AS last_corrected_at,`
+}
+
 export function buildPunchListSelectFields(
   idDealerProvider: number,
-  opts: Pick<PunchListSqlOpts, 'includeAmounts' | 'includePaymentTypeName' | 'includeErrorType'>,
+  opts: Pick<
+    PunchListSqlOpts,
+    'includeAmounts' | 'includePaymentTypeName' | 'includeErrorType' | 'errorTypes' | 'issueType'
+  > & { includeCorrectedColumns?: boolean },
 ): string {
   const includeAmounts = opts.includeAmounts === true
   const includePaymentTypeName = opts.includePaymentTypeName === true
+  // Sólo el export Individual las pide: la grilla llena `fixes[]` con la segunda
+  // consulta por página, que además trae quién corrigió y la fecha del ponche.
+  const correctedFields =
+    opts.includeCorrectedColumns === true && opts.issueType === 'only_fixed'
+      ? correctedColumnsSql(errorTypesInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES))
+      : ''
   // V2 hace un SELECT interno por invocación: sólo se paga cuando hace falta.
   const errorTypeField =
     opts.includeErrorType === true
@@ -105,6 +148,7 @@ export function buildPunchListSelectFields(
   tew.fixed_at                             AS fixed_at,
   tew.fixed_by                             AS fixed_by,
   tew.fixed_error_snapshot                 AS fixed_error_snapshot,
+  ${correctedFields}
   ${amountFields}
 
   ${utcEpochExpr('tew.punch_in')}          AS punch_in_epoch,
@@ -166,7 +210,15 @@ export function buildPunchListFromWhere(
   const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, skipDealerRestriction } =
     filter
   const ttk = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
-  const issue = resolveGroupedIssueFilter(opts.issueType, opts.errorTypes)
+  const issue = resolveGroupedIssueFilter({
+    issueType: opts.issueType,
+    errorTypes: opts.errorTypes,
+    fechaDesde,
+    fechaHasta,
+    includeDeletedFixes: opts.includeDeletedFixes === true,
+    snapshotAt: opts.snapshotAt,
+    dealerIds,
+  })
 
   const paymentTypeSql = opts.idPaymentType ? ' AND tew.id_payment_type = ?' : ''
   const paymentTypeParams = opts.idPaymentType ? [opts.idPaymentType] : []
@@ -184,32 +236,60 @@ export function buildPunchListFromWhere(
   const maxHoursSql = opts.maxHours != null ? ` AND ${punchHoursExpr} <= ?` : ''
   const maxHoursParams = opts.maxHours != null ? [opts.maxHours] : []
 
+  // El JOIN de dealer NO se omite nunca — sólo su predicado. El SELECT proyecta
+  // `c.id` y arma el nombre con GET_DEALER_NAME_BY_PROVIDER, y el único origen del
+  // alias `c` es `ttk.join`: sacarlo rompe la consulta antes de devolver una fila.
+  // En modo Corrected la autorización por dealer se resuelve adentro, sobre
+  // `f.id_dealer`. El provider NO se omite nunca, ni afuera ni adentro.
+  const estadoSql = issue.estado === null ? '' : 'tew.estado = ? AND '
+  const estadoParams = issue.estado === null ? [] : [issue.estado]
+
+  const dealerAndSql = issue.skipOuterDealerPredicate ? '' : ttk.and
+  const dealerAndParams = issue.skipOuterDealerPredicate ? [] : ttk.params
+
+  // En Corrected el rango va adentro, sobre `f.punch_date`: dejarlo también afuera
+  // sobre `tew.punch_in` metería el evento en dos períodos distintos.
+  const dateRangeSql = issue.skipOuterDateRange
+    ? ''
+    : ' AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)'
+  const dateRangeParams = issue.skipOuterDateRange ? [] : [fechaDesde, fechaHasta]
+
+  const outerEmployeeSql = issue.skipOuterEmployeeFilter ? '' : employeeSql
+  const outerEmployeeParams = issue.skipOuterEmployeeFilter ? [] : employeeParams
+
+  // Frontera de la foto de Grouped: aplica en TODOS los modos. Sin esto, expandir un
+  // grupo (o exportarlo) muestra ponchadas que no estaban en el padre.
+  const snapshotSql = opts.snapshotAt ? ' AND tew.punch_in <= ?' : ''
+  const snapshotParams = opts.snapshotAt ? [opts.snapshotAt] : []
+
   const fromWhere = `
       FROM TTK_EMPLOYEE_WORK tew
       ${ttk.join}
       INNER JOIN usuarios     u  ON u.id_usuario = tew.id_author
       LEFT  JOIN usuarios     uf ON uf.id_usuario = tew.fixed_by
       LEFT  JOIN GENERIC_DATA gd ON gd.id = tew.id_payment_type
-      WHERE tew.estado = ?
-        AND tew.id_dealer_provider = ?
-        ${ttk.and}
-        AND tew.punch_in >= ? AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+      WHERE ${estadoSql}tew.id_dealer_provider = ?
+        ${dealerAndSql}
+        ${dateRangeSql}
+        ${snapshotSql}
         ${issue.extraSql}
         ${paymentTypeSql}
-        ${employeeSql}
+        ${outerEmployeeSql}
         ${searchSql}
         ${minHoursSql}
         ${maxHoursSql}
         ${liveStatusSql(opts.todayLiveStatus)}`
 
+  // Cada bloque aporta sus binds EN EL ORDEN EN QUE SU SQL APARECE EN EL TEXTO.
   const params: (string | number)[] = [
-    issue.estado,
+    ...estadoParams,
     idDealerProvider,
-    ...ttk.params,
-    fechaDesde,
-    fechaHasta,
+    ...dealerAndParams,
+    ...dateRangeParams,
+    ...snapshotParams,
+    ...issue.extraParams,
     ...paymentTypeParams,
-    ...employeeParams,
+    ...outerEmployeeParams,
     ...searchParams,
     ...minHoursParams,
     ...maxHoursParams,
@@ -257,7 +337,10 @@ export function buildPunchListExportSql(
   opts: PunchListSqlOpts,
 ): { sql: string; params: (string | number)[]; fromWhere: string } {
   const { fromWhere, params } = buildPunchListFromWhere(filter, opts)
-  const select = buildPunchListSelectFields(filter.idDealerProvider, opts)
+  const select = buildPunchListSelectFields(filter.idDealerProvider, {
+    ...opts,
+    includeCorrectedColumns: true,
+  })
   const sql = `SELECT ${select} ${fromWhere} ORDER BY tew.punch_in DESC, tew.id DESC`
   return { sql, params, fromWhere }
 }

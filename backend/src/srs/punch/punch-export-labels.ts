@@ -39,6 +39,16 @@ export type PunchExportLabels = {
   liveStatusLabels: Record<string, string>
   /** Fila "Error types" del Report Info. */
   errorTypes: string
+  /**
+   * Fila "Status" del Report Info. El eje pendiente/corregido salio de `issueType`
+   * y pasó a ser un filtro propio: sin esta fila el archivo lista corregidos y dice
+   * que no hay filtro (`xls-export-report-info` es alwaysApply).
+   */
+  errorStatus: string
+  errorStatusLabels: Record<'pending' | 'corrected', string>
+  /** Columnas de datos que sólo aparecen en modo Corrected. */
+  colCorrectedTypes: string
+  colLastCorrectedAt: string
   /** Nombre visible de cada codigo de TTK_PUNCH_WITH_ERROR_V2. */
   errorTypeNames: Record<1 | 2 | 3, string>
 }
@@ -89,6 +99,10 @@ const EN: PunchExportLabels = {
     only_fixed: 'Corrected punches',
   },
   errorTypes: 'Error types',
+  errorStatus: 'Status',
+  errorStatusLabels: { pending: 'Pending', corrected: 'Corrected' },
+  colCorrectedTypes: 'Corrected',
+  colLastCorrectedAt: 'Last corrected at',
   errorTypeNames: {
     1: 'Without clock out',
     2: 'Break missing',
@@ -147,6 +161,10 @@ const ES: PunchExportLabels = {
     only_fixed: 'Ponchadas corregidas',
   },
   errorTypes: 'Tipos de error',
+  errorStatus: 'Estado',
+  errorStatusLabels: { pending: 'Pendientes', corrected: 'Corregidos' },
+  colCorrectedTypes: 'Corregido',
+  colLastCorrectedAt: 'Última corrección',
   errorTypeNames: {
     1: 'Sin salida',
     2: 'Sin descanso',

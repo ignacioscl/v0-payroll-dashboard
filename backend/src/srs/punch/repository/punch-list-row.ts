@@ -67,6 +67,16 @@ export function mapPunchListRow(
         : null,
     fixedErrorSnapshot: toStringOrNull(r.fixed_error_snapshot),
 
+    // Sólo el SQL del export Individual proyecta estas dos columnas.
+    correctedTypes:
+      r.corrected_types == null
+        ? null
+        : String(r.corrected_types)
+            .split(',')
+            .map((t) => Number(t.trim()))
+            .filter((t) => t === 1 || t === 2 || t === 3),
+    lastCorrectedAt: toStringOrNull(r.last_corrected_at),
+
     usuario: {
       id: Number(r.id_usuario),
       nombre: String(r.nombre ?? ''),

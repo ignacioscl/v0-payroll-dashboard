@@ -57,6 +57,8 @@ interface DataTableToolbarProps<TData> {
   recordsCount?: number
   /** Label after the records counter when `recordsCount` is set. */
   recordsCountLabel?: string
+  /** Nota al lado del contador (p. ej. "estás viendo ponchadas corregidas"). */
+  recordsCountNote?: React.ReactNode
 
   /** Scroll the table card below the fixed nav so it fills the viewport. */
   enableTableFocus?: boolean
@@ -82,6 +84,7 @@ export function DataTableToolbar<TData>({
   leading,
   recordsCount,
   recordsCountLabel,
+  recordsCountNote,
   enableTableFocus = false,
   isTableFocused = false,
   onFocusTable,
@@ -165,6 +168,7 @@ export function DataTableToolbar<TData>({
             </span>
           )}
           <span>{displayLabel}</span>
+          {recordsCountNote}
         </div>
 
         {enableGlobalFilter && (

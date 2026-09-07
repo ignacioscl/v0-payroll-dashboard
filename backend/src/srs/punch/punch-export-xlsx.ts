@@ -5,6 +5,7 @@ import { punchExportLabels } from './punch-export-labels'
 import {
   formatDurationHhMmSs,
   formatNyDate,
+  formatDbStampForExport,
   formatNyStamp,
   formatNyTime,
   formatPunchMethodSuffix,
@@ -34,6 +35,8 @@ export type WritePunchExportOptions = {
   stream: Writable
   locale: PunchExportLocale
   includePaymentType: boolean
+  /** Agrega las columnas "Corrected" y "Last corrected at" (sólo modo Corrected). */
+  includeCorrected?: boolean
   generatedBy: string
   generatedAt?: Date
   reportMeta: PunchExportMetaRow[]
@@ -66,6 +69,7 @@ export function punchRowToCells(
   row: PunchListRowDto,
   locale: PunchExportLocale,
   includePaymentType: boolean,
+  includeCorrected = false,
 ): (string | number)[] {
   const cells: (string | number)[] = [
     row.usuario?.nombre ?? '',
@@ -102,10 +106,24 @@ export function punchRowToCells(
   if (includePaymentType) {
     cells.push(row.objPaymentType?.name ?? '')
   }
+  if (includeCorrected) {
+    const l = punchExportLabels(locale)
+    cells.push(
+      (row.correctedTypes ?? [])
+        .map((t) => l.errorTypeNames[t as 1 | 2 | 3] ?? String(t))
+        .join(', '),
+    )
+    // Nunca el string crudo de la base: el resto de la planilla usa MM/DD/YYYY.
+    cells.push(formatDbStampForExport(row.lastCorrectedAt))
+  }
   return cells
 }
 
-function columnHeaders(locale: PunchExportLocale, includePaymentType: boolean): string[] {
+function columnHeaders(
+  locale: PunchExportLocale,
+  includePaymentType: boolean,
+  includeCorrected: boolean,
+): string[] {
   const l = punchExportLabels(locale)
   const headers = [
     l.colEmployee,
@@ -120,6 +138,7 @@ function columnHeaders(locale: PunchExportLocale, includePaymentType: boolean): 
     l.colTimeBreak,
   ]
   if (includePaymentType) headers.push(l.colPaymentType)
+  if (includeCorrected) headers.push(l.colCorrectedTypes, l.colLastCorrectedAt)
   return headers
 }
 
@@ -150,7 +169,9 @@ export async function writePunchExportWorkbook(opts: WritePunchExportOptions): P
   const locale = opts.locale
   const labels = punchExportLabels(locale)
   const includePaymentType = opts.includePaymentType
-  const headers = columnHeaders(locale, includePaymentType)
+  // Sólo en modo Corrected: son las dos columnas agregadas del SQL del export.
+  const includeCorrected = opts.includeCorrected === true
+  const headers = columnHeaders(locale, includePaymentType, includeCorrected)
   const colCount = headers.length
   const generatedAt = opts.generatedAt ?? new Date()
   const stamp = `${labels.generated} ${formatNyStamp(generatedAt)} · ${labels.reportName}`
@@ -217,7 +238,7 @@ export async function writePunchExportWorkbook(opts: WritePunchExportOptions): P
       sheet = openDataSheet(sheetIndex)
       dataOnSheet = 0
     }
-    const values = punchRowToCells(punch, locale, includePaymentType)
+    const values = punchRowToCells(punch, locale, includePaymentType, includeCorrected)
     const excelRow = sheet.addRow(values)
     styleDataRow(excelRow, colCount, dataOnSheet % 2 === 1)
     excelRow.commit()

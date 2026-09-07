@@ -17,6 +17,7 @@ import {
   matchPreset,
 } from '@/lib/filters/date-range-presets'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
+import { ErrorStatusToggle } from '@/components/filters/error-status-toggle'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import {
   getIssueFilterLabel,
@@ -32,6 +33,7 @@ import type { PaymentTypeCatalogItem } from '@/lib/ttk/payment-type-filter'
 import { TodayLiveStatusFilterCards } from '@/components/ttk/today-live-status-filter-cards'
 import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
 import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
+import { effectiveErrorStatus } from '@/lib/ttk/error-status'
 
 const STORAGE_KEY = 'punch-report-filters-open'
 
@@ -124,6 +126,8 @@ export function PunchReportFilterPanel({
     selectedDealers,
     selectedType,
     setSelectedType,
+    errorStatus,
+    setErrorStatus,
     selectedTodayLiveStatus,
     setSelectedTodayLiveStatus,
     dateRange,
@@ -159,12 +163,25 @@ export function PunchReportFilterPanel({
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
 
+    // El eje de estado también es un filtro: sin chip queda invisible y no
+    // removible. Sólo aparece cuando EFECTIVAMENTE aplica (§T9bis).
+    if (effectiveErrorStatus(selectedType, errorStatus) === 'corrected') {
+      list.push({
+        key: 'error-status',
+        label: t('punch.errorStatusCorrected'),
+        onRemove: () => setErrorStatus('pending'),
+      })
+    }
+
     // Un chip por tipo destildado, SÓLO si la exclusión está aplicando: las tres
     // tarjetas viven bajo `Only with errors` y sin ese filtro no hacen nada, así
     // que un chip "X excluded" ahí sería un filtro que dice estar activo y no lo
     // está. Sin el chip, en cambio, el filtro queda invisible y no removible:
     // por eso va exactamente cuando aplica.
-    for (const code of selectedType === 'only_error' ? excludedErrorTypes : []) {
+    const typeChipsApply =
+      selectedType === 'only_error' ||
+      effectiveErrorStatus(selectedType, errorStatus) === 'corrected'
+    for (const code of typeChipsApply ? excludedErrorTypes : []) {
       list.push({
         key: `error-type-${code}`,
         label: t('punch.errorTypeExcludedChip', {
@@ -257,6 +274,8 @@ export function PunchReportFilterPanel({
     selectedEmployee,
     selectedDealers.length,
     selectedType,
+    errorStatus,
+    setErrorStatus,
     excludedErrorTypes,
     toggleErrorType,
     selectedTodayLiveStatus,
@@ -281,6 +300,7 @@ export function PunchReportFilterPanel({
     setSearch('')
     setSelectedEmployee(null)
     setSelectedType('all')
+    setErrorStatus('pending')
     // Restaura los tres tipos incluidos de una. `clearFilters()` del contexto no
     // se usa en ningún lado: el reset que el usuario ve es éste.
     resetErrorTypes()
@@ -293,6 +313,7 @@ export function PunchReportFilterPanel({
     setSearch,
     setSelectedEmployee,
     setSelectedType,
+    setErrorStatus,
     setSelectedTodayLiveStatus,
     setDateRange,
     onPunchMinHoursChange,
@@ -342,7 +363,7 @@ export function PunchReportFilterPanel({
         <button
           type="button"
           className={cn(
-            'flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors',
+            'flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 text-left transition-colors',
             'hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
           )}
         >
@@ -434,6 +455,18 @@ export function PunchReportFilterPanel({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
+        {/* El eje pendiente/corregido vive acá, no en el header: es un filtro del
+            contenido de la pantalla, y en el header competía por lugar con dealers,
+            rango y el botón de agregar hasta desbordarse encima de ellos. */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('punch.errorStatus')}
+          </span>
+          <ErrorStatusToggle respectSelectedType />
+        </div>
+
+        <div className="hidden h-[18px] w-px bg-border sm:block" />
+
         <PunchHoursFilter
           minHours={punchMinHours}
           maxHours={punchMaxHours}

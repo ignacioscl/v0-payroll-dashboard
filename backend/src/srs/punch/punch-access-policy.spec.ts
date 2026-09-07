@@ -44,6 +44,42 @@ describe('PunchAccessPolicyService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
+  /* ---------------------------------------------------------------------- */
+  /* Gate de eliminadas (T7)                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  it('only_fixed SIN permiso 68 NO da 403: se recorta el subconjunto', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_fixed' })
+    expect(access.includeDeletedFixes).toBe(false)
+  })
+
+  it('only_fixed CON permiso 68 incluye las correcciones sobre eliminadas', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65, 68]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_fixed' })
+    expect(access.includeDeletedFixes).toBe(true)
+  })
+
+  it('only_deletes CON permiso 68 pasa', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65, 68]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_deletes' })
+    expect(access.includeDeletedFixes).toBe(true)
+  })
+
+  it('resolveDeletedVisibility NO exige la acción de Punch Report', async () => {
+    // Es el gate que usan los KPI: su consumidor vivo (/reports/business-kpis) se
+    // autoriza con Production Report, no con Punch Report. Reusar assertAndResolve
+    // metería un 403 donde hoy no lo hay.
+    const svc = new PunchAccessPolicyService(mockPerms([68]), mockSrs(async () => []) as never)
+    await expect(svc.resolveDeletedVisibility(ctx())).resolves.toBe(true)
+
+    const svcSinNada = new PunchAccessPolicyService(mockPerms([]), mockSrs(async () => []) as never)
+    await expect(svcSinNada.resolveDeletedVisibility(ctx())).resolves.toBe(false)
+  })
+
   it('usuario externo con issueType distinto de all da 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)

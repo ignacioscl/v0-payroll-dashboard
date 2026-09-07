@@ -7,6 +7,7 @@ import {
 } from '@/lib/ttk/payment-type-filter'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { errorTypesParam } from '@/lib/filters/error-types-cookie'
+import { resolveIssueType, type ErrorStatus } from '@/lib/ttk/error-status'
 
 /** Cursor keyset devuelto por el backend; el cliente lo reenvía tal cual. */
 export type PunchListCursor = {
@@ -34,6 +35,8 @@ export type PunchListQueryParams = {
   issueType?: string
   /** CSV canónico de tipos incluidos. String ya joineado, nunca number[]. */
   errorTypes?: string
+  /** Frontera congelada del grupo padre (expansión de Grouped y su export). */
+  snapshotAt?: string
   todayLiveStatus?: string
 }
 
@@ -57,10 +60,15 @@ export function buildPunchListParams(input: {
   paymentTypeFilter?: PaymentTypeFilterValue
   todayLiveStatus?: string
   includedErrorTypes?: readonly number[]
+  errorStatus?: ErrorStatus
+  snapshotAt?: string
 }): PunchListQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
-  let issueType = input.selectedType && input.selectedType !== 'all' ? input.selectedType : undefined
+  // El eje de estado se cruza con el tipo en UN SOLO lugar (resolveIssueType):
+  // list, Grouped, detalle agrupado y los dos exports pasan por acá.
+  const crossedType = resolveIssueType(input.selectedType, input.errorStatus ?? 'pending')
+  let issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
   let idPaymentType: number | undefined
 
   if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
@@ -88,6 +96,7 @@ export function buildPunchListParams(input: {
     idEmployee: employeeId,
     issueType,
     errorTypes: errorTypesParam(input.includedErrorTypes),
+    snapshotAt: input.snapshotAt,
     todayLiveStatus:
       input.todayLiveStatus && input.todayLiveStatus !== TODAY_LIVE_STATUS_ALL
         ? input.todayLiveStatus
@@ -113,6 +122,7 @@ export function punchListParamsToSearchParams(params: PunchListQueryParams): URL
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
   if (params.errorTypes) qs.set('errorTypes', params.errorTypes)
+  if (params.snapshotAt) qs.set('snapshotAt', params.snapshotAt)
   if (params.todayLiveStatus) qs.set('todayLiveStatus', params.todayLiveStatus)
   return qs
 }

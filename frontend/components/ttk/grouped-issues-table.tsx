@@ -28,7 +28,7 @@ import {
 } from '@/lib/ttk/payment-type-filter'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
-import { IssuesDataTable } from '@/components/ttk/issues-data-table'
+import { CorrectedRecordsNote, IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { PunchErrorIndicator } from '@/components/ttk/punch-error-indicator'
 import { GroupedPunchExportButton } from '@/components/ttk/grouped-punch-export-button'
 import type {
@@ -43,6 +43,8 @@ import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { effectiveErrorStatus, resolveIssueType } from '@/lib/ttk/error-status'
+import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
 const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
 
@@ -63,9 +65,12 @@ function paymentTypeHours(row: PunchGroupedRow, label: string): number | null {
 function GroupedPunchDetail({
   row,
   useHoursFormat,
+  snapshotAt,
 }: {
   row: PunchGroupedRow
   useHoursFormat: boolean
+  /** La misma foto que vio el padre: sin esto la expansión trae filas de más. */
+  snapshotAt?: string
 }) {
   const { t } = useTranslation()
   const employeeId = Number(row.idUsuario)
@@ -85,6 +90,7 @@ function GroupedPunchDetail({
       </p>
       <IssuesDataTable
         employeeIdOverride={employeeId}
+        snapshotAt={snapshotAt}
         ignoreSearch
         showToolbarFilters={false}
         tableId={`grouped-detail-${employeeId}`}
@@ -95,6 +101,8 @@ function GroupedPunchDetail({
         enableExport={false}
         enableTableFocus={false}
         groupedHoursFormat={useHoursFormat}
+        // El aviso de corregidas va una sola vez, arriba, en la tabla padre.
+        showCorrectedNote={false}
       />
     </div>
   )
@@ -116,6 +124,7 @@ export function GroupedIssuesDataTable({
     selectedEmployee,
     selectedDealers,
     selectedType,
+    errorStatus,
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
@@ -123,9 +132,26 @@ export function GroupedIssuesDataTable({
     errorTypesReady,
   } = useFilters()
 
+  // El gate de la lista blanca mira el issueType YA CRUZADO: en modo corregido el
+  // EXISTS del backend respeta los tipos tildados, así que la lista blanca rige.
+  const crossedIssueType = resolveIssueType(selectedType, errorStatus)
+  const isCorrectedMode = effectiveErrorStatus(selectedType, errorStatus) === 'corrected'
+  const groupColumnLabel = isCorrectedMode
+    ? t('punch.groupCorrectedColumn')
+    : t('punch.withErrors')
+  /** El export del detalle arma el XLSX en el navegador: los nombres van resueltos. */
+  const errorTypeNamesForExport = React.useMemo(
+    () => ({
+      1: errorTypeLabel(t, 1),
+      2: errorTypeLabel(t, 2),
+      3: errorTypeLabel(t, 3),
+    }),
+    [t],
+  )
+
   // Ver comentario en issues-data-table: la lista blanca sólo rige bajo un filtro
   // de error; con `all` la tabla trae todo y las tarjetas están inactivas.
-  const includedErrorTypes = isErrorIssueType(selectedType)
+  const includedErrorTypes = isErrorIssueType(crossedIssueType)
     ? storedIncludedErrorTypes
     : ALL_ERROR_TYPES
   const emptyByErrorTypes = includedErrorTypes.length === 0
@@ -157,7 +183,6 @@ export function GroupedIssuesDataTable({
     { id: 'employee', desc: false },
   ])
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
-  const [employeeSearch, setEmployeeSearch] = React.useState('')
   const [useHoursFormat, setUseHoursFormat] = React.useState(true)
 
   React.useEffect(() => {
@@ -172,7 +197,6 @@ export function GroupedIssuesDataTable({
   }, [])
 
   const debouncedDealers = useDebouncedValue(selectedDealers, 450)
-  const debouncedEmployeeSearch = useDebouncedValue(employeeSearch, 300)
   const debouncedMinHours = useDebouncedValue(punchMinHoursRaw, 600)
   const debouncedMaxHours = useDebouncedValue(punchMaxHoursRaw, 600)
   const minHoursTotal = debouncedMinHours !== '' ? Number(debouncedMinHours) : null
@@ -198,11 +222,15 @@ export function GroupedIssuesDataTable({
         dateRange,
         selectedType,
         selectedEmployeeId: selectedEmployee?.id ?? null,
-        search: debouncedEmployeeSearch,
+        // Vacío a propósito: el empleado se elige en el header y viaja arriba, en
+        // `selectedEmployeeId`. El buscador libre de esta grilla era un segundo
+        // filtro del mismo campo y se sacó.
+        search: '',
         page: pageIndex + 1,
         pageSize,
         snapshotAt: pageIndex > 0 ? snapshotAtRef.current : undefined,
         includedErrorTypes,
+        errorStatus,
         sort:
           sortCol === 'employee'
             ? 'nombreEmployee'
@@ -219,7 +247,6 @@ export function GroupedIssuesDataTable({
       dateRange,
       selectedType,
       selectedEmployee?.id,
-      debouncedEmployeeSearch,
       pageIndex,
       pageSize,
       sortCol,
@@ -228,6 +255,7 @@ export function GroupedIssuesDataTable({
       maxHoursTotal,
       paymentTypeFilter,
       includedErrorTypes,
+      errorStatus,
     ],
   )
 
@@ -265,9 +293,27 @@ export function GroupedIssuesDataTable({
         pageSize: 500,
         todayLiveStatus: selectedTodayLiveStatus,
         includedErrorTypes,
+        errorStatus,
+        // Payment type SÍ viaja: filtra ponchada por ponchada, igual que en la
+        // consulta agrupada. Sin él el detalle del export traía ponches de otros
+        // tipos de pago que la pantalla no lista.
+        paymentTypeFilter,
       }),
-    [debouncedDealers, dateRange, selectedType, selectedTodayLiveStatus, includedErrorTypes],
+    [
+      debouncedDealers,
+      dateRange,
+      selectedType,
+      selectedTodayLiveStatus,
+      includedErrorTypes,
+      errorStatus,
+      paymentTypeFilter,
+    ],
   )
+
+  // minHoursTotal/maxHoursTotal NO viajan acá a propósito. En Grouped el filtro de
+  // horas es sobre el TOTAL del empleado en el período —lo dice el cartel de la
+  // pantalla—, no sobre cada ponchada. Pasarlo al detalle lo aplicaría ponche por
+  // ponche y escondería ponchadas de empleados que sí pasaron el filtro.
 
   const buildExportLabels = React.useCallback((): PunchGroupedExportLabels => {
     return {
@@ -282,9 +328,12 @@ export function GroupedIssuesDataTable({
       timeBreak: t('punch.timeBreak'),
       paymentType: t('punch.paymentType'),
       dealer: t('profile.dealer'),
-      hasError: t('punch.withErrors'),
+      hasError: groupColumnLabel,
       yes: t('punch.exportYes'),
       no: t('punch.exportNo'),
+      correctedTypes: t('punch.groupCorrectedColumn'),
+      lastCorrectedAt: t('punch.correctedWhen'),
+      deletedPunch: t('punch.deletedPunchChip'),
       groupedSheet: t('punch.exportGroupedSheetName'),
       totalHours: t('punch.totalHours'),
       exportingProgress: t('punch.exportGroupedGenerating'),
@@ -307,6 +356,11 @@ export function GroupedIssuesDataTable({
         employee: t('common.employee'),
         paymentType: t('punch.paymentType'),
         errorTypes: t('punch.errorTypesReportInfo'),
+        errorStatus: t('punch.errorStatus'),
+        issueType: t('punch.issueTypeReportInfo'),
+        search: t('common.search'),
+        minHours: t('punch.minHoursReportInfo'),
+        maxHours: t('punch.maxHoursReportInfo'),
         all: t('punch.exportAll'),
       },
     }
@@ -334,6 +388,15 @@ export function GroupedIssuesDataTable({
         includedErrorTypes.length === 3
           ? all
           : includedErrorTypes.map((c) => errorTypeLabel(t, c as ErrorTypeCode)).join(', '),
+      // Los cinco de abajo faltaban: el Report Info decía "sin filtro" sobre filtros
+      // que sí estaban aplicando (`xls-export-report-info` es alwaysApply).
+      errorStatus: isCorrectedMode
+        ? t('punch.errorStatusCorrected')
+        : t('punch.errorStatusPending'),
+      issueType: selectedType && selectedType !== 'all' ? getIssueFilterLabel(t, selectedType) : all,
+      search: all,
+      minHours: minHoursTotal != null ? String(minHoursTotal) : all,
+      maxHours: maxHoursTotal != null ? String(maxHoursTotal) : all,
     }
   }, [
     t,
@@ -343,6 +406,10 @@ export function GroupedIssuesDataTable({
     selectedEmployee,
     paymentTypeLabelForExport,
     includedErrorTypes,
+    isCorrectedMode,
+    selectedType,
+    minHoursTotal,
+    maxHoursTotal,
   ])
 
   React.useEffect(() => {
@@ -353,7 +420,6 @@ export function GroupedIssuesDataTable({
     // universo anterior y mezcla dos conjuntos de datos.
     snapshotAtRef.current = undefined
   }, [
-    debouncedEmployeeSearch,
     debouncedDealers,
     selectedType,
     dateRange,
@@ -420,7 +486,7 @@ export function GroupedIssuesDataTable({
             aria-label={
               row.getIsExpanded() ? t('punch.collapsePunches') : t('punch.expandPunches')
             }
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             {row.getIsExpanded() ? (
               <ChevronDown className="h-4 w-4" />
@@ -451,11 +517,11 @@ export function GroupedIssuesDataTable({
                   e.stopPropagation()
                   row.toggleExpanded()
                 }}
-                className="min-w-0 truncate text-left font-medium hover:underline"
+                className="min-w-0 cursor-pointer truncate text-left font-medium hover:underline"
               >
                 {r.nombreEmployee}
               </button>
-              {r.errorSummary ? (
+              {!isCorrectedMode && r.errorSummary ? (
                 <span
                   className="shrink-0"
                   onClick={(e) => e.stopPropagation()}
@@ -513,11 +579,25 @@ export function GroupedIssuesDataTable({
         id: 'hasError',
         accessorFn: (row) => row.hasError,
         enableSorting: false,
+        // La columna cambia de FUENTE, no sólo de etiqueta (decisión D-B): mirando
+        // corregidos la pregunta no es "¿tiene errores?" sino "¿qué se le corrigió?".
+        // El backend manda `correctedTypes` en vez de `errorSummary` en ese modo.
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t('punch.withErrors')} />
+          <DataTableColumnHeader column={column} title={groupColumnLabel} />
         ),
         cell: ({ row }) => {
           const r = row.original
+          if (isCorrectedMode) {
+            const types = r.correctedTypes ?? []
+            if (types.length === 0) {
+              return <span className="text-xs text-muted-foreground">{t('punch.exportNo')}</span>
+            }
+            return (
+              <span className="text-xs">
+                {types.map((type) => errorTypeLabel(t, type as ErrorTypeCode)).join(', ')}
+              </span>
+            )
+          }
           if (!r.hasError) {
             return <span className="text-xs text-muted-foreground">{t('punch.exportNo')}</span>
           }
@@ -531,8 +611,15 @@ export function GroupedIssuesDataTable({
           return <span className="text-xs">{t('punch.exportYes')}</span>
         },
         meta: {
-          label: t('punch.withErrors'),
-          exportValue: (r) => (r.hasError ? t('punch.exportYes') : t('punch.exportNo')),
+          label: groupColumnLabel,
+          exportValue: (r) =>
+            isCorrectedMode
+              ? (r.correctedTypes ?? [])
+                  .map((type) => errorTypeLabel(t, type as ErrorTypeCode))
+                  .join(', ')
+              : r.hasError
+                ? t('punch.exportYes')
+                : t('punch.exportNo'),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
     ],
@@ -553,7 +640,6 @@ export function GroupedIssuesDataTable({
       dateRange?.from?.toISOString(),
       dateRange?.to?.toISOString(),
       selectedType,
-      debouncedEmployeeSearch,
       pageIndex,
       pageSize,
       sorting,
@@ -564,6 +650,10 @@ export function GroupedIssuesDataTable({
       // Obligatorio: esta tabla pasa `extra: {}` a useDataTableQuery, así que el
       // escape hatch que mete `extra` en la key no aplica acá.
       errorTypesQueryKey(includedErrorTypes),
+      // El issueType YA CRUZADO con el estado. `selectedType` solo no alcanza:
+      // no cambia al pasar de pendientes a corregidos, así que sin esto la tabla
+      // se queda con la página cacheada del otro estado.
+      crossedIssueType,
     ],
     queryFn: async () => {
       const res = await fetchPunchGrouped(listExtra)
@@ -648,7 +738,11 @@ export function GroupedIssuesDataTable({
 
   const renderSubComponent = React.useCallback(
     (row: Row<PunchGroupedRow>) => (
-      <GroupedPunchDetail row={row.original} useHoursFormat={useHoursFormat} />
+      <GroupedPunchDetail
+        row={row.original}
+        useHoursFormat={useHoursFormat}
+        snapshotAt={snapshotAtRef.current}
+      />
     ),
     [useHoursFormat],
   )
@@ -674,11 +768,12 @@ export function GroupedIssuesDataTable({
         getRowId={(row) => String(row.idUsuario)}
         isLoading={isFetching}
         emptyState={emptyState}
-        enableGlobalFilter
-        globalFilter={employeeSearch}
-        onGlobalFilterChange={setEmployeeSearch}
-        globalFilterPlaceholder={t('punch.searchEmployeeByName')}
+        // El empleado ya se filtra desde el header, que aplica a las dos vistas.
+        // Este buscador era un segundo filtro del mismo campo, en otro lugar y con
+        // otro alcance: dos controles para lo mismo que se contradicen entre sí.
+        enableGlobalFilter={false}
         manualFiltering
+        recordsCountNote={isCorrectedMode ? <CorrectedRecordsNote /> : null}
         enableExport={false}
         enableRowSelection
         rowSelection={rowSelection}
@@ -731,6 +826,8 @@ export function GroupedIssuesDataTable({
               buildLabels={buildExportLabels}
               buildReportInfo={buildReportInfo}
               includedErrorTypes={includedErrorTypes}
+              includeCorrected={isCorrectedMode}
+              errorTypeNames={errorTypeNamesForExport}
               selectedEmployeeIds={selectedEmployeeIds}
             />
           </>

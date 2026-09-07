@@ -44,6 +44,13 @@ export type PunchGroupedExportLabels = TtkListExportLabels & {
     employee: string
     paymentType: string
     errorTypes: string
+    /** Eje pendiente/corregido: sin esta fila el archivo no dice qué estado listó. */
+    errorStatus: string
+    /** Filtros efectivos que este Report Info venía omitiendo. */
+    issueType: string
+    search: string
+    minHours: string
+    maxHours: string
     all: string
   }
 }
@@ -64,6 +71,16 @@ export type PunchGroupedReportInfo = {
   employee: string
   paymentType: string
   errorTypes: string
+  /**
+   * `xls-export-report-info` es `alwaysApply` y este Report Info venía omitiendo
+   * `issueType`, `search` y min/max horas: incumplía la regla ANTES de este
+   * paquete. Agregarle sólo "Status" lo dejaría igual de incompleto.
+   */
+  errorStatus: string
+  issueType: string
+  search: string
+  minHours: string
+  maxHours: string
 }
 
 export type PunchGroupedExportMode = 'grouped' | 'detail'
@@ -83,6 +100,10 @@ export type PunchGroupedExportInput = {
   reportInfo: PunchGroupedReportInfo
   /** Tipos incluidos: gobierna la columna WITH ERRORS del detalle. */
   includedErrorTypes?: readonly number[]
+  /** Modo Corrected: agrega las columnas de corrección al detalle por empleado. */
+  includeCorrected?: boolean
+  /** Nombre visible de cada código 1|2|3, ya traducido. */
+  errorTypeNames?: Record<number, string>
   onProgress?: (message: string) => void
 }
 
@@ -265,7 +286,12 @@ function buildReportInfoRows(
     { field: r.dealers, value: info.dealers },
     { field: r.employee, value: info.employee },
     { field: r.paymentType, value: info.paymentType },
+    { field: r.issueType, value: info.issueType },
+    { field: r.errorStatus, value: info.errorStatus },
     { field: r.errorTypes, value: info.errorTypes },
+    { field: r.search, value: info.search },
+    { field: r.minHours, value: info.minHours },
+    { field: r.maxHours, value: info.maxHours },
   ]
 }
 
@@ -281,6 +307,8 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     fileName,
     reportInfo,
     includedErrorTypes = ALL_ERROR_TYPES,
+    includeCorrected = false,
+    errorTypeNames,
     onProgress,
   } = input
 
@@ -363,7 +391,12 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
 
       const punches = await fetchAllPunchesForEmployee(punchListParams, employee.idUsuario)
       const detailRecords = punches.map((p) =>
-        ttkListRowToExportRecord(p, labels, { includePaymentType, includedErrorTypes }),
+        ttkListRowToExportRecord(p, labels, {
+          includePaymentType,
+          includedErrorTypes,
+          includeCorrected,
+          errorTypeNames,
+        }),
       )
       const { headers: detailHeaders, rows: detailRows } = recordsToMatrix(
         detailRecords.length > 0

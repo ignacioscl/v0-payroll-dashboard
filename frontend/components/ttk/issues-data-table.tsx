@@ -4,6 +4,7 @@ import * as React from 'react'
 import type { ColumnDef, ColumnPinningState, SortingState } from '@tanstack/react-table'
 import {
   AlertTriangle,
+  CheckCheck,
   CheckCircle,
   Images,
   Info,
@@ -79,6 +80,8 @@ import { useMinWidth } from '@/hooks/use-mobile'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 import type { DateRange } from 'react-day-picker'
+import { effectiveErrorStatus, resolveIssueType } from '@/lib/ttk/error-status'
+import { PunchDeletedChip, PunchFixChips } from '@/components/ttk/punch-fix-chips'
 
 /** Pin Employee / Actions only at this width and above. */
 const TABLE_PIN_MIN_WIDTH = 1200
@@ -95,6 +98,11 @@ export type IssuesDataTableProps = {
   ignoreSearch?: boolean
   /** When set, filters punches to this employee (e.g. grouped row expand). */
   employeeIdOverride?: number
+  /**
+   * Frontera congelada del grupo padre (expansión de Grouped y su export). Sin
+   * ella, expandir un grupo muestra ponchadas que no estaban en el padre.
+   */
+  snapshotAt?: string
   tableId?: string
   defaultPageSize?: number
   exportFileName?: string
@@ -119,6 +127,30 @@ export type IssuesDataTableProps = {
   enableTableFocus?: boolean
   /** When set, timeWork/timeBreak follow the grouped hrs/decimal toggle. */
   groupedHoursFormat?: boolean
+  /**
+   * When false, hides the "already corrected" chip next to the record count.
+   * En Grouped el aviso va UNA vez, en la tabla padre: repetirlo en cada grupo
+   * expandido lo convierte en ruido y lo aleja del contador que califica.
+   */
+  showCorrectedNote?: boolean
+}
+
+/**
+ * Chip «ya corregidas» que va al lado del contador de filas.
+ *
+ * Vive acá y se exporta porque lo usan las dos grillas: en Individual lo pone
+ * esta tabla, y en Grouped lo pone la tabla PADRE —el aviso califica al total de
+ * empleados listados, no a cada grupo abierto—. Duplicar el markup terminaba en
+ * dos chips que se parecían pero no eran iguales.
+ */
+export function CorrectedRecordsNote() {
+  const { t } = useTranslation()
+  return (
+    <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+      <CheckCheck className="size-3" />
+      {t('punch.viewingCorrectedNote')}
+    </span>
+  )
 }
 
 /** Columna de orden → whitelist del endpoint (`punchIn` | `employee`). */
@@ -167,6 +199,7 @@ export function IssuesDataTable({
   issueTypeOverride,
   ignoreSearch = false,
   employeeIdOverride,
+  snapshotAt,
   tableId = 'issues-punches',
   defaultPageSize = 25,
   exportFileName = 'punch-issues',
@@ -180,6 +213,7 @@ export function IssuesDataTable({
   enableExport = true,
   enableTableFocus = true,
   groupedHoursFormat,
+  showCorrectedNote = true,
 }: IssuesDataTableProps = {}) {
   const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
@@ -214,6 +248,7 @@ export function IssuesDataTable({
     selectedDealers,
     selectedType,
     setSelectedType,
+    errorStatus,
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
@@ -232,7 +267,11 @@ export function IssuesDataTable({
    * tabla lista todas las ponchadas y las tres tarjetas están inactivas, así que
    * no filtra ni apaga ningún ⚠.
    */
-  const includedErrorTypes = isErrorIssueType(effectiveSelectedType)
+  // El gate mira el issueType YA CRUZADO con el estado: en modo corregido el
+  // EXISTS del backend respeta los tipos tildados, así que la lista blanca rige.
+  const crossedIssueType = resolveIssueType(effectiveSelectedType, errorStatus)
+  const isCorrectedMode = effectiveErrorStatus(effectiveSelectedType, errorStatus) === 'corrected'
+  const includedErrorTypes = isErrorIssueType(crossedIssueType)
     ? storedIncludedErrorTypes
     : ALL_ERROR_TYPES
   const emptyByErrorTypes = includedErrorTypes.length === 0
@@ -346,6 +385,8 @@ export function IssuesDataTable({
         paymentTypeFilter: effectivePaymentTypeFilter,
         todayLiveStatus: selectedTodayLiveStatus,
         includedErrorTypes,
+        errorStatus,
+        snapshotAt,
       }),
     [
       effectiveSearch,
@@ -361,6 +402,8 @@ export function IssuesDataTable({
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
       includedErrorTypes,
+      errorStatus,
+      snapshotAt,
     ],
   )
 
@@ -427,6 +470,13 @@ export function IssuesDataTable({
                       errorSnapshot={r.fixedErrorSnapshot}
                     />
                   ) : null}
+                  {/*
+                    Un chip por EVENTO de corrección. `estado` ya viajaba en el DTO:
+                    en modo Corrected una ponchada borrada sigue en la lista y hay
+                    que decirlo en la fila.
+                  */}
+                  {isCorrectedMode ? <PunchFixChips fixes={r.fixes} /> : null}
+                  {isCorrectedMode && Number(r.estado ?? 1) === 0 ? <PunchDeletedChip /> : null}
                 </div>
                 {r.dealer?.razonSocial ? (
                   <span className="truncate text-[10px] font-normal text-muted-foreground">
@@ -797,6 +847,11 @@ export function IssuesDataTable({
       listParams.sort,
       listParams.dir,
       errorTypesQueryKey(includedErrorTypes),
+      // SIN esto la grilla no se entera del switch: `effectiveSelectedType` no
+      // cambia al pasar de pendientes a corregidos (sigue siendo `only_error`),
+      // así que react-query daba por buena la página cacheada y no volvía a pedir.
+      // Es el issueType YA CRUZADO, que es lo que de verdad viaja al backend.
+      crossedIssueType,
     ],
     enabled: queryEnabled,
     params: listParams,
@@ -871,6 +926,12 @@ export function IssuesDataTable({
           enableGlobalFilter={false}
           recordsCount={queryEnabled ? total : 0}
           recordsCountLabel={t('punch.issues')}
+          // Sin esto, la grilla en modo corregido se lee igual que la de
+          // pendientes: mismas columnas, mismas filas, y nada que diga que lo
+          // que estás viendo son ponchadas que YA se arreglaron.
+          recordsCountNote={
+            isCorrectedMode && showCorrectedNote ? <CorrectedRecordsNote /> : null
+          }
           pageSize={pageSize}
           onPageSizeChange={setPageSize}
           showPageSizeInInfiniteScroll

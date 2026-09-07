@@ -6,11 +6,13 @@ import { Readable } from 'stream'
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
+  PunchListFixDto,
   PunchListLiveStatus,
   PunchListResponseDto,
   PunchListRowDto,
   PunchListSort,
 } from '../dto/punch-list.dto'
+import { errorTypesInList, DEFAULT_ERROR_TYPES } from './punch-error-types'
 import { mapPunchListRow } from './punch-list-row'
 import {
   buildPunchListExportSql,
@@ -39,6 +41,8 @@ export interface PunchListOptions {
   includePaymentTypeName: boolean
   errorTypes?: readonly number[]
   includeErrorType?: boolean
+  includeDeletedFixes?: boolean
+  snapshotAt?: string
 }
 
 @Injectable()
@@ -62,6 +66,7 @@ export class PunchListRepository {
     const total = Number(countRows[0]?.total ?? 0)
 
     const results = pageRows.map((r) => mapPunchListRow(r, flags))
+    await this.attachFixes(results, filter, opts)
 
     const last = pageRows[pageRows.length - 1]
     const sort: PunchListSort = opts.sort ?? 'punchIn'
@@ -74,6 +79,70 @@ export class PunchListRepository {
         : null
 
     return { results, pageSize: opts.pageSize, total, hasMore, nextCursor }
+  }
+
+  /**
+   * Segunda consulta por los ids de la página, sólo en modo Corrected.
+   *
+   * La página tiene 25-50 ids: una consulta más, indexada por `idx_punch`, y
+   * `fixes[]` llega completo y ordenado. Meterlo en el SQL de filas con un
+   * `GROUP_CONCAT` lo truncaría en `group_concat_max_len` sin avisar.
+   *
+   * El predicado es el MISMO que el del `EXISTS` que seleccionó las filas: un evento
+   * de un tipo destildado no aparece acá aunque la ponchada haya entrado por otro.
+   */
+  private async attachFixes(
+    rows: PunchListRowDto[],
+    filter: SrsKpiFilter,
+    opts: PunchListSqlOpts,
+  ): Promise<void> {
+    if (opts.issueType !== 'only_fixed' || rows.length === 0) return
+
+    const ids = rows.map((r) => r.id).filter((id) => Number.isFinite(id) && id > 0)
+    if (ids.length === 0) return
+
+    const types = errorTypesInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES)
+    const params: (string | number)[] = [filter.idDealerProvider, ...ids]
+    let sql =
+      `SELECT f.id_ttk_employee_work                        AS punch_id,
+              f.error_type                                  AS error_type,
+              DATE_FORMAT(f.punch_date, '%Y-%m-%d')         AS punch_date,
+              DATE_FORMAT(f.fixed_at, '%Y-%m-%d %H:%i:%s')  AS fixed_at,
+              uf.nombre                                     AS fixed_by_nombre
+         FROM TTK_PUNCH_ERROR_FIX f
+         LEFT JOIN usuarios uf ON uf.id_usuario = f.id_fixed_by
+        WHERE f.id_dealer_provider = ?
+          AND f.id_ttk_employee_work IN (${ids.map(() => '?').join(',')})
+          AND f.error_type IN (${types})`
+
+    if (filter.fechaDesde && filter.fechaHasta) {
+      sql += ' AND f.punch_date >= ? AND f.punch_date <= ?'
+      params.push(filter.fechaDesde, filter.fechaHasta)
+    }
+    if (opts.snapshotAt) {
+      sql += ' AND f.fixed_at <= ?'
+      params.push(opts.snapshotAt)
+    }
+    sql += ' ORDER BY f.fixed_at ASC, f.id ASC'
+
+    const fixRows: Record<string, unknown>[] = await this.srs.query(sql, params)
+
+    const byPunch = new Map<number, PunchListFixDto[]>()
+    for (const r of fixRows) {
+      const punchId = Number(r.punch_id)
+      const list = byPunch.get(punchId) ?? []
+      list.push({
+        errorType: Number(r.error_type),
+        punchDate: String(r.punch_date ?? ''),
+        fixedAt: String(r.fixed_at ?? ''),
+        fixedByName: r.fixed_by_nombre == null ? null : String(r.fixed_by_nombre),
+      })
+      byPunch.set(punchId, list)
+    }
+
+    for (const row of rows) {
+      row.fixes = byPunch.get(row.id) ?? []
+    }
   }
 
   /** Cheap preflight so SQL errors become JSON before the xlsx headers go out. */

@@ -6,6 +6,7 @@ import {
   PAYMENT_TYPE_FILTER_WITHOUT,
 } from '@/lib/ttk/payment-type-filter'
 import { errorTypesParam } from '@/lib/filters/error-types-cookie'
+import { resolveIssueType, type ErrorStatus } from '@/lib/ttk/error-status'
 
 export type PunchGroupedQueryParams = {
   fechaDesde: string
@@ -58,10 +59,14 @@ export function buildPunchGroupedParams(input: {
   paymentTypeFilter?: PaymentTypeFilterValue
   snapshotAt?: string
   includedErrorTypes?: readonly number[]
+  errorStatus?: ErrorStatus
 }): PunchGroupedQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
-  let issueType = input.selectedType && input.selectedType !== 'all' ? input.selectedType : undefined
+  // El eje de estado se cruza con el tipo en UN SOLO lugar (resolveIssueType):
+  // list, Grouped, detalle agrupado y los dos exports pasan por acá.
+  const crossedType = resolveIssueType(input.selectedType, input.errorStatus ?? 'pending')
+  let issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
   let idPaymentType: number | undefined
 
   if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {

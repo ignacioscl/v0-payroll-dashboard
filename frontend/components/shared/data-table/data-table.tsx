@@ -435,6 +435,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   recordsCount?: number
   /** Label after the records counter when `recordsCount` is set (defaults to common.records). */
   recordsCountLabel?: string
+  /** Nota al lado del contador de filas. */
+  recordsCountNote?: React.ReactNode
 
   /** Show a toolbar button that scrolls the table below the fixed nav. */
   enableTableFocus?: boolean
@@ -519,6 +521,7 @@ export function DataTable<TData, TValue = unknown>({
   toolbarTrailing,
   recordsCount,
   recordsCountLabel,
+  recordsCountNote,
   enableTableFocus = false,
   className,
   density = 'compact',
@@ -1052,6 +1055,7 @@ export function DataTable<TData, TValue = unknown>({
         trailing={toolbarTrailing}
         recordsCount={recordsCount}
         recordsCountLabel={recordsCountLabel}
+        recordsCountNote={recordsCountNote}
         enableTableFocus={enableTableFocus}
         isTableFocused={isTableFocused}
         onFocusTable={handleFocusTable}

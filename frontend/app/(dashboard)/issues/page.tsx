@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   LogOut,
   Hand,
+  Info,
   Trash2,
   DollarSign,
   CheckCheck,
@@ -35,6 +36,8 @@ import { ERROR_TYPE_META } from '@/lib/ttk/error-type-meta'
 import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
+import { effectiveErrorStatus, rangeStartsBeforeCorrectionsLog } from '@/lib/ttk/error-status'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 type IssueType =
   | 'only_error'
@@ -63,12 +66,16 @@ interface IssueCardConfig {
  * ISSUE_CARD_META y en runtime `counts[card.type].pending` sería
  * `undefined.pending`, porque TtkIssueCountsData no tiene ese bucket.
  */
+/**
+ * `only_fixed` YA NO es una posición del radio: ese eje es el switch del header.
+ * `ISSUE_CARD_META` sí conserva su entrada, porque el `Record<IssueType,…>` es
+ * exhaustivo y sacarla rompe el tipado.
+ */
 const ISSUE_CARD_TYPES: IssueType[] = [
   'only_error',
   'manual_punch',
   'only_deletes',
   'without_salary',
-  'only_fixed',
 ]
 
 /** Ícono y variante de cada tipo de error, por código (no por posición). */
@@ -111,6 +118,8 @@ export default function IssuesPage() {
     dateRange,
     selectedType,
     setSelectedType,
+    errorStatus,
+    setErrorStatus,
     setSelectedTodayLiveStatus,
     filtersHydrated,
     excludedErrorTypes,
@@ -167,7 +176,12 @@ export default function IssuesPage() {
     )
   }, [canViewDeleted, t])
 
-  const errorTypesActive = selectedType === 'only_error'
+  // Fuente única (§T9bis): con Manual/Without salary/Deleted el estado no aplica,
+  // así que `effectiveErrorStatus` devuelve 'pending' y las tarjetas no se activan
+  // por el switch. La expresión suelta activaba Manual + Corrected.
+  const activeErrorStatus = effectiveErrorStatus(selectedType, errorStatus)
+  const isCorrectedMode = activeErrorStatus === 'corrected'
+  const errorTypesActive = isCorrectedMode || selectedType === 'only_error'
   // La exclusión sólo cuenta bajo `Only with errors`; si no, los contadores
   // muestran los números de siempre.
   const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : ALL_ERROR_TYPES
@@ -213,9 +227,27 @@ export default function IssuesPage() {
    */
   const totalPending = noErrorTypes ? 0 : counts.only_error.pending
 
+  /**
+   * En modo Corrected las cards cambian de BUCKET, no sólo de título: sin esto el
+   * switch cambiaba la grilla y dejaba las cards mintiendo.
+   */
+  const activeErrorBucket = isCorrectedMode ? counts.only_fixed : counts.only_error
+  const activeErrorTotal = noErrorTypes ? 0 : activeErrorBucket.pending
+  const statusSuffix = isCorrectedMode ? ` ${t('punch.errorStatusCorrected')}` : ''
+
   const renderSubtitle = (type: IssueType): React.ReactNode => {
-    if (type === 'only_error' && counts.only_error.by_type) {
-      const { clock_out_missing, break_missing, shift_20h_plus } = counts.only_error.by_type
+    if (type === 'only_deletes' && counts.only_deletes.by_type) {
+      const bt = counts.only_deletes.by_type
+      const withError = bt.clock_out_missing + bt.break_missing + bt.shift_20h_plus
+      // El número grande son TODAS las eliminadas (D-A); el desglose puede sumar menos.
+      return (
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
+          <span>{t('punch.deletedWithError', { count: withError })}</span>
+        </div>
+      )
+    }
+    if (type === 'only_error' && activeErrorBucket.by_type) {
+      const { clock_out_missing, break_missing, shift_20h_plus } = activeErrorBucket.by_type
       return (
         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
           <span>
@@ -249,7 +281,24 @@ export default function IssuesPage() {
             <span className="font-medium tabular-nums">
               {loading
                 ? '…'
-                : t('punch.withErrorsCount', { count: totalPending })}
+                : isCorrectedMode
+                  ? // La grilla lista PONCHADAS y el card cuenta EVENTOS: una
+                    // ponchada con dos correcciones son dos eventos y una fila.
+                    // Las dos cifras se singularizan por separado: "2 correcciones
+                    // · 1 ponchada" es un caso real y frecuente.
+                    [
+                      t(
+                        activeErrorTotal === 1 ? 'punch.correctionsOne' : 'punch.correctionsMany',
+                        { count: activeErrorTotal },
+                      ),
+                      t(
+                        (counts.only_fixed.punches ?? 0) === 1
+                          ? 'punch.punchesOne'
+                          : 'punch.punchesMany',
+                        { count: counts.only_fixed.punches ?? 0 },
+                      ),
+                    ].join(' · ')
+                  : t('punch.withErrorsCount', { count: totalPending })}
             </span>
           </Badge>
         }
@@ -257,6 +306,16 @@ export default function IssuesPage() {
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>
+      ) : null}
+
+      {/* Mismo aviso que el Dashboard: la bitácora de correcciones arrancó el
+          2026-08-27 y no hubo backfill, así que antes de esa fecha la historia
+          puede estar incompleta. Faltaba en esta pantalla. */}
+      {rangeStartsBeforeCorrectionsLog(dateRange?.from) ? (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>{t('punch.correctionsCoverageNotice')}</AlertDescription>
+        </Alert>
       ) : null}
 
       <PunchReportFilterPanel
@@ -282,12 +341,12 @@ export default function IssuesPage() {
                 {visibleIssueCards.map((card) => (
                   <KPICard
                     key={card.type}
-                    title={card.title}
+                    title={card.type === 'only_error' ? `${card.title}${statusSuffix}` : card.title}
                     value={
                       // "Only with errors" es el único agregado de esta lista que
                       // depende de los tipos: con los tres destildados va a 0.
                       // Los otros cuatro no miran tipo de error.
-                      card.type === 'only_error' ? totalPending : counts[card.type].pending
+                      card.type === 'only_error' ? activeErrorTotal : counts[card.type].pending
                     }
                     icon={card.icon}
                     variant={card.variant}
@@ -325,7 +384,7 @@ export default function IssuesPage() {
                     <KPICard
                       key={`error-type-${meta.code}`}
                       title={t(meta.labelKey)}
-                      value={counts.only_error.by_type?.[meta.byTypeKey] ?? 0}
+                      value={activeErrorBucket.by_type?.[meta.byTypeKey] ?? 0}
                       icon={ERROR_TYPE_ICONS[meta.code]}
                       variant={ERROR_TYPE_VARIANTS[meta.code]}
                       loading={loading}

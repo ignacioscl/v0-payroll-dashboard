@@ -109,6 +109,21 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   })
   errorTypes?: string
 
+  /**
+   * Misma frontera congelada que Grouped, propagada al detalle expandido y a su
+   * export: sin ella la expansión de un grupo muestra ponchadas que no estaban en
+   * el padre. Aplica en TODOS los modos; en Corrected además congela el ledger.
+   *
+   * Opcional: sin él, el comportamiento es exactamente el de antes.
+   */
+  @ApiPropertyOptional({
+    example: '2026-07-30 12:08:13',
+    description: 'Frontera superior congelada (YYYY-MM-DD HH:mm:ss)',
+  })
+  @IsOptional()
+  @IsString()
+  snapshotAt?: string
+
   @ApiPropertyOptional({
     enum: PUNCH_LIST_LIVE_STATUS,
     description: 'Estado en vivo del día (tarjetas del Dashboard)',
@@ -152,6 +167,30 @@ export class PunchListBadPunchDto {
   @ApiProperty({ example: 'Clock out is not set' }) res!: string
 }
 
+/**
+ * Un evento del registro de correcciones (`TTK_PUNCH_ERROR_FIX`).
+ *
+ * La metadata legacy `fixedAt/fixedBy/fixedErrorSnapshot` es una marca POR PONCHADA
+ * que sólo se setea cuando la ponchada queda sin ningún error, y se limpia al
+ * volver a romperse: es nula justamente en los dos casos que interesan —ponchada
+ * eliminada y ponchada vuelta a romper—. Estos eventos no.
+ */
+export class PunchListFixDto {
+  @ApiProperty({ example: 1, description: '1 sin salida, 2 sin descanso, 3 turno 20h+' })
+  errorType!: number
+
+  /**
+   * Fecha del ponche congelada al corregir. Va incluida a propósito: es lo que hace
+   * visible, en la propia fila, una divergencia con `punchInGmt0`.
+   */
+  @ApiProperty({ example: '2026-05-01' }) punchDate!: string
+
+  @ApiProperty({ example: '2026-08-27 18:16:53' }) fixedAt!: string
+
+  @ApiPropertyOptional({ nullable: true, example: 'Ana Pérez' })
+  fixedByName!: string | null
+}
+
 export class PunchListRowDto {
   @ApiProperty({ example: 910611 }) id!: number
 
@@ -174,6 +213,26 @@ export class PunchListRowDto {
   @ApiPropertyOptional({ type: PunchListFixedByDto, nullable: true })
   fixedBy!: PunchListFixedByDto | null
   @ApiPropertyOptional({ nullable: true }) fixedErrorSnapshot!: string | null
+
+  /**
+   * Eventos de corrección de ESTA ponchada dentro del rango y de los tipos tildados,
+   * ordenados por `fixedAt ASC, id ASC`.
+   *
+   * La grilla lista PONCHADAS y el card cuenta EVENTOS: una ponchada con dos
+   * correcciones es una fila y dos eventos. Por eso viajan los dos.
+   */
+  @ApiPropertyOptional({ type: [PunchListFixDto] })
+  fixes?: PunchListFixDto[]
+
+  /**
+   * Columnas AGREGADAS del export Individual, que es un solo stream con `mapRow`
+   * síncrono: ahí no cabe la segunda consulta por página que llena `fixes[]`.
+   * Sólo viajan en modo Corrected.
+   */
+  @ApiPropertyOptional({ nullable: true, example: [1, 2] })
+  correctedTypes?: number[] | null
+  @ApiPropertyOptional({ nullable: true, example: '2026-08-27 18:16:53' })
+  lastCorrectedAt?: string | null
 
   @ApiPropertyOptional({ type: PunchListUsuarioDto, nullable: true })
   usuario!: PunchListUsuarioDto | null

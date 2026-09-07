@@ -46,6 +46,10 @@ export type GroupedPunchExportButtonProps = {
   buildReportInfo: () => PunchGroupedReportInfo
   /** Tipos incluidos: gobierna la columna WITH ERRORS del detalle. */
   includedErrorTypes?: readonly number[]
+  /** Modo Corrected: agrega las columnas de corrección al detalle por empleado. */
+  includeCorrected?: boolean
+  /** Nombre visible de cada código 1|2|3, ya traducido. */
+  errorTypeNames?: Record<number, string>
   selectedEmployeeIds: number[]
 }
 
@@ -109,6 +113,8 @@ export function GroupedPunchExportButton({
   buildLabels,
   buildReportInfo,
   includedErrorTypes,
+  includeCorrected,
+  errorTypeNames,
   selectedEmployeeIds,
 }: GroupedPunchExportButtonProps) {
   const { t } = useTranslation()
@@ -152,6 +158,8 @@ export function GroupedPunchExportButton({
       labels: buildLabels(),
       fileName,
       includedErrorTypes,
+      includeCorrected,
+      errorTypeNames,
       // El modo y el alcance los sabe este botón, no la grilla: se congelan acá,
       // en el momento del clic, junto con el resto de los filtros.
       reportInfo: {

@@ -31,6 +31,14 @@ export type PunchAccessPolicy = {
   skipDealerRestriction: boolean
   /** `interno && lista parcial` — ver T.0.5 del plan. */
   includeErrorType: boolean
+  /**
+   * Si las correcciones sobre ponchadas ya eliminadas entran a la lista.
+   *
+   * En modo `only_fixed` NO es un 403: el modo está permitido y lo que se recorta es
+   * el subconjunto. Una ponchada corregida y después borrada sigue siendo una
+   * corrección, pero VERLA exige `Punch > Delete Punch`.
+   */
+  includeDeletedFixes: boolean
 }
 
 @Injectable()
@@ -47,10 +55,13 @@ export class PunchAccessPolicyService {
 
     const issueType = (query.issueType ?? 'all').trim() || 'all'
 
-    if (issueType === 'only_deletes') {
-      if (!(await this.permissions.userHasRolAccion(ctx, ROL_ACCION_DELETE_PUNCH))) {
-        throw new ForbiddenException('You do not have permission to view deleted punches.')
-      }
+    // Corrected lista tambien ponchadas eliminadas (una correccion sobre una ponchada
+    // despues borrada sigue siendo una correccion). Quien no puede ver eliminadas,
+    // las ve excluidas -no un 403-: el modo Corrected en si esta permitido.
+    const includeDeletedFixes = await this.resolveDeletedVisibility(ctx)
+
+    if (issueType === 'only_deletes' && !includeDeletedFixes) {
+      throw new ForbiddenException('You do not have permission to view deleted punches.')
     }
 
     if (ctx.isUserDealer && issueType !== 'all') {
@@ -95,7 +106,21 @@ export class PunchAccessPolicyService {
       dealerIds,
       skipDealerRestriction,
       includeErrorType,
+      includeDeletedFixes,
     }
+  }
+
+  /**
+   * Gate ESTRECHO: consulta sólo la acción de eliminar ponchadas.
+   *
+   * Existe para que los KPI no tengan que pasar por `assertAndResolve()`, que
+   * **empieza** exigiendo la acción de Punch Report. El consumidor vivo de los KPI
+   * es `/reports/business-kpis`, que se autoriza con Admin o Production Report: un
+   * usuario legítimo con Production Report y sin Punch Report hoy ve los KPI, y
+   * reusar el gate completo le metería un 403 donde hoy no lo hay.
+   */
+  async resolveDeletedVisibility(ctx: SrsContext): Promise<boolean> {
+    return this.permissions.userHasRolAccion(ctx, ROL_ACCION_DELETE_PUNCH)
   }
 
   /**

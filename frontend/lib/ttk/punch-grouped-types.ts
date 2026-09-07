@@ -11,6 +11,11 @@ export type PunchGroupedRow = {
   breakNumber: number
   hasError: boolean
   errorSummary?: string | null
+  /**
+   * Tipos CORREGIDOS del empleado en el período. Sólo viaja en modo Corrected;
+   * en el resto de los modos la columna responde `errorSummary` (decisión D-B).
+   */
+  correctedTypes?: number[] | null
   byPaymentType: PunchGroupedPaymentTypeRow[]
 }
 

@@ -23,6 +23,7 @@ export class PunchListService {
     return this.repository.getList(filter, {
       errorTypes,
       includeErrorType: access.includeErrorType,
+      includeDeletedFixes: access.includeDeletedFixes,
       pageSize: query.pageSize ?? 25,
       sort: query.sort,
       dir: query.dir,
@@ -34,6 +35,7 @@ export class PunchListService {
       search: query.search,
       idEmployee: query.idEmployee,
       issueType: query.issueType,
+      snapshotAt: query.snapshotAt,
       todayLiveStatus: query.todayLiveStatus,
       includeAmounts: access.canViewPaymentAmounts,
       includePaymentTypeName: access.canViewPaymentTypeName,
