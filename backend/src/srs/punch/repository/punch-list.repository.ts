@@ -30,9 +30,12 @@ export interface PunchListOptions {
   dir?: 'asc' | 'desc'
   afterValue?: string
   afterId?: number
+  /** '1' = la ultima fila recibida cae en el tramo de vacios. */
+  afterEmpty?: '0' | '1'
   minHours?: number
   maxHours?: number
-  idPaymentType?: number
+  /** Ids YA parseados y validados (parsePaymentTypeIds + catalogo del provider). */
+  idPaymentTypes?: readonly number[]
   search?: string
   idEmployee?: number
   issueType?: string
@@ -69,11 +72,16 @@ export class PunchListRepository {
     await this.attachFixes(results, filter, opts)
 
     const last = pageRows[pageRows.length - 1]
-    const sort: PunchListSort = opts.sort ?? 'punchIn'
+    // UNA sola forma de leer el cursor, sirva la columna que sirva: el SELECT de
+    // pagina proyecta `sort_value`/`sort_empty` para el sort activo. Antes esto
+    // elegia entre `nombre` y `punch_in_cursor` a mano, y por eso agregar
+    // columnas al orden mandaba el `punch_in` de la ultima fila y la pagina 2
+    // salia de cualquier lado (BUG-07).
     const nextCursor =
       hasMore && last
         ? {
-            value: String(sort === 'employee' ? (last.nombre ?? '') : (last.punch_in_cursor ?? '')),
+            empty: (Number(last.sort_empty) === 1 ? 1 : 0) as 0 | 1,
+            value: last.sort_value == null ? null : String(last.sort_value),
             id: Number(last.id),
           }
         : null

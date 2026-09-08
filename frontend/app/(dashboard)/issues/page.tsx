@@ -15,7 +15,6 @@ import { canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
@@ -144,24 +143,24 @@ export default function IssuesPage() {
     }
   }, [isExternal, meLoading, selectedType, setSelectedType])
 
+  // D-6 - EXCLUSION MUTUA con la tarjeta *Without salary*: los dos piden lo
+  // mismo (`id_payment_type IS NULL` vs `IN (...)`), asi que no pueden estar
+  // activos a la vez. Ver PLAN.md 4.2.2bis.
+  //
+  // OJO: este efecto NO puede tener rama `else`. Con `else` la secuencia
+  // "tarjeta prendida -> tildo un tipo" se rompe: el handler apaga la tarjeta,
+  // `selectedType` cambia, este efecto corre y el `else` pisaria el combo,
+  // borrando el tipo que el usuario acaba de tildar.
   useEffect(() => {
     if (!canViewPayment) return
     if (selectedType === 'without_salary') {
-      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
-    } else {
-      setPaymentTypeFilter((prev) =>
-        prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
-      )
+      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_ALL)
     }
   }, [selectedType, canViewPayment])
 
   const handlePaymentTypeFilterChange = (next: PaymentTypeFilterValue) => {
     setPaymentTypeFilter(next)
-    if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
-      setSelectedType('without_salary')
-      return
-    }
-    if (selectedType === 'without_salary') {
+    if (next.ids.length > 0 && selectedType === 'without_salary') {
       setSelectedType('all')
     }
   }

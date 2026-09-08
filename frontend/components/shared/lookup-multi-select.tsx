@@ -12,8 +12,21 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { LookupOption } from '@/lib/invoice-advanced-filters'
+/**
+ * Opción de un multi-select genérico. Vive acá, con el componente, porque el
+ * componente no es de billing: lo usan Districts, los filtros de Invoices y el
+ * de Payment type de TTK. `lib/invoice-advanced-filters` la re-exporta para no
+ * romper los imports que ya la traían de ahí.
+ */
+export type LookupOption = {
+  id: number
+  label: string
+  sublabel?: string
+  thumbnailUuid?: string | null
+  logoImg?: string | null
+}
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { userAvatarUrl } from '@/lib/face/face-proxy-url'
 
@@ -171,19 +184,34 @@ export function LookupMultiSelect({
     action()
   }
 
+  /**
+   * Para las filas de la lista: evita que el mousedown robe el foco del buscador
+   * (y cierre el popover) SIN togglear. El toggle lo hace `onSelect`, que es el
+   * unico camino comun a mouse y teclado.
+   */
+  const preventFocusSteal = (e: React.MouseEvent) => {
+    e.preventDefault()
+  }
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button
+        {/*
+          Va sobre el `Button` compartido a proposito: `cursor-pointer` esta
+          horneada ahi (components/ui/button.tsx) y asi la heredan los cinco
+          usos de este componente, que es lo que pide
+          frontend/.cursor/rules/cursor-pointer-clickables.mdc en vez de
+          parchar la clase en cada llamador.
+        */}
+        <Button
           type="button"
+          variant="outline"
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'inline-flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background/50 px-3 text-xs font-normal text-foreground shadow-xs transition-colors',
+            'h-8 w-full justify-between gap-2 border-border bg-background/50 px-3 text-xs font-normal text-foreground',
             'hover:bg-muted/30 hover:text-foreground',
-            'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30',
-            'disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
         >
@@ -202,7 +230,7 @@ export function LookupMultiSelect({
           ) : (
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           )}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[min(100vw-2rem,22rem)] p-0" align="start">
         <Command shouldFilter={false}>
@@ -236,8 +264,12 @@ export function LookupMultiSelect({
                   <CommandItem
                     key={opt.id}
                     value={String(opt.id)}
-                    onSelect={() => {}}
-                    onMouseDown={handleRowMouseDown(() => toggle(opt.id))}
+                    // El toggle vive SOLO aca: cmdk dispara `onSelect` tanto con
+                    // click como con Enter, asi que la fila se tildea con teclado
+                    // sin duplicar el toggle del mouse. Antes estaba colgado de
+                    // `onMouseDown` y `onSelect` vacio: Enter no hacia nada.
+                    onSelect={() => toggle(opt.id)}
+                    onMouseDown={preventFocusSteal}
                     className="cursor-pointer items-center gap-2 text-xs data-[selected=true]:text-foreground"
                   >
                     <RowCheckbox checked={checked} />

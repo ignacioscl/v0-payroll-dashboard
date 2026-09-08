@@ -1,10 +1,7 @@
 import { format } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
-import {
-  PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
-} from '@/lib/ttk/payment-type-filter'
+import { PAYMENT_TYPE_FILTER_ALL } from '@/lib/ttk/payment-type-filter'
 import { isTodayLiveStatus } from '@/lib/ttk/today-live-status'
 
 /** Session user fields needed to map header dealer combo → SRS scope params. */
@@ -99,12 +96,12 @@ export function buildTtkListFilterExtra(input: {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
-  let withoutSalary = flags.without_salary
-  if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
-    withoutSalary = 1
-  } else if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    withoutSalary = 0
-  }
+  // `ttk-list.php` NO cambia (§4.2.3): sigue aceptando UN id y su propio
+  // `without_salary`. El combo ya no puede pedir «sin tipo», así que lo unico
+  // que puede apagar ese flag es haber tildado tipos concretos.
+  const singlePaymentTypeId =
+    paymentTypeFilter.ids.length === 1 ? paymentTypeFilter.ids[0] : undefined
+  const withoutSalary = paymentTypeFilter.ids.length > 0 ? 0 : flags.without_salary
 
   const employeeId =
     input.selectedEmployeeId != null && input.selectedEmployeeId > 0
@@ -138,8 +135,10 @@ export function buildTtkListFilterExtra(input: {
   if (input.punchMaxHours != null && input.punchMaxHours > 0) {
     params.punch_max_hours = input.punchMaxHours
   }
-  if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    params.id_payment_type = paymentTypeFilter
+  // Semántica singular conservada: con varios tildados no hay parámetro que
+  // mande, y este endpoint no lo expone en ninguna de sus dos pantallas.
+  if (singlePaymentTypeId != null) {
+    params.id_payment_type = singlePaymentTypeId
   }
   if (input.todayLiveStatus && isTodayLiveStatus(input.todayLiveStatus)) {
     params.today_live_status = input.todayLiveStatus

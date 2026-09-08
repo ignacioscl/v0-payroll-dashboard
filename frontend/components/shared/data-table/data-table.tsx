@@ -87,6 +87,14 @@ export interface DataTableColumnMeta<TData> {
    * the active sort. Defaults to the column id.
    */
   sortKey?: string
+  /**
+   * Start hidden in the column selector (the user puede mostrarla).
+   *
+   * Solo se aplica cuando NO hay visibilidad persistida para esa tabla: la
+   * eleccion del usuario siempre gana. Sin la meta, la columna se comporta
+   * exactamente como hasta ahora.
+   */
+  hiddenByDefault?: boolean
 }
 
 /** Visual treatment for the header row. */
@@ -544,11 +552,26 @@ export function DataTable<TData, TValue = unknown>({
    * visibility after mount so colgroup + header + body update together. */
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const visibilityHydrated = React.useRef(false)
+  /** Columnas que arrancan ocultas (`meta.hiddenByDefault`). */
+  const defaultHidden = React.useMemo<VisibilityState>(() => {
+    const out: VisibilityState = {}
+    for (const col of columns) {
+      const meta = col.meta as DataTableColumnMeta<TData> | undefined
+      const id = (col as { id?: string }).id
+      if (meta?.hiddenByDefault && id) out[id] = false
+    }
+    return out
+  }, [columns])
   React.useEffect(() => {
     const persisted = readPersistedVisibility(tableId)
     visibilityHydrated.current = true
-    if (Object.keys(persisted).length) setColumnVisibility(persisted)
-  }, [tableId])
+    // Lo persistido GANA: `hiddenByDefault` es un default, no una imposicion.
+    if (Object.keys(persisted).length) {
+      setColumnVisibility(persisted)
+    } else if (Object.keys(defaultHidden).length) {
+      setColumnVisibility(defaultHidden)
+    }
+  }, [tableId, defaultHidden])
   React.useEffect(() => {
     if (!visibilityHydrated.current) return
     persistVisibility(tableId, columnVisibility)

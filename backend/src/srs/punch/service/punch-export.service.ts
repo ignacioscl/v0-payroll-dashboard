@@ -9,7 +9,7 @@ import { SrsContext } from '../../auth/srs-auth-context.service'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PunchAccessPolicyService } from '../punch-access-policy'
 import { PunchExportSemaphore } from '../punch-export-semaphore'
-import { PunchExportTicketStore } from '../punch-export-ticket.store'
+import { PunchExportTicketStore, type PunchExportStoredFilters } from '../punch-export-ticket.store'
 import {
   PunchExportPrepareDto,
   PunchExportPrepareResponseDto,
@@ -30,6 +30,8 @@ import {
 } from '../punch-export-labels'
 import { writePunchExportWorkbook, type PunchExportMetaRow } from '../punch-export-xlsx'
 import { isPunchIssueType } from '../punch-issue-types'
+import { parsePaymentTypeIds } from '../repository/punch-payment-types'
+import { assertPaymentTypesInCatalog } from '../repository/punch-payment-type-catalog'
 import { isDefaultErrorTypes, parseErrorTypes } from '../repository/punch-error-types'
 import type { PunchListRowDto } from '../dto/punch-list.dto'
 
@@ -66,8 +68,14 @@ export class PunchExportService {
     }
     try {
       const errorTypes = parseErrorTypes(body.errorTypes).values
-      await this.policy.assertAndResolve(ctx, { ...body, errorTypes })
-      return this.tickets.createPending(ctx.idUsuario, { ...body }, () => this.semaphore.release())
+      const idPaymentTypes = parsePaymentTypeIds(body.idPaymentTypes)
+      await this.policy.assertAndResolve(ctx, { ...body, errorTypes, idPaymentTypes })
+      await assertPaymentTypesInCatalog(this.srs, ctx.idDealerProvider, idPaymentTypes)
+      // El ticket guarda la forma YA canonica: el replay de la descarga no
+      // vuelve a parsear un raw distinto del que se valido aca.
+      return this.tickets.createPending(ctx.idUsuario, { ...body, idPaymentTypes }, () =>
+        this.semaphore.release(),
+      )
     } catch (e) {
       this.semaphore.release()
       throw e
@@ -80,7 +88,9 @@ export class PunchExportService {
 
   async streamToResponse(ctx: SrsContext, ticketId: string, res: Response): Promise<void> {
     const ticket = this.tickets.consumeForDownload(ticketId, ctx.idUsuario)
-    const filters = ticket.filters as PunchExportPrepareDto
+    // Tipado con la forma ALMACENADA, no con el DTO crudo: el ticket guarda
+    // `idPaymentTypes` ya parseado a number[] (ver `prepare`).
+    const filters = ticket.filters as PunchExportStoredFilters
 
     let headersSent = false
     let mysqlCleanup: (() => Promise<void>) | null = null
@@ -113,12 +123,21 @@ export class PunchExportService {
       // de un raw distinto. Si esto se salteara, el xlsx tendría otro filtro que
       // la pantalla y ningún test lo detectaría.
       const errorTypes = parseErrorTypes(filters.errorTypes).values
-      const access = await this.policy.assertAndResolve(ctx, { ...filters, errorTypes })
+      const idPaymentTypes = filters.idPaymentTypes ?? []
+      const access = await this.policy.assertAndResolve(ctx, { ...filters, errorTypes, idPaymentTypes })
+      // Se revalida en la descarga: un id puede haber dejado de ser valido entre
+      // el `prepare` y el click (se desactivo, cambio de provider). Sin esto el
+      // XLSX saldria con un filtro que hoy ya no esta autorizado.
+      const paymentTypeRows = await assertPaymentTypesInCatalog(
+        this.srs,
+        ctx.idDealerProvider,
+        idPaymentTypes,
+      )
       const filter = buildSrsKpiFilter(ctx, filters)
       const sqlOpts = {
         minHours: filters.minHours,
         maxHours: filters.maxHours,
-        idPaymentType: filters.idPaymentType,
+        idPaymentTypes,
         search: filters.search,
         idEmployee: filters.idEmployee,
         issueType: filters.issueType,
@@ -136,6 +155,7 @@ export class PunchExportService {
       const meta = await this.buildReportMeta(
         ctx,
         filters,
+        paymentTypeRows.map((r: { name: string }) => r.name),
         access.canViewPaymentTypeName,
         access.dealerIds,
         locale,
@@ -212,7 +232,14 @@ export class PunchExportService {
 
   private async buildReportMeta(
     ctx: SrsContext,
-    filters: PunchExportPrepareDto,
+    filters: PunchExportStoredFilters,
+    /**
+     * Nombres YA resueltos contra el catalogo del provider
+     * (assertPaymentTypesInCatalog). NO se resuelven aca: la version vieja
+     * consultaba GENERIC_DATA sin categoria, sin estado y sin provider, y por
+     * ahi se filtraba el nombre de un tipo ajeno al Report Info (4.2.3ter).
+     */
+    paymentTypeNames: readonly string[],
     canViewPaymentTypeName: boolean,
     dealerIds: number[],
     locale: PunchExportLocale,
@@ -241,10 +268,7 @@ export class PunchExportService {
       ? await this.loadEmployeeName(filters.idEmployee)
       : null
 
-    const paymentTypeName =
-      canViewPaymentTypeName && filters.idPaymentType
-        ? await this.loadPaymentTypeName(filters.idPaymentType)
-        : null
+    const paymentTypeLabel = paymentTypeNames.length > 0 ? paymentTypeNames.join(', ') : null
 
     const meta: PunchExportMetaRow[] = [
       { field: labels.report, value: labels.reportName },
@@ -282,12 +306,15 @@ export class PunchExportService {
     ]
 
     if (canViewPaymentTypeName) {
+      // D-12: `All` o la lista de nombres. «Sin tipo de pago» NO sale por aca:
+      // sale por la fila de *Issue type*, que ya escribe `Without salary` y que
+      // el combo no escribe nunca (D-6).
       meta.push({
         field: labels.paymentType,
         value:
           filters.issueType === 'without_salary'
             ? labels.issueTypeLabels.without_salary
-            : metaAll(labels, paymentTypeName),
+            : metaAll(labels, paymentTypeLabel),
       })
     }
 
@@ -315,11 +342,4 @@ export class PunchExportService {
     return String(rows[0]?.nombre ?? idEmployee)
   }
 
-  private async loadPaymentTypeName(id: number): Promise<string> {
-    const rows: { name?: string }[] = await this.srs.query(
-      'SELECT name FROM GENERIC_DATA WHERE id = ? LIMIT 1',
-      [id],
-    )
-    return String(rows[0]?.name ?? id)
-  }
 }

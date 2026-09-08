@@ -7,8 +7,27 @@ import { SrsCursorDto, SrsCursorPagedResponseDto } from '../../shared/dto/srs-pa
 import { IsValidPunchDateRange } from '../punch-date-range'
 import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 
-/** Columnas por las que se puede ordenar el listado (whitelist). */
-export const PUNCH_LIST_SORTS = ['punchIn', 'employee'] as const
+/**
+ * Columnas por las que se puede ordenar el listado (whitelist).
+ *
+ * BUG-07: antes eran solo dos y el front convertia TODO lo demas a `punchIn`,
+ * asi que ordenar por Time break ordenaba por hora de entrada. Ahora cada
+ * columna que ofrece orden esta aca y el `@IsIn` rechaza el resto con 400 —
+ * nada de fallback silencioso.
+ *
+ * `date` NO esta: la columna Date y la columna Punch in ordenan por el mismo
+ * instante, asi que el front mapea las dos a `punchIn`.
+ */
+export const PUNCH_LIST_SORTS = [
+  'punchIn',
+  'employee',
+  'punchOut',
+  'breakStart',
+  'breakEnd',
+  'timeWork',
+  'timeBreak',
+  'paymentType',
+] as const
 export type PunchListSort = (typeof PUNCH_LIST_SORTS)[number]
 
 /** Estados "en vivo" del día (mirror de TTKEmployeeDao::getTodayLiveStatusCondition). */
@@ -55,6 +74,17 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   @Min(1)
   afterId?: number
 
+  @ApiPropertyOptional({
+    enum: ['0', '1'],
+    example: '0',
+    description:
+      'Cursor: 1 si la ultima fila recibida cae en el tramo de VACIOS de la columna ordenada. ' +
+      'Con 1, afterValue tiene que estar AUSENTE (el valor es NULL). Ausente = 0.',
+  })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  afterEmpty?: '0' | '1'
+
   /** Filtra la ponchada individual (no el total del empleado, a diferencia de grouped). */
   @ApiPropertyOptional({ example: 4, description: 'Horas mínimas de la ponchada' })
   @IsOptional()
@@ -70,12 +100,18 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   @Min(0)
   maxHours?: number
 
-  @ApiPropertyOptional({ example: 101, description: 'GENERIC_DATA.id del payment type' })
+  @ApiPropertyOptional({
+    example: '8,10',
+    description:
+      'CSV de GENERIC_DATA.id de payment type (max 50). Ausente = sin filtro. ' +
+      'Los ids se validan contra el catalogo del provider: uno ajeno => 400. ' +
+      'Para «sin tipo de pago» va issueType=without_salary, no este parametro.',
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idPaymentType?: number
+  @Matches(/^[1-9]\d{0,9}(,[1-9]\d{0,9}){0,49}$/, {
+    message: 'idPaymentTypes must be a comma-separated list of positive integer ids (max 50).',
+  })
+  idPaymentTypes?: string
 
   @ApiPropertyOptional({ description: 'Nombre o parte del nombre del empleado' })
   @IsOptional()

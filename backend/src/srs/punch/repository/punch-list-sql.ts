@@ -1,13 +1,16 @@
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { resolveGroupedIssueFilter } from './punch-grouped-issue-filter'
+import { buildPaymentTypeFilterSql } from './punch-payment-types'
 import { DEFAULT_ERROR_TYPES, errorTypesInList } from './punch-error-types'
 import { PunchListLiveStatus, PunchListSort } from '../dto/punch-list.dto'
+import { coerceAfterValue, PUNCH_SORT_SPECS } from './punch-list-sort'
 
 export type PunchListSqlOpts = {
   minHours?: number
   maxHours?: number
-  idPaymentType?: number
+  /** Ids YA parseados y validados (parsePaymentTypeIds + catalogo del provider). */
+  idPaymentTypes?: readonly number[]
   search?: string
   idEmployee?: number
   issueType?: string
@@ -41,11 +44,8 @@ export type PunchListPageSqlOpts = PunchListSqlOpts & {
   dir?: 'asc' | 'desc'
   afterValue?: string
   afterId?: number
-}
-
-const SORT_COLUMNS: Record<PunchListSort, string> = {
-  punchIn: 'tew.punch_in',
-  employee: 'u.nombre',
+  /** '1' = la ultima fila recibida cae en el tramo de vacios. */
+  afterEmpty?: '0' | '1'
 }
 
 /**
@@ -220,8 +220,10 @@ export function buildPunchListFromWhere(
     dealerIds,
   })
 
-  const paymentTypeSql = opts.idPaymentType ? ' AND tew.id_payment_type = ?' : ''
-  const paymentTypeParams = opts.idPaymentType ? [opts.idPaymentType] : []
+  // Los ids se INTERPOLAN (no se bindean): un `?` de cantidad variable correria
+  // todos los binds posteriores. Ver punch-payment-types.ts.
+  const paymentTypeSql = buildPaymentTypeFilterSql(opts.idPaymentTypes ?? [])
+  const paymentTypeParams: (string | number)[] = []
 
   const employeeSql = opts.idEmployee ? ' AND tew.id_author = ?' : ''
   const employeeParams = opts.idEmployee ? [opts.idEmployee] : []
@@ -303,7 +305,7 @@ export function buildPunchListPageSql(
   opts: PunchListPageSqlOpts,
 ): {
   sql: string
-  params: (string | number)[]
+  params: (string | number | null)[]
   fromWhere: string
   baseParams: (string | number)[]
   countSql: string
@@ -312,20 +314,52 @@ export function buildPunchListPageSql(
   const select = buildPunchListSelectFields(filter.idDealerProvider, opts)
 
   const sort: PunchListSort = opts.sort ?? 'punchIn'
-  const col = SORT_COLUMNS[sort] ?? SORT_COLUMNS.punchIn
+  const spec = PUNCH_SORT_SPECS[sort] ?? PUNCH_SORT_SPECS.punchIn
+  const col = spec.order
   const dir = opts.dir === 'asc' ? 'ASC' : 'DESC'
   const cmp = dir === 'ASC' ? '>' : '<'
 
-  const hasCursor = Boolean(opts.afterValue) && Number(opts.afterId) > 0
-  const cursorSql = hasCursor
-    ? ` AND ( ${col} ${cmp} ? OR (${col} = ? AND tew.id ${cmp} ?) )`
-    : ''
-  const cursorParams: (string | number)[] = hasCursor
-    ? [opts.afterValue!, opts.afterValue!, Number(opts.afterId)]
-    : []
+  // El sort activo se proyecta para que el cursor se lea SIEMPRE igual, sirva la
+  // columna que sirva. Antes el repositorio elegia entre `nombre` y
+  // `punch_in_cursor` a mano, que es lo que hacia imposible agregar columnas.
+  const emptyExpr = spec.nullable ? `(${col} IS NULL)` : '0'
+  const cursorSelect = `, ${spec.cursor} AS sort_value, ${emptyExpr} AS sort_empty`
 
-  const orderSql = `ORDER BY ${col} ${dir}, tew.id ${dir}`
-  const sql = `SELECT ${select} ${fromWhere} ${cursorSql} ${orderSql} LIMIT ?`
+  const afterEmpty = opts.afterEmpty === '1'
+  // Con afterEmpty='1' el valor ES null: el cursor existe aunque `afterValue`
+  // no venga. Mirar solo `afterValue` truncaba la lista dentro del tramo vacio.
+  const hasCursor =
+    Number(opts.afterId) > 0 && (afterEmpty || Boolean(opts.afterValue))
+
+  let cursorSql = ''
+  let cursorParams: (string | number | null)[] = []
+
+  if (hasCursor) {
+    const afterId = Number(opts.afterId)
+    if (!spec.nullable) {
+      // Camino por defecto: identico al de produccion, tres binds.
+      const value = coerceAfterValue(spec, opts.afterValue ?? '')
+      cursorSql = ` AND ( ${col} ${cmp} ? OR (${col} = ? AND tew.id ${cmp} ?) )`
+      cursorParams = [value, value, afterId]
+    } else {
+      // `<=>` (igualdad null-safe) es lo que hace que el tramo de vacios —donde
+      // `col` es NULL en TODAS las filas— desempate por id en vez de evaporarse:
+      // con `=` normal, NULL = NULL da NULL y la pagina 2 del tramo vuelve vacia.
+      const value = afterEmpty ? null : coerceAfterValue(spec, opts.afterValue ?? '')
+      const flag = afterEmpty ? 1 : 0
+      cursorSql =
+        ` AND ( ${emptyExpr} > ?` +
+        ` OR (${emptyExpr} = ? AND ${col} ${cmp} ?)` +
+        ` OR (${emptyExpr} = ? AND ${col} <=> ? AND tew.id ${cmp} ?) )`
+      cursorParams = [flag, flag, value, flag, value, afterId]
+    }
+  }
+
+  // El termino lider va SIEMPRE ASC: manda los vacios al final en las dos
+  // direcciones. Sin `nullable` no se emite, y `punchIn` sigue index-ordered.
+  const nullTerm = spec.nullable ? `(${col} IS NULL) ASC, ` : ''
+  const orderSql = `ORDER BY ${nullTerm}${col} ${dir}, tew.id ${dir}`
+  const sql = `SELECT ${select}${cursorSelect} ${fromWhere} ${cursorSql} ${orderSql} LIMIT ?`
   const params = [...baseParams, ...cursorParams, opts.pageSize + 1]
   const countSql = `SELECT COUNT(*) AS total ${fromWhere}`
 

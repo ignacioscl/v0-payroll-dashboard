@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { InvoiceTypeFilter, type InvoiceTypeState } from '@/components/billing/invoice-type-filter'
 import { InvoiceAdvancedFilters } from '@/components/billing/invoice-advanced-filters'
 import { InvoiceDeletedFilter } from '@/components/billing/invoice-deleted-filter'
-import { LookupMultiSelect } from '@/components/billing/lookup-multi-select'
+import { LookupMultiSelect } from '@/components/shared/lookup-multi-select'
 import { useInvoiceWorkerLookup } from '@/hooks/use-invoice-lookups'
 import {
   EMPTY_ADVANCED_FILTERS,

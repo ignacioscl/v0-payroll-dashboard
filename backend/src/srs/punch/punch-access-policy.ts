@@ -18,7 +18,14 @@ import { DEFAULT_ERROR_TYPES, isDefaultErrorTypes } from './repository/punch-err
 export type PunchAccessQuery = {
   idDealer: string
   issueType?: string
-  idPaymentType?: number
+  /** Forma canonica ya parseada (parsePaymentTypeIds), no el string crudo. */
+  idPaymentTypes?: readonly number[]
+  /**
+   * Ordenar POR payment type tambien es usarlo: el LEFT JOIN a GENERIC_DATA
+   * esta siempre en el FROM, asi que sin este campo quien no tiene el permiso
+   * no ve la columna pero igual recibe las filas ordenadas por el valor oculto.
+   */
+  sort?: string
   idEmployee?: number
   /** Forma canónica ya parseada (parseErrorTypes), no el string crudo. */
   errorTypes?: readonly number[]
@@ -86,7 +93,12 @@ export class PunchAccessPolicyService {
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE)) ||
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE_ALT))
 
-    if (query.idPaymentType || issueType === 'without_salary') {
+    const usesPaymentType =
+      (query.idPaymentTypes?.length ?? 0) > 0 ||
+      issueType === 'without_salary' ||
+      query.sort === 'paymentType'
+
+    if (usesPaymentType) {
       if (!canViewPaymentTypeName) {
         throw new ForbiddenException('You do not have permission to filter by payment type.')
       }

@@ -22,6 +22,14 @@ import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 export type PunchGroupedExportLabels = TtkListExportLabels & {
   groupedSheet: string
   totalHours: string
+  /** P7 — set 1: Punches / Errors / Fixed. */
+  punchCount: string
+  errorCount: string
+  fixedCount: string
+  /** Etiqueta de la columna dinamica en modo Corregidos. */
+  correctedColumn: string
+  /** Nombres visibles de los tipos de error, para exportar `correctedTypes`. */
+  errorTypeNames: Record<number, string>
   exportingProgress: string
   exportSheetTitle?: string
   exportSheetSubtitle?: string
@@ -51,6 +59,8 @@ export type PunchGroupedExportLabels = TtkListExportLabels & {
     search: string
     minHours: string
     maxHours: string
+    /** §4.1bis — Working / On lunch / Out, que ahora SI se aplica al padre. */
+    liveStatus: string
     all: string
   }
 }
@@ -81,6 +91,8 @@ export type PunchGroupedReportInfo = {
   search: string
   minHours: string
   maxHours: string
+  /** §4.1bis — etiqueta visible del estado en vivo elegido. */
+  liveStatus: string
 }
 
 export type PunchGroupedExportMode = 'grouped' | 'detail'
@@ -141,12 +153,19 @@ function paymentTypeHours(row: PunchGroupedRow, label: string): number | '' {
 function buildGroupedHeaders(
   paymentTypeLabels: string[],
   labels: PunchGroupedExportLabels,
+  isCorrectedMode: boolean,
 ): string[] {
   return [
     labels.employee,
     labels.totalHours,
     labels.timeBreak,
-    labels.hasError,
+    // El encabezado YA cambiaba con el modo; lo que no cambiaba era la celda.
+    isCorrectedMode ? labels.correctedColumn : labels.hasError,
+    // P7 — salen SIEMPRE, esten ocultas o no en pantalla: esta hoja se arma por
+    // su cuenta y no mira la visibilidad de columnas. Es intencional.
+    labels.punchCount,
+    labels.errorCount,
+    labels.fixedCount,
     ...paymentTypeLabels,
   ]
 }
@@ -155,12 +174,32 @@ function buildGroupedDataRow(
   row: PunchGroupedRow,
   paymentTypeLabels: string[],
   labels: PunchGroupedExportLabels,
+  isCorrectedMode: boolean,
 ): (string | number)[] {
+  // La columna dinamica escribia SIEMPRE `Yes/No` mientras el encabezado si
+  // cambiaba a *Corrected*: una columna titulada "Corrected" con "Yes" adentro,
+  // que no dice QUE se corrigio. Rompe D-B y la invariante de D-11.
+  const count = isCorrectedMode ? row.fixedCount : row.errorCount
+  const suffix = count > 0 ? ` (${count})` : ''
+  const dynamicCell = isCorrectedMode
+    ? (() => {
+        const types = (row.correctedTypes ?? []).map((t) => labels.errorTypeNames[t] ?? String(t))
+        return types.length === 0 ? labels.no : types.join(', ') + suffix
+      })()
+    : row.hasError
+      ? labels.yes + suffix
+      : labels.no
+
   return [
     row.nombreEmployee,
     Math.round(row.hoursNumber * 100) / 100,
     Math.round(row.breakNumber * 100) / 100,
-    row.hasError ? labels.yes : labels.no,
+    dynamicCell,
+    // Numeros de verdad, no strings: el mapper del backend ya los pasa por
+    // Number(), asi que el XLSX escribe celdas numericas y ordenables.
+    row.punchCount,
+    row.errorCount,
+    row.fixedCount,
     ...paymentTypeLabels.map((pt) => paymentTypeHours(row, pt)),
   ]
 }
@@ -215,8 +254,12 @@ async function fetchAllPunchesForEmployee(
       pageSize: EXPORT_PAGE_SIZE,
       sort: 'punchIn',
       dir: 'desc',
-      afterValue: cursor?.value,
+      // `sort: 'punchIn'` no es nulable, asi que este cursor nunca cae en el
+      // tramo de vacios — pero se migra igual, para que no quede un segundo
+      // dialecto del mismo contrato.
+      afterValue: cursor?.value ?? undefined,
       afterId: cursor?.id,
+      afterEmpty: cursor ? (cursor.empty === 1 ? '1' : '0') : undefined,
     })
     collected.push(...page.results)
     cursor = page.hasMore ? page.nextCursor : null
@@ -292,6 +335,9 @@ function buildReportInfoRows(
     { field: r.search, value: info.search },
     { field: r.minHours, value: info.minHours },
     { field: r.maxHours, value: info.maxHours },
+    // `xls-export-report-info` es alwaysApply: el archivo tiene que decir CON QUE
+    // filtros se genero, y este ahora aplica de verdad a la fila agrupada.
+    { field: r.liveStatus, value: info.liveStatus },
   ]
 }
 
@@ -335,8 +381,11 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
   }
 
   const withDetail = mode === 'detail'
-  const headers = buildGroupedHeaders(paymentTypeLabels, labels)
-  const dataRows = groupedRows.map((r) => buildGroupedDataRow(r, paymentTypeLabels, labels))
+  const isCorrectedMode = groupedParamsBase.issueType === 'only_fixed'
+  const headers = buildGroupedHeaders(paymentTypeLabels, labels, isCorrectedMode)
+  const dataRows = groupedRows.map((r) =>
+    buildGroupedDataRow(r, paymentTypeLabels, labels, isCorrectedMode),
+  )
 
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'SRS Payroll Dashboard'
@@ -363,7 +412,8 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     .join(' · ')
   const headerRow = applyTitleRow(mainWs, title, headers.length, subtitle)
 
-  const errorColIndex = headers.indexOf(labels.hasError) + 1
+  const errorColIndex =
+    headers.indexOf(isCorrectedMode ? labels.correctedColumn : labels.hasError) + 1
   const hoursColIndexes = new Set(
     [labels.totalHours, labels.timeBreak, ...paymentTypeLabels]
       .map((h) => headers.indexOf(h) + 1)

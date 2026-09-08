@@ -19,7 +19,7 @@ const filter: SrsKpiFilter = {
 const opts = {
   minHours: 4,
   maxHours: 12,
-  idPaymentType: 101,
+  idPaymentTypes: [101, 8],
   search: 'juan',
   issueType: 'only_error' as const,
   todayLiveStatus: 'working' as const,
@@ -78,6 +78,8 @@ describe('punch-list SQL compartido', () => {
   it('en modo Pending los binds van estado, provider, dealers, rango, resto', () => {
     const { fromWhere, params } = buildPunchListFromWhere(filter, opts)
     expect((fromWhere.match(/\?/g) ?? []).length).toBe(params.length)
+    // Interpolado y canonico: ordenado y sin duplicados.
+    expect(fromWhere).toContain('AND tew.id_payment_type IN (8,101)')
     expect(params).toEqual([
       1, // issue.estado
       79, // provider
@@ -86,7 +88,9 @@ describe('punch-list SQL compartido', () => {
       286,
       '2026-01-01',
       '2026-01-31',
-      101, // payment type
+      // payment type NO aparece: los ids se INTERPOLAN, no se bindean
+      // (punch-payment-types.ts). Es justamente lo que hace que agregar este
+      // filtro no corra el orden de los binds posteriores.
       '%juan%', // search
       4,
       12,
@@ -111,7 +115,7 @@ describe('punch-list SQL compartido', () => {
       '2026-01-31',
       639, // extraParams: f.id_dealer
       286,
-      101,
+      // idem: payment type va interpolado, no bindeado
       '%juan%',
       4,
       12,

@@ -29,12 +29,24 @@ export class SrsPagedResponseDto<T> {
 export class SrsCursorDto {
   @ApiProperty({
     example: '2026-07-30 12:01:16',
-    description: 'Valor de la columna por la que se ordena, en el formato de la base',
+    nullable: true,
+    description:
+      'Valor de la columna por la que se ordena, en el formato de la base. ' +
+      'NULL cuando la ultima fila cae en el tramo de vacios (ver `empty`).',
   })
-  value!: string
+  value!: string | null
 
   @ApiProperty({ example: 910577, description: 'Id único de la última fila entregada' })
   id!: number
+
+  @ApiProperty({
+    example: 0,
+    enum: [0, 1],
+    description:
+      '1 si la ultima fila entregada cae en el tramo de VACIOS de la columna ordenada. ' +
+      'Los vacios van siempre al final, en asc y en desc (BUG-07 / D-4).',
+  })
+  empty!: 0 | 1
 }
 
 /**

@@ -55,6 +55,20 @@ export type GroupedIssueFilter = {
    * texto de error vigente. El repositorio lo usa para decidir a que campo del DTO va.
    */
   marksCorrections: boolean
+  /**
+   * P7 — expresion de FILA "esta ponchada sigue con error HOY", en TODOS los modos.
+   *
+   * NO se puede usar `markSql` para contar: en `only_fixed` vale `'1'`, porque
+   * toda fila que llego ahi ya paso el EXISTS. Contar con eso daria
+   * `errorCount === punchCount` en cada fila de la vista Corregidos, o sea una
+   * columna que repite otra. Con esta expresion separada, `errorCount` significa
+   * LO MISMO en los dos modos: "de estas ponchadas, cuantas siguen rotas".
+   */
+  currentErrorMarkSql: string
+  /** P7 — predicado del EXISTS de `fixedCount`, alias `f7`. Se arma en TODOS los modos. */
+  fixedCountSql: string
+  /** En el MISMO orden en que aparecen sus `?`. */
+  fixedCountParams: (string | number)[]
 }
 
 /** Texto de error VIGENTE de la ponchada, tal como lo muestra la columna hoy. */
@@ -142,6 +156,10 @@ export function resolveGroupedIssueFilter(opts: GroupedIssueFilterOpts = {}): Gr
   const list = errorTypesInList(errorTypes)
   const markSql = `TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (${list})`
 
+  // P7 — se arma UNA vez, con el predicado canonico (no una copia), y sirve para
+  // los dos modos. Alias `f7` para no chocar con `f` (filas) ni `f2` (detalle).
+  const fixedCount = buildFixPredicate('f7', opts, list)
+
   /** Forma por defecto: pendientes. Solo `only_fixed` se aparta. */
   const pending = (estado: number, extraSql: string): GroupedIssueFilter => ({
     estado,
@@ -155,6 +173,9 @@ export function resolveGroupedIssueFilter(opts: GroupedIssueFilterOpts = {}): Gr
     markDetailSql: `CASE WHEN ${markSql} THEN ${CURRENT_ERROR_TEXT_SQL} ELSE NULL END`,
     markDetailParams: [],
     marksCorrections: false,
+    currentErrorMarkSql: markSql,
+    fixedCountSql: fixedCount.sql,
+    fixedCountParams: fixedCount.params,
   })
 
   if (type === 'only_deletes') {
@@ -210,6 +231,14 @@ export function resolveGroupedIssueFilter(opts: GroupedIssueFilterOpts = {}): Gr
         // repetir el mismo predicado y sus binds sin cambiar una sola respuesta.
         markSql: '1',
         markParams: [],
+        // P7 — pero para CONTAR si hace falta preguntarlo: en este modo `markSql`
+        // vale '1', asi que contar con el daria errorCount === punchCount. Aca
+        // `errorCount` responde "de estas ponchadas ya corregidas, cuantas
+        // siguen rotas hoy", que es informacion util de verdad: una ponchada
+        // puede tener el clock out corregido y el break todavia roto (BUG-01).
+        currentErrorMarkSql: markSql,
+        fixedCountSql: fixedCount.sql,
+        fixedCountParams: fixedCount.params,
         // Los tipos que se CORRIGIERON de esa ponchada, no el error que tiene hoy.
         markDetailSql:
           `(SELECT GROUP_CONCAT(DISTINCT f2.error_type ORDER BY f2.error_type SEPARATOR ',')` +

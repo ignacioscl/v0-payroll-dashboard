@@ -3,7 +3,7 @@ import type { DateRange } from 'react-day-picker'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
+  paymentTypeFilterParams,
 } from '@/lib/ttk/payment-type-filter'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { errorTypesParam } from '@/lib/filters/error-types-cookie'
@@ -11,11 +11,32 @@ import { resolveIssueType, type ErrorStatus } from '@/lib/ttk/error-status'
 
 /** Cursor keyset devuelto por el backend; el cliente lo reenvía tal cual. */
 export type PunchListCursor = {
-  value: string
+  /**
+   * `null` cuando la ultima fila cae en el tramo de VACIOS de la columna
+   * ordenada. Tiene que poder faltar: es la unica forma de materializar el bind
+   * `null` que necesita la comparacion null-safe del backend.
+   */
+  value: string | null
   id: number
+  /** 1 = la ultima fila esta dentro del tramo de vacios (que va siempre al final). */
+  empty: 0 | 1
 }
 
-export type PunchListSort = 'punchIn' | 'employee'
+/**
+ * Columnas por las que el endpoint acepta ordenar.
+ *
+ * Antes eran dos y el front convertia todo lo demas a `punchIn`: por eso
+ * ordenar por Time break ordenaba por hora de entrada (BUG-07).
+ */
+export type PunchListSort =
+  | 'punchIn'
+  | 'employee'
+  | 'punchOut'
+  | 'breakStart'
+  | 'breakEnd'
+  | 'timeWork'
+  | 'timeBreak'
+  | 'paymentType'
 
 export type PunchListQueryParams = {
   fechaDesde: string
@@ -26,10 +47,12 @@ export type PunchListQueryParams = {
   dir?: 'asc' | 'desc'
   afterValue?: string
   afterId?: number
+  afterEmpty?: '0' | '1'
   /** Horas de la ponchada individual (no el total del empleado, como en grouped). */
   minHours?: number
   maxHours?: number
-  idPaymentType?: number
+  /** CSV canónico de GENERIC_DATA.id. String ya joineado, nunca number[]. */
+  idPaymentTypes?: string
   search?: string
   idEmployee?: number
   issueType?: string
@@ -68,14 +91,11 @@ export function buildPunchListParams(input: {
   // El eje de estado se cruza con el tipo en UN SOLO lugar (resolveIssueType):
   // list, Grouped, detalle agrupado y los dos exports pasan por acá.
   const crossedType = resolveIssueType(input.selectedType, input.errorStatus ?? 'pending')
-  let issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
-  let idPaymentType: number | undefined
-
-  if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
-    issueType = 'without_salary'
-  } else if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    idPaymentType = paymentTypeFilter
-  }
+  // El combo de payment type NO escribe `issueType`: viaja por su propio
+  // parámetro y es EXCLUYENTE con la tarjeta *Without salary* (D-6, §4.2.2bis).
+  // Antes lo pisaba con 'without_salary', que es lo que hacía imposible pedir
+  // varios tipos a la vez.
+  const issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
 
   const employeeId =
     input.selectedEmployeeId != null && input.selectedEmployeeId > 0
@@ -91,7 +111,7 @@ export function buildPunchListParams(input: {
     dir: input.dir,
     minHours: input.minHours != null && input.minHours > 0 ? input.minHours : undefined,
     maxHours: input.maxHours != null && input.maxHours > 0 ? input.maxHours : undefined,
-    idPaymentType,
+    idPaymentTypes: paymentTypeFilterParams(paymentTypeFilter),
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
@@ -113,11 +133,18 @@ export function punchListParamsToSearchParams(params: PunchListQueryParams): URL
   })
   if (params.sort) qs.set('sort', params.sort)
   if (params.dir) qs.set('dir', params.dir)
-  if (params.afterValue) qs.set('afterValue', params.afterValue)
-  if (params.afterId != null) qs.set('afterId', String(params.afterId))
+  // `afterEmpty` viaja SIEMPRE que haya cursor, y con '1' el valor se OMITE:
+  // en el tramo de vacios el valor es NULL, no string vacio.
+  if (params.afterId != null) {
+    qs.set('afterId', String(params.afterId))
+    qs.set('afterEmpty', params.afterEmpty ?? '0')
+    if (params.afterEmpty !== '1' && params.afterValue) {
+      qs.set('afterValue', params.afterValue)
+    }
+  }
   if (params.minHours != null) qs.set('minHours', String(params.minHours))
   if (params.maxHours != null) qs.set('maxHours', String(params.maxHours))
-  if (params.idPaymentType != null) qs.set('idPaymentType', String(params.idPaymentType))
+  if (params.idPaymentTypes) qs.set('idPaymentTypes', params.idPaymentTypes)
   if (params.search) qs.set('search', params.search)
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
@@ -133,7 +160,8 @@ export type PunchExportPrepareBody = {
   idDealer: string
   minHours?: number
   maxHours?: number
-  idPaymentType?: number
+  /** CSV canónico de GENERIC_DATA.id. String ya joineado, nunca number[]. */
+  idPaymentTypes?: string
   search?: string
   idEmployee?: number
   issueType?: string
@@ -150,7 +178,7 @@ export function punchExportBodyFromListParams(params: PunchListQueryParams): Pun
     idDealer: params.idDealer,
     minHours: params.minHours,
     maxHours: params.maxHours,
-    idPaymentType: params.idPaymentType,
+    idPaymentTypes: params.idPaymentTypes,
     search: params.search,
     idEmployee: params.idEmployee,
     issueType: params.issueType,

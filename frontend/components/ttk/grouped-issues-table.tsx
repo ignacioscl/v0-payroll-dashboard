@@ -21,9 +21,11 @@ import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
 import { formatGroupedHoursDisplay } from '@/lib/ttk/format-grouped-hours'
 import { buildPunchListParams } from '@/lib/ttk/punch-list-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
+import type { PunchGroupedSort } from '@/lib/ttk/punch-grouped-filters'
+import { TODAY_LIVE_STATUS_ALL, todayLiveStatusLabel } from '@/lib/ttk/today-live-status'
 import {
-  PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
+  isPaymentTypeFilterAll,
+  paymentTypeNames,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
@@ -57,6 +59,41 @@ function readGroupedHoursFormatPreference(): boolean {
   return true
 }
 
+/**
+ * Columna de la grilla -> clave del endpoint.
+ *
+ * A nivel de MODULO por el mismo motivo que en Individual: `listExtra` se
+ * declara antes que `columns`, asi que leer `columns` desde ese memo revienta.
+ *
+ * Antes esto era un ternario que caia a `nombreEmployee` para todo lo
+ * desconocido, y el backend ademas tenia `@IsString()` sin whitelist: una
+ * columna nueva ordenable habria ordenado por nombre EN SILENCIO. Ahora el
+ * `@IsIn` del DTO devuelve 400 y esto tira en desarrollo.
+ */
+const PUNCH_GROUPED_SORT_BY_COLUMN_ID: Record<string, PunchGroupedSort> = {
+  employee: 'nombreEmployee',
+  hoursNumber: 'hoursNumber',
+  breakNumber: 'breakNumber',
+  punchCount: 'punchCount',
+  errorCount: 'errorCount',
+  fixedCount: 'fixedCount',
+}
+
+/** Orden inicial visible. El estado vacio se normaliza a esto (§4.3.8). */
+const PUNCH_GROUPED_DEFAULT_SORTING: SortingState = [{ id: 'employee', desc: false }]
+
+function mapGroupedSort(columnId: string | undefined): PunchGroupedSort {
+  if (!columnId) return 'nombreEmployee'
+  const key = PUNCH_GROUPED_SORT_BY_COLUMN_ID[columnId]
+  if (!key) {
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(`Columna sin sortKey en PUNCH_GROUPED_SORT_BY_COLUMN_ID: ${columnId}`)
+    }
+    return 'nombreEmployee'
+  }
+  return key
+}
+
 function paymentTypeHours(row: PunchGroupedRow, label: string): number | null {
   const match = row.byPaymentType.find((pt) => pt.label === label)
   return match ? match.hoursNumber : null
@@ -66,11 +103,21 @@ function GroupedPunchDetail({
   row,
   useHoursFormat,
   snapshotAt,
+  paymentTypeFilter,
 }: {
   row: PunchGroupedRow
   useHoursFormat: boolean
   /** La misma foto que vio el padre: sin esto la expansión trae filas de más. */
   snapshotAt?: string
+  /**
+   * BUG-04: sin esto el detalle listaba ponchadas que el padre YA habia
+   * descartado. El resto de los filtros baja solo por el contexto; este vivia
+   * como state de la pagina y nadie se lo pasaba al detalle.
+   *
+   * NO se pasa `onPaymentTypeFilterChange`: el detalle no puede cambiar el
+   * filtro de la pagina.
+   */
+  paymentTypeFilter?: PaymentTypeFilterValue
 }) {
   const { t } = useTranslation()
   const employeeId = Number(row.idUsuario)
@@ -91,6 +138,7 @@ function GroupedPunchDetail({
       <IssuesDataTable
         employeeIdOverride={employeeId}
         snapshotAt={snapshotAt}
+        paymentTypeFilter={paymentTypeFilter}
         ignoreSearch
         showToolbarFilters={false}
         tableId={`grouped-detail-${employeeId}`}
@@ -171,17 +219,26 @@ export function GroupedIssuesDataTable({
   }, [dealers])
 
   const paymentTypeLabelForExport = React.useMemo(() => {
-    if (paymentTypeFilter === undefined || paymentTypeFilter === PAYMENT_TYPE_FILTER_ALL) return null
-    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) return t('punch.withoutPaymentType')
-    const opt = paymentTypeCatalog.find((o) => o.id === paymentTypeFilter)
-    return opt?.name ?? opt?.title ?? String(paymentTypeFilter)
-  }, [paymentTypeFilter, paymentTypeCatalog, t])
+    // D-12: `All` cuando no hay nada tildado, y la lista de nombres cuando si.
+    // «Sin tipo de pago» NO sale por aca: sale por la fila de *Issue type*
+    // (`without_salary`), que este combo ya no escribe.
+    if (paymentTypeFilter === undefined || isPaymentTypeFilterAll(paymentTypeFilter)) return null
+    const names = paymentTypeNames(paymentTypeFilter, paymentTypeCatalog)
+    return names.length > 0 ? names.join(', ') : paymentTypeFilter.ids.join(', ')
+  }, [paymentTypeFilter, paymentTypeCatalog])
 
   const [pageIndex, setPageIndex] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(25)
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'employee', desc: false },
-  ])
+  const [sorting, setSortingState] = React.useState<SortingState>(PUNCH_GROUPED_DEFAULT_SORTING)
+  /** Idem Individual: el estado vacio se normaliza al orden inicial visible (D-4). */
+  const setSorting = React.useCallback<React.Dispatch<React.SetStateAction<SortingState>>>(
+    (next) =>
+      setSortingState((prev) => {
+        const resolved = typeof next === 'function' ? next(prev) : next
+        return resolved.length === 0 ? PUNCH_GROUPED_DEFAULT_SORTING : resolved
+      }),
+    [],
+  )
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
   const [useHoursFormat, setUseHoursFormat] = React.useState(true)
 
@@ -231,16 +288,16 @@ export function GroupedIssuesDataTable({
         snapshotAt: pageIndex > 0 ? snapshotAtRef.current : undefined,
         includedErrorTypes,
         errorStatus,
-        sort:
-          sortCol === 'employee'
-            ? 'nombreEmployee'
-            : sortCol === 'hoursNumber' || sortCol === 'breakNumber'
-              ? sortCol
-              : 'nombreEmployee',
+        sort: mapGroupedSort(sortCol),
         dir: sortDir as 'asc' | 'desc',
         minHoursTotal,
         maxHoursTotal,
         paymentTypeFilter,
+        // §4.1bis — la pantalla YA mostraba las tarjetas Working/On lunch/Out en
+        // Grouped, pero este filtro no bajaba a la consulta del padre y SI al
+        // detalle expandido: la fila y su detalle contaban universos distintos.
+        // Es la misma incoherencia de BUG-04, al reves.
+        todayLiveStatus: selectedTodayLiveStatus,
       }),
     [
       debouncedDealers,
@@ -256,6 +313,7 @@ export function GroupedIssuesDataTable({
       paymentTypeFilter,
       includedErrorTypes,
       errorStatus,
+      selectedTodayLiveStatus,
     ],
   )
 
@@ -318,6 +376,14 @@ export function GroupedIssuesDataTable({
   const buildExportLabels = React.useCallback((): PunchGroupedExportLabels => {
     return {
       employee: t('common.employee'),
+      // P7 — set 1. *Fixed* y no *Corrected*: en modo Corregidos la columna
+      // dinamica ya se llama *Corrected*, y en el Excel no hay tooltip que
+      // desambigue dos encabezados iguales.
+      punchCount: t('punch.punchCount'),
+      errorCount: t('punch.errorCount'),
+      fixedCount: t('punch.fixedCount'),
+      correctedColumn: t('punch.corrected'),
+      errorTypeNames: { 1: errorTypeLabel(t, 1), 2: errorTypeLabel(t, 2), 3: errorTypeLabel(t, 3) },
       roleDept: t('punch.roleDept'),
       date: t('common.date'),
       punchIn: t('punch.punchIn'),
@@ -357,6 +423,7 @@ export function GroupedIssuesDataTable({
         paymentType: t('punch.paymentType'),
         errorTypes: t('punch.errorTypesReportInfo'),
         errorStatus: t('punch.errorStatus'),
+        liveStatus: t('punch.liveStatusToday'),
         issueType: t('punch.issueTypeReportInfo'),
         search: t('common.search'),
         minHours: t('punch.minHoursReportInfo'),
@@ -397,6 +464,10 @@ export function GroupedIssuesDataTable({
       search: all,
       minHours: minHoursTotal != null ? String(minHoursTotal) : all,
       maxHours: maxHoursTotal != null ? String(maxHoursTotal) : all,
+      liveStatus:
+        selectedTodayLiveStatus && selectedTodayLiveStatus !== TODAY_LIVE_STATUS_ALL
+          ? todayLiveStatusLabel(selectedTodayLiveStatus)
+          : all,
     }
   }, [
     t,
@@ -428,6 +499,12 @@ export function GroupedIssuesDataTable({
     paymentTypeFilter,
     selectedEmployee?.id,
     includedErrorTypes,
+    // `errorStatus` FALTABA. El request y la queryKey si cambian con el estado,
+    // asi que pasar de Pendientes a Corregidos DESDE LA PAGINA 3 pedia la
+    // pagina 3 del universo nuevo —que puede no existir, y la tabla queda
+    // vacia— y dejaba seleccionadas filas del modo anterior.
+    errorStatus,
+    selectedTodayLiveStatus,
   ])
 
   const columns = React.useMemo<ColumnDef<PunchGroupedRow>[]>(
@@ -587,6 +664,16 @@ export function GroupedIssuesDataTable({
         ),
         cell: ({ row }) => {
           const r = row.original
+          // D-11 / a2 — el numero va ADENTRO de esta columna, en los DOS modos:
+          // en Pending los errores VIGENTES, en Corrected las ponchadas con
+          // correccion. Cambia de significado con el modo, y eso es legible solo
+          // porque el header tambien cambia. Sin dato no se pinta ningun `0`.
+          const count = isCorrectedMode ? r.fixedCount : r.errorCount
+          const countBadge =
+            count > 0 ? (
+              <span className="ml-1.5 font-mono text-xs font-semibold tabular-nums">{count}</span>
+            ) : null
+
           if (isCorrectedMode) {
             const types = r.correctedTypes ?? []
             if (types.length === 0) {
@@ -595,6 +682,7 @@ export function GroupedIssuesDataTable({
             return (
               <span className="text-xs">
                 {types.map((type) => errorTypeLabel(t, type as ErrorTypeCode)).join(', ')}
+                {countBadge}
               </span>
             )
           }
@@ -603,27 +691,106 @@ export function GroupedIssuesDataTable({
           }
           if (r.errorSummary) {
             return (
-              <span onClick={(e) => e.stopPropagation()}>
+              <span
+                className="inline-flex items-center"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <PunchErrorIndicator errorText={r.errorSummary} />
+                {countBadge}
               </span>
             )
           }
-          return <span className="text-xs">{t('punch.exportYes')}</span>
+          return (
+            <span className="text-xs">
+              {t('punch.exportYes')}
+              {countBadge}
+            </span>
+          )
         },
         meta: {
           label: groupColumnLabel,
-          exportValue: (r) =>
-            isCorrectedMode
-              ? (r.correctedTypes ?? [])
-                  .map((type) => errorTypeLabel(t, type as ErrorTypeCode))
-                  .join(', ')
-              : r.hasError
-                ? t('punch.exportYes')
-                : t('punch.exportNo'),
+          // Invariante de D-11: header = celda = export. La celda muestra el
+          // numero, asi que el export lo lleva tambien.
+          exportValue: (r) => {
+            const count = isCorrectedMode ? r.fixedCount : r.errorCount
+            const suffix = count > 0 ? ` (${count})` : ''
+            if (isCorrectedMode) {
+              const types = (r.correctedTypes ?? []).map((type) =>
+                errorTypeLabel(t, type as ErrorTypeCode),
+              )
+              return types.length === 0 ? t('punch.exportNo') : types.join(', ') + suffix
+            }
+            return r.hasError ? t('punch.exportYes') + suffix : t('punch.exportNo')
+          },
+        } satisfies DataTableColumnMeta<PunchGroupedRow>,
+      },
+      // P7 — set 1: Punches / Errors / Fixed. *Fixed* y no *Corrected* porque en
+      // modo Corregidos la columna dinamica YA se llama *Corrected*, y dos
+      // headers iguales con fuentes distintas es ilegible, sobre todo en el Excel.
+      // Las tres ORDENAN (son las unicas de esta grilla) y arrancan OCULTAS: el
+      // numero ya se ve adentro de la dinamica, estas estan para ordenar y para
+      // el Excel.
+      {
+        id: 'punchCount',
+        accessorFn: (row) => row.punchCount,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('punch.punchCount')} />
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono tabular-nums">{row.original.punchCount}</span>
+        ),
+        meta: {
+          label: t('punch.punchCount'),
+          sortKey: 'punchCount',
+          mono: true,
+          numeric: true,
+          hiddenByDefault: true,
+          exportValue: (r) => String(r.punchCount),
+        } satisfies DataTableColumnMeta<PunchGroupedRow>,
+      },
+      {
+        id: 'errorCount',
+        accessorFn: (row) => row.errorCount,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('punch.errorCount')} />
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono tabular-nums">{row.original.errorCount}</span>
+        ),
+        meta: {
+          label: t('punch.errorCount'),
+          sortKey: 'errorCount',
+          mono: true,
+          numeric: true,
+          hiddenByDefault: true,
+          exportValue: (r) => String(r.errorCount),
+        } satisfies DataTableColumnMeta<PunchGroupedRow>,
+      },
+      {
+        id: 'fixedCount',
+        accessorFn: (row) => row.fixedCount,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('punch.fixedCount')} />
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono tabular-nums">{row.original.fixedCount}</span>
+        ),
+        meta: {
+          label: t('punch.fixedCount'),
+          sortKey: 'fixedCount',
+          mono: true,
+          numeric: true,
+          hiddenByDefault: true,
+          exportValue: (r) => String(r.fixedCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
     ],
-    [t, useHoursFormat],
+    // `isCorrectedMode` y `groupColumnLabel` FALTABAN: la celda, el header y el
+    // exportValue de la columna dinamica los leen, asi que al mover el switch
+    // Pendientes/Corregidos sin recargar la columna se quedaba con la etiqueta,
+    // la fuente o el exportador del modo anterior. Es un defecto preexistente,
+    // pero esta linea es justo la que hay que editar.
+    [t, useHoursFormat, isCorrectedMode, groupColumnLabel],
   )
 
   const {
@@ -650,6 +817,7 @@ export function GroupedIssuesDataTable({
       // Obligatorio: esta tabla pasa `extra: {}` a useDataTableQuery, así que el
       // escape hatch que mete `extra` en la key no aplica acá.
       errorTypesQueryKey(includedErrorTypes),
+      selectedTodayLiveStatus,
       // El issueType YA CRUZADO con el estado. `selectedType` solo no alcanza:
       // no cambia al pasar de pendientes a corregidos, así que sin esto la tabla
       // se queda con la página cacheada del otro estado.
@@ -742,9 +910,10 @@ export function GroupedIssuesDataTable({
         row={row.original}
         useHoursFormat={useHoursFormat}
         snapshotAt={snapshotAtRef.current}
+        paymentTypeFilter={paymentTypeFilter}
       />
     ),
-    [useHoursFormat],
+    [useHoursFormat, paymentTypeFilter],
   )
 
   return (

@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
+import type { PunchListLiveStatus } from './dto/punch-list.dto'
+
 export type PunchExportTicketState = 'pending' | 'running' | 'done' | 'error'
 
 export type PunchExportStoredFilters = {
@@ -14,13 +16,15 @@ export type PunchExportStoredFilters = {
   idDealer: string
   minHours?: number
   maxHours?: number
-  idPaymentType?: number
+  /** Ids YA parseados y validados (parsePaymentTypeIds + catalogo del provider). */
+  idPaymentTypes?: readonly number[]
   search?: string
   idEmployee?: number
   issueType?: string
   /** CSV canónico de la lista blanca; se guarda tal cual llegó al `prepare`. */
   errorTypes?: string
-  todayLiveStatus?: string
+  /** Union, no `string`: el replay se lo pasa directo a `PunchListSqlOpts`. */
+  todayLiveStatus?: PunchListLiveStatus
 }
 
 export type PunchExportTicket = {

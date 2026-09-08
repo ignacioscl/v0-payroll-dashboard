@@ -709,6 +709,9 @@ export interface Messages {
     issues: string
     total: string
     withErrors: string
+    punchCount: string
+    errorCount: string
+    fixedCount: string
     errorRate: string
     withoutClockOut: string
     withoutBreak: string

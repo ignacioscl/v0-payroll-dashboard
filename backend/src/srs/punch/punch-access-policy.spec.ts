@@ -120,15 +120,33 @@ describe('PunchAccessPolicyService', () => {
     expect(partial.includeErrorType).toBe(true)
   })
 
-  it('idPaymentType o without_salary sin ver payment type da 403', async () => {
+  it('idPaymentTypes, without_salary o sort=paymentType sin permiso dan 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
     await expect(
-      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentType: 101 }),
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [101] }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [8, 10] }),
     ).rejects.toBeInstanceOf(ForbiddenException)
     await expect(
       svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'without_salary' }),
     ).rejects.toBeInstanceOf(ForbiddenException)
+    // Ordenar POR payment type tambien es usarlo: el LEFT JOIN esta siempre en
+    // el FROM, asi que sin este brazo quien no tiene el permiso no ve la columna
+    // pero igual recibe las filas ordenadas por el valor oculto (4.2.3bis).
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, sort: 'paymentType' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('lista vacia de payment types NO dispara el 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    // `idPaymentTypes: []` es «sin filtro», no «filtrando por payment type».
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [] }),
+    ).resolves.toBeDefined()
   })
 
   it('dealer fuera de RESTRICTION da 403 y no busca el nombre', async () => {

@@ -70,7 +70,6 @@ import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -153,9 +152,50 @@ export function CorrectedRecordsNote() {
   )
 }
 
-/** Columna de orden → whitelist del endpoint (`punchIn` | `employee`). */
+/**
+ * Columna de la grilla -> clave del endpoint. **Es el contrato entero.**
+ *
+ * Vive a nivel de MODULO a proposito: `listParams` se arma antes que `columns`,
+ * asi que leer `columns` desde ese memo tocaria una const sin inicializar y
+ * revienta en runtime. Lo leen los dos —el memo de params y las columnas, que
+ * copian de aca su `meta.sortKey`— y no hay dependencia de orden porque no hay
+ * ninguna variable del componente en el medio.
+ *
+ * `date` y `punchIn` comparten clave A PROPOSITO: la columna Date muestra la
+ * fecha de `punch_in` y la columna Punch in su hora, asi que ordenar por
+ * cualquiera de las dos ordena por el mismo instante.
+ *
+ * Una columna que no esta aca va con `enableSorting: false`. Antes esta funcion
+ * devolvia `punchIn` para TODO lo que no fuera `employee`, y por eso ordenar
+ * por Time break ordenaba por hora de entrada (BUG-07).
+ */
+export const PUNCH_LIST_SORT_BY_COLUMN_ID: Record<string, PunchListSort> = {
+  employee: 'employee',
+  date: 'punchIn',
+  punchIn: 'punchIn',
+  breakStart: 'breakStart',
+  breakEnd: 'breakEnd',
+  punchOut: 'punchOut',
+  timeWork: 'timeWork',
+  timeBreak: 'timeBreak',
+  paymentType: 'paymentType',
+}
+
+/** Orden inicial visible. El estado vacio se normaliza a esto (§4.3.8). */
+const PUNCH_LIST_DEFAULT_SORTING: SortingState = [{ id: 'date', desc: true }]
+
 function mapPunchListSort(sorting: SortingState): PunchListSort {
-  return sorting[0]?.id === 'employee' ? 'employee' : 'punchIn'
+  const id = sorting[0]?.id
+  if (!id) return 'punchIn'
+  const key = PUNCH_LIST_SORT_BY_COLUMN_ID[id]
+  if (!key) {
+    // No degradar en silencio: BUG-07 nacio justamente de un mapeo que lo hacia.
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(`Columna sin sortKey en PUNCH_LIST_SORT_BY_COLUMN_ID: ${id}`)
+    }
+    return 'punchIn'
+  }
+  return key
 }
 
 function mapPunchListDir(sorting: SortingState): 'asc' | 'desc' {
@@ -277,9 +317,21 @@ export function IssuesDataTable({
   const emptyByErrorTypes = includedErrorTypes.length === 0
 
   const [pageSize, setPageSize] = React.useState(defaultPageSize)
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'date', desc: true },
-  ])
+  const [sorting, setSortingState] = React.useState<SortingState>(PUNCH_LIST_DEFAULT_SORTING)
+  /**
+   * «Clear sort» del menu deja `sorting = []`, y con eso el backend igual ordena
+   * por su default (`punchIn DESC`) pero NINGUN encabezado queda marcado: la
+   * lista esta ordenada y ninguna flecha lo dice, que es justo lo que D-4
+   * prohibe. Se normaliza el estado vacio al orden inicial VISIBLE.
+   */
+  const setSorting = React.useCallback<React.Dispatch<React.SetStateAction<SortingState>>>(
+    (next) =>
+      setSortingState((prev) => {
+        const resolved = typeof next === 'function' ? next(prev) : next
+        return resolved.length === 0 ? PUNCH_LIST_DEFAULT_SORTING : resolved
+      }),
+    [],
+  )
   const [punchMinHoursRawInternal, setPunchMinHoursRawInternal] = React.useState('')
   const [punchMaxHoursRawInternal, setPunchMaxHoursRawInternal] = React.useState('')
   const punchMinHoursRaw = punchMinHoursRawProp ?? punchMinHoursRawInternal
@@ -302,25 +354,23 @@ export function IssuesDataTable({
       filtersHydrated && canViewPayment && !meLoading && showToolbarFilters,
     )
 
+  // Espejo del de issues/page.tsx. El guard `showToolbarFilters` es lo que
+  // impide que el 2do nivel de Grouped mueva el radio de la pagina: ahi vale
+  // false. Igual que alla, SIN rama `else` (D-6, PLAN.md 4.2.2bis).
   React.useEffect(() => {
     if (!canViewPayment || !showToolbarFilters) return
     if (effectiveSelectedType === 'without_salary') {
-      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
-    } else {
-      setPaymentTypeFilter((prev) =>
-        prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
-      )
+      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_ALL)
     }
   }, [effectiveSelectedType, canViewPayment, showToolbarFilters, setPaymentTypeFilter])
 
   const handlePaymentTypeFilterChange = React.useCallback(
     (next: PaymentTypeFilterValue) => {
       setPaymentTypeFilter(next)
-      if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
-        setSelectedType('without_salary')
-        return
-      }
-      if (selectedType === 'without_salary' || effectiveSelectedType === 'without_salary') {
+      if (
+        next.ids.length > 0 &&
+        (selectedType === 'without_salary' || effectiveSelectedType === 'without_salary')
+      ) {
         setSelectedType('all')
       }
     },
@@ -490,13 +540,18 @@ export function IssuesDataTable({
         meta: {
           label: t('common.employee'),
           pin: 'left',
-          sortKey: 'us.nombre',
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.employee,
           exportValue: (r) => r.usuario?.nombre ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'role',
         accessorFn: (row) => roleLabel(row),
+        // D-9 — su valor es una subconsulta correlacionada del SELECT; el WHERE
+        // del cursor no puede referenciar el alias, asi que habria que repetirla
+        // dos veces mas por fila. Hoy la columna dice que ordena y NO ordena:
+        // sacarle la flecha es cumplir BUG-07, no recortarlo.
+        enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.roleDept')} />
         ),
@@ -515,7 +570,7 @@ export function IssuesDataTable({
         cell: ({ row }) => formatGmtDate(row.original.punchInGmt0) || '—',
         meta: {
           label: t('common.date'),
-          sortKey: 'tew.punch_in',
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.date,
           exportValue: (r) => formatUsDateForExport(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
@@ -533,6 +588,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchIn,
           label: t('punch.punchIn'),
           mono: true,
           exportValue: (r) => {
@@ -555,6 +611,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakStart,
           label: t('punch.breakStart'),
           mono: true,
           exportValue: (r) => {
@@ -577,6 +634,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakEnd,
           label: t('punch.breakEnd'),
           mono: true,
           exportValue: (r) => {
@@ -599,6 +657,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchOut,
           label: t('punch.punchOut'),
           mono: true,
           exportValue: (r) => {
@@ -615,6 +674,7 @@ export function IssuesDataTable({
         ),
         cell: ({ row }) => formatTimeWorkBreak(row.original, 'work', groupedHoursFormat),
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeWork,
           label: t('punch.timeWork'),
           mono: true,
           exportValue: (r) => formatTimeWorkBreak(r, 'work', groupedHoursFormat),
@@ -628,6 +688,7 @@ export function IssuesDataTable({
         ),
         cell: ({ row }) => formatTimeWorkBreak(row.original, 'break', groupedHoursFormat),
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeBreak,
           label: t('punch.timeBreak'),
           mono: true,
           exportValue: (r) => formatTimeWorkBreak(r, 'break', groupedHoursFormat),
@@ -668,6 +729,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.paymentType,
           label: t('punch.paymentType'),
           exportValue: (r) => r.objPaymentType?.name ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,

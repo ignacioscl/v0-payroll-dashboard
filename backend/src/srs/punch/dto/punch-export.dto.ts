@@ -48,12 +48,18 @@ export class PunchExportPrepareDto {
   @Min(0)
   maxHours?: number
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '8,10',
+    description:
+      'CSV de GENERIC_DATA.id de payment type (max 50). Ausente = sin filtro. ' +
+      'Los ids se validan contra el catalogo del provider: uno ajeno => 400. ' +
+      'Para «sin tipo de pago» va issueType=without_salary, no este parametro.',
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idPaymentType?: number
+  @Matches(/^[1-9]\d{0,9}(,[1-9]\d{0,9}){0,49}$/, {
+    message: 'idPaymentTypes must be a comma-separated list of positive integer ids (max 50).',
+  })
+  idPaymentTypes?: string
 
   @ApiPropertyOptional()
   @IsOptional()

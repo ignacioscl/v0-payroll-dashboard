@@ -26,7 +26,8 @@ import {
 } from '@/lib/i18n/label-helpers'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
+  isPaymentTypeFilterAll,
+  paymentTypeNames,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import type { PaymentTypeCatalogItem } from '@/lib/ttk/payment-type-filter'
@@ -154,10 +155,14 @@ export function PunchReportFilterPanel({
   const activePreset = matchPreset(dateRange)
 
   const paymentTypeLabel = React.useMemo(() => {
-    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_ALL) return null
-    if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) return t('punch.withoutPaymentType')
-    const opt = paymentTypeOptions.find((o) => o.id === paymentTypeFilter)
-    return opt?.name ?? opt?.title ?? t('punch.paymentTypeChip', { id: paymentTypeFilter })
+    if (isPaymentTypeFilterAll(paymentTypeFilter)) return null
+    const names = paymentTypeNames(paymentTypeFilter, paymentTypeOptions)
+    // Con el catalogo todavia cargando no hay nombres que mostrar: se cuenta,
+    // que es mejor que un chip vacio o con ids crudos.
+    if (names.length === 0) {
+      return t('invoices.filterManySelected', { count: paymentTypeFilter.ids.length })
+    }
+    return names.join(', ')
   }, [paymentTypeFilter, paymentTypeOptions, t])
 
   const chips = React.useMemo((): FilterChip[] => {

@@ -16,6 +16,12 @@ export type PunchGroupedRow = {
    * en el resto de los modos la columna responde `errorSummary` (decisión D-B).
    */
   correctedTypes?: number[] | null
+  /** P7 — ponchadas del empleado que entran en el filtro actual. */
+  punchCount: number
+  /** P7 — de esas, cuantas siguen con error HOY (mismo criterio en los dos modos). */
+  errorCount: number
+  /** P7 — de esas, cuantas tienen al menos una correccion registrada en el periodo. */
+  fixedCount: number
   byPaymentType: PunchGroupedPaymentTypeRow[]
 }
 

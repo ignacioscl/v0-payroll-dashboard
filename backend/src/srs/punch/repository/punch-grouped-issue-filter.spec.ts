@@ -9,6 +9,15 @@ const MARK_ALL = "TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1,2,3)"
 /** Rango obligatorio en modo Corrected: el filtro baja al ledger. */
 const RANGE = { fechaDesde: '2026-08-01', fechaHasta: '2026-08-31' }
 
+/**
+ * P7 — predicado del EXISTS de `fixedCount`, sin rango/dealers/snapshot.
+ * Alias `f7`, para no chocar con `f` (filas) ni `f2` (detalle).
+ */
+const FIXED_COUNT_SQL =
+  'f7.id_ttk_employee_work = tew.id' +
+  ' AND f7.id_dealer_provider = tew.id_dealer_provider' +
+  ' AND f7.error_type IN (1,2,3)'
+
 const pendingShape = (extraSql: string, estado = 1) => ({
   estado,
   extraSql,
@@ -21,6 +30,11 @@ const pendingShape = (extraSql: string, estado = 1) => ({
   markDetailSql: `CASE WHEN ${MARK_ALL} THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(TTK_PUNCH_WITH_ERROR(tew.id), '$.res')), '') ELSE NULL END`,
   markDetailParams: [],
   marksCorrections: false,
+  // P7 — presentes en TODOS los modos, no solo en only_fixed: la columna
+  // `errorCount` tiene sentido sobre todo en Pending.
+  currentErrorMarkSql: MARK_ALL,
+  fixedCountSql: FIXED_COUNT_SQL,
+  fixedCountParams: [],
 })
 
 describe('resolveGroupedIssueFilter', () => {
