@@ -74,7 +74,11 @@ export function PaymentTypeFilter({
         loading={loading}
         disabled={loading}
         placeholder={t('punch.allPaymentTypes')}
-        className="h-7 min-w-[140px] max-w-[220px] px-2 text-[11px]"
+        // `w-auto` pisa el `w-full` del componente: el `Button` compartido trae
+        // `shrink-0`, y este es el unico uso montado en un flex EN FILA. Sin esto
+        // el trigger pide el 100% del padre y ya no puede achicarse, asi que se
+        // desborda sobre el control vecino de la toolbar.
+        className="h-7 w-auto min-w-[140px] max-w-[220px] text-[11px]"
       />
     </div>
   )

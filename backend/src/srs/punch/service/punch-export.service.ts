@@ -306,15 +306,17 @@ export class PunchExportService {
     ]
 
     if (canViewPaymentTypeName) {
-      // D-12: `All` o la lista de nombres. «Sin tipo de pago» NO sale por aca:
-      // sale por la fila de *Issue type*, que ya escribe `Without salary` y que
-      // el combo no escribe nunca (D-6).
+      // D-12: `All` o la lista de nombres, y NADA MAS.
+      //
+      // «Sin tipo de pago» NO sale por aca: sale por la fila de *Issue type*,
+      // que ya escribe `Without salary`. Hasta la v8 esta fila tenia una rama
+      // `issueType === 'without_salary'` que lo duplicaba, y con D-6 quedo
+      // directamente mal: el combo ya no puede pedir «sin tipo», asi que esa
+      // rama hacia que el Report Info dijera «Payment type: Without salary»
+      // cuando el filtro de payment type estaba en `All`.
       meta.push({
         field: labels.paymentType,
-        value:
-          filters.issueType === 'without_salary'
-            ? labels.issueTypeLabels.without_salary
-            : metaAll(labels, paymentTypeLabel),
+        value: metaAll(labels, paymentTypeLabel),
       })
     }
 

@@ -102,6 +102,18 @@ export function LookupMultiSelect({
   const [draft, setDraft] = useState<number[]>([])
   const [search, setSearch] = useState('')
   const [known, setKnown] = useState<Record<number, LookupOption>>({})
+  /**
+   * Foco de teclado sobre "Check all".
+   *
+   * cmdk mantiene SIEMPRE una fila marcada con `data-selected`, aunque el foco
+   * del DOM este afuera de la lista. Si ademas marcamos este boton, quedan dos
+   * cosas resaltadas y no se sabe cual responde al Enter. Con este flag se
+   * resalta este boton y se APAGA el de la lista: uno a la vez.
+   *
+   * No hace falta `focus-visible`: `preventFocusSteal` impide que el mouse le
+   * de foco, asi que esto solo se prende con teclado.
+   */
+  const [checkAllFocused, setCheckAllFocused] = useState(false)
 
   useEffect(() => {
     if (options.length === 0) return
@@ -178,12 +190,6 @@ export function LookupMultiSelect({
     })
   }
 
-  const handleRowMouseDown = (action: () => void) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    action()
-  }
-
   /**
    * Para las filas de la lista: evita que el mousedown robe el foco del buscador
    * (y cierre el popover) SIN togglear. El toggle lo hace `onSelect`, que es el
@@ -244,10 +250,33 @@ export function LookupMultiSelect({
           <button
             type="button"
             disabled={visibleIds.length === 0}
-            onMouseDown={handleRowMouseDown(toggleAllVisible)}
+            onMouseDown={preventFocusSteal}
+            onClick={toggleAllVisible}
+            // Enter/Space sobre este boton los maneja el navegador (dispara el
+            // click de arriba). Lo que hay que cortar es la BURBUJA hacia el root
+            // de cmdk, que ante un Enter hace preventDefault() y despacha
+            // `cmdk-item-select` sobre la fila resaltada: sin esto, tener el foco
+            // aca y apretar Enter tildaba una FILA en vez de "check all".
+            // No lleva preventDefault: el click nativo tiene que seguir saliendo.
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+            }}
+            onFocus={() => setCheckAllFocused(true)}
+            onBlur={() => setCheckAllFocused(false)}
             className={cn(
               'flex w-full cursor-pointer items-center px-2 py-1.5 text-xs outline-none',
               'hover:bg-accent hover:text-accent-foreground',
+              // Sin esto el foco de teclado es INVISIBLE: `outline-none` mata el
+              // anillo del navegador y no habia nada en su lugar. Y este boton
+              // vive FUERA del CommandList —a proposito, para que no desaparezca
+              // al filtrar—, asi que las flechas de cmdk no lo recorren: Tab es
+              // el UNICO camino de teclado para llegar.
+              //
+              // MISMO indicador que la fila activa de cmdk (`bg-accent`), porque
+              // representan lo mismo: "el Enter va aca". Lo que evita la
+              // confusion no es usar otro estilo, es que no haya dos prendidos
+              // a la vez — de eso se encarga `checkAllFocused` en el CommandList.
+              checkAllFocused && 'bg-accent text-accent-foreground',
               'disabled:pointer-events-none disabled:opacity-50',
               'border-b border-border',
             )}
@@ -255,7 +284,16 @@ export function LookupMultiSelect({
             <RowCheckbox checked={allVisibleSelected} />
             <span className="font-medium">{checkAllLabel}</span>
           </button>
-          <CommandList className="max-h-[240px]">
+          <CommandList
+            className={cn(
+              'max-h-[240px]',
+              // Uno a la vez: mientras el foco esta en "Check all", la fila que
+              // cmdk mantiene marcada se apaga. `!` porque el estilo original
+              // vive en el propio CommandItem (components/ui/command.tsx).
+              checkAllFocused && '[&_[data-selected=true]]:!bg-transparent',
+              checkAllFocused && '[&_[data-selected=true]]:!text-foreground',
+            )}
+          >
             <CommandEmpty>{emptyLabel ?? t('common.noRecords')}</CommandEmpty>
             <CommandGroup>
               {listOptions.map((opt) => {

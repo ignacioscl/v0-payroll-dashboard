@@ -148,6 +148,9 @@ function GroupedPunchDetail({
         tableScrollHeight={false}
         enableExport={false}
         enableTableFocus={false}
+        // `Rows` y `Columns` ya estan en la tabla padre, arriba: repetirlos
+        // adentro de cada fila expandida es ruido.
+        enableToolbarControls={false}
         groupedHoursFormat={useHoursFormat}
         // El aviso de corregidas va una sola vez, arriba, en la tabla padre.
         showCorrectedNote={false}
@@ -733,6 +736,11 @@ export function GroupedIssuesDataTable({
       {
         id: 'punchCount',
         accessorFn: (row) => row.punchCount,
+        // El default del DataTable es 160px: muchisimo para un contador de una o
+        // dos cifras. Lo que fija el piso es el ancho del encabezado, no el dato.
+        size: 104,
+        minSize: 84,
+        maxSize: 130,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.punchCount')} />
         ),
@@ -743,14 +751,17 @@ export function GroupedIssuesDataTable({
           label: t('punch.punchCount'),
           sortKey: 'punchCount',
           mono: true,
-          numeric: true,
-          hiddenByDefault: true,
           exportValue: (r) => String(r.punchCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
         id: 'errorCount',
         accessorFn: (row) => row.errorCount,
+        // El default del DataTable es 160px: muchisimo para un contador de una o
+        // dos cifras. Lo que fija el piso es el ancho del encabezado, no el dato.
+        size: 104,
+        minSize: 84,
+        maxSize: 130,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.errorCount')} />
         ),
@@ -761,14 +772,17 @@ export function GroupedIssuesDataTable({
           label: t('punch.errorCount'),
           sortKey: 'errorCount',
           mono: true,
-          numeric: true,
-          hiddenByDefault: true,
           exportValue: (r) => String(r.errorCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
         id: 'fixedCount',
         accessorFn: (row) => row.fixedCount,
+        // El default del DataTable es 160px: muchisimo para un contador de una o
+        // dos cifras. Lo que fija el piso es el ancho del encabezado, no el dato.
+        size: 104,
+        minSize: 84,
+        maxSize: 130,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.fixedCount')} />
         ),
@@ -779,8 +793,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.fixedCount'),
           sortKey: 'fixedCount',
           mono: true,
-          numeric: true,
-          hiddenByDefault: true,
           exportValue: (r) => String(r.fixedCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },

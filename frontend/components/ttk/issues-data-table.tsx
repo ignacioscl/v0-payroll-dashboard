@@ -124,6 +124,12 @@ export type IssuesDataTableProps = {
   enableExport?: boolean
   /** When false, hides the full-screen table focus control (e.g. nested grouped detail). */
   enableTableFocus?: boolean
+  /**
+   * Barra de herramientas propia (`Rows` + `Columns`). En el 2do nivel de
+   * Grouped se apaga: son los mismos dos controles que ya tiene la tabla padre
+   * justo arriba, repetidos adentro de cada fila expandida.
+   */
+  enableToolbarControls?: boolean
   /** When set, timeWork/timeBreak follow the grouped hrs/decimal toggle. */
   groupedHoursFormat?: boolean
   /**
@@ -252,6 +258,7 @@ export function IssuesDataTable({
   showToolbarFilters = true,
   enableExport = true,
   enableTableFocus = true,
+  enableToolbarControls = true,
   groupedHoursFormat,
   showCorrectedNote = true,
 }: IssuesDataTableProps = {}) {
@@ -996,7 +1003,7 @@ export function IssuesDataTable({
           }
           pageSize={pageSize}
           onPageSizeChange={setPageSize}
-          showPageSizeInInfiniteScroll
+          showPageSizeInInfiniteScroll={enableToolbarControls}
           pageSizeOptions={[25]}
           includeAllPageSize
           infiniteScroll={{
@@ -1031,7 +1038,7 @@ export function IssuesDataTable({
               </div>
             ) : undefined
           }
-          enableViewOptions
+          enableViewOptions={enableToolbarControls}
           enableExport={false}
           toolbarTrailing={
             enableExport ? (

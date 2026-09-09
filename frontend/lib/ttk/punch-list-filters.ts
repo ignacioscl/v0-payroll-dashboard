@@ -97,6 +97,17 @@ export function buildPunchListParams(input: {
   // varios tipos a la vez.
   const issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
 
+  // D-6 — la exclusion mutua se DERIVA aca, no se delega al efecto que limpia el
+  // combo. Ese efecto corrige el estado UN RENDER TARDE: entre el click en la
+  // tarjeta *Without salary* y su ejecucion hay un render donde conviven
+  // `selectedType='without_salary'` y los ids todavia tildados, y este memo los
+  // emitia a los DOS -> `idPaymentTypes=8,10&issueType=without_salary`, que es
+  // `id_payment_type IS NULL AND id_payment_type IN (8,10)`: cero filas, un
+  // request al pedo y una entrada de cache con una combinacion imposible.
+  // Derivandolo, ningun estado intermedio puede filtrarse.
+  const idPaymentTypes =
+    issueType === 'without_salary' ? undefined : paymentTypeFilterParams(paymentTypeFilter)
+
   const employeeId =
     input.selectedEmployeeId != null && input.selectedEmployeeId > 0
       ? input.selectedEmployeeId
@@ -111,7 +122,7 @@ export function buildPunchListParams(input: {
     dir: input.dir,
     minHours: input.minHours != null && input.minHours > 0 ? input.minHours : undefined,
     maxHours: input.maxHours != null && input.maxHours > 0 ? input.maxHours : undefined,
-    idPaymentTypes: paymentTypeFilterParams(paymentTypeFilter),
+    idPaymentTypes,
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
