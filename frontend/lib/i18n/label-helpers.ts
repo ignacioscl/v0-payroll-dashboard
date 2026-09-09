@@ -8,6 +8,7 @@ const ISSUE_FILTER_KEYS: Record<string, string> = {
   only_error: 'punch.onlyWithErrors',
   only_error_clockout: 'punch.withoutClockOut',
   only_error_break: 'punch.withoutBreak',
+  only_error_20h: 'punch.shift20h',
   manual_punch: 'punch.manualPlural',
   only_deletes: 'punch.deletedPlural',
   without_salary: 'punch.withoutSalary',

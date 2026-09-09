@@ -1,16 +1,23 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker'
 import {
   readSelectedDealersCookie,
   writeSelectedDealersCookie,
 } from '@/lib/filters/dealer-selection-cookie'
+import {
+  includedErrorTypesFrom,
+  readExcludedErrorTypesCookie,
+  writeExcludedErrorTypesCookie,
+} from '@/lib/filters/error-types-cookie'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { getDefaultDateRange, isTodayOnlyDateRange } from '@/lib/filters/date-range-presets'
 import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
 } from '@/lib/ttk/today-live-status'
+import { DEFAULT_ERROR_STATUS, type ErrorStatus } from '@/lib/ttk/error-status'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 
 interface FilterContextType {
@@ -34,6 +41,31 @@ interface FilterContextType {
   setSelectedDistricts: (value: number[]) => void
   selectedType: string
   setSelectedType: (value: string) => void
+  /**
+   * Eje pendiente/corregido. Vive acá —y no en cada pantalla— porque es un filtro
+   * de la misma naturaleza que dealers y rango, y tiene que valer igual en las dos.
+   *
+   * Para un usuario externo vale siempre `pending`: la policy le prohíbe cualquier
+   * `issueType` distinto de `all`, y se resuelve en el MISMO render en que se
+   * conoce la identidad (no en un effect, que dejaría pasar un pedido con 403).
+   */
+  errorStatus: ErrorStatus
+  setErrorStatus: (value: ErrorStatus) => void
+  /**
+   * Tipos de error DESTILDADOS por el usuario (lo que se persiste).
+   * `[]` = los tres visibles; `[1,2,3]` = los tres excluidos.
+   * Para un usuario externo esto vale siempre `[]`: la policy le prohíbe
+   * filtrar por tipo de error, así que la preferencia se ignora sin esperar
+   * a un effect (si no, pasa un render con el filtro puesto).
+   */
+  excludedErrorTypes: number[]
+  /** Derivado, nunca persistido: `{1,2,3} − excluidos`. */
+  includedErrorTypes: number[]
+  toggleErrorType: (type: number) => void
+  /** Vuelve a incluir los tres. Lo usa el "Clear all" del panel de filtros. */
+  resetErrorTypes: () => void
+  /** False mientras `/me` no resolvió: ninguna query afectada se habilita. */
+  errorTypesReady: boolean
   selectedStatus: string
   setSelectedStatus: (value: string) => void
   /** Dashboard live headcount filter: on_lunch | working | out */
@@ -53,7 +85,16 @@ interface FilterContextType {
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined)
 
+/** Referencia estable: evita re-render en cada pasada para el caso externo. */
+const EMPTY_EXCLUDED: number[] = []
+
 export function FilterProvider({ children }: { children: ReactNode }) {
+  const { user, loading: meLoading } = useSrsMe()
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  // Mientras no se sepa quién es, ninguna query afectada por la exclusión arranca:
+  // un effect corre DESPUÉS del render, así que sin este gate pasaría un pedido
+  // con la exclusión puesta antes de poder limpiarla.
+  const errorTypesReady = !meLoading
   const [search, setSearch] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
   const [selectedDealers, setSelectedDealersState] = useState<string[]>([])
@@ -61,6 +102,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedDistricts, setSelectedDistricts] = useState<number[]>([])
   const [selectedDealer, setSelectedDealer] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
+  // SIN cookie a propósito: dealers y tipos sí persisten, el estado no. Nadie tiene
+  // que entrar al día siguiente viendo corregidos creyendo que ve pendientes.
+  const [errorStatusState, setErrorStatus] = useState<ErrorStatus>(DEFAULT_ERROR_STATUS)
+  const [excludedErrorTypesState, setExcludedErrorTypesState] = useState<number[]>([])
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
     useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
@@ -85,13 +130,59 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Restore cookie after mount so SSR and first client render match (avoid hydration mismatch).
+  // Las dos cookies se restauran en el MISMO effect y antes de `setFiltersHydrated(true)`:
+  // ese flag es el gate de 10+ queries, así que un effect aparte dejaría una ventana
+  // con `filtersHydrated` en true y la exclusión todavía vacía → primer fetch con el
+  // filtro equivocado y refetch inmediato.
   useEffect(() => {
     const saved = readSelectedDealersCookie()
     if (saved.length > 0) {
       setSelectedDealersState(saved)
     }
+    const savedErrorTypes = readExcludedErrorTypesCookie()
+    if (savedErrorTypes.length > 0) {
+      setExcludedErrorTypesState(savedErrorTypes)
+    }
     setFiltersHydrated(true)
   }, [])
+
+  // El externo no puede filtrar por tipo de error: el valor EFECTIVO se resuelve
+  // en la misma renderización en que se conoce la identidad, no en un effect.
+  const excludedErrorTypes = isExternal ? EMPTY_EXCLUDED : excludedErrorTypesState
+  // Mismo patrón que la línea de arriba, por el mismo motivo.
+  const errorStatus: ErrorStatus = isExternal ? DEFAULT_ERROR_STATUS : errorStatusState
+  const includedErrorTypes = useMemo(
+    () => includedErrorTypesFrom(excludedErrorTypes),
+    [excludedErrorTypes],
+  )
+
+  // El updater es PURO: la cookie se escribe en un effect. Con el write adentro,
+  // React lo invoca dos veces en StrictMode y un "destildar los tres de una"
+  // (Clear all) se aplicaba dos veces y volvía al estado original.
+  const toggleErrorType = useCallback((type: number) => {
+    setExcludedErrorTypesState((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type].sort((a, b) => a - b),
+    )
+  }, [])
+
+  const resetErrorTypes = useCallback(() => {
+    setExcludedErrorTypesState((prev) => (prev.length === 0 ? prev : []))
+  }, [])
+
+  // Persistencia. Después de hidratar, para no pisar la cookie con el [] inicial.
+  useEffect(() => {
+    if (!filtersHydrated) return
+    writeExcludedErrorTypesCookie(excludedErrorTypesState)
+  }, [filtersHydrated, excludedErrorTypesState])
+
+  // El borrado FÍSICO de la cookie sí puede vivir en un effect: es limpieza, no gate.
+  useEffect(() => {
+    if (!isExternal) return
+    if (excludedErrorTypesState.length === 0) return
+    setExcludedErrorTypesState([])
+  }, [isExternal, excludedErrorTypesState.length])
 
   useEffect(() => {
     const def = getDefaultDateRange()
@@ -108,6 +199,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDealerIdAllowList(null)
     setSelectedDealer('all')
     setSelectedType('all')
+    setErrorStatus(DEFAULT_ERROR_STATUS)
+    setExcludedErrorTypesState([])
     setSelectedStatus('all')
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     const def = getDefaultDateRange()
@@ -132,6 +225,13 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setDealerIdAllowList,
       selectedType,
       setSelectedType,
+      errorStatus,
+      setErrorStatus,
+      excludedErrorTypes,
+      includedErrorTypes,
+      toggleErrorType,
+      resetErrorTypes,
+      errorTypesReady,
       selectedStatus,
       setSelectedStatus,
       selectedTodayLiveStatus,

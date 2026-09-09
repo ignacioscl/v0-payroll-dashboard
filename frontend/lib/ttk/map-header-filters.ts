@@ -1,10 +1,7 @@
 import { format } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
-import {
-  PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
-} from '@/lib/ttk/payment-type-filter'
+import { PAYMENT_TYPE_FILTER_ALL } from '@/lib/ttk/payment-type-filter'
 import { isTodayLiveStatus } from '@/lib/ttk/today-live-status'
 
 /** Session user fields needed to map header dealer combo → SRS scope params. */
@@ -43,12 +40,32 @@ export function toPayrollScopeUser(
   }
 }
 
+/**
+ * Agrega `error_types` sólo cuando la lista es parcial.
+ *
+ * Va como helper explícito y NO adentro de `buildTtkScopeParams`: ese builder lo
+ * comparten counts, dashboard summary y `useTtkTodayStatus()`, que no tiene nada
+ * que ver con tipos de error — heredarlo le mandaría un parámetro ajeno y le
+ * ensuciaría la cache key.
+ */
+export function appendErrorTypesParam(
+  params: Record<string, string | number>,
+  includedErrorTypes?: readonly number[],
+): void {
+  if (!includedErrorTypes) return
+  // Lista completa => no se manda (compatibilidad). Lista vacía => tampoco: en ese
+  // caso el front directamente no pide filas, y un CSV vacío sería un 400.
+  if (includedErrorTypes.length === 0 || includedErrorTypes.length === 3) return
+  params.error_types = includedErrorTypes.join(',')
+}
+
 /** Maps header "issue type" filter to TTK datatable flags (ttk_main without group). */
 export function mapIssueTypeToTtkFlags(selectedType: string) {
   return {
     only_error: selectedType === 'only_error' ? 1 : 0,
     only_error_clockout: selectedType === 'only_error_clockout' ? 1 : 0,
     only_error_break: selectedType === 'only_error_break' ? 1 : 0,
+    only_error_20h: selectedType === 'only_error_20h' ? 1 : 0,
     manual_punch: selectedType === 'manual_punch' ? 1 : 0,
     only_deletes: selectedType === 'only_deletes' ? 1 : 0,
     without_salary: selectedType === 'without_salary' ? 1 : 0,
@@ -73,16 +90,18 @@ export function buildTtkListFilterExtra(input: {
   paymentTypeFilter?: PaymentTypeFilterValue
   todayLiveStatus?: string
   scopeUser?: PayrollScopeUser | null
+  /** Tipos incluidos (derivado de las exclusiones). Omitir = los tres. */
+  includedErrorTypes?: readonly number[]
 }): Record<string, string | number> {
   const flags = mapIssueTypeToTtkFlags(input.selectedType)
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
-  let withoutSalary = flags.without_salary
-  if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
-    withoutSalary = 1
-  } else if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    withoutSalary = 0
-  }
+  // `ttk-list.php` NO cambia (§4.2.3): sigue aceptando UN id y su propio
+  // `without_salary`. El combo ya no puede pedir «sin tipo», así que lo unico
+  // que puede apagar ese flag es haber tildado tipos concretos.
+  const singlePaymentTypeId =
+    paymentTypeFilter.ids.length === 1 ? paymentTypeFilter.ids[0] : undefined
+  const withoutSalary = paymentTypeFilter.ids.length > 0 ? 0 : flags.without_salary
 
   const employeeId =
     input.selectedEmployeeId != null && input.selectedEmployeeId > 0
@@ -96,6 +115,7 @@ export function buildTtkListFilterExtra(input: {
     only_error: flags.only_error,
     only_error_clockout: flags.only_error_clockout,
     only_error_break: flags.only_error_break,
+    only_error_20h: flags.only_error_20h,
     manual_punch: flags.manual_punch,
     only_deletes: flags.only_deletes,
     without_salary: withoutSalary,
@@ -105,6 +125,7 @@ export function buildTtkListFilterExtra(input: {
   }
 
   appendPayrollDealerScopeParams(params, input.selectedDealers, input.scopeUser)
+  appendErrorTypesParam(params, input.includedErrorTypes)
   if (employeeId != null) {
     params.id_employee = employeeId
   }
@@ -114,8 +135,10 @@ export function buildTtkListFilterExtra(input: {
   if (input.punchMaxHours != null && input.punchMaxHours > 0) {
     params.punch_max_hours = input.punchMaxHours
   }
-  if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    params.id_payment_type = paymentTypeFilter
+  // Semántica singular conservada: con varios tildados no hay parámetro que
+  // mande, y este endpoint no lo expone en ninguna de sus dos pantallas.
+  if (singlePaymentTypeId != null) {
+    params.id_payment_type = singlePaymentTypeId
   }
   if (input.todayLiveStatus && isTodayLiveStatus(input.todayLiveStatus)) {
     params.today_live_status = input.todayLiveStatus

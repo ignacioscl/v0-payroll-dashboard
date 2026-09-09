@@ -24,7 +24,8 @@ export function TodayStatusSection() {
   const router = useRouter()
   const { t, locale } = useTranslation()
   const dateFnsLocale = locale === 'es' ? es : enUS
-  const { setDateRange, setSelectedTodayLiveStatus, setSelectedType } = useFilters()
+  const { setDateRange, setSelectedTodayLiveStatus, setSelectedType, setErrorStatus } =
+    useFilters()
   const { status, loading, error } = useTtkTodayStatus()
 
   const liveStatusLabels = useMemo(() => getTodayLiveStatusOptions(t), [t])
@@ -53,6 +54,10 @@ export function TodayStatusSection() {
 
   const openPunchReport = (liveStatus: TodayLiveStatus) => {
     setSelectedType('all')
+    // Fija los DOS ejes: con la tabla de verdad, `all` + `corrected` se convierte en
+    // `only_fixed`, así que Working/Lunch/Out abriría historial corregido en vez
+    // del estado vivo de hoy.
+    setErrorStatus('pending')
     setSelectedTodayLiveStatus(liveStatus)
     setDateRange(getTodayDateRange())
     router.push('/issues')

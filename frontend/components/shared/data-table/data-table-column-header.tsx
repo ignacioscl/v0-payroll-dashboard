@@ -63,7 +63,14 @@ export function DataTableColumnHeader<TData, TValue>({
               )}
             >
               <span>{title}</span>
-              {sorted === 'desc' ? (
+              {/*
+                El icono depende de `getCanSort()`, no de que la columna abra
+                menu. Antes se pintaba a TODA columna ordenable O escondible, asi
+                que una columna con `enableSorting: false` seguia mostrando la
+                flecha y solo perdia las opciones del menu: ofrecia un orden que
+                no existe. La accion de ocultar no se pierde — el menu sigue.
+              */}
+              {!column.getCanSort() ? null : sorted === 'desc' ? (
                 <ArrowDown className="ml-0.5 size-3" />
               ) : sorted === 'asc' ? (
                 <ArrowUp className="ml-0.5 size-3" />

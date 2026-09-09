@@ -1,10 +1,5 @@
-export type LookupOption = {
-  id: number
-  label: string
-  sublabel?: string
-  thumbnailUuid?: string | null
-  logoImg?: string | null
-}
+/** Se movió junto al componente genérico; se re-exporta para no tocar los imports viejos. */
+export type { LookupOption } from '@/components/shared/lookup-multi-select'
 
 export type InvoiceAdvancedFilterState = {
   departmentIds: number[]

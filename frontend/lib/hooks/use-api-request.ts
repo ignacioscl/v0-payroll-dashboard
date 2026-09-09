@@ -8,6 +8,25 @@ import CustomError from '@/types/custom-error';
 import { UrlEnum } from '@/types/enum-url';
 import { isSrsLoginHtml } from '@/lib/srs/parse-srs-response';
 
+/**
+ * Saca el mensaje de error de una respuesta rechazada por axios.
+ *
+ * Nest lo pone en `data.message`. Los endpoints PHP de payroll usan el sobre de
+ * `ErrorManager`, que lo pone en `data.error.message` — y hasta ahora esos
+ * endpoints nunca devolvían 4xx (todo salía 200 con `status:"fail"`), así que
+ * este catch no corría. Al empezar a emitir status reales, sin esto el mensaje
+ * quedaría `undefined` y el usuario vería "An error occurred".
+ *
+ * El proxy de Next agrega una tercera forma: `{ error: 'Unauthorized' }`, con
+ * `error` string (lib/srs-proxy.ts:27).
+ */
+export function srsErrorMessage(error: any): any {
+  const data = error?.response?.data;
+  if (!data) return undefined;
+  if (typeof data.error === 'string') return data.error;
+  return data.error?.message ?? data.message;
+}
+
 export type PaginationState = {
   pageIndex?: number | undefined;
   pageSize?: number;
@@ -70,14 +89,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error);
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -119,7 +138,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -127,7 +146,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       });
       //return {data: [],...pagination,total:0,error:error?.response?.data} as any
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -153,7 +172,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -161,7 +180,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       });
       //return {data: [],...pagination,total:0,error:error?.response?.data} as any
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -176,7 +195,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -184,7 +203,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       });
       //return {data: [],...pagination,total:0,error:error?.response?.data} as any
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -201,7 +220,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -209,7 +228,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       });
       //return {data: [],...pagination,total:0,error:error?.response?.data} as any
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -227,14 +246,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error);
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -256,14 +275,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error);
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -308,14 +327,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
       }
       setError(error);
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -336,7 +355,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       }
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -344,7 +363,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
       });
 
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -359,14 +378,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -388,14 +407,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -410,14 +429,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
@@ -439,14 +458,14 @@ export function useApiRequest<T, Q = undefined, R = T>(
     } catch (error: any) {
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,
         replacements: error?.response?.data.replacements,
       });
       throw new CustomError({
-        message: error?.response?.data?.message,
+        message: srsErrorMessage(error),
         status: error?.response?.status,
         validationErrors: error?.response?.data?.validationErrors,
         i18nKey: error?.response?.data.i18nKey,

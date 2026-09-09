@@ -19,7 +19,7 @@ const filter: SrsKpiFilter = {
 const opts = {
   minHours: 4,
   maxHours: 12,
-  idPaymentType: 101,
+  idPaymentTypes: [101, 8],
   search: 'juan',
   issueType: 'only_error' as const,
   todayLiveStatus: 'working' as const,
@@ -67,6 +67,97 @@ describe('punch-list SQL compartido', () => {
     expect(page.sql).toContain('LIMIT ?')
     expect(page.params[page.params.length - 1]).toBe(26)
     expect(page.params).toEqual(expect.arrayContaining(['Ana', 9]))
+  })
+
+  /* ---------------------------------------------------------------------- */
+  /* Orden de binds — el error que no se ve hasta que la grilla devuelve      */
+  /* otro período. Contar `?` contra params.length NO alcanza: hay que        */
+  /* comparar el ORDEN.                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  it('en modo Pending los binds van estado, provider, dealers, rango, resto', () => {
+    const { fromWhere, params } = buildPunchListFromWhere(filter, opts)
+    expect((fromWhere.match(/\?/g) ?? []).length).toBe(params.length)
+    // Interpolado y canonico: ordenado y sin duplicados.
+    expect(fromWhere).toContain('AND tew.id_payment_type IN (8,101)')
+    expect(params).toEqual([
+      1, // issue.estado
+      79, // provider
+      42, // RESTRICTION_DEALER_V2(idUsuario, ...)
+      639,
+      286,
+      '2026-01-01',
+      '2026-01-31',
+      // payment type NO aparece: los ids se INTERPOLAN, no se bindean
+      // (punch-payment-types.ts). Es justamente lo que hace que agregar este
+      // filtro no corra el orden de los binds posteriores.
+      '%juan%', // search
+      4,
+      12,
+    ])
+  })
+
+  it('en modo Corrected desaparecen estado, rango y dealers de AFUERA, y reaparecen adentro', () => {
+    const { fromWhere, params } = buildPunchListFromWhere(filter, {
+      ...opts,
+      issueType: 'only_fixed',
+    })
+    expect((fromWhere.match(/\?/g) ?? []).length).toBe(params.length)
+    // El rango exterior sobre tew.punch_in ya no existe.
+    expect(fromWhere).not.toContain('tew.punch_in >= ?')
+    // El predicado de dealers tampoco; el JOIN sí, porque el SELECT proyecta c.id.
+    expect(fromWhere).not.toContain('RESTRICTION_DEALER_V2')
+    expect(fromWhere).toContain('JOIN CONTRATISTA c ON c.id = tew.id_dealer')
+    expect(params).toEqual([
+      1, // estado: sin permiso de eliminadas sigue viajando
+      79, // provider — NUNCA se omite
+      '2026-01-01', // extraParams: rango sobre f.punch_date
+      '2026-01-31',
+      639, // extraParams: f.id_dealer
+      286,
+      // idem: payment type va interpolado, no bindeado
+      '%juan%',
+      4,
+      12,
+    ])
+  })
+
+  it('con permiso de eliminadas el bind de estado desaparece del todo', () => {
+    const { fromWhere, params } = buildPunchListFromWhere(filter, {
+      ...opts,
+      issueType: 'only_fixed',
+      includeDeletedFixes: true,
+    })
+    expect(fromWhere).not.toContain('tew.estado = ?')
+    expect((fromWhere.match(/\?/g) ?? []).length).toBe(params.length)
+    expect(params[0]).toBe(79)
+  })
+
+  it('el snapshot aplica en TODOS los modos, no sólo en Corrected', () => {
+    for (const issueType of ['only_error', 'only_fixed'] as const) {
+      const { fromWhere, params } = buildPunchListFromWhere(filter, {
+        ...opts,
+        issueType,
+        snapshotAt: '2026-09-06 12:00:00',
+      })
+      expect(fromWhere).toContain('tew.punch_in <= ?')
+      expect(params).toContain('2026-09-06 12:00:00')
+      expect((fromWhere.match(/\?/g) ?? []).length).toBe(params.length)
+    }
+  })
+
+  it('las columnas de corregidos son SÓLO del export y SÓLO en modo Corrected', () => {
+    const page = buildPunchListPageSql(filter, { ...opts, issueType: 'only_fixed', pageSize: 25 })
+    expect(page.sql).not.toContain('corrected_types')
+
+    const exportCorrected = buildPunchListExportSql(filter, { ...opts, issueType: 'only_fixed' })
+    expect(exportCorrected.sql).toContain('corrected_types')
+    expect(exportCorrected.sql).toContain('last_corrected_at')
+    // Y no agregan un solo bind: el fragmento de tipos se interpola.
+    expect((exportCorrected.sql.match(/\?/g) ?? []).length).toBe(exportCorrected.params.length)
+
+    const exportPending = buildPunchListExportSql(filter, opts)
+    expect(exportPending.sql).not.toContain('corrected_types')
   })
 
   it('sin permiso de importes no selecciona hourly_rate ni type_payment de tew', () => {

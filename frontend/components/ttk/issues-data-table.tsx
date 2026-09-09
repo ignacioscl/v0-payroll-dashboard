@@ -4,6 +4,7 @@ import * as React from 'react'
 import type { ColumnDef, ColumnPinningState, SortingState } from '@tanstack/react-table'
 import {
   AlertTriangle,
+  CheckCheck,
   CheckCircle,
   Images,
   Info,
@@ -18,6 +19,8 @@ import {
 } from '@/components/shared/data-table'
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
+import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { isErrorIssueType, punchErrorVisible } from '@/lib/ttk/error-type-meta'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import {
   buildPunchListParams,
@@ -67,7 +70,6 @@ import { useTtkDeletePunch } from '@/hooks/use-ttk-delete-punch'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -77,9 +79,14 @@ import { useMinWidth } from '@/hooks/use-mobile'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 import type { DateRange } from 'react-day-picker'
+import { effectiveErrorStatus, resolveIssueType } from '@/lib/ttk/error-status'
+import { PunchDeletedChip, PunchFixChips } from '@/components/ttk/punch-fix-chips'
 
 /** Pin Employee / Actions only at this width and above. */
 const TABLE_PIN_MIN_WIDTH = 1200
+
+/** Referencia estable para el vacío: evita re-render por identidad nueva. */
+const EMPTY_ROWS: TtkListRow[] = []
 
 export type IssuesDataTableProps = {
   /** Overrides header date range (e.g. dashboard yesterday-only). */
@@ -90,6 +97,11 @@ export type IssuesDataTableProps = {
   ignoreSearch?: boolean
   /** When set, filters punches to this employee (e.g. grouped row expand). */
   employeeIdOverride?: number
+  /**
+   * Frontera congelada del grupo padre (expansión de Grouped y su export). Sin
+   * ella, expandir un grupo muestra ponchadas que no estaban en el padre.
+   */
+  snapshotAt?: string
   tableId?: string
   defaultPageSize?: number
   exportFileName?: string
@@ -112,13 +124,84 @@ export type IssuesDataTableProps = {
   enableExport?: boolean
   /** When false, hides the full-screen table focus control (e.g. nested grouped detail). */
   enableTableFocus?: boolean
+  /**
+   * Barra de herramientas propia (`Rows` + `Columns`). En el 2do nivel de
+   * Grouped se apaga: son los mismos dos controles que ya tiene la tabla padre
+   * justo arriba, repetidos adentro de cada fila expandida.
+   */
+  enableToolbarControls?: boolean
   /** When set, timeWork/timeBreak follow the grouped hrs/decimal toggle. */
   groupedHoursFormat?: boolean
+  /**
+   * When false, hides the "already corrected" chip next to the record count.
+   * En Grouped el aviso va UNA vez, en la tabla padre: repetirlo en cada grupo
+   * expandido lo convierte en ruido y lo aleja del contador que califica.
+   */
+  showCorrectedNote?: boolean
 }
 
-/** Columna de orden → whitelist del endpoint (`punchIn` | `employee`). */
+/**
+ * Chip «ya corregidas» que va al lado del contador de filas.
+ *
+ * Vive acá y se exporta porque lo usan las dos grillas: en Individual lo pone
+ * esta tabla, y en Grouped lo pone la tabla PADRE —el aviso califica al total de
+ * empleados listados, no a cada grupo abierto—. Duplicar el markup terminaba en
+ * dos chips que se parecían pero no eran iguales.
+ */
+export function CorrectedRecordsNote() {
+  const { t } = useTranslation()
+  return (
+    <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+      <CheckCheck className="size-3" />
+      {t('punch.viewingCorrectedNote')}
+    </span>
+  )
+}
+
+/**
+ * Columna de la grilla -> clave del endpoint. **Es el contrato entero.**
+ *
+ * Vive a nivel de MODULO a proposito: `listParams` se arma antes que `columns`,
+ * asi que leer `columns` desde ese memo tocaria una const sin inicializar y
+ * revienta en runtime. Lo leen los dos —el memo de params y las columnas, que
+ * copian de aca su `meta.sortKey`— y no hay dependencia de orden porque no hay
+ * ninguna variable del componente en el medio.
+ *
+ * `date` y `punchIn` comparten clave A PROPOSITO: la columna Date muestra la
+ * fecha de `punch_in` y la columna Punch in su hora, asi que ordenar por
+ * cualquiera de las dos ordena por el mismo instante.
+ *
+ * Una columna que no esta aca va con `enableSorting: false`. Antes esta funcion
+ * devolvia `punchIn` para TODO lo que no fuera `employee`, y por eso ordenar
+ * por Time break ordenaba por hora de entrada (BUG-07).
+ */
+export const PUNCH_LIST_SORT_BY_COLUMN_ID: Record<string, PunchListSort> = {
+  employee: 'employee',
+  date: 'punchIn',
+  punchIn: 'punchIn',
+  breakStart: 'breakStart',
+  breakEnd: 'breakEnd',
+  punchOut: 'punchOut',
+  timeWork: 'timeWork',
+  timeBreak: 'timeBreak',
+  paymentType: 'paymentType',
+}
+
+/** Orden inicial visible. El estado vacio se normaliza a esto (§4.3.8). */
+const PUNCH_LIST_DEFAULT_SORTING: SortingState = [{ id: 'date', desc: true }]
+
 function mapPunchListSort(sorting: SortingState): PunchListSort {
-  return sorting[0]?.id === 'employee' ? 'employee' : 'punchIn'
+  const id = sorting[0]?.id
+  if (!id) return 'punchIn'
+  const key = PUNCH_LIST_SORT_BY_COLUMN_ID[id]
+  if (!key) {
+    // No degradar en silencio: BUG-07 nacio justamente de un mapeo que lo hacia.
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(`Columna sin sortKey en PUNCH_LIST_SORT_BY_COLUMN_ID: ${id}`)
+    }
+    return 'punchIn'
+  }
+  return key
 }
 
 function mapPunchListDir(sorting: SortingState): 'asc' | 'desc' {
@@ -133,9 +216,15 @@ function roleLabel(row: TtkListRow): string {
   return parts.join(' / ')
 }
 
-function punchErrorLabel(row: TtkListRow): string | null {
-  const res = row.badPunch?.res?.trim()
-  return res ? res : null
+/**
+ * Texto del ⚠, o null si esta fila no debe marcarse.
+ *
+ * Con lista parcial el backend manda `errorType` y la marca se apaga para el
+ * tipo excluido: la ponchada sigue en el listado sin filtro, pero sin triángulo.
+ */
+function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
+  if (!punchErrorVisible(row, includedErrorTypes)) return null
+  return row.badPunch?.res?.trim() || null
 }
 
 function formatTimeWorkBreak(
@@ -156,6 +245,7 @@ export function IssuesDataTable({
   issueTypeOverride,
   ignoreSearch = false,
   employeeIdOverride,
+  snapshotAt,
   tableId = 'issues-punches',
   defaultPageSize = 25,
   exportFileName = 'punch-issues',
@@ -168,7 +258,9 @@ export function IssuesDataTable({
   showToolbarFilters = true,
   enableExport = true,
   enableTableFocus = true,
+  enableToolbarControls = true,
   groupedHoursFormat,
+  showCorrectedNote = true,
 }: IssuesDataTableProps = {}) {
   const { t } = useTranslation()
   // Dynamic scroll height: fills the available viewport below the fixed nav,
@@ -203,19 +295,50 @@ export function IssuesDataTable({
     selectedDealers,
     selectedType,
     setSelectedType,
+    errorStatus,
     selectedTodayLiveStatus,
     dateRange,
     filtersHydrated,
+    includedErrorTypes: storedIncludedErrorTypes,
+    errorTypesReady,
   } = useFilters()
+
+
 
   const effectiveDateRange = dateRangeOverride ?? dateRange
   const effectiveSelectedType = issueTypeOverride ?? selectedType
   const effectiveSearch = ignoreSearch ? '' : search
 
+  /**
+   * La lista blanca sólo rige cuando el pedido filtra por error. Con `all` la
+   * tabla lista todas las ponchadas y las tres tarjetas están inactivas, así que
+   * no filtra ni apaga ningún ⚠.
+   */
+  // El gate mira el issueType YA CRUZADO con el estado: en modo corregido el
+  // EXISTS del backend respeta los tipos tildados, así que la lista blanca rige.
+  const crossedIssueType = resolveIssueType(effectiveSelectedType, errorStatus)
+  const isCorrectedMode = effectiveErrorStatus(effectiveSelectedType, errorStatus) === 'corrected'
+  const includedErrorTypes = isErrorIssueType(crossedIssueType)
+    ? storedIncludedErrorTypes
+    : ALL_ERROR_TYPES
+  const emptyByErrorTypes = includedErrorTypes.length === 0
+
   const [pageSize, setPageSize] = React.useState(defaultPageSize)
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'date', desc: true },
-  ])
+  const [sorting, setSortingState] = React.useState<SortingState>(PUNCH_LIST_DEFAULT_SORTING)
+  /**
+   * «Clear sort» del menu deja `sorting = []`, y con eso el backend igual ordena
+   * por su default (`punchIn DESC`) pero NINGUN encabezado queda marcado: la
+   * lista esta ordenada y ninguna flecha lo dice, que es justo lo que D-4
+   * prohibe. Se normaliza el estado vacio al orden inicial VISIBLE.
+   */
+  const setSorting = React.useCallback<React.Dispatch<React.SetStateAction<SortingState>>>(
+    (next) =>
+      setSortingState((prev) => {
+        const resolved = typeof next === 'function' ? next(prev) : next
+        return resolved.length === 0 ? PUNCH_LIST_DEFAULT_SORTING : resolved
+      }),
+    [],
+  )
   const [punchMinHoursRawInternal, setPunchMinHoursRawInternal] = React.useState('')
   const [punchMaxHoursRawInternal, setPunchMaxHoursRawInternal] = React.useState('')
   const punchMinHoursRaw = punchMinHoursRawProp ?? punchMinHoursRawInternal
@@ -238,25 +361,23 @@ export function IssuesDataTable({
       filtersHydrated && canViewPayment && !meLoading && showToolbarFilters,
     )
 
+  // Espejo del de issues/page.tsx. El guard `showToolbarFilters` es lo que
+  // impide que el 2do nivel de Grouped mueva el radio de la pagina: ahi vale
+  // false. Igual que alla, SIN rama `else` (D-6, PLAN.md 4.2.2bis).
   React.useEffect(() => {
     if (!canViewPayment || !showToolbarFilters) return
     if (effectiveSelectedType === 'without_salary') {
-      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_WITHOUT)
-    } else {
-      setPaymentTypeFilter((prev) =>
-        prev === PAYMENT_TYPE_FILTER_WITHOUT ? PAYMENT_TYPE_FILTER_ALL : prev,
-      )
+      setPaymentTypeFilter(PAYMENT_TYPE_FILTER_ALL)
     }
   }, [effectiveSelectedType, canViewPayment, showToolbarFilters, setPaymentTypeFilter])
 
   const handlePaymentTypeFilterChange = React.useCallback(
     (next: PaymentTypeFilterValue) => {
       setPaymentTypeFilter(next)
-      if (next === PAYMENT_TYPE_FILTER_WITHOUT) {
-        setSelectedType('without_salary')
-        return
-      }
-      if (selectedType === 'without_salary' || effectiveSelectedType === 'without_salary') {
+      if (
+        next.ids.length > 0 &&
+        (selectedType === 'without_salary' || effectiveSelectedType === 'without_salary')
+      ) {
         setSelectedType('all')
       }
     },
@@ -320,6 +441,9 @@ export function IssuesDataTable({
         maxHours: punchMaxHours,
         paymentTypeFilter: effectivePaymentTypeFilter,
         todayLiveStatus: selectedTodayLiveStatus,
+        includedErrorTypes,
+        errorStatus,
+        snapshotAt,
       }),
     [
       effectiveSearch,
@@ -334,11 +458,16 @@ export function IssuesDataTable({
       punchMaxHours,
       effectivePaymentTypeFilter,
       selectedTodayLiveStatus,
+      includedErrorTypes,
+      errorStatus,
+      snapshotAt,
     ],
   )
 
   const queryEnabled =
     filtersHydrated &&
+    errorTypesReady &&
+    !emptyByErrorTypes &&
     debouncedDealers.length > 0 &&
     Boolean(listParams.fechaDesde) &&
     Boolean(listParams.fechaHasta)
@@ -387,8 +516,8 @@ export function IssuesDataTable({
                   <span className="truncate font-medium">
                     {r.usuario?.nombre ?? '—'}
                   </span>
-                  {punchErrorLabel(r) ? (
-                    <PunchErrorIndicator errorText={punchErrorLabel(r)!} />
+                  {punchErrorLabel(r, includedErrorTypes) ? (
+                    <PunchErrorIndicator errorText={punchErrorLabel(r, includedErrorTypes)!} />
                   ) : null}
                   {Number(r.manualCreate) === 1 ? <PunchManualIndicator /> : null}
                   {r.fixedAt ? (
@@ -398,6 +527,13 @@ export function IssuesDataTable({
                       errorSnapshot={r.fixedErrorSnapshot}
                     />
                   ) : null}
+                  {/*
+                    Un chip por EVENTO de corrección. `estado` ya viajaba en el DTO:
+                    en modo Corrected una ponchada borrada sigue en la lista y hay
+                    que decirlo en la fila.
+                  */}
+                  {isCorrectedMode ? <PunchFixChips fixes={r.fixes} /> : null}
+                  {isCorrectedMode && Number(r.estado ?? 1) === 0 ? <PunchDeletedChip /> : null}
                 </div>
                 {r.dealer?.razonSocial ? (
                   <span className="truncate text-[10px] font-normal text-muted-foreground">
@@ -411,13 +547,18 @@ export function IssuesDataTable({
         meta: {
           label: t('common.employee'),
           pin: 'left',
-          sortKey: 'us.nombre',
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.employee,
           exportValue: (r) => r.usuario?.nombre ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
         id: 'role',
         accessorFn: (row) => roleLabel(row),
+        // D-9 — su valor es una subconsulta correlacionada del SELECT; el WHERE
+        // del cursor no puede referenciar el alias, asi que habria que repetirla
+        // dos veces mas por fila. Hoy la columna dice que ordena y NO ordena:
+        // sacarle la flecha es cumplir BUG-07, no recortarlo.
+        enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('punch.roleDept')} />
         ),
@@ -436,7 +577,7 @@ export function IssuesDataTable({
         cell: ({ row }) => formatGmtDate(row.original.punchInGmt0) || '—',
         meta: {
           label: t('common.date'),
-          sortKey: 'tew.punch_in',
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.date,
           exportValue: (r) => formatUsDateForExport(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
@@ -454,6 +595,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchIn,
           label: t('punch.punchIn'),
           mono: true,
           exportValue: (r) => {
@@ -476,6 +618,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakStart,
           label: t('punch.breakStart'),
           mono: true,
           exportValue: (r) => {
@@ -498,6 +641,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakEnd,
           label: t('punch.breakEnd'),
           mono: true,
           exportValue: (r) => {
@@ -520,6 +664,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchOut,
           label: t('punch.punchOut'),
           mono: true,
           exportValue: (r) => {
@@ -536,6 +681,7 @@ export function IssuesDataTable({
         ),
         cell: ({ row }) => formatTimeWorkBreak(row.original, 'work', groupedHoursFormat),
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeWork,
           label: t('punch.timeWork'),
           mono: true,
           exportValue: (r) => formatTimeWorkBreak(r, 'work', groupedHoursFormat),
@@ -549,6 +695,7 @@ export function IssuesDataTable({
         ),
         cell: ({ row }) => formatTimeWorkBreak(row.original, 'break', groupedHoursFormat),
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeBreak,
           label: t('punch.timeBreak'),
           mono: true,
           exportValue: (r) => formatTimeWorkBreak(r, 'break', groupedHoursFormat),
@@ -589,6 +736,7 @@ export function IssuesDataTable({
           )
         },
         meta: {
+          sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.paymentType,
           label: t('punch.paymentType'),
           exportValue: (r) => r.objPaymentType?.name ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
@@ -736,6 +884,8 @@ export function IssuesDataTable({
     getThumbnailUuid,
     handleThumbnailSaved,
     groupedHoursFormat,
+    // Sin esto las celdas quedan con el closure viejo y el ⚠ no se apaga.
+    includedErrorTypes,
     t,
   ])
 
@@ -765,15 +915,24 @@ export function IssuesDataTable({
       pageSize,
       listParams.sort,
       listParams.dir,
+      errorTypesQueryKey(includedErrorTypes),
+      // SIN esto la grilla no se entera del switch: `effectiveSelectedType` no
+      // cambia al pasar de pendientes a corregidos (sigue siendo `only_error`),
+      // así que react-query daba por buena la página cacheada y no volvía a pedir.
+      // Es el issueType YA CRUZADO, que es lo que de verdad viaja al backend.
+      crossedIssueType,
     ],
     enabled: queryEnabled,
     params: listParams,
     staleTime: 2 * 60 * 1000,
   })
 
-  const rows = listQuery.rows
-  const total = listQuery.total
-  const isFetching = listQuery.isFetching
+  // Deshabilitar la query NO alcanza: `useDataTableQuery`/react-query conservan
+  // `placeholderData: keepPreviousData`, así que sin descartar el resultado acá
+  // quedarían pintadas las filas del universo anterior.
+  const rows = emptyByErrorTypes ? EMPTY_ROWS : listQuery.rows
+  const total = emptyByErrorTypes ? 0 : listQuery.total
+  const isFetching = emptyByErrorTypes ? false : listQuery.isFetching
   const error =
     listQuery.error instanceof Error
       ? listQuery.error.message
@@ -836,9 +995,15 @@ export function IssuesDataTable({
           enableGlobalFilter={false}
           recordsCount={queryEnabled ? total : 0}
           recordsCountLabel={t('punch.issues')}
+          // Sin esto, la grilla en modo corregido se lee igual que la de
+          // pendientes: mismas columnas, mismas filas, y nada que diga que lo
+          // que estás viendo son ponchadas que YA se arreglaron.
+          recordsCountNote={
+            isCorrectedMode && showCorrectedNote ? <CorrectedRecordsNote /> : null
+          }
           pageSize={pageSize}
           onPageSizeChange={setPageSize}
-          showPageSizeInInfiniteScroll
+          showPageSizeInInfiniteScroll={enableToolbarControls}
           pageSizeOptions={[25]}
           includeAllPageSize
           infiniteScroll={{
@@ -873,7 +1038,7 @@ export function IssuesDataTable({
               </div>
             ) : undefined
           }
-          enableViewOptions
+          enableViewOptions={enableToolbarControls}
           enableExport={false}
           toolbarTrailing={
             enableExport ? (

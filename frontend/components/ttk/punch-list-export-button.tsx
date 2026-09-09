@@ -18,10 +18,33 @@ type PunchListExportButtonProps = {
   enabled: boolean
 }
 
+/**
+ * Dispara la bajada del xlsx ya preparado.
+ *
+ * Va por un `<a download>` y NO por un iframe oculto: un iframe de 0×0 apuntando
+ * a una URL con `export?ticket=` es justo lo que cazan los bloqueadores de
+ * contenido, y Chrome corta el pedido con `ERR_BLOCKED_BY_CLIENT` sin que la app
+ * se entere —el ticket se prepara bien y el archivo nunca llega—. Un anchor con
+ * `download` al mismo origen no lo toca ningún bloqueador y tampoco navega.
+ */
+function startTicketDownload(ticket: string) {
+  const a = document.createElement('a')
+  a.href = `/api/srs-kpis/punch/list/export?ticket=${encodeURIComponent(ticket)}`
+  // El nombre real lo manda el server en Content-Disposition; esto es el fallback.
+  a.download = ''
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  // El anchor NO se saca en el mismo tick: el ticket es de un solo uso y el
+  // servidor arma el archivo mientras lo transmite, así que la bajada vive
+  // bastante después del click. Sacarlo enseguida la deja cancelada en 0 bytes.
+  window.setTimeout(() => a.remove(), 60_000)
+}
+
 export function PunchListExportButton({ params, enabled }: PunchListExportButtonProps) {
   const { t } = useTranslation()
   const [generating, setGenerating] = React.useState(false)
-  const iframeRef = React.useRef<HTMLIFrameElement | null>(null)
   const pollRef = React.useRef<number | null>(null)
   const ticketRef = React.useRef<string | null>(null)
 
@@ -35,9 +58,6 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
   const cancelDownload = React.useCallback(() => {
     stopPoll()
     ticketRef.current = null
-    if (iframeRef.current) {
-      iframeRef.current.src = 'about:blank'
-    }
     setGenerating(false)
   }, [stopPoll])
 
@@ -79,9 +99,7 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
       pollOnce()
       pollRef.current = window.setInterval(pollOnce, 800)
 
-      if (iframeRef.current) {
-        iframeRef.current.src = `/api/srs-kpis/punch/list/export?ticket=${encodeURIComponent(prepared.ticket)}`
-      }
+      startTicketDownload(prepared.ticket)
     } catch (e) {
       setGenerating(false)
       toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {
@@ -123,12 +141,6 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
           {t('common.export')}
         </Button>
       )}
-      <iframe
-        ref={iframeRef}
-        title={t('punch.exportFrameTitle')}
-        className="hidden"
-        aria-hidden
-      />
     </div>
   )
 }

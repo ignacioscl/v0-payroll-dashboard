@@ -13,12 +13,22 @@ import {
   SrsPermissionRepository,
 } from '../auth/srs-permission.repository'
 import { parseDealerIds, skipDealerRestrictionForRol } from '../shared/kpi/srs-kpi-dealer-filter'
+import { DEFAULT_ERROR_TYPES, isDefaultErrorTypes } from './repository/punch-error-types'
 
 export type PunchAccessQuery = {
   idDealer: string
   issueType?: string
-  idPaymentType?: number
+  /** Forma canonica ya parseada (parsePaymentTypeIds), no el string crudo. */
+  idPaymentTypes?: readonly number[]
+  /**
+   * Ordenar POR payment type tambien es usarlo: el LEFT JOIN a GENERIC_DATA
+   * esta siempre en el FROM, asi que sin este campo quien no tiene el permiso
+   * no ve la columna pero igual recibe las filas ordenadas por el valor oculto.
+   */
+  sort?: string
   idEmployee?: number
+  /** Forma canónica ya parseada (parseErrorTypes), no el string crudo. */
+  errorTypes?: readonly number[]
 }
 
 export type PunchAccessPolicy = {
@@ -26,6 +36,16 @@ export type PunchAccessPolicy = {
   canViewPaymentAmounts: boolean
   dealerIds: number[]
   skipDealerRestriction: boolean
+  /** `interno && lista parcial` — ver T.0.5 del plan. */
+  includeErrorType: boolean
+  /**
+   * Si las correcciones sobre ponchadas ya eliminadas entran a la lista.
+   *
+   * En modo `only_fixed` NO es un 403: el modo está permitido y lo que se recorta es
+   * el subconjunto. Una ponchada corregida y después borrada sigue siendo una
+   * corrección, pero VERLA exige `Punch > Delete Punch`.
+   */
+  includeDeletedFixes: boolean
 }
 
 @Injectable()
@@ -42,15 +62,27 @@ export class PunchAccessPolicyService {
 
     const issueType = (query.issueType ?? 'all').trim() || 'all'
 
-    if (issueType === 'only_deletes') {
-      if (!(await this.permissions.userHasRolAccion(ctx, ROL_ACCION_DELETE_PUNCH))) {
-        throw new ForbiddenException('You do not have permission to view deleted punches.')
-      }
+    // Corrected lista tambien ponchadas eliminadas (una correccion sobre una ponchada
+    // despues borrada sigue siendo una correccion). Quien no puede ver eliminadas,
+    // las ve excluidas -no un 403-: el modo Corrected en si esta permitido.
+    const includeDeletedFixes = await this.resolveDeletedVisibility(ctx)
+
+    if (issueType === 'only_deletes' && !includeDeletedFixes) {
+      throw new ForbiddenException('You do not have permission to view deleted punches.')
     }
 
     if (ctx.isUserDealer && issueType !== 'all') {
       throw new ForbiddenException('External users can only view all punches.')
     }
+
+    const errorTypes = query.errorTypes ?? DEFAULT_ERROR_TYPES
+    const defaultErrorTypes = isDefaultErrorTypes(errorTypes)
+    if (ctx.isUserDealer && !defaultErrorTypes) {
+      throw new ForbiddenException('External users can only view all punches.')
+    }
+    // El código de error por fila sólo existe cuando hay algo que re-decidir, y
+    // nunca para un externo (que ni siquiera puede filtrar por tipo).
+    const includeErrorType = !ctx.isUserDealer && !defaultErrorTypes
 
     const canViewPaymentTypeName =
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_VIEW_PAYMENT_TYPE)) ||
@@ -61,7 +93,12 @@ export class PunchAccessPolicyService {
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE)) ||
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE_ALT))
 
-    if (query.idPaymentType || issueType === 'without_salary') {
+    const usesPaymentType =
+      (query.idPaymentTypes?.length ?? 0) > 0 ||
+      issueType === 'without_salary' ||
+      query.sort === 'paymentType'
+
+    if (usesPaymentType) {
       if (!canViewPaymentTypeName) {
         throw new ForbiddenException('You do not have permission to filter by payment type.')
       }
@@ -75,7 +112,27 @@ export class PunchAccessPolicyService {
       await this.assertEmployeeInScope(ctx, query.idEmployee, dealerIds, skipDealerRestriction)
     }
 
-    return { canViewPaymentTypeName, canViewPaymentAmounts, dealerIds, skipDealerRestriction }
+    return {
+      canViewPaymentTypeName,
+      canViewPaymentAmounts,
+      dealerIds,
+      skipDealerRestriction,
+      includeErrorType,
+      includeDeletedFixes,
+    }
+  }
+
+  /**
+   * Gate ESTRECHO: consulta sólo la acción de eliminar ponchadas.
+   *
+   * Existe para que los KPI no tengan que pasar por `assertAndResolve()`, que
+   * **empieza** exigiendo la acción de Punch Report. El consumidor vivo de los KPI
+   * es `/reports/business-kpis`, que se autoriza con Admin o Production Report: un
+   * usuario legítimo con Production Report y sin Punch Report hoy ve los KPI, y
+   * reusar el gate completo le metería un 403 donde hoy no lo hay.
+   */
+  async resolveDeletedVisibility(ctx: SrsContext): Promise<boolean> {
+    return this.permissions.userHasRolAccion(ctx, ROL_ACCION_DELETE_PUNCH)
   }
 
   /**

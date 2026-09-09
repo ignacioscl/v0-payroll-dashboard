@@ -8,16 +8,91 @@ import { ttkListRowToExportRecord, type TtkListExportLabels } from '@/lib/ttk/tt
 import {
   applyTitleRow,
   downloadExcelWorkbook,
+  writeReportInfoSheet,
   writeStyledDataRows,
+  type ReportInfoRow,
 } from '@/lib/excel/srs-xlsx-theme'
+import {
+  formatUsCalendarDate,
+  formatUsDateTimeForExport,
+  todayUsForFilename,
+} from '@/lib/format-us-datetime'
+import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 
 export type PunchGroupedExportLabels = TtkListExportLabels & {
   groupedSheet: string
   totalHours: string
+  /** P7 — set 1: Punches / Errors / Fixed. */
+  punchCount: string
+  errorCount: string
+  fixedCount: string
+  /** Etiqueta de la columna dinamica en modo Corregidos. */
+  correctedColumn: string
+  /** Nombres visibles de los tipos de error, para exportar `correctedTypes`. */
+  errorTypeNames: Record<number, string>
   exportingProgress: string
   exportSheetTitle?: string
   exportSheetSubtitle?: string
   exportDetailSheetTitle?: string
+  /** Etiquetas de la hoja Report Info. */
+  reportInfo: {
+    sheet: string
+    field: string
+    value: string
+    report: string
+    generated: string
+    generatedBy: string
+    screen: string
+    screenValue: string
+    mode: string
+    scope: string
+    period: string
+    until: string
+    dealers: string
+    employee: string
+    paymentType: string
+    errorTypes: string
+    /** Eje pendiente/corregido: sin esta fila el archivo no dice qué estado listó. */
+    errorStatus: string
+    /** Filtros efectivos que este Report Info venía omitiendo. */
+    issueType: string
+    search: string
+    minHours: string
+    maxHours: string
+    /** §4.1bis — Working / On lunch / Out, que ahora SI se aplica al padre. */
+    liveStatus: string
+    all: string
+  }
+}
+
+/**
+ * Nombres VISIBLES de los filtros, congelados al hacer clic en exportar.
+ *
+ * La grilla no tiene los catálogos: los labels de dealer viven en el
+ * `useSrsDealers()` del header y el payment type llega como valor técnico. Por
+ * eso los baja la página y los pasa ya resueltos — la regla prohíbe exportar
+ * ids o nombres técnicos.
+ */
+export type PunchGroupedReportInfo = {
+  generatedBy: string
+  mode: string
+  scope: string
+  dealers: string
+  employee: string
+  paymentType: string
+  errorTypes: string
+  /**
+   * `xls-export-report-info` es `alwaysApply` y este Report Info venía omitiendo
+   * `issueType`, `search` y min/max horas: incumplía la regla ANTES de este
+   * paquete. Agregarle sólo "Status" lo dejaría igual de incompleto.
+   */
+  errorStatus: string
+  issueType: string
+  search: string
+  minHours: string
+  maxHours: string
+  /** §4.1bis — etiqueta visible del estado en vivo elegido. */
+  liveStatus: string
 }
 
 export type PunchGroupedExportMode = 'grouped' | 'detail'
@@ -34,6 +109,13 @@ export type PunchGroupedExportInput = {
   includePaymentType: boolean
   labels: PunchGroupedExportLabels
   fileName: string
+  reportInfo: PunchGroupedReportInfo
+  /** Tipos incluidos: gobierna la columna WITH ERRORS del detalle. */
+  includedErrorTypes?: readonly number[]
+  /** Modo Corrected: agrega las columnas de corrección al detalle por empleado. */
+  includeCorrected?: boolean
+  /** Nombre visible de cada código 1|2|3, ya traducido. */
+  errorTypeNames?: Record<number, string>
   onProgress?: (message: string) => void
 }
 
@@ -71,12 +153,19 @@ function paymentTypeHours(row: PunchGroupedRow, label: string): number | '' {
 function buildGroupedHeaders(
   paymentTypeLabels: string[],
   labels: PunchGroupedExportLabels,
+  isCorrectedMode: boolean,
 ): string[] {
   return [
     labels.employee,
     labels.totalHours,
     labels.timeBreak,
-    labels.hasError,
+    // El encabezado YA cambiaba con el modo; lo que no cambiaba era la celda.
+    isCorrectedMode ? labels.correctedColumn : labels.hasError,
+    // P7 — salen SIEMPRE, esten ocultas o no en pantalla: esta hoja se arma por
+    // su cuenta y no mira la visibilidad de columnas. Es intencional.
+    labels.punchCount,
+    labels.errorCount,
+    labels.fixedCount,
     ...paymentTypeLabels,
   ]
 }
@@ -85,12 +174,32 @@ function buildGroupedDataRow(
   row: PunchGroupedRow,
   paymentTypeLabels: string[],
   labels: PunchGroupedExportLabels,
+  isCorrectedMode: boolean,
 ): (string | number)[] {
+  // La columna dinamica escribia SIEMPRE `Yes/No` mientras el encabezado si
+  // cambiaba a *Corrected*: una columna titulada "Corrected" con "Yes" adentro,
+  // que no dice QUE se corrigio. Rompe D-B y la invariante de D-11.
+  const count = isCorrectedMode ? row.fixedCount : row.errorCount
+  const suffix = count > 0 ? ` (${count})` : ''
+  const dynamicCell = isCorrectedMode
+    ? (() => {
+        const types = (row.correctedTypes ?? []).map((t) => labels.errorTypeNames[t] ?? String(t))
+        return types.length === 0 ? labels.no : types.join(', ') + suffix
+      })()
+    : row.hasError
+      ? labels.yes + suffix
+      : labels.no
+
   return [
     row.nombreEmployee,
     Math.round(row.hoursNumber * 100) / 100,
     Math.round(row.breakNumber * 100) / 100,
-    row.hasError ? labels.yes : labels.no,
+    dynamicCell,
+    // Numeros de verdad, no strings: el mapper del backend ya los pasa por
+    // Number(), asi que el XLSX escribe celdas numericas y ordenables.
+    row.punchCount,
+    row.errorCount,
+    row.fixedCount,
     ...paymentTypeLabels.map((pt) => paymentTypeHours(row, pt)),
   ]
 }
@@ -145,8 +254,12 @@ async function fetchAllPunchesForEmployee(
       pageSize: EXPORT_PAGE_SIZE,
       sort: 'punchIn',
       dir: 'desc',
-      afterValue: cursor?.value,
+      // `sort: 'punchIn'` no es nulable, asi que este cursor nunca cae en el
+      // tramo de vacios — pero se migra igual, para que no quede un segundo
+      // dialecto del mismo contrato.
+      afterValue: cursor?.value ?? undefined,
       afterId: cursor?.id,
+      afterEmpty: cursor ? (cursor.empty === 1 ? '1' : '0') : undefined,
     })
     collected.push(...page.results)
     cursor = page.hasMore ? page.nextCursor : null
@@ -161,11 +274,71 @@ function buildGroupedSubtitle(
   fechaDesde?: string,
   fechaHasta?: string,
 ): string {
+  // Fechas US en TODO el archivo, no sólo en Report Info: con el formato ISO el
+  // subtítulo mezclaba convenciones dentro del mismo xlsx.
   const period =
-    fechaDesde && fechaHasta ? `${fechaDesde} → ${fechaHasta}` : undefined
+    fechaDesde && fechaHasta
+      ? `${formatUsCalendarDate(fechaDesde)} → ${formatUsCalendarDate(fechaHasta)}`
+      : undefined
   const countLabel = labels.exportSheetSubtitle?.replace('{count}', String(count)) ?? `${count}`
   const parts = [period, countLabel].filter(Boolean)
   return parts.join(' · ')
+}
+
+/**
+ * Período legible del reporte, en formato US.
+ *
+ * Único lugar donde se arma: título, sello y Report Info lo comparten. Antes el
+ * título tenía su propio fallback con las fechas ISO crudas, así que el mismo
+ * archivo mezclaba `2026-06-01` arriba y `06/01/2026` en la hoja de info.
+ */
+function periodLabel(
+  labels: PunchGroupedExportLabels,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+): string {
+  if (!base.fechaDesde || !base.fechaHasta) return labels.reportInfo.all
+  return `${formatUsCalendarDate(base.fechaDesde)} ${labels.reportInfo.until} ${formatUsCalendarDate(base.fechaHasta)}`
+}
+
+function buildStamp(
+  labels: PunchGroupedExportLabels,
+  info: PunchGroupedReportInfo,
+  generatedAt: Date,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+): string {
+  return `${periodLabel(labels, base)} · ${info.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`
+}
+
+function buildReportInfoRows(
+  labels: PunchGroupedExportLabels,
+  info: PunchGroupedReportInfo,
+  generatedAt: Date,
+  base: Omit<PunchGroupedQueryParams, 'page' | 'pageSize'>,
+  employeeCount: number,
+): ReportInfoRow[] {
+  const r = labels.reportInfo
+  const period = periodLabel(labels, base)
+  return [
+    { field: r.report, value: `${labels.groupedSheet} (${employeeCount})` },
+    { field: r.generated, value: formatUsDateTimeForExport(generatedAt.toISOString()) },
+    { field: r.generatedBy, value: info.generatedBy },
+    { field: r.screen, value: r.screenValue },
+    { field: r.mode, value: info.mode },
+    { field: r.scope, value: info.scope },
+    { field: r.period, value: period },
+    { field: r.dealers, value: info.dealers },
+    { field: r.employee, value: info.employee },
+    { field: r.paymentType, value: info.paymentType },
+    { field: r.issueType, value: info.issueType },
+    { field: r.errorStatus, value: info.errorStatus },
+    { field: r.errorTypes, value: info.errorTypes },
+    { field: r.search, value: info.search },
+    { field: r.minHours, value: info.minHours },
+    { field: r.maxHours, value: info.maxHours },
+    // `xls-export-report-info` es alwaysApply: el archivo tiene que decir CON QUE
+    // filtros se genero, y este ahora aplica de verdad a la fila agrupada.
+    { field: r.liveStatus, value: info.liveStatus },
+  ]
 }
 
 export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Promise<number> {
@@ -178,8 +351,14 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     includePaymentType,
     labels,
     fileName,
+    reportInfo,
+    includedErrorTypes = ALL_ERROR_TYPES,
+    includeCorrected = false,
+    errorTypeNames,
     onProgress,
   } = input
+
+  const generatedAt = new Date()
 
   onProgress?.(labels.exportingProgress)
 
@@ -202,8 +381,11 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
   }
 
   const withDetail = mode === 'detail'
-  const headers = buildGroupedHeaders(paymentTypeLabels, labels)
-  const dataRows = groupedRows.map((r) => buildGroupedDataRow(r, paymentTypeLabels, labels))
+  const isCorrectedMode = groupedParamsBase.issueType === 'only_fixed'
+  const headers = buildGroupedHeaders(paymentTypeLabels, labels, isCorrectedMode)
+  const dataRows = groupedRows.map((r) =>
+    buildGroupedDataRow(r, paymentTypeLabels, labels, isCorrectedMode),
+  )
 
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'SRS Payroll Dashboard'
@@ -215,17 +397,23 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
   })
 
   const title =
-    labels.exportSheetTitle ??
-    `${labels.groupedSheet} — ${groupedParamsBase.fechaDesde ?? ''} / ${groupedParamsBase.fechaHasta ?? ''}`
-  const subtitle = buildGroupedSubtitle(
-    labels,
-    groupedRows.length,
-    groupedParamsBase.fechaDesde,
-    groupedParamsBase.fechaHasta,
-  )
+    labels.exportSheetTitle ?? `${labels.groupedSheet} — ${periodLabel(labels, groupedParamsBase)}`
+  const subtitle = [
+    buildGroupedSubtitle(
+      labels,
+      groupedRows.length,
+      groupedParamsBase.fechaDesde,
+      groupedParamsBase.fechaHasta,
+    ),
+    // Sello corto también en la hoja principal.
+    `${reportInfo.generatedBy} · ${formatUsDateTimeForExport(generatedAt.toISOString())}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const headerRow = applyTitleRow(mainWs, title, headers.length, subtitle)
 
-  const errorColIndex = headers.indexOf(labels.hasError) + 1
+  const errorColIndex =
+    headers.indexOf(isCorrectedMode ? labels.correctedColumn : labels.hasError) + 1
   const hoursColIndexes = new Set(
     [labels.totalHours, labels.timeBreak, ...paymentTypeLabels]
       .map((h) => headers.indexOf(h) + 1)
@@ -253,7 +441,12 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
 
       const punches = await fetchAllPunchesForEmployee(punchListParams, employee.idUsuario)
       const detailRecords = punches.map((p) =>
-        ttkListRowToExportRecord(p, labels, { includePaymentType }),
+        ttkListRowToExportRecord(p, labels, {
+          includePaymentType,
+          includedErrorTypes,
+          includeCorrected,
+          errorTypeNames,
+        }),
       )
       const { headers: detailHeaders, rows: detailRows } = recordsToMatrix(
         detailRecords.length > 0
@@ -265,11 +458,15 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
       const detailTitle =
         labels.exportDetailSheetTitle?.replace('{name}', employee.nombreEmployee) ??
         employee.nombreEmployee
+      // Sello corto: la hoja tiene que sobrevivir a que alguien la copie sola.
       const detailHeaderRow = applyTitleRow(
         detailWs,
         detailTitle,
         Math.max(detailHeaders.length, 1),
-        `${punches.length} punches`,
+        [
+          `${punches.length} punches`,
+          buildStamp(labels, reportInfo, generatedAt, groupedParamsBase),
+        ].join(' · '),
       )
 
       const detailErrorCol = detailHeaders.indexOf(labels.hasError) + 1
@@ -281,8 +478,17 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     }
   }
 
-  const stamp = new Date().toISOString().slice(0, 10)
-  await downloadExcelWorkbook(workbook, `${fileName}-${stamp}.xlsx`)
+  writeReportInfoSheet(
+    workbook,
+    labels.reportInfo.sheet,
+    labels.reportInfo.sheet,
+    { field: labels.reportInfo.field, value: labels.reportInfo.value },
+    buildReportInfoRows(labels, reportInfo, generatedAt, groupedParamsBase, groupedRows.length),
+  )
+
+  // Filename en formato US: el ISO de toISOString() mezclaba convenciones y
+  // además usaba la fecha UTC, que de noche cae en el día siguiente.
+  await downloadExcelWorkbook(workbook, `${fileName}-${todayUsForFilename()}.xlsx`)
 
   return groupedRows.length
 }

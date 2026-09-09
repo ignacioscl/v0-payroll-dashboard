@@ -356,10 +356,18 @@ ORDER BY avg_days_to_pay DESC;
 
 ---
 
-## 4. Punch Quality (`TTK_EMPLOYEE_WORK`)
+## 4. Punch Quality (`TTK_EMPLOYEE_WORK` + `TTK_PUNCH_ERROR_FIX`)
 
 `tew.id_author` = empleado dueño de la ponchada. Excluir días en curso al medir
 "missing punch-out" (`fecha < CURDATE()`).
+
+> **Las correcciones NO salen de `tew.fixed_at`.** Esa columna es una marca POR
+> PONCHADA que sólo se setea cuando la ponchada queda sin **ningún** error, y se
+> limpia al volver a romperse: no cuenta las correcciones parciales, ni las
+> correcciones sobre ponchadas después eliminadas. La fuente es el ledger
+> append-only `TTK_PUNCH_ERROR_FIX`, agregado por `f.punch_date` (el día de la
+> ponchada congelado al corregir), con el join doble de provider
+> `f.id_dealer_provider = tew.id_dealer_provider`.
 
 ### 4.1 Totales y error rate
 
@@ -369,15 +377,28 @@ SELECT COUNT(*)                                                   total_punches,
        SUM(tew.break_start IS NOT NULL AND tew.break_end IS NULL
            AND tew.fecha < CURDATE())                             missing_break_end,
        SUM(tew.manual_create = 1)                                 manual_punches,
-       SUM(tew.fixed_at IS NOT NULL)                              admin_corrections,
        ROUND(100 * SUM( (tew.punch_out IS NULL AND tew.fecha < CURDATE())
                      OR (tew.break_start IS NOT NULL AND tew.break_end IS NULL AND tew.fecha < CURDATE())
-                     OR tew.manual_create = 1
-                     OR tew.fixed_at IS NOT NULL ) / COUNT(*), 1) error_rate_pct
+                     OR tew.manual_create = 1 ) / COUNT(*), 1)    error_rate_pct
 FROM TTK_EMPLOYEE_WORK tew
 WHERE tew.estado = 1
   AND tew.id_dealer_provider = :id_dealer_provider
   AND tew.fecha BETWEEN :fecha_desde AND :fecha_hasta;
+```
+
+`admin_corrections` va **aparte**, no joineado al `FROM` de arriba: un join al
+ledger multiplicaría `missing_punch_out` y `manual_punches` por la cantidad de
+eventos de corrección.
+
+```sql
+SELECT COUNT(*) admin_corrections
+FROM TTK_PUNCH_ERROR_FIX f
+INNER JOIN TTK_EMPLOYEE_WORK tew
+        ON tew.id = f.id_ttk_employee_work
+       AND tew.id_dealer_provider = f.id_dealer_provider
+WHERE f.id_dealer_provider = :id_dealer_provider
+  AND tew.estado = 1                    -- se omite con permiso "Punch > Delete Punch"
+  AND f.punch_date BETWEEN :fecha_desde AND :fecha_hasta;
 ```
 
 ### 4.2 Deleted Punches (audit log)
@@ -395,31 +416,56 @@ WHERE tew.estado = 0
 
 ### 4.3 Correction Delay (ponchada → fix)
 
+Por EVENTO, no por ponchada, y sin depender de que la ponchada haya quedado
+100% sana. El período se selecciona por `f.punch_date`, igual que el resto.
+
 ```sql
-SELECT ROUND(AVG(DATEDIFF(tew.fixed_at, tew.fecha)), 1) avg_correction_delay_days
-FROM TTK_EMPLOYEE_WORK tew
-WHERE tew.estado = 1 AND tew.fixed_at IS NOT NULL
-  AND tew.id_dealer_provider = :id_dealer_provider
-  AND tew.fixed_at BETWEEN :fecha_desde AND :fecha_hasta;
+SELECT ROUND(AVG(DATEDIFF(f.fixed_at, f.punch_date)), 1) avg_correction_delay_days
+FROM TTK_PUNCH_ERROR_FIX f
+INNER JOIN TTK_EMPLOYEE_WORK tew
+        ON tew.id = f.id_ttk_employee_work
+       AND tew.id_dealer_provider = f.id_dealer_provider
+WHERE f.id_dealer_provider = :id_dealer_provider
+  AND tew.estado = 1                    -- se omite con permiso "Punch > Delete Punch"
+  AND f.punch_date BETWEEN :fecha_desde AND :fecha_hasta;
 ```
 
 ### 4.4 Reincidentes (tabla) y serie semanal
 
+> Esta query estuvo **rota** hasta 2026-09-06: `usuarios` no tiene `id` ni
+> `apellido` (tiene `id_usuario` y `nombre`), así que devolvía
+> `ERROR 1054 Unknown column 'u.apellido'`. Nunca se notó porque `/kpis` usa datos
+> mock y el endpoint no tiene caller de frontend.
+>
+> `corrected` se lee del **registro de correcciones**, nunca del estado actual:
+> leerlo del estado miente, porque un error corregido desaparece del estado y el
+> empleado al que más rápido se lo arreglaron aparece limpio. Por eso `total`
+> también lo incluye — "ponchadas con incidencia vigente **o** con corrección
+> registrada" — y así `corrected <= total` se cumple por construcción. El
+> `LEFT JOIN` sobre un `SELECT DISTINCT` no multiplica filas aunque haya varios
+> eventos por ponchada. Cuenta PONCHADAS, a propósito distinto del card, que
+> cuenta eventos.
+
 ```sql
-SELECT u.id, CONCAT(u.nombre, ' ', u.apellido) employee, c.razon_social dealer,
+SELECT u.id_usuario, u.nombre employee,
+       GET_DEALER_NAME_BY_PROVIDER(:id_dealer_provider, c.id) dealer,
        SUM(tew.punch_out IS NULL AND tew.fecha < CURDATE())  missing_out,
        SUM(tew.manual_create = 1)                            manual,
-       SUM(tew.fixed_at IS NOT NULL)                         corrected,
+       SUM(fx.corrected IS NOT NULL)                         corrected,
        SUM( (tew.punch_out IS NULL AND tew.fecha < CURDATE())
             OR tew.manual_create = 1
-            OR tew.fixed_at IS NOT NULL )                    total
+            OR fx.corrected IS NOT NULL )                    total
 FROM TTK_EMPLOYEE_WORK tew
-JOIN usuarios u    ON u.id = tew.id_author
-JOIN CONTRATISTA c ON c.id = tew.id_dealer
+JOIN usuarios u    ON u.id_usuario = tew.id_author
+JOIN CONTRATISTA c ON c.id         = tew.id_dealer
+LEFT JOIN (SELECT DISTINCT f.id_ttk_employee_work id, 1 corrected
+             FROM TTK_PUNCH_ERROR_FIX f
+            WHERE f.id_dealer_provider = :id_dealer_provider
+              AND f.punch_date BETWEEN :fecha_desde AND :fecha_hasta) fx ON fx.id = tew.id
 WHERE tew.estado = 1
   AND tew.id_dealer_provider = :id_dealer_provider
   AND tew.fecha BETWEEN :fecha_desde AND :fecha_hasta
-GROUP BY u.id, employee, dealer
+GROUP BY u.id_usuario, employee, dealer
 HAVING total > 0
 ORDER BY total DESC
 LIMIT 10;

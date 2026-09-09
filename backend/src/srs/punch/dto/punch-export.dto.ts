@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
 } from 'class-validator'
 
@@ -47,12 +48,18 @@ export class PunchExportPrepareDto {
   @Min(0)
   maxHours?: number
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '8,10',
+    description:
+      'CSV de GENERIC_DATA.id de payment type (max 50). Ausente = sin filtro. ' +
+      'Los ids se validan contra el catalogo del provider: uno ajeno => 400. ' +
+      'Para «sin tipo de pago» va issueType=without_salary, no este parametro.',
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idPaymentType?: number
+  @Matches(/^[1-9]\d{0,9}(,[1-9]\d{0,9}){0,49}$/, {
+    message: 'idPaymentTypes must be a comma-separated list of positive integer ids (max 50).',
+  })
+  idPaymentTypes?: string
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -70,6 +77,16 @@ export class PunchExportPrepareDto {
   @IsOptional()
   @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
+
+  @ApiPropertyOptional({
+    description: 'Lista blanca de tipos de error (1,2,3). Ausente = 1,2,3.',
+    example: '1,3',
+  })
+  @IsOptional()
+  @Matches(/^[123](,[123]){0,2}$/, {
+    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  })
+  errorTypes?: string
 
   @ApiPropertyOptional({ enum: PUNCH_LIST_LIVE_STATUS })
   @IsOptional()

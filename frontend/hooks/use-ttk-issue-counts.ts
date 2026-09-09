@@ -4,7 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
-import { buildTtkScopeParams, toPayrollScopeUser } from '@/lib/ttk/map-header-filters'
+import {
+  appendErrorTypesParam,
+  buildTtkScopeParams,
+  toPayrollScopeUser,
+} from '@/lib/ttk/map-header-filters'
+import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
 import {
   EMPTY_TTK_ISSUE_COUNTS,
   type TtkIssueCountsData,
@@ -21,6 +26,10 @@ export type UseTtkIssueCountsArgs = {
   selectedEmployeeId?: number | null
   filtersHydrated?: boolean
   enabled?: boolean
+  /** Tipos incluidos. NO entra al gate `enabled`: ver comentario abajo. */
+  includedErrorTypes?: readonly number[]
+  /** False mientras `/me` no resolvió. */
+  errorTypesReady?: boolean
 }
 
 export function ttkIssueCountsQueryKey(args: {
@@ -28,6 +37,7 @@ export function ttkIssueCountsQueryKey(args: {
   selectedDealers: string[]
   dateRange: DateRange | undefined
   selectedEmployeeId?: number | null
+  includedErrorTypes?: readonly number[]
 }) {
   return [
     'ttk-issue-counts',
@@ -36,6 +46,8 @@ export function ttkIssueCountsQueryKey(args: {
     args.selectedDealers.slice().sort().join(','),
     args.dateRange?.from?.toISOString(),
     args.dateRange?.to?.toISOString(),
+    // Sin esto, destildar un tipo sirve el conteo anterior (staleTime 60s).
+    errorTypesQueryKey(args.includedErrorTypes ?? [1, 2, 3]),
   ] as const
 }
 
@@ -54,11 +66,19 @@ export function useTtkIssueCounts(args: UseTtkIssueCountsArgs) {
     selectedDealers: debouncedDealers,
     dateRange: args.dateRange,
     selectedEmployeeId: args.selectedEmployeeId ?? null,
+    includedErrorTypes: args.includedErrorTypes,
   }
 
   const params = buildTtkScopeParams({ ...queryArgs, scopeUser })
+  appendErrorTypesParam(params, args.includedErrorTypes)
+  // OJO: el gate NO mira `includedErrorTypes`. Con los tres tipos destildados los
+  // contadores IGUAL se piden (sin el parámetro), porque son la única fuente del
+  // número real que muestra cada tarjeta tachada. Traducirlo a
+  // `includedErrorTypes.length > 0` haría caer el hook a EMPTY_TTK_ISSUE_COUNTS y
+  // las tarjetas mostrarían 0. El que sí lo mira es el gate de las grillas.
   const enabled =
     (args.filtersHydrated ?? true) &&
+    (args.errorTypesReady ?? true) &&
     (args.enabled ?? true) &&
     debouncedDealers.length > 0 &&
     Boolean(params.fecha_desde) &&

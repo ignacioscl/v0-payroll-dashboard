@@ -37,6 +37,20 @@ export type PunchExportLabels = {
   colPaymentType: string
   issueTypeLabels: Record<PunchIssueType, string>
   liveStatusLabels: Record<string, string>
+  /** Fila "Error types" del Report Info. */
+  errorTypes: string
+  /**
+   * Fila "Status" del Report Info. El eje pendiente/corregido salio de `issueType`
+   * y pasó a ser un filtro propio: sin esta fila el archivo lista corregidos y dice
+   * que no hay filtro (`xls-export-report-info` es alwaysApply).
+   */
+  errorStatus: string
+  errorStatusLabels: Record<'pending' | 'corrected', string>
+  /** Columnas de datos que sólo aparecen en modo Corrected. */
+  colCorrectedTypes: string
+  colLastCorrectedAt: string
+  /** Nombre visible de cada codigo de TTK_PUNCH_WITH_ERROR_V2. */
+  errorTypeNames: Record<1 | 2 | 3, string>
 }
 
 const EN: PunchExportLabels = {
@@ -77,11 +91,22 @@ const EN: PunchExportLabels = {
     all: 'All',
     only_error: 'Only with errors',
     only_error_clockout: 'Without clock out',
-    only_error_break: 'Without break',
+    only_error_break: 'Break missing',
+    only_error_20h: 'Shift 20h+',
     manual_punch: 'Manual punch',
     only_deletes: 'Deleted punches',
     without_salary: 'Without salary',
     only_fixed: 'Corrected punches',
+  },
+  errorTypes: 'Error types',
+  errorStatus: 'Status',
+  errorStatusLabels: { pending: 'Pending', corrected: 'Corrected' },
+  colCorrectedTypes: 'Corrected',
+  colLastCorrectedAt: 'Last corrected at',
+  errorTypeNames: {
+    1: 'Without clock out',
+    2: 'Break missing',
+    3: 'Shift 20h+',
   },
   liveStatusLabels: {
     working: 'Working',
@@ -129,10 +154,21 @@ const ES: PunchExportLabels = {
     only_error: 'Solo con errores',
     only_error_clockout: 'Sin salida',
     only_error_break: 'Sin descanso',
+    only_error_20h: 'Turno 20h+',
     manual_punch: 'Ponchada manual',
     only_deletes: 'Ponchadas eliminadas',
     without_salary: 'Sin sueldo',
     only_fixed: 'Ponchadas corregidas',
+  },
+  errorTypes: 'Tipos de error',
+  errorStatus: 'Estado',
+  errorStatusLabels: { pending: 'Pendientes', corrected: 'Corregidos' },
+  colCorrectedTypes: 'Corregido',
+  colLastCorrectedAt: 'Última corrección',
+  errorTypeNames: {
+    1: 'Sin salida',
+    2: 'Sin descanso',
+    3: 'Turno 20h+',
   },
   liveStatusLabels: {
     working: 'Trabajando',

@@ -1,3 +1,11 @@
+export type TtkListRowFix = {
+  errorType: number
+  /** Fecha del ponche congelada al corregir: hace visible una divergencia con punchIn. */
+  punchDate: string
+  fixedAt: string
+  fixedByName: string | null
+}
+
 export type TtkListRow = {
   id: number | string
   punchIn?: string | null
@@ -18,6 +26,15 @@ export type TtkListRow = {
   fixedBy?: { id?: number | string; nombre?: string } | null
   /** JSON or text from `TTK_PUNCH_WITH_ERROR` before correction. */
   fixedErrorSnapshot?: string | null
+  /**
+   * Eventos del registro de correcciones de ESTA ponchada, dentro del rango y de
+   * los tipos tildados. Sólo viaja en modo Corrected.
+   *
+   * `fixedAt/fixedBy/fixedErrorSnapshot` es metadata legacy POR PONCHADA que se
+   * setea sólo cuando la ponchada queda sin ningún error y se limpia al volver a
+   * romperse: es nula justo en los dos casos que este modo viene a mostrar.
+   */
+  fixes?: TtkListRowFix[]
   /** 1 = row created manually in SRS (supervisor add punch). */
   manualCreate?: number
   idPunchInLogValidation?: number | null

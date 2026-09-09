@@ -29,6 +29,11 @@ export type TtkDashboardErrorTrendPoint = {
 export type TtkDashboardTopDealer = {
   id_dealer: number
   dealer_name: string
+  /**
+   * En `top_dealers` son errores vigentes (una ponchada = uno, por el enmascarado
+   * de TTK_PUNCH_WITH_ERROR_V2). En `top_dealers_fixed` son EVENTOS de corrección:
+   * una ponchada con dos tipos arreglados suma dos, igual que la tarjeta.
+   */
   error_count: number
 }
 
@@ -39,7 +44,10 @@ export type TtkDashboardCounts = TtkIssueCountsData & {
 export type TtkDashboardSummaryData = {
   counts: TtkDashboardCounts
   error_trend: TtkDashboardErrorTrendPoint[]
+  /** Ranking de deuda: errores que la sucursal tiene HOY sin resolver. */
   top_dealers: TtkDashboardTopDealer[]
+  /** Ranking de actividad: correcciones registradas en el ledger del período. */
+  top_dealers_fixed: TtkDashboardTopDealer[]
 }
 
 export type TtkDashboardSummaryResponse = {
@@ -49,19 +57,26 @@ export type TtkDashboardSummaryResponse = {
   error?: { message?: string }
 }
 
+const EMPTY_SUMMARY_BY_TYPE = {
+  clock_out_missing: 0,
+  break_missing: 0,
+  shift_20h_plus: 0,
+}
+
 export const EMPTY_TTK_DASHBOARD_SUMMARY: TtkDashboardSummaryData = {
   counts: {
     total_punches: 0,
-    only_error: { pending: 0, by_type: { clock_out_missing: 0, break_missing: 0, shift_20h_plus: 0 } },
+    only_error: { pending: 0, by_type: EMPTY_SUMMARY_BY_TYPE },
     only_error_clockout: { pending: 0 },
     only_error_break: { pending: 0 },
     manual_punch: { pending: 0 },
     without_salary: { pending: 0 },
-    only_deletes: { pending: 0 },
-    only_fixed: { pending: 0 },
+    only_deletes: { pending: 0, by_type: EMPTY_SUMMARY_BY_TYPE },
+    only_fixed: { pending: 0, punches: 0, by_type: EMPTY_SUMMARY_BY_TYPE, on_deleted: 0 },
   },
   error_trend: [],
   top_dealers: [],
+  top_dealers_fixed: [],
 }
 
 export const TTK_ERROR_CODE_LABELS: Record<number, string> = {

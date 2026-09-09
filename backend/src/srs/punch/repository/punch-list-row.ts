@@ -25,6 +25,12 @@ function toStringOrNull(raw: unknown): string | null {
 export type PunchListRowFlags = {
   includeAmounts: boolean
   includePaymentTypeName: boolean
+  /**
+   * `interno && lista blanca parcial`. Con lista default la fila queda
+   * byte-idéntica a la de hoy (ni aparece la clave), y a un usuario externo
+   * —que no puede filtrar por tipo de error— nunca se le serializa el código.
+   */
+  includeErrorType?: boolean
 }
 
 /** Mapea la fila cruda a la forma que ya consume el frontend (`TtkListRow`). */
@@ -60,6 +66,16 @@ export function mapPunchListRow(
         ? { id: fixedById, nombre: String(r.fixed_by_nombre ?? '') }
         : null,
     fixedErrorSnapshot: toStringOrNull(r.fixed_error_snapshot),
+
+    // Sólo el SQL del export Individual proyecta estas dos columnas.
+    correctedTypes:
+      r.corrected_types == null
+        ? null
+        : String(r.corrected_types)
+            .split(',')
+            .map((t) => Number(t.trim()))
+            .filter((t) => t === 1 || t === 2 || t === 3),
+    lastCorrectedAt: toStringOrNull(r.last_corrected_at),
 
     usuario: {
       id: Number(r.id_usuario),
@@ -101,6 +117,10 @@ export function mapPunchListRow(
 
   if (!flags.includePaymentTypeName) {
     delete (row as { objPaymentType?: unknown }).objPaymentType
+  }
+
+  if (flags.includeErrorType) {
+    row.errorType = toNumberOrNull(r.error_type)
   }
 
   return row

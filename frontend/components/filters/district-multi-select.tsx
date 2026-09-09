@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 
-import { LookupMultiSelect } from '@/components/billing/lookup-multi-select'
+import { LookupMultiSelect } from '@/components/shared/lookup-multi-select'
 import { useInvoiceDistrictLookup } from '@/hooks/use-invoice-lookups'
 import { canFilterInvoiceDistrict } from '@/lib/auth/billing-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'

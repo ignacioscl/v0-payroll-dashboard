@@ -1,4 +1,8 @@
-import { formatUsDateForExport, formatUsTimeForExport } from '@/lib/format-us-datetime'
+import {
+  formatUsDateForExport,
+  formatUsDateTimeForExport,
+  formatUsTimeForExport,
+} from '@/lib/format-us-datetime'
 import {
   breakEndMethod,
   breakStartMethod,
@@ -8,6 +12,8 @@ import {
 } from '@/lib/ttk/punch-method'
 import { formatDurationDisplay } from '@/lib/ttk/map-header-filters'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
+import { punchErrorVisible } from '@/lib/ttk/error-type-meta'
+import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 
 export type TtkListExportLabels = {
   employee: string
@@ -24,6 +30,14 @@ export type TtkListExportLabels = {
   hasError: string
   yes: string
   no: string
+  /**
+   * Columnas del modo Corrected. Este export arma el XLSX EN EL NAVEGADOR desde
+   * `fixes[]`: agregar columnas a la proyección del backend no las hace aparecer
+   * acá, es un cableado distinto del stream Individual.
+   */
+  correctedTypes: string
+  lastCorrectedAt: string
+  deletedPunch: string
 }
 
 function roleLabel(row: TtkListRow): string {
@@ -31,17 +45,30 @@ function roleLabel(row: TtkListRow): string {
   return [row.rolDpto.role, row.rolDpto.department].filter(Boolean).join(' / ')
 }
 
-function punchErrorLabel(row: TtkListRow): string | null {
-  const res = row.badPunch?.res?.trim()
-  return res ? res : null
+/**
+ * Misma regla que el ⚠ de la grilla (punchErrorVisible): con lista parcial el
+ * backend manda `errorType` y la marca se apaga para el tipo excluido. Sin esto
+ * la misma ponchada decía "No" en pantalla y "Yes" en el Excel.
+ */
+function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
+  if (!punchErrorVisible(row, includedErrorTypes)) return null
+  return row.badPunch?.res?.trim() || null
 }
 
 /** Flat row for XLS export — mirrors IssuesDataTable column export values. */
 export function ttkListRowToExportRecord(
   row: TtkListRow,
   labels: TtkListExportLabels,
-  options: { includePaymentType: boolean },
+  options: {
+    includePaymentType: boolean
+    includedErrorTypes?: readonly number[]
+    /** Sólo en modo Corrected: agrega las columnas de corrección y el flag de eliminada. */
+    includeCorrected?: boolean
+    /** Nombre visible de cada código 1|2|3, ya traducido por el caller. */
+    errorTypeNames?: Record<number, string>
+  },
 ): Record<string, string | number> {
+  const included = options.includedErrorTypes ?? ALL_ERROR_TYPES
   const out: Record<string, string | number> = {
     [labels.employee]: row.usuario?.nombre ?? '',
     [labels.roleDept]: roleLabel(row),
@@ -65,11 +92,27 @@ export function ttkListRowToExportRecord(
     })(),
     [labels.timeWork]: formatDurationDisplay(row.timeWork),
     [labels.timeBreak]: formatDurationDisplay(row.timeBreak),
-    [labels.hasError]: punchErrorLabel(row) ? labels.yes : labels.no,
+    [labels.hasError]: punchErrorLabel(row, included) ? labels.yes : labels.no,
   }
 
   if (options.includePaymentType) {
     out[labels.paymentType] = row.objPaymentType?.name ?? ''
+  }
+
+  if (options.includeCorrected) {
+    const fixes = row.fixes ?? []
+    const names = options.errorTypeNames ?? {}
+    // Un evento de un tipo destildado no llega en `fixes[]`, aunque la ponchada
+    // haya entrado por otro: el backend aplica el mismo predicado canónico.
+    out[labels.correctedTypes] = [...new Set(fixes.map((f) => f.errorType))]
+      .sort((a, b) => a - b)
+      .map((code) => names[code] ?? String(code))
+      .join(', ')
+    // Formateado, NUNCA el string crudo de la base: el resto de la planilla usa
+    // MM/DD/YYYY y esta celda salía como '2026-09-06 17:37:12'.
+    const lastFixedAt = fixes.length ? fixes.map((f) => f.fixedAt).sort().at(-1)! : null
+    out[labels.lastCorrectedAt] = formatUsDateTimeForExport(lastFixedAt)
+    out[labels.deletedPunch] = Number(row.estado ?? 1) === 0 ? labels.yes : labels.no
   }
 
   return out

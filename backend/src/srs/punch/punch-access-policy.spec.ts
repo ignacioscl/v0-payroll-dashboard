@@ -44,6 +44,42 @@ describe('PunchAccessPolicyService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
+  /* ---------------------------------------------------------------------- */
+  /* Gate de eliminadas (T7)                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  it('only_fixed SIN permiso 68 NO da 403: se recorta el subconjunto', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_fixed' })
+    expect(access.includeDeletedFixes).toBe(false)
+  })
+
+  it('only_fixed CON permiso 68 incluye las correcciones sobre eliminadas', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65, 68]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_fixed' })
+    expect(access.includeDeletedFixes).toBe(true)
+  })
+
+  it('only_deletes CON permiso 68 pasa', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65, 68]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'only_deletes' })
+    expect(access.includeDeletedFixes).toBe(true)
+  })
+
+  it('resolveDeletedVisibility NO exige la acción de Punch Report', async () => {
+    // Es el gate que usan los KPI: su consumidor vivo (/reports/business-kpis) se
+    // autoriza con Production Report, no con Punch Report. Reusar assertAndResolve
+    // metería un 403 donde hoy no lo hay.
+    const svc = new PunchAccessPolicyService(mockPerms([68]), mockSrs(async () => []) as never)
+    await expect(svc.resolveDeletedVisibility(ctx())).resolves.toBe(true)
+
+    const svcSinNada = new PunchAccessPolicyService(mockPerms([]), mockSrs(async () => []) as never)
+    await expect(svcSinNada.resolveDeletedVisibility(ctx())).resolves.toBe(false)
+  })
+
   it('usuario externo con issueType distinto de all da 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
@@ -52,15 +88,65 @@ describe('PunchAccessPolicyService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
-  it('idPaymentType o without_salary sin ver payment type da 403', async () => {
+  it('usuario externo con lista de tipos parcial da 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
     await expect(
-      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentType: 101 }),
+      svc.assertAndResolve(ctx({ isUserDealer: true }), { ...BASE_QUERY, errorTypes: [1, 3] }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('usuario externo con lista default pasa, pero sin errorType en la fila', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const access = await svc.assertAndResolve(ctx({ isUserDealer: true }), {
+      ...BASE_QUERY,
+      errorTypes: [1, 2, 3],
+    })
+    expect(access.includeErrorType).toBe(false)
+  })
+
+  it('interno: includeErrorType sólo con lista parcial', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+
+    const withDefault = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, errorTypes: [1, 2, 3] })
+    expect(withDefault.includeErrorType).toBe(false)
+
+    const withoutParam = await svc.assertAndResolve(ctx(), BASE_QUERY)
+    expect(withoutParam.includeErrorType).toBe(false)
+
+    const partial = await svc.assertAndResolve(ctx(), { ...BASE_QUERY, errorTypes: [1, 3] })
+    expect(partial.includeErrorType).toBe(true)
+  })
+
+  it('idPaymentTypes, without_salary o sort=paymentType sin permiso dan 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [101] }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [8, 10] }),
     ).rejects.toBeInstanceOf(ForbiddenException)
     await expect(
       svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'without_salary' }),
     ).rejects.toBeInstanceOf(ForbiddenException)
+    // Ordenar POR payment type tambien es usarlo: el LEFT JOIN esta siempre en
+    // el FROM, asi que sin este brazo quien no tiene el permiso no ve la columna
+    // pero igual recibe las filas ordenadas por el valor oculto (4.2.3bis).
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, sort: 'paymentType' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('lista vacia de payment types NO dispara el 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    // `idPaymentTypes: []` es «sin filtro», no «filtrando por payment type».
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, idPaymentTypes: [] }),
+    ).resolves.toBeDefined()
   })
 
   it('dealer fuera de RESTRICTION da 403 y no busca el nombre', async () => {

@@ -87,6 +87,13 @@ export interface DataTableColumnMeta<TData> {
    * the active sort. Defaults to the column id.
    */
   sortKey?: string
+  /**
+   * Start hidden in the column selector (the user puede mostrarla).
+   *
+   * Solo se aplica cuando NO hay visibilidad persistida para esa tabla: la
+   * eleccion del usuario siempre gana. Sin la meta, la columna se comporta
+   * exactamente como hasta ahora.
+   */
 }
 
 /** Visual treatment for the header row. */
@@ -435,6 +442,8 @@ export interface DataTableProps<TData, TValue = unknown> {
   recordsCount?: number
   /** Label after the records counter when `recordsCount` is set (defaults to common.records). */
   recordsCountLabel?: string
+  /** Nota al lado del contador de filas. */
+  recordsCountNote?: React.ReactNode
 
   /** Show a toolbar button that scrolls the table below the fixed nav. */
   enableTableFocus?: boolean
@@ -519,6 +528,7 @@ export function DataTable<TData, TValue = unknown>({
   toolbarTrailing,
   recordsCount,
   recordsCountLabel,
+  recordsCountNote,
   enableTableFocus = false,
   className,
   density = 'compact',
@@ -1052,6 +1062,7 @@ export function DataTable<TData, TValue = unknown>({
         trailing={toolbarTrailing}
         recordsCount={recordsCount}
         recordsCountLabel={recordsCountLabel}
+        recordsCountNote={recordsCountNote}
         enableTableFocus={enableTableFocus}
         isTableFocused={isTableFocused}
         onFocusTable={handleFocusTable}

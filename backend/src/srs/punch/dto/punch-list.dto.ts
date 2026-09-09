@@ -1,14 +1,33 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { SrsCursorDto, SrsCursorPagedResponseDto } from '../../shared/dto/srs-paged-response.dto'
 import { IsValidPunchDateRange } from '../punch-date-range'
 import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 
-/** Columnas por las que se puede ordenar el listado (whitelist). */
-export const PUNCH_LIST_SORTS = ['punchIn', 'employee'] as const
+/**
+ * Columnas por las que se puede ordenar el listado (whitelist).
+ *
+ * BUG-07: antes eran solo dos y el front convertia TODO lo demas a `punchIn`,
+ * asi que ordenar por Time break ordenaba por hora de entrada. Ahora cada
+ * columna que ofrece orden esta aca y el `@IsIn` rechaza el resto con 400 —
+ * nada de fallback silencioso.
+ *
+ * `date` NO esta: la columna Date y la columna Punch in ordenan por el mismo
+ * instante, asi que el front mapea las dos a `punchIn`.
+ */
+export const PUNCH_LIST_SORTS = [
+  'punchIn',
+  'employee',
+  'punchOut',
+  'breakStart',
+  'breakEnd',
+  'timeWork',
+  'timeBreak',
+  'paymentType',
+] as const
 export type PunchListSort = (typeof PUNCH_LIST_SORTS)[number]
 
 /** Estados "en vivo" del día (mirror de TTKEmployeeDao::getTodayLiveStatusCondition). */
@@ -55,6 +74,17 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   @Min(1)
   afterId?: number
 
+  @ApiPropertyOptional({
+    enum: ['0', '1'],
+    example: '0',
+    description:
+      'Cursor: 1 si la ultima fila recibida cae en el tramo de VACIOS de la columna ordenada. ' +
+      'Con 1, afterValue tiene que estar AUSENTE (el valor es NULL). Ausente = 0.',
+  })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  afterEmpty?: '0' | '1'
+
   /** Filtra la ponchada individual (no el total del empleado, a diferencia de grouped). */
   @ApiPropertyOptional({ example: 4, description: 'Horas mínimas de la ponchada' })
   @IsOptional()
@@ -70,12 +100,18 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   @Min(0)
   maxHours?: number
 
-  @ApiPropertyOptional({ example: 101, description: 'GENERIC_DATA.id del payment type' })
+  @ApiPropertyOptional({
+    example: '8,10',
+    description:
+      'CSV de GENERIC_DATA.id de payment type (max 50). Ausente = sin filtro. ' +
+      'Los ids se validan contra el catalogo del provider: uno ajeno => 400. ' +
+      'Para «sin tipo de pago» va issueType=without_salary, no este parametro.',
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idPaymentType?: number
+  @Matches(/^[1-9]\d{0,9}(,[1-9]\d{0,9}){0,49}$/, {
+    message: 'idPaymentTypes must be a comma-separated list of positive integer ids (max 50).',
+  })
+  idPaymentTypes?: string
 
   @ApiPropertyOptional({ description: 'Nombre o parte del nombre del empleado' })
   @IsOptional()
@@ -96,6 +132,33 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
   @IsOptional()
   @IsIn(PUNCH_ISSUE_TYPES as unknown as string[])
   issueType?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Lista blanca de tipos de error (1=sin salida, 2=sin descanso, 3=turno 20h+). ' +
+      'Ausente = 1,2,3. Duplicados o tokens fuera de {1,2,3} => 400.',
+    example: '1,3',
+  })
+  @IsOptional()
+  @Matches(/^[123](,[123]){0,2}$/, {
+    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  })
+  errorTypes?: string
+
+  /**
+   * Misma frontera congelada que Grouped, propagada al detalle expandido y a su
+   * export: sin ella la expansión de un grupo muestra ponchadas que no estaban en
+   * el padre. Aplica en TODOS los modos; en Corrected además congela el ledger.
+   *
+   * Opcional: sin él, el comportamiento es exactamente el de antes.
+   */
+  @ApiPropertyOptional({
+    example: '2026-07-30 12:08:13',
+    description: 'Frontera superior congelada (YYYY-MM-DD HH:mm:ss)',
+  })
+  @IsOptional()
+  @IsString()
+  snapshotAt?: string
 
   @ApiPropertyOptional({
     enum: PUNCH_LIST_LIVE_STATUS,
@@ -140,6 +203,30 @@ export class PunchListBadPunchDto {
   @ApiProperty({ example: 'Clock out is not set' }) res!: string
 }
 
+/**
+ * Un evento del registro de correcciones (`TTK_PUNCH_ERROR_FIX`).
+ *
+ * La metadata legacy `fixedAt/fixedBy/fixedErrorSnapshot` es una marca POR PONCHADA
+ * que sólo se setea cuando la ponchada queda sin ningún error, y se limpia al
+ * volver a romperse: es nula justamente en los dos casos que interesan —ponchada
+ * eliminada y ponchada vuelta a romper—. Estos eventos no.
+ */
+export class PunchListFixDto {
+  @ApiProperty({ example: 1, description: '1 sin salida, 2 sin descanso, 3 turno 20h+' })
+  errorType!: number
+
+  /**
+   * Fecha del ponche congelada al corregir. Va incluida a propósito: es lo que hace
+   * visible, en la propia fila, una divergencia con `punchInGmt0`.
+   */
+  @ApiProperty({ example: '2026-05-01' }) punchDate!: string
+
+  @ApiProperty({ example: '2026-08-27 18:16:53' }) fixedAt!: string
+
+  @ApiPropertyOptional({ nullable: true, example: 'Ana Pérez' })
+  fixedByName!: string | null
+}
+
 export class PunchListRowDto {
   @ApiProperty({ example: 910611 }) id!: number
 
@@ -163,6 +250,26 @@ export class PunchListRowDto {
   fixedBy!: PunchListFixedByDto | null
   @ApiPropertyOptional({ nullable: true }) fixedErrorSnapshot!: string | null
 
+  /**
+   * Eventos de corrección de ESTA ponchada dentro del rango y de los tipos tildados,
+   * ordenados por `fixedAt ASC, id ASC`.
+   *
+   * La grilla lista PONCHADAS y el card cuenta EVENTOS: una ponchada con dos
+   * correcciones es una fila y dos eventos. Por eso viajan los dos.
+   */
+  @ApiPropertyOptional({ type: [PunchListFixDto] })
+  fixes?: PunchListFixDto[]
+
+  /**
+   * Columnas AGREGADAS del export Individual, que es un solo stream con `mapRow`
+   * síncrono: ahí no cabe la segunda consulta por página que llena `fixes[]`.
+   * Sólo viajan en modo Corrected.
+   */
+  @ApiPropertyOptional({ nullable: true, example: [1, 2] })
+  correctedTypes?: number[] | null
+  @ApiPropertyOptional({ nullable: true, example: '2026-08-27 18:16:53' })
+  lastCorrectedAt?: string | null
+
   @ApiPropertyOptional({ type: PunchListUsuarioDto, nullable: true })
   usuario!: PunchListUsuarioDto | null
   @ApiPropertyOptional({ type: PunchListRolDptoDto, nullable: true })
@@ -171,6 +278,14 @@ export class PunchListRowDto {
   dealer!: PunchListDealerDto | null
   @ApiPropertyOptional({ type: PunchListBadPunchDto, nullable: true })
   badPunch!: PunchListBadPunchDto | null
+
+  /**
+   * Codigo de TTK_PUNCH_WITH_ERROR_V2 (1 sin salida, 2 sin descanso, 3 turno 20h+).
+   * Sólo viaja cuando hay lista blanca parcial y el usuario es interno
+   * (`includeErrorType`); con lista default la respuesta queda como siempre.
+   */
+  @ApiPropertyOptional({ nullable: true, example: 2 })
+  errorType?: number | null
   @ApiPropertyOptional({ type: PunchListPaymentTypeDto, nullable: true })
   objPaymentType!: PunchListPaymentTypeDto | null
 

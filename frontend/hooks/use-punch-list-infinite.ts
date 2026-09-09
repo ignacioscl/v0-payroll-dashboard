@@ -38,8 +38,9 @@ export function usePunchListInfinite({
     queryFn: async ({ pageParam }) =>
       fetchPunchList({
         ...params,
-        afterValue: pageParam?.value,
+        afterValue: pageParam?.value ?? undefined,
         afterId: pageParam?.id,
+        afterEmpty: pageParam ? (pageParam.empty === 1 ? '1' : '0') : undefined,
       }),
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
   })

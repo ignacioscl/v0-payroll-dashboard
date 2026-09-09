@@ -41,6 +41,86 @@ function row(id: number): PunchListRowDto {
 }
 
 describe('writePunchExportWorkbook', () => {
+  it('en modo Corrected agrega las dos columnas y la fila Status del Report Info', async () => {
+    const stream = new PassThrough()
+    const chunks: Buffer[] = []
+    stream.on('data', (c: Buffer) => chunks.push(c))
+    const finished = new Promise<void>((resolve, reject) => {
+      stream.on('finish', resolve)
+      stream.on('error', reject)
+    })
+
+    const corrected: PunchListRowDto = {
+      ...row(1),
+      estado: 0,
+      correctedTypes: [1, 2],
+      lastCorrectedAt: '2026-08-27 18:16:53',
+    }
+
+    await writePunchExportWorkbook({
+      stream,
+      locale: 'en',
+      includePaymentType: true,
+      includeCorrected: true,
+      generatedBy: 'Tester',
+      generatedAt: new Date('2026-09-06T12:00:00.000Z'),
+      reportMeta: [
+        { field: 'Report', value: 'Punch Report' },
+        // El eje de estado salió de `issueType`: sin esta fila el archivo lista
+        // corregidos y dice que no hay filtro.
+        { field: 'Status', value: 'Corrected' },
+      ],
+      rows: [corrected],
+    })
+    await finished
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(Buffer.concat(chunks))
+
+    const info = wb.getWorksheet('Report Info')
+    expect(info?.getCell('A3').value).toBe('Status')
+    expect(info?.getCell('B3').value).toBe('Corrected')
+
+    const data = wb.getWorksheet('Punch Report')
+    const headers = (data!.getRow(2).values as unknown[]).slice(1).map(String)
+    expect(headers).toContain('Corrected')
+    expect(headers).toContain('Last corrected at')
+
+    const cells = (data!.getRow(3).values as unknown[]).slice(1).map(String)
+    expect(cells).toContain('Without clock out, Break missing')
+    // Formateada como el resto de la planilla, no el string crudo de la base.
+    // Ver .cursor/rules/export-date-format.mdc.
+    expect(cells).toContain('08/27/2026, 6:16 PM')
+  })
+
+  it('sin modo Corrected las dos columnas no existen', async () => {
+    const stream = new PassThrough()
+    const chunks: Buffer[] = []
+    stream.on('data', (c: Buffer) => chunks.push(c))
+    const finished = new Promise<void>((resolve, reject) => {
+      stream.on('finish', resolve)
+      stream.on('error', reject)
+    })
+
+    await writePunchExportWorkbook({
+      stream,
+      locale: 'en',
+      includePaymentType: true,
+      generatedBy: 'Tester',
+      generatedAt: new Date('2026-09-06T12:00:00.000Z'),
+      reportMeta: [{ field: 'Report', value: 'Punch Report' }],
+      rows: [row(1)],
+    })
+    await finished
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(Buffer.concat(chunks))
+    const headers = (wb.getWorksheet('Punch Report')!.getRow(2).values as unknown[])
+      .slice(1)
+      .map(String)
+    expect(headers).not.toContain('Last corrected at')
+  })
+
   it('Report Info es la primera hoja y rota Punch Report 2 con umbral sintético', async () => {
     const stream = new PassThrough()
     const chunks: Buffer[] = []

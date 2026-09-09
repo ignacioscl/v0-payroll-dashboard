@@ -3,8 +3,20 @@ import type { DateRange } from 'react-day-picker'
 import type { PaymentTypeFilterValue } from '@/lib/ttk/payment-type-filter'
 import {
   PAYMENT_TYPE_FILTER_ALL,
-  PAYMENT_TYPE_FILTER_WITHOUT,
+  paymentTypeFilterParams,
 } from '@/lib/ttk/payment-type-filter'
+import { errorTypesParam } from '@/lib/filters/error-types-cookie'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
+import { resolveIssueType, type ErrorStatus } from '@/lib/ttk/error-status'
+
+/** Whitelist de orden de la vista agrupada. Espeja `PUNCH_GROUPED_SORTS` de Nest. */
+export type PunchGroupedSort =
+  | 'nombreEmployee'
+  | 'hoursNumber'
+  | 'breakNumber'
+  | 'punchCount'
+  | 'errorCount'
+  | 'fixedCount'
 
 export type PunchGroupedQueryParams = {
   fechaDesde: string
@@ -12,14 +24,19 @@ export type PunchGroupedQueryParams = {
   idDealer: string
   page: number
   pageSize: number
-  sort?: string
+  sort?: PunchGroupedSort
   dir?: 'asc' | 'desc'
   minHoursTotal?: number
   maxHoursTotal?: number
-  idPaymentType?: number
+  /** CSV canónico de GENERIC_DATA.id. String ya joineado, nunca number[]. */
+  idPaymentTypes?: string
   search?: string
   idEmployee?: number
   issueType?: string
+  /** CSV canónico de tipos incluidos. */
+  errorTypes?: string
+  /** Estado en vivo del día (Working / On lunch / Out). */
+  todayLiveStatus?: string
   /**
    * Frontera superior congelada (`punch_in <= snapshotAt`).
    *
@@ -48,23 +65,35 @@ export function buildPunchGroupedParams(input: {
   search?: string
   page: number
   pageSize: number
-  sort?: string
+  sort?: PunchGroupedSort
   dir?: 'asc' | 'desc'
   minHoursTotal?: number | null
   maxHoursTotal?: number | null
   paymentTypeFilter?: PaymentTypeFilterValue
   snapshotAt?: string
+  includedErrorTypes?: readonly number[]
+  errorStatus?: ErrorStatus
+  todayLiveStatus?: string
 }): PunchGroupedQueryParams {
   const paymentTypeFilter = input.paymentTypeFilter ?? PAYMENT_TYPE_FILTER_ALL
 
-  let issueType = input.selectedType && input.selectedType !== 'all' ? input.selectedType : undefined
-  let idPaymentType: number | undefined
+  // El eje de estado se cruza con el tipo en UN SOLO lugar (resolveIssueType):
+  // list, Grouped, detalle agrupado y los dos exports pasan por acá.
+  const crossedType = resolveIssueType(input.selectedType, input.errorStatus ?? 'pending')
+  // El combo de payment type NO escribe `issueType`: viaja por su propio
+  // parámetro y es EXCLUYENTE con la tarjeta *Without salary* (D-6, §4.2.2bis).
+  const issueType = crossedType && crossedType !== 'all' ? crossedType : undefined
 
-  if (paymentTypeFilter === PAYMENT_TYPE_FILTER_WITHOUT) {
-    issueType = 'without_salary'
-  } else if (typeof paymentTypeFilter === 'number' && paymentTypeFilter > 0) {
-    idPaymentType = paymentTypeFilter
-  }
+  // D-6 — la exclusion mutua se DERIVA aca, no se delega al efecto que limpia el
+  // combo. Ese efecto corrige el estado UN RENDER TARDE: entre el click en la
+  // tarjeta *Without salary* y su ejecucion hay un render donde conviven
+  // `selectedType='without_salary'` y los ids todavia tildados, y este memo los
+  // emitia a los DOS -> `idPaymentTypes=8,10&issueType=without_salary`, que es
+  // `id_payment_type IS NULL AND id_payment_type IN (8,10)`: cero filas, un
+  // request al pedo y una entrada de cache con una combinacion imposible.
+  // Derivandolo, ningun estado intermedio puede filtrarse.
+  const idPaymentTypes =
+    issueType === 'without_salary' ? undefined : paymentTypeFilterParams(paymentTypeFilter)
 
   const employeeId =
     input.selectedEmployeeId != null && input.selectedEmployeeId > 0
@@ -83,11 +112,17 @@ export function buildPunchGroupedParams(input: {
       input.minHoursTotal != null && input.minHoursTotal > 0 ? input.minHoursTotal : undefined,
     maxHoursTotal:
       input.maxHoursTotal != null && input.maxHoursTotal > 0 ? input.maxHoursTotal : undefined,
-    idPaymentType,
+    idPaymentTypes,
     search: employeeId != null ? undefined : input.search?.trim() || undefined,
     idEmployee: employeeId,
     issueType,
+    errorTypes: errorTypesParam(input.includedErrorTypes),
     snapshotAt: input.snapshotAt,
+    // Mismo criterio que buildPunchListParams: 'all' es ausencia de filtro.
+    todayLiveStatus:
+      input.todayLiveStatus && input.todayLiveStatus !== TODAY_LIVE_STATUS_ALL
+        ? input.todayLiveStatus
+        : undefined,
   }
 }
 
@@ -105,10 +140,12 @@ export function punchGroupedParamsToSearchParams(
   if (params.dir) qs.set('dir', params.dir)
   if (params.minHoursTotal != null) qs.set('minHoursTotal', String(params.minHoursTotal))
   if (params.maxHoursTotal != null) qs.set('maxHoursTotal', String(params.maxHoursTotal))
-  if (params.idPaymentType != null) qs.set('idPaymentType', String(params.idPaymentType))
+  if (params.idPaymentTypes) qs.set('idPaymentTypes', params.idPaymentTypes)
   if (params.search) qs.set('search', params.search)
   if (params.idEmployee != null) qs.set('idEmployee', String(params.idEmployee))
   if (params.issueType) qs.set('issueType', params.issueType)
+  if (params.errorTypes) qs.set('errorTypes', params.errorTypes)
   if (params.snapshotAt) qs.set('snapshotAt', params.snapshotAt)
+  if (params.todayLiveStatus) qs.set('todayLiveStatus', params.todayLiveStatus)
   return qs
 }
