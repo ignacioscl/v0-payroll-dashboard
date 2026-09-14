@@ -38,9 +38,14 @@ export function DataTableColumnHeader<TData, TValue>({
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   const meta = column.columnDef.meta as
-    | { filter?: ColumnFilterConfig }
+    | { filter?: ColumnFilterConfig; numeric?: boolean }
     | undefined
   const filterConfig = meta?.filter
+  // `meta.numeric` alinea las celdas a la derecha; el título tiene que ir igual o
+  // cada número queda debajo del título de la columna de al lado. El `text-right`
+  // del `<th>` no alcanza porque este bloque es flex: se invierte el orden para que
+  // el título quede pegado al borde derecho y el ícono de orden pase a su izquierda.
+  const numeric = meta?.numeric === true
 
   if (!column.getCanSort() && !column.getCanHide() && !filterConfig) {
     return <div className={cn('font-semibold', className)}>{title}</div>
@@ -49,7 +54,7 @@ export function DataTableColumnHeader<TData, TValue>({
   const sorted = column.getIsSorted()
 
   return (
-    <div className={cn('flex items-center gap-0.5', className)}>
+    <div className={cn('flex items-center gap-0.5', numeric && 'flex-row-reverse', className)}>
       {column.getCanSort() || column.getCanHide() ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -57,7 +62,8 @@ export function DataTableColumnHeader<TData, TValue>({
               variant="ghost"
               size="sm"
               className={cn(
-                '-ml-2 h-7 gap-1 px-2 text-xs font-semibold uppercase tracking-wide',
+                numeric ? '-mr-2 flex-row-reverse' : '-ml-2',
+                'h-7 gap-1 px-2 text-xs font-semibold uppercase tracking-wide',
                 'text-inherit hover:bg-white/10 hover:text-inherit data-[state=open]:bg-white/15',
                 'focus-visible:ring-0 focus-visible:ring-offset-0',
               )}
@@ -71,15 +77,15 @@ export function DataTableColumnHeader<TData, TValue>({
                 no existe. La accion de ocultar no se pierde — el menu sigue.
               */}
               {!column.getCanSort() ? null : sorted === 'desc' ? (
-                <ArrowDown className="ml-0.5 size-3" />
+                <ArrowDown className={cn(numeric ? 'mr-0.5' : 'ml-0.5', 'size-3')} />
               ) : sorted === 'asc' ? (
-                <ArrowUp className="ml-0.5 size-3" />
+                <ArrowUp className={cn(numeric ? 'mr-0.5' : 'ml-0.5', 'size-3')} />
               ) : (
-                <ArrowUpDown className="ml-0.5 size-3 opacity-40" />
+                <ArrowUpDown className={cn(numeric ? 'mr-0.5' : 'ml-0.5', 'size-3 opacity-40')} />
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[160px]">
+          <DropdownMenuContent align={numeric ? 'end' : 'start'} className="min-w-[160px]">
             {column.getCanSort() && (
               <>
                 <DropdownMenuItem

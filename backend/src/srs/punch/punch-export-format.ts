@@ -85,6 +85,39 @@ export function buildPunchExportFilename(date: Date = new Date()): string {
   return `punch_export_${p.month}-${p.day}-${p.year}_${hour}-${p.minute}_${period}.xlsx`
 }
 
+/**
+ * Nombre del export del ranking de dealers del Dashboard. Mismo formato que
+ * `buildPunchExportFilename` (hora de NY, guiones en vez de barras y dos puntos),
+ * con otro prefijo.
+ */
+export function buildDealerRankingExportFilename(date: Date = new Date()): string {
+  const p = nyParts(date, {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  const hour = String(p.hour).padStart(2, '0')
+  const period = nyPeriod(p.dayPeriod)
+  return `dealers_ranking_${p.month}-${p.day}-${p.year}_${hour}-${p.minute}_${period}.xlsx`
+}
+
+/**
+ * `YYYY-MM-DD` → `MM/DD/YYYY`, por los componentes y sin pasar por `Date`: un
+ * `new Date('2026-08-27')` es medianoche UTC y en NY cae el día anterior. Si no
+ * matchea, devuelve el valor tal cual.
+ *
+ * Vivía privada en punch-export.service.ts; se movió acá para que el export del
+ * ranking arme el período y la fecha del aviso con el mismo helper.
+ */
+export function ymdToUs(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd.trim())
+  if (!m) return ymd
+  return `${m[2]}/${m[3]}/${m[1]}`
+}
+
 export function formatDurationHhMmSs(value?: string | null): string {
   if (!value) return ''
   const trimmed = value.trim()

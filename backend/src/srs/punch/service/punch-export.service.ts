@@ -21,25 +21,17 @@ import {
   contentDispositionAttachment,
   formatNyStamp,
   XLSX_MIME,
+  ymdToUs,
   type PunchExportLocale,
 } from '../punch-export-format'
-import {
-  localeFromNavTemplate,
-  punchExportLabels,
-  type PunchExportLabels,
-} from '../punch-export-labels'
+import { punchExportLabels, type PunchExportLabels } from '../punch-export-labels'
+import { loadDealerNames, loadUserName, resolveLocale } from '../punch-export-lookups'
 import { writePunchExportWorkbook, type PunchExportMetaRow } from '../punch-export-xlsx'
 import { isPunchIssueType } from '../punch-issue-types'
 import { parsePaymentTypeIds } from '../repository/punch-payment-types'
 import { assertPaymentTypesInCatalog } from '../repository/punch-payment-type-catalog'
 import { isDefaultErrorTypes, parseErrorTypes } from '../repository/punch-error-types'
 import type { PunchListRowDto } from '../dto/punch-list.dto'
-
-function ymdToUs(ymd: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd.trim())
-  if (!m) return ymd
-  return `${m[2]}/${m[3]}/${m[1]}`
-}
 
 function metaAll(labels: PunchExportLabels, value?: string | null): string {
   const v = value?.trim()
@@ -150,8 +142,8 @@ export class PunchExportService {
       }
 
       const generatedAt = new Date()
-      const locale = await this.resolveLocale(ctx)
-      const generatedBy = await this.loadUserName(ctx.idUsuario)
+      const locale = await resolveLocale(this.srs, ctx)
+      const generatedBy = await loadUserName(this.srs, ctx.idUsuario)
       const meta = await this.buildReportMeta(
         ctx,
         filters,
@@ -213,23 +205,6 @@ export class PunchExportService {
     })()
   }
 
-  private async resolveLocale(ctx: SrsContext): Promise<PunchExportLocale> {
-    if (!ctx.idDealerProvider) return localeFromNavTemplate(1)
-    const rows: { type_nav_template?: number }[] = await this.srs.query(
-      'SELECT type_nav_template FROM CONTRATISTA WHERE id = ? LIMIT 1',
-      [ctx.idDealerProvider],
-    )
-    return localeFromNavTemplate(Number(rows[0]?.type_nav_template ?? 1))
-  }
-
-  private async loadUserName(idUsuario: number): Promise<string> {
-    const rows: { nombre?: string }[] = await this.srs.query(
-      'SELECT nombre FROM usuarios WHERE id_usuario = ? LIMIT 1',
-      [idUsuario],
-    )
-    return String(rows[0]?.nombre ?? idUsuario)
-  }
-
   private async buildReportMeta(
     ctx: SrsContext,
     filters: PunchExportStoredFilters,
@@ -247,7 +222,7 @@ export class PunchExportService {
     generatedAt: Date,
   ): Promise<PunchExportMetaRow[]> {
     const labels = punchExportLabels(locale)
-    const dealerNames = await this.loadDealerNames(ctx.idDealerProvider, dealerIds)
+    const dealerNames = await loadDealerNames(this.srs, ctx.idDealerProvider, dealerIds)
 
     const issueType = (filters.issueType ?? 'all').trim() || 'all'
     const issueLabel = isPunchIssueType(issueType)
@@ -321,19 +296,6 @@ export class PunchExportService {
     }
 
     return meta
-  }
-
-  private async loadDealerNames(idDealerProvider: number, dealerIds: number[]): Promise<string[]> {
-    if (dealerIds.length === 0) return []
-    const names: string[] = []
-    for (const id of dealerIds) {
-      const rows: { name?: string }[] = await this.srs.query(
-        'SELECT GET_DEALER_NAME_BY_PROVIDER(?, ?) AS name',
-        [idDealerProvider, id],
-      )
-      names.push(String(rows[0]?.name ?? id))
-    }
-    return names
   }
 
   private async loadEmployeeName(idEmployee: number): Promise<string> {

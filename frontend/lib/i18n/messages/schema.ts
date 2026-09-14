@@ -916,6 +916,15 @@ export interface Messages {
     dealersMostErrors: string
     /** Mismo widget con el switch en corregidos: ranking de actividad, no de deuda. */
     dealersMostCorrected: string
+    /** Encabezados del modal "View all" del ranking de dealers. */
+    dealersRankingDealer: string
+    dealersRankingErrors: string
+    /** Corrected: eventos de corrección, el número de la tarjeta. */
+    dealersRankingCorrections: string
+    /** Corrected: ponchadas distintas, lo que cuenta Grouped (`fixedCount`). */
+    dealersRankingPunches: string
+    /** Ayuda arriba de la lista; sólo con *Time Tracking > Hours Admin.* (65). */
+    dealersRankingClickHint: string
     yesterdayIssues: string
     withoutClockOutChart: string
     breakMissingChart: string

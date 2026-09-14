@@ -6,9 +6,18 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
+import type { DealerRankingStatus } from './dto/punch-dealer-ranking.dto'
 import type { PunchListLiveStatus } from './dto/punch-list.dto'
 
 export type PunchExportTicketState = 'pending' | 'running' | 'done' | 'error'
+
+/**
+ * Qué export emitió el ticket. El store y el semáforo son UNO SOLO para los dos
+ * exports (el cupo protege el pool de 5 conexiones), así que el ticket lleva su
+ * tipo: uno de Punch Report nunca se descarga por la ruta del ranking de dealers,
+ * ni al revés. El default es `punch-list`, así las llamadas de P4 no cambian.
+ */
+export type PunchExportTicketKind = 'punch-list' | 'dealer-ranking'
 
 export type PunchExportStoredFilters = {
   fechaDesde: string
@@ -27,10 +36,23 @@ export type PunchExportStoredFilters = {
   todayLiveStatus?: PunchListLiveStatus
 }
 
+/** Filtros del export del ranking de dealers del Dashboard, tal cual pasaron el `prepare`. */
+export type DealerRankingExportStoredFilters = {
+  fechaDesde: string
+  fechaHasta: string
+  idDealer: string
+  /** CSV canónico de la lista blanca; se guarda tal cual llegó al `prepare`. */
+  errorTypes?: string
+  search?: string
+  /** Posición del switch Pending/Corrected al momento del click. */
+  status: DealerRankingStatus
+}
+
 export type PunchExportTicket = {
   id: string
   idUsuario: number
-  filters: PunchExportStoredFilters
+  kind: PunchExportTicketKind
+  filters: PunchExportStoredFilters | DealerRankingExportStoredFilters
   state: PunchExportTicketState
   errorMessage?: string
   createdAt: number
@@ -57,13 +79,15 @@ export class PunchExportTicketStore {
 
   createPending(
     idUsuario: number,
-    filters: PunchExportStoredFilters,
+    filters: PunchExportStoredFilters | DealerRankingExportStoredFilters,
     onExpirePending: () => void,
+    kind: PunchExportTicketKind = 'punch-list',
   ): { ticket: string; expiresAt: string } {
     const id = randomUUID()
     const ticket: PunchExportTicket = {
       id,
       idUsuario,
+      kind,
       filters,
       state: 'pending',
       createdAt: Date.now(),
@@ -81,8 +105,12 @@ export class PunchExportTicketStore {
     return this.tickets.get(id)
   }
 
-  consumeForDownload(id: string, idUsuario: number): PunchExportTicket {
-    const ticket = this.requireOwned(id, idUsuario)
+  consumeForDownload(
+    id: string,
+    idUsuario: number,
+    kind: PunchExportTicketKind = 'punch-list',
+  ): PunchExportTicket {
+    const ticket = this.requireOwned(id, idUsuario, kind)
     if (ticket.state !== 'pending') {
       throw new GoneException('Export ticket already used')
     }
@@ -97,8 +125,9 @@ export class PunchExportTicketStore {
   getStatus(
     id: string,
     idUsuario: number,
+    kind: PunchExportTicketKind = 'punch-list',
   ): { status: PunchExportTicketState; errorMessage?: string } {
-    const ticket = this.requireOwned(id, idUsuario)
+    const ticket = this.requireOwned(id, idUsuario, kind)
     return { status: ticket.state, errorMessage: ticket.errorMessage }
   }
 
@@ -132,9 +161,15 @@ export class PunchExportTicketStore {
     ticket.terminalTimer.unref?.()
   }
 
-  private requireOwned(id: string, idUsuario: number): PunchExportTicket {
+  private requireOwned(
+    id: string,
+    idUsuario: number,
+    kind: PunchExportTicketKind,
+  ): PunchExportTicket {
     const ticket = this.tickets.get(id)
-    if (!ticket) {
+    // Un ticket del otro export responde igual que uno que no existe: por esta
+    // ruta, no existe. No se consume ni se toca: su propia ruta lo sigue sirviendo.
+    if (!ticket || ticket.kind !== kind) {
       throw new NotFoundException('Export ticket not found')
     }
     if (ticket.idUsuario !== idUsuario) {

@@ -328,6 +328,29 @@ function getHeaderCellBackground(
   return headerIsColored ? headerColor : 'var(--card)'
 }
 
+/**
+ * Box shadows for a HEADER cell (`<th>`): the edge shadow of pinned columns and,
+ * with a sticky header, a 1px band of the header color above the cell.
+ *
+ * The band covers a seam: when the scroll container lands on a fractional pixel
+ * (e.g. inside a Dialog centered with `translate(-50%, -50%)`), Chrome snaps the
+ * container's clip edge and the sticky `<th>` to different pixels, and the rows
+ * scrolling underneath show through a 1px line above the header. Without scroll
+ * the band sits outside the container's clip and is never visible.
+ */
+function getHeaderCellShadow(
+  stickyHeader: boolean,
+  background: string,
+  isLastLeftPinned: boolean,
+  isFirstRightPinned: boolean,
+): string | undefined {
+  const shadows: string[] = []
+  if (stickyHeader) shadows.push(`0 -1px 0 0 ${background}`)
+  if (isLastLeftPinned) shadows.push('inset -4px 0 8px -4px rgba(0,0,0,0.14)')
+  if (isFirstRightPinned) shadows.push('inset 4px 0 8px -4px rgba(0,0,0,0.14)')
+  return shadows.length > 0 ? shadows.join(', ') : undefined
+}
+
 /* -------------------------------------------------------------------------- */
 /* Component                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -1172,12 +1195,12 @@ export function DataTable<TData, TValue = unknown>({
                           headerIsColored,
                           headerColor,
                         ),
-                        ...(isLastLeftPinned
-                          ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
-                          : {}),
-                        ...(isFirstRightPinned
-                          ? { boxShadow: 'inset 4px 0 8px -4px rgba(0,0,0,0.14)' }
-                          : {}),
+                        boxShadow: getHeaderCellShadow(
+                          stickyHeader,
+                          getHeaderCellBackground(headerIsColored, headerColor),
+                          isLastLeftPinned,
+                          isFirstRightPinned,
+                        ),
                       }}
                       className={cn(
                         'relative box-border h-8 overflow-hidden px-3 py-1.5 text-xs font-semibold whitespace-nowrap',

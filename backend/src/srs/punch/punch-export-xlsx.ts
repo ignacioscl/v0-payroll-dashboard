@@ -248,3 +248,7 @@ export async function writePunchExportWorkbook(opts: WritePunchExportOptions): P
   sheet.commit()
   await workbook.commit()
 }
+
+// Sólo visibilidad, no comportamiento: el export del ranking de dealers del
+// Dashboard arma su libro con el mismo estilo (punch-dealer-ranking-xlsx.ts).
+export { THEME, thinBorder, applyHeaderRow, styleDataRow }

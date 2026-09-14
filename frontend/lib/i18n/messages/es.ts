@@ -918,6 +918,12 @@ export const es: Messages = {
     errorDistribution: 'Distribución de errores',
     dealersMostErrors: 'Sucursales con más errores',
     dealersMostCorrected: 'Sucursales con más errores corregidos',
+    dealersRankingDealer: 'Sucursal',
+    dealersRankingErrors: 'Errores',
+    dealersRankingCorrections: 'Correcciones',
+    dealersRankingPunches: 'Ponchadas',
+    dealersRankingClickHint:
+      'Haga clic en una sucursal para ver sus errores en Punch Report (vista agrupada).',
     yesterdayIssues: 'Errores de ponchadas de ayer',
     withoutClockOutChart: 'Sin salida',
     breakMissingChart: 'Descanso faltante',

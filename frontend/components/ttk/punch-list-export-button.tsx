@@ -12,34 +12,11 @@ import {
 } from '@/lib/ttk/punch-list-filters'
 import { fetchPunchExportPrepare, fetchPunchExportStatus } from '@/lib/srs-kpis-api'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { startTicketDownload } from '@/lib/ttk/ticket-download'
 
 type PunchListExportButtonProps = {
   params: PunchListQueryParams
   enabled: boolean
-}
-
-/**
- * Dispara la bajada del xlsx ya preparado.
- *
- * Va por un `<a download>` y NO por un iframe oculto: un iframe de 0×0 apuntando
- * a una URL con `export?ticket=` es justo lo que cazan los bloqueadores de
- * contenido, y Chrome corta el pedido con `ERR_BLOCKED_BY_CLIENT` sin que la app
- * se entere —el ticket se prepara bien y el archivo nunca llega—. Un anchor con
- * `download` al mismo origen no lo toca ningún bloqueador y tampoco navega.
- */
-function startTicketDownload(ticket: string) {
-  const a = document.createElement('a')
-  a.href = `/api/srs-kpis/punch/list/export?ticket=${encodeURIComponent(ticket)}`
-  // El nombre real lo manda el server en Content-Disposition; esto es el fallback.
-  a.download = ''
-  a.rel = 'noopener'
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  // El anchor NO se saca en el mismo tick: el ticket es de un solo uso y el
-  // servidor arma el archivo mientras lo transmite, así que la bajada vive
-  // bastante después del click. Sacarlo enseguida la deja cancelada en 0 bytes.
-  window.setTimeout(() => a.remove(), 60_000)
 }
 
 export function PunchListExportButton({ params, enabled }: PunchListExportButtonProps) {
@@ -99,7 +76,7 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
       pollOnce()
       pollRef.current = window.setInterval(pollOnce, 800)
 
-      startTicketDownload(prepared.ticket)
+      startTicketDownload('/api/srs-kpis/punch/list/export', prepared.ticket)
     } catch (e) {
       setGenerating(false)
       toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {

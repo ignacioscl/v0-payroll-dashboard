@@ -136,6 +136,67 @@ export class PunchAccessPolicyService {
   }
 
   /**
+   * Gate del ranking de dealers del Dashboard (la tarjeta "Dealers with most
+   * errors" y su modal).
+   *
+   * NO exige la acción de Punch Report (*Time Tracking > Hours Admin.*, 65): es
+   * paridad con el resumen PHP al que reemplaza, que sólo pide estar logueado
+   * (`ttk-dashboard-summary.php`). Exigirla le vaciaría la tarjeta a quien hoy la ve.
+   * El export del ranking SÍ la exige: pasa por `assertAndResolve()` completo y,
+   * además, por `assertDealersRelatedToProvider()`.
+   */
+  async assertDashboardRanking(
+    ctx: SrsContext,
+    idDealer: string,
+  ): Promise<Pick<PunchAccessPolicy, 'dealerIds' | 'skipDealerRestriction' | 'includeDeletedFixes'>> {
+    // Externos afuera: Punch Report ya les prohíbe mirar por errores, y el ranking
+    // no es otra cosa. Tampoco ven el Dashboard (el front los manda a /issues).
+    if (ctx.isUserDealer) {
+      throw new ForbiddenException('External users cannot view the dealers ranking.')
+    }
+
+    const dealerIds = [...new Set(parseDealerIds(idDealer))]
+    const skipDealerRestriction = skipDealerRestrictionForRol(ctx.idRol)
+    await this.assertDealersInScope(ctx, dealerIds, skipDealerRestriction)
+    await this.assertDealersRelatedToProvider(ctx, dealerIds)
+
+    // Correcciones sobre ponchadas eliminadas: el mismo recorte que los KPI y que
+    // `getFixFrom()` en PHP.
+    const includeDeletedFixes = await this.resolveDeletedVisibility(ctx)
+
+    return { dealerIds, skipDealerRestriction, includeDeletedFixes }
+  }
+
+  /**
+   * Cada dealer pedido tiene que estar relacionado con el provider del que llama en
+   * `DEALER_REL`. Es la misma condición con la que el header arma el combo de
+   * dealers (`ContratistaDao.php`, filtro `idDealerProv`, sin mirar `fecha_end`), así
+   * que nunca rechaza un dealer que el combo ofrece.
+   *
+   * Cierra el caso del Admin (rol 1/2): para él `assertDealersInScope` sólo verifica
+   * que el dealer exista, y el Report Info de un export nombraría (con
+   * `GET_DEALER_NAME_BY_PROVIDER`, que no mira el scope) un dealer de otro cliente.
+   * Mismo mensaje que `assertDealersInScope`: el 403 no dice cuál de los dos falló.
+   */
+  async assertDealersRelatedToProvider(ctx: SrsContext, dealerIds: readonly number[]): Promise<void> {
+    const ids = [...new Set(dealerIds)]
+    if (ids.length === 0) {
+      throw new ForbiddenException('Forbidden')
+    }
+    const placeholders = ids.map(() => '?').join(',')
+    const rows: { n: number | string }[] = await this.srs.query(
+      `SELECT COUNT(DISTINCT dr.id_dealer_customer) AS n
+       FROM DEALER_REL dr
+       WHERE dr.id_dealer_provider = ?
+         AND dr.id_dealer_customer IN (${placeholders})`,
+      [ctx.idDealerProvider, ...ids],
+    )
+    if (Number(rows[0]?.n ?? 0) !== ids.length) {
+      throw new ForbiddenException('One or more dealers are outside your scope.')
+    }
+  }
+
+  /**
    * Requested dealer ids must all pass RESTRICTION_DEALER_V2 (unless Admin 1/2).
    * Do not look up names first — GET_DEALER_NAME_BY_PROVIDER is unscoped.
    */

@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils'
  * la misma naturaleza que dealers y rango y tiene que valer igual en las dos
  * pantallas que lo usan.
  *
- * Cuando el radio de Punch Report está en un tipo que no cruza con el estado
- * (*Manual punch*, *Without salary*, *Deleted punches*) se muestra
+ * Cuando el radio de Punch Report no está en *Only with errors* (ninguna
+ * tarjeta, *Manual punch*, *Without salary*, *Deleted punches*) se muestra
  * **deshabilitado con su hint, no oculto**: si desaparece, el usuario no entiende
  * por qué dejó de filtrar.
  */

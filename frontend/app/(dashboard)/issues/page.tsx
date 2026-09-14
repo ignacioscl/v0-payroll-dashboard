@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useFilters } from '@/lib/filter-context'
 import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
@@ -103,9 +104,16 @@ const ISSUE_CARD_META: Record<
   only_fixed: { icon: <CheckCheck className="h-5 w-5" />, variant: 'info' },
 }
 
-export default function IssuesPage() {
+function IssuesPageContent() {
   const { t } = useTranslation()
-  const [viewMode, setViewMode] = useState<IssuesViewMode>('individual')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  // `?view=grouped` lo pone el click en un dealer del modal del Dashboard (F3).
+  // Sólo decide la vista INICIAL: después el toggle Individual/Grouped es local.
+  const viewFromUrl = searchParams.get('view')
+  const [viewMode, setViewMode] = useState<IssuesViewMode>(() =>
+    viewFromUrl === 'grouped' ? 'grouped' : 'individual',
+  )
   const [punchMinHoursRaw, setPunchMinHoursRaw] = useState('')
   const [punchMaxHoursRaw, setPunchMaxHoursRaw] = useState('')
   const [paymentTypeFilter, setPaymentTypeFilter] =
@@ -143,6 +151,13 @@ export default function IssuesPage() {
     }
   }, [isExternal, meLoading, selectedType, setSelectedType])
 
+  // La URL se limpia apenas se leyó: un reload no tiene que reabrir Grouped por un
+  // parámetro viejo.
+  useEffect(() => {
+    if (viewFromUrl == null) return
+    router.replace('/issues', { scroll: false })
+  }, [viewFromUrl, router])
+
   // D-6 - EXCLUSION MUTUA con la tarjeta *Without salary*: los dos piden lo
   // mismo (`id_payment_type IS NULL` vs `IN (...)`), asi que no pueden estar
   // activos a la vez. Ver PLAN.md 4.2.2bis.
@@ -175,12 +190,14 @@ export default function IssuesPage() {
     )
   }, [canViewDeleted, t])
 
-  // Fuente única (§T9bis): con Manual/Without salary/Deleted el estado no aplica,
-  // así que `effectiveErrorStatus` devuelve 'pending' y las tarjetas no se activan
-  // por el switch. La expresión suelta activaba Manual + Corrected.
+  // Fuente única (§T9bis): sin *Only with errors* —ninguna tarjeta, o Manual/Without
+  // salary/Deleted— el estado no aplica, así que `effectiveErrorStatus` devuelve
+  // 'pending' y las tarjetas no se activan por el switch (F6).
   const activeErrorStatus = effectiveErrorStatus(selectedType, errorStatus)
   const isCorrectedMode = activeErrorStatus === 'corrected'
-  const errorTypesActive = isCorrectedMode || selectedType === 'only_error'
+  // Con F6 el modo corregido sólo existe bajo `Only with errors`, así que alcanza
+  // con esa tarjeta: el `isCorrectedMode ||` de antes ya no agrega ningún caso.
+  const errorTypesActive = selectedType === 'only_error'
   // La exclusión sólo cuenta bajo `Only with errors`; si no, los contadores
   // muestran los números de siempre.
   const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : ALL_ERROR_TYPES
@@ -453,5 +470,17 @@ export default function IssuesPage() {
       )}
 
     </div>
+  )
+}
+
+/**
+ * Next 16 exige `Suspense` alrededor de un componente que usa `useSearchParams()`.
+ * Mismo patrón que `app/login/page.tsx`.
+ */
+export default function IssuesPage() {
+  return (
+    <Suspense fallback={null}>
+      <IssuesPageContent />
+    </Suspense>
   )
 }

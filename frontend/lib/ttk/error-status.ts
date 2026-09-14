@@ -22,21 +22,28 @@ export function isErrorStatus(value: unknown): value is ErrorStatus {
  * El estado que REALMENTE aplica.
  *
  * Única fuente: switch, cards, mappers, grillas, chips, contador de filtros
- * activos y exports leen de acá. Con *Manual punch*, *Without salary* o
- * *Deleted punches* el estado no aplica —esas tarjetas no son errores— y la
- * respuesta es `pending`, aunque el switch esté en la otra posición.
+ * activos y exports leen de acá. Sólo aplica con *Only with errors* marcada
+ * (F6): sin ninguna tarjeta, o con *Manual punch*, *Without salary* o *Deleted
+ * punches* —esas tarjetas no son errores—, la respuesta es `pending`, aunque el
+ * switch esté en la otra posición.
  *
  * El switch NO se resetea al mover el radio: queda donde estaba y vuelve a
- * aplicar cuando el radio vuelve a `only_error`/`all`. Resetearlo haría perder
- * la selección por mirar de reojo otra tarjeta.
+ * aplicar cuando el radio vuelve a `only_error`. Resetearlo haría perder la
+ * selección por mirar de reojo otra tarjeta.
  */
 export function effectiveErrorStatus(selectedType: string, errorStatus: ErrorStatus): ErrorStatus {
   return errorStatusCrossesType(selectedType) ? errorStatus : DEFAULT_ERROR_STATUS
 }
 
-/** Los dos únicos tipos del radio que se cruzan con el eje de estado. */
+/**
+ * El único tipo del radio que se cruza con el eje de estado.
+ *
+ * Hasta F6 también cruzaba `all`: sin ninguna tarjeta, Corrected listaba sólo las
+ * corregidas y prendía las tarjetas de tipo, un filtro que el usuario no eligió
+ * y que la pantalla no explicaba.
+ */
 export function errorStatusCrossesType(selectedType: string): boolean {
-  return selectedType === 'all' || selectedType === 'only_error'
+  return selectedType === 'only_error'
 }
 
 /**
@@ -44,8 +51,7 @@ export function errorStatusCrossesType(selectedType: string): boolean {
  *
  * | selectedType | errorStatus | issueType   |
  * |--------------|-------------|-------------|
- * | all          | pending     | all         |
- * | all          | corrected   | only_fixed  |
+ * | all          | cualquiera  | all         |
  * | only_error   | pending     | only_error  |
  * | only_error   | corrected   | only_fixed  |
  * | otro         | cualquiera  | ese tipo    |

@@ -12,6 +12,11 @@ import {
   type PunchListQueryParams,
 } from '@/lib/ttk/punch-list-filters'
 import type { TtkListRow } from '@/lib/ttk/ttk-list-types'
+import type {
+  DealerRankingExportPrepareBody,
+  DealerRankingQueryParams,
+  DealerRankingResponse,
+} from '@/lib/ttk/dealer-ranking-types'
 
 export interface ProductionKpi {
   woCompleted: number
@@ -282,4 +287,53 @@ export async function fetchPunchExportStatus(
     status: 'pending' | 'running' | 'done' | 'error'
     errorMessage?: string
   }>(res, `punch/list/export/status (${res.status})`)
+}
+
+/**
+ * Ranking de dealers del Dashboard: la tarjeta (top 5) y su modal "View all".
+ * Trae Pending y Corrected en la misma respuesta: el switch es del cliente.
+ */
+export async function fetchDealerRanking(
+  params: DealerRankingQueryParams,
+): Promise<DealerRankingResponse> {
+  const qs = new URLSearchParams({
+    fechaDesde: params.fechaDesde,
+    fechaHasta: params.fechaHasta,
+    idDealer: params.idDealer,
+  })
+  if (params.errorTypes) qs.set('errorTypes', params.errorTypes)
+  if (params.search) qs.set('search', params.search)
+  const res = await fetch(`/api/srs-kpis/punch/dealer-ranking?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  return readNestJson<DealerRankingResponse>(res, `punch/dealer-ranking (${res.status})`)
+}
+
+/** Export del ranking (Report Info + Dealers + Employees): mismo protocolo de ticket que P4. */
+export async function fetchDealerRankingExportPrepare(
+  body: DealerRankingExportPrepareBody,
+): Promise<{ ticket: string; expiresAt: string }> {
+  const res = await fetch('/api/srs-kpis/punch/dealer-ranking/export/prepare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify(body),
+  })
+  return readNestJson<{ ticket: string; expiresAt: string }>(
+    res,
+    `punch/dealer-ranking/export/prepare (${res.status})`,
+  )
+}
+
+export async function fetchDealerRankingExportStatus(
+  ticket: string,
+): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string }> {
+  const qs = new URLSearchParams({ ticket })
+  const res = await fetch(`/api/srs-kpis/punch/dealer-ranking/export/status?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  return readNestJson<{
+    status: 'pending' | 'running' | 'done' | 'error'
+    errorMessage?: string
+  }>(res, `punch/dealer-ranking/export/status (${res.status})`)
 }

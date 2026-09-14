@@ -41,6 +41,8 @@ import { PageHeading } from '@/components/layout/page-heading'
 import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
 import { ErrorStatusToggle } from '@/components/filters/error-status-toggle'
 import { TodayStatusSection } from '@/components/dashboard/today-status-section'
+import { DealersRankingDialog } from '@/components/dashboard/dealers-ranking-dialog'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DashboardYesterdayIssuesTable } from '@/components/dashboard/dashboard-yesterday-issues-table'
@@ -48,11 +50,14 @@ import { useFilters } from '@/lib/filter-context'
 import { errorTypeMeta, errorTypesWithState } from '@/lib/ttk/error-type-meta'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTtkDashboardSummary } from '@/hooks/use-ttk-dashboard-summary'
+import { useTtkDealerRanking } from '@/hooks/use-ttk-dealer-ranking'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canDeletePunch } from '@/lib/auth/ttk-permissions'
+import { canAccessDailyPunch, canDeletePunch } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getDashboardKpiTitle } from '@/lib/i18n/label-helpers'
 import { rangeStartsBeforeCorrectionsLog, type ErrorStatus } from '@/lib/ttk/error-status'
+import { EMPTY_DEALER_RANKING_ROWS } from '@/lib/ttk/dealer-ranking-types'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 
 /**
  * Claves que dibuja cada posición del toggle. Fuera del componente para que la
@@ -128,9 +133,6 @@ const TREND_BREAKDOWN_KEYS = {
 
 // Los colores de los tipos de error viven en ERROR_TYPE_META, atados al código.
 // El array por posición que había acá era justo el que pintaba mal el donut.
-
-/** Referencia estable para el ranking vacío. */
-const EMPTY_TOP_DEALERS: never[] = []
 
 /** Ícono y variante de cada tipo de error, por código (no por posición). */
 const DASH_ERROR_TYPE_ICONS: Record<1 | 2 | 3, React.ReactNode> = {
@@ -307,19 +309,39 @@ export default function DashboardPage() {
   const {
     search,
     selectedDealers,
+    setSelectedDealers,
     dateRange,
     filtersHydrated,
     setSelectedType,
     errorStatus,
     setErrorStatus,
+    setSelectedTodayLiveStatus,
     includedErrorTypes,
     toggleErrorType,
     errorTypesReady,
   } = useFilters()
   const { user, hasPermission } = useSrsMe()
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
+  // DP1: el export del modal (hoja Employees) y el click a Punch Report piden el
+  // permiso que ya gobierna ese dato y ese destino. Ver el ranking, no: hoy
+  // tampoco lo pide.
+  const canAccessPunchReport = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
+  const [rankingOpen, setRankingOpen] = useState(false)
 
   const { summary, loading } = useTtkDashboardSummary({
+    includedErrorTypes,
+    errorTypesReady,
+    search,
+    selectedDealers,
+    dateRange,
+    filtersHydrated,
+  })
+  // El ranking de dealers sale de Nest, en un pedido aparte del resumen.
+  const {
+    ranking,
+    params: rankingParams,
+    loading: rankingLoading,
+  } = useTtkDealerRanking({
     includedErrorTypes,
     errorTypesReady,
     search,
@@ -343,12 +365,15 @@ export default function DashboardPage() {
    * El ranking SÍ sigue al switch, y en corregidos sale del ledger. Leer el estado
    * actual dejaría en cero a la sucursal que corrigió todo —la haría pasar por la
    * más prolija cuando es la que más trabajo hizo—; el mismo criterio que el top
-   * de empleados. `?? EMPTY` porque una respuesta cacheada de antes de este cambio
-   * no trae la clave nueva.
+   * de empleados. La tarjeta corta en 5 la misma lista que el modal muestra
+   * entera: sale de un solo pedido, así que no pueden diferir.
    */
-  const topDealers = noErrorTypes
-    ? EMPTY_TOP_DEALERS
-    : (isCorrected ? summary.top_dealers_fixed : summary.top_dealers) ?? EMPTY_TOP_DEALERS
+  const rankingRows = noErrorTypes
+    ? EMPTY_DEALER_RANKING_ROWS
+    : isCorrected
+      ? ranking.corrected
+      : ranking.pending
+  const topDealers = rankingRows.slice(0, 5)
 
   const kpiCards: DashboardKpiConfig[] = useMemo(() => {
     const cards: DashboardKpiConfig[] = [
@@ -666,13 +691,32 @@ export default function DashboardPage() {
    * Cada deep-link fija LOS DOS ejes, explícito y nunca por omisión.
    *
    * `errorStatus` es global y sobrevive a la navegación: sin fijarlo, un acceso
-   * pensado para ver el estado actual abriría historial corregido (y con la tabla
-   * de verdad, `all` + `corrected` se convierte en `only_fixed`).
+   * pensado para ver el estado actual abriría historial corregido (con *Only with
+   * errors* marcada, `corrected` se convierte en `only_fixed`).
    */
   const goToIssues = (issueType: IssueType, status: ErrorStatus = 'pending') => {
     setSelectedType(issueType)
     setErrorStatus(status)
     router.push('/issues')
+  }
+
+  /**
+   * Click en un dealer del modal (F3): Punch Report agrupado, con los filtros del
+   * Dashboard y sólo ese dealer.
+   *
+   * - El header queda en ese dealer y persiste en la cookie de siempre (U6).
+   * - *Only with errors* habilita el switch y los tipos en Punch Report (F6), y el
+   *   switch va explícito en la posición del Dashboard (U11).
+   * - El estado en vivo se limpia: el ranking no lo aplica y Grouped sí, así que
+   *   uno que quedó puesto haría que el destino no cierre contra el modal.
+   */
+  const openDealerInPunchReport = (idDealer: number) => {
+    setSelectedDealers([String(idDealer)])
+    setSelectedType('only_error')
+    setErrorStatus(errorStatus)
+    setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
+    setRankingOpen(false)
+    router.push('/issues?view=grouped')
   }
 
   const scopeReady = filtersHydrated && selectedDealers.length > 0
@@ -690,6 +734,14 @@ export default function DashboardPage() {
     const to = format(toDate, dateFmt, { locale: dateFnsLocale })
     return { from, to, sameDay: from === to }
   }, [dateRange, dateFnsLocale])
+
+  /** `Report from … to …`: el título del período y el subtítulo del modal de dealers. */
+  const reportPeriodText = reportPeriodLabel
+    ? t('dashboard.reportFrom', {
+        from: reportPeriodLabel.from,
+        to: reportPeriodLabel.sameDay ? reportPeriodLabel.from : reportPeriodLabel.to,
+      })
+    : null
 
   return (
     <motion.div className="space-y-8" variants={container} initial="hidden" animate="show">
@@ -709,17 +761,7 @@ export default function DashboardPage() {
       <motion.div variants={item} className="space-y-6 border-t border-border pt-8">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">
-            {reportPeriodLabel
-              ? reportPeriodLabel.sameDay
-                ? t('dashboard.reportFrom', {
-                    from: reportPeriodLabel.from,
-                    to: reportPeriodLabel.from,
-                  })
-                : t('dashboard.reportFrom', {
-                    from: reportPeriodLabel.from,
-                    to: reportPeriodLabel.to,
-                  })
-              : '…'}
+            {reportPeriodText ?? '…'}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">{t('dashboard.reportUsesFilters')}</p>
         </div>
@@ -1029,7 +1071,7 @@ export default function DashboardPage() {
               : 'overflow-hidden border-red-100 bg-gradient-to-br from-white to-red-50/50'
           }
         >
-          <CardHeader className="pb-4">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-lg ${
@@ -1046,9 +1088,25 @@ export default function DashboardPage() {
                 ? t('dashboard.dealersMostCorrected')
                 : t('dashboard.dealersMostErrors')}
             </CardTitle>
+            {/*
+              Mismo lugar que el "View all" de *Yesterday's punch issues*, pero botón y
+              no link: abre el modal con el ranking entero, no navega.
+            */}
+            {rankingRows.length > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-sm font-medium text-primary hover:text-primary/80"
+                onClick={() => setRankingOpen(true)}
+              >
+                {t('common.viewAll')}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {rankingLoading ? (
               <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : topDealers.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('common.noDataToDisplay')}</p>
@@ -1056,7 +1114,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {topDealers.map((dealerItem, index) => (
                   <motion.div
-                    key={dealerItem.id_dealer}
+                    key={dealerItem.idDealer}
                     className="flex items-center justify-between rounded-xl bg-muted/30 p-3 transition-colors hover:bg-muted/50"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -1078,7 +1136,7 @@ export default function DashboardPage() {
                       >
                         #{index + 1}
                       </span>
-                      <p className="text-sm font-medium text-foreground">{dealerItem.dealer_name}</p>
+                      <p className="text-sm font-medium text-foreground">{dealerItem.dealerName}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span
@@ -1086,7 +1144,7 @@ export default function DashboardPage() {
                           isCorrected ? 'text-emerald-600' : 'text-destructive'
                         }`}
                       >
-                        {dealerItem.error_count}
+                        {dealerItem.total}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {isCorrected ? t('common.corrections') : t('common.errors')}
@@ -1134,6 +1192,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <DealersRankingDialog
+        open={rankingOpen}
+        onOpenChange={setRankingOpen}
+        isCorrected={isCorrected}
+        rows={rankingRows}
+        loading={rankingLoading}
+        includedErrorTypes={includedErrorTypes}
+        periodLabel={reportPeriodText}
+        showCoverageNotice={isCorrected && showCorrectionsCoverageNotice}
+        canAccessPunchReport={canAccessPunchReport}
+        onDealerClick={openDealerInPunchReport}
+        exportParams={rankingParams}
+      />
       </motion.div>
     </motion.div>
   )
