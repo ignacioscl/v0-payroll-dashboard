@@ -195,7 +195,7 @@ export function BillingActionSection({
   )
 }
 
-/** Selectable radio/checkbox tile — denser than a bare Select. */
+/** Single-choice tile: the tile itself shows the selection, no radio dot (rule: selection-tiles-no-radio). */
 export function BillingOptionTile({
   selected,
   onSelect,
@@ -220,7 +220,7 @@ export function BillingOptionTile({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
+        'flex w-full cursor-pointer items-start rounded-lg border px-3 py-2.5 text-left transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
         selected
           ? 'border-primary/55 bg-primary/5 ring-1 ring-primary/25'
@@ -229,15 +229,6 @@ export function BillingOptionTile({
         className,
       )}
     >
-      <span
-        className={cn(
-          'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border',
-          selected ? 'border-primary bg-primary' : 'border-muted-foreground/40',
-        )}
-        aria-hidden
-      >
-        {selected ? <span className="size-1.5 rounded-full bg-primary-foreground" /> : null}
-      </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
           {Icon ? <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} /> : null}

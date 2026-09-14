@@ -414,6 +414,39 @@ const rows = query.data?.pages.flatMap((p) => p.results) ?? []
 Slot opcional renderizado debajo del body (y por encima/―en lugar de― la
 paginación). Úsalo para barras de totales, resúmenes o acciones de tabla.
 
+## Header de la tabla: mensajes y acciones de estado
+
+Todo lo que habla del **estado de la lista** —una acción sobre las filas seleccionadas
+("Delete selected (25)") o un aviso de que se está viendo un subconjunto ("estás viendo
+ponchadas corregidas")— va **dentro del header de la tabla, a la derecha del contador**, con
+`recordsCountNote`. Nunca en una fila aparte arriba de la tabla: la empuja hacia abajo cada vez
+que aparece y queda lejos de lo que describe.
+
+```tsx
+<DataTable<Row>
+  recordsCount={total}
+  recordsCountLabel={t('nav.invoices')}
+  recordsCountNote={
+    selected.length > 0 ? (
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        className="ml-1 h-7 gap-1.5 px-2 text-[11px]"
+        onClick={openBulkDelete}
+      >
+        <Trash2 className="size-3.5" />
+        {t('invoices.actionDeleteBulk', { count: selected.length })}
+      </Button>
+    ) : null
+  }
+/>
+```
+
+- Mismo alto y tamaño de texto que el resto del toolbar (`h-7`, `text-[11px]`), para que el
+  header no cambie de alto cuando aparece.
+- Sólo si no entra en el header (texto largo, varios avisos a la vez) va afuera de la tabla.
+
 ## Sub-filas / drilldown (`renderSubComponent`)
 
 Para expandir una fila y mostrar detalle inline (sub-tabla), pasá
@@ -492,3 +525,6 @@ sin DB. Borrar cuando ya no se necesite.
 - `tableId` debe ser único y estable por pantalla — es la clave de persistencia.
 - No reimplementar paginación / column visibility / export / filtros
   manualmente: o usás este componente, o agregás slots al genérico.
+- Los mensajes y acciones de estado de la lista (acción sobre la selección, aviso de
+  subconjunto) van en el header, al lado del contador (`recordsCountNote`); nunca en una fila
+  aparte arriba de la tabla.

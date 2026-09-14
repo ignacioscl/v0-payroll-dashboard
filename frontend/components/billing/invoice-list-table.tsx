@@ -1363,21 +1363,23 @@ export function InvoiceListTable({
       </TooltipProvider>
     ) : null
 
+  // Selection action lives in the table header, next to the counter (data-table rule).
+  const deleteSelectedNote =
+    canBulkDelete && selectedStatementIds.length > 0 ? (
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        className="ml-1 h-7 gap-1.5 px-2 text-[11px]"
+        onClick={() => setBulkDeleteOpen(true)}
+      >
+        <Trash2 className="size-3.5" />
+        {t('invoices.actionDeleteBulk', { count: selectedStatementIds.length })}
+      </Button>
+    ) : null
+
   return (
     <>
-      {canBulkDelete && selectedStatementIds.length > 0 ? (
-        <div className="mb-2 flex items-center gap-2">
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            {t('invoices.actionDeleteBulk', { count: selectedStatementIds.length })}
-          </Button>
-        </div>
-      ) : null}
       <DataTable<InvoiceRow>
         tableId="billing-invoices-v7"
         columns={columns}
@@ -1388,6 +1390,7 @@ export function InvoiceListTable({
         enableGlobalFilter={false}
         recordsCount={gateReady && summaryTotal != null ? summaryTotal : undefined}
         recordsCountLabel={t('nav.invoices')}
+        recordsCountNote={deleteSelectedNote}
         pageSize={pageSize}
         onPageSizeChange={onPageSizeChange}
         showPageSizeInInfiniteScroll

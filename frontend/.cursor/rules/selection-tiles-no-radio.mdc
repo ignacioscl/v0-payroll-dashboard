@@ -1,0 +1,57 @@
+---
+description: Single-choice options with a title/description (export type, print layout, delivery) are selectable tiles WITHOUT a radio dot — the tile itself is the selection.
+globs: v0-payroll-dashboard/frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Selection tiles: the tile is the check
+
+When the user picks **one option out of a few**, and each option has a title (plus an optional
+icon and a short description) — export type, print layout, download vs. email — render the
+options as **selectable tiles**, not as radio buttons.
+
+The tile **is** the control. Its own border and background show which one is selected; there is
+no radio dot (or checkbox) inside it.
+
+## Do
+
+- Use `BillingOptionTile` (`components/billing/billing-action-dialog.tsx`), laid out in a grid:
+  `grid gap-1.5 sm:grid-cols-N`.
+- Selected: `border-primary/55 bg-primary/5 ring-1 ring-primary/25`. Unselected:
+  `border-border/80 bg-card hover:bg-muted/40`. That change is the only selection indicator.
+- The whole tile is one `<button type="button">` with `cursor-pointer`, `aria-pressed={selected}`
+  and a visible focus ring, so keyboard and screen-reader users still get the state.
+- If another module needs the same pattern, move the tile to `components/shared/` and reuse it.
+  Never copy the markup.
+
+## Do NOT
+
+- Put a radio dot or a checkbox inside the tile. It repeats what the tile already shows and adds
+  noise.
+- Build the pattern as a `RadioGroup` with cards used as labels.
+
+## When NOT to use tiles
+
+- More than ~5 options, or options with no description → `Select` / `SearchableCombobox`.
+- On/off or multi-select options → `BillingToggleRow` / checkboxes.
+
+## Example
+
+```tsx
+// ✅ The tile is the selection
+<div className="grid gap-1.5 sm:grid-cols-3">
+  <BillingOptionTile
+    selected={kind === 'invoice'}
+    onSelect={() => setKind('invoice')}
+    title={t('invoices.bulkExportTypeInvoice')}
+    description={t('invoices.bulkExportTypeInvoiceHint')}
+    icon={List}
+  />
+</div>
+
+// ❌ Radio dot inside the tile
+<button type="button" className="… rounded-lg border …">
+  <span className="size-4 rounded-full border …" />
+  …
+</button>
+```
