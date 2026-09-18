@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFilters } from '@/lib/filter-context'
-import { errorTypeLabel, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
+import { errorTypeLabel, type FlagTypeCode } from '@/lib/ttk/error-type-meta'
 import {
   getDefaultDateRange,
   matchPreset,
@@ -34,7 +34,7 @@ import type { PaymentTypeCatalogItem } from '@/lib/ttk/payment-type-filter'
 import { TodayLiveStatusFilterCards } from '@/components/ttk/today-live-status-filter-cards'
 import { PunchHoursFilter } from '@/components/ttk/punch-hours-filter'
 import { PaymentTypeFilter } from '@/components/ttk/payment-type-filter'
-import { effectiveErrorStatus } from '@/lib/ttk/error-status'
+import { effectiveErrorStatus, errorStatusCrossesType } from '@/lib/ttk/error-status'
 
 const STORAGE_KEY = 'punch-report-filters-open'
 
@@ -183,14 +183,12 @@ export function PunchReportFilterPanel({
     // que un chip "X excluded" ahí sería un filtro que dice estar activo y no lo
     // está. Sin el chip, en cambio, el filtro queda invisible y no removible:
     // por eso va exactamente cuando aplica.
-    const typeChipsApply =
-      selectedType === 'only_error' ||
-      effectiveErrorStatus(selectedType, errorStatus) === 'corrected'
+    const typeChipsApply = errorStatusCrossesType(selectedType)
     for (const code of typeChipsApply ? excludedErrorTypes : []) {
       list.push({
         key: `error-type-${code}`,
         label: t('punch.errorTypeExcludedChip', {
-          type: errorTypeLabel(t, code as ErrorTypeCode),
+          type: errorTypeLabel(t, code as FlagTypeCode),
         }),
         onRemove: () => toggleErrorType(code),
       })

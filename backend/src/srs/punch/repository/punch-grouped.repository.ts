@@ -52,9 +52,18 @@ function parseCorrectedTypes(raw: string | null): number[] {
   const seen = new Set<number>()
   for (const token of raw.split(/<br\/>|,/)) {
     const value = Number(token.trim())
-    if (value === 1 || value === 2 || value === 3) seen.add(value)
+    if (value === 1 || value === 2 || value === 3 || value === 4 || value === 7) seen.add(value)
   }
   return [...seen].sort((a, b) => a - b)
+}
+
+function groupedFakeGpsEvents(r: Record<string, unknown>): string[] {
+  const events: string[] = []
+  if (Number(r.fakeGpsIn) === 1) events.push('clock_in')
+  if (Number(r.fakeGpsOut) === 1) events.push('clock_out')
+  if (Number(r.fakeGpsBreakStart) === 1) events.push('break_start')
+  if (Number(r.fakeGpsBreakEnd) === 1) events.push('break_end')
+  return events
 }
 
 /**
@@ -174,6 +183,7 @@ export class GroupedPunchRepository {
       FROM TTK_EMPLOYEE_WORK tew
       ${ttk.join}
       INNER JOIN usuarios u ON u.id_usuario = tew.id_author
+      LEFT JOIN TTK_EMPLOYEE_WORK_EXT ext ON ext.id_ttk = tew.id
       WHERE ${estadoSql}tew.id_dealer_provider = ?
         ${dealerAndSql}
         ${dateRangeSql}
@@ -231,6 +241,10 @@ export class GroupedPunchRepository {
          SUM(CASE WHEN EXISTS (SELECT 1 FROM TTK_PUNCH_ERROR_FIX f7
                                 WHERE ${issue.fixedCountSql})
                   THEN 1 ELSE 0 END)                                                AS fixedCount,
+         MAX(CASE WHEN ext.punch_in_mock_gps = 1 THEN 1 ELSE 0 END)                 AS fakeGpsIn,
+         MAX(CASE WHEN ext.punch_out_mock_gps = 1 THEN 1 ELSE 0 END)                AS fakeGpsOut,
+         MAX(CASE WHEN ext.break_start_mock_gps = 1 THEN 1 ELSE 0 END)              AS fakeGpsBreakStart,
+         MAX(CASE WHEN ext.break_end_mock_gps = 1 THEN 1 ELSE 0 END)                AS fakeGpsBreakEnd,
          NULLIF(
            GROUP_CONCAT(
              DISTINCT ${issue.markDetailSql}
@@ -340,6 +354,7 @@ export class GroupedPunchRepository {
         fixedCount: Number(r.fixedCount ?? 0),
         errorSummary: issue.marksCorrections ? null : detail,
         correctedTypes: issue.marksCorrections ? parseCorrectedTypes(detail) : null,
+        fakeGpsEvents: groupedFakeGpsEvents(r),
         byPaymentType: byType[Number(r.idUsuario)] ?? [],
       }
     })

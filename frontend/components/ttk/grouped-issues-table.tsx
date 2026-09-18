@@ -12,9 +12,6 @@ import {
 } from '@/components/shared/data-table'
 import { useFilters } from '@/lib/filter-context'
 import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
-
-/** Referencia estable para el vacío. */
-const EMPTY_GROUPED_ROWS: PunchGroupedRow[] = []
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
@@ -37,18 +34,21 @@ import type {
   PunchGroupedExportLabels,
   PunchGroupedReportInfo,
 } from '@/lib/ttk/punch-grouped-export'
-import { errorTypeLabel, isErrorIssueType, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
+import { errorTypeLabel, FLAG_TYPE_META, isErrorIssueType, visibleFlagTypes, type FlagTypeCode } from '@/lib/ttk/error-type-meta'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { effectiveErrorStatus, resolveIssueType } from '@/lib/ttk/error-status'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 
 const groupedAdapter = createPaginatedAdapter<PunchGroupedRow>()
+
+/** Referencia estable para el vacío. */
+const EMPTY_GROUPED_ROWS: PunchGroupedRow[] = []
 
 const GROUPED_HOURS_FORMAT_STORAGE_KEY = 'punch.grouped.hoursFormat'
 
@@ -192,11 +192,8 @@ export function GroupedIssuesDataTable({
     : t('punch.withErrors')
   /** El export del detalle arma el XLSX en el navegador: los nombres van resueltos. */
   const errorTypeNamesForExport = React.useMemo(
-    () => ({
-      1: errorTypeLabel(t, 1),
-      2: errorTypeLabel(t, 2),
-      3: errorTypeLabel(t, 3),
-    }),
+    () =>
+      Object.fromEntries(FLAG_TYPE_META.map((meta) => [meta.code, errorTypeLabel(t, meta.code)])),
     [t],
   )
 
@@ -209,6 +206,7 @@ export function GroupedIssuesDataTable({
 
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+  const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
 
   // Catálogos para los nombres VISIBLES del Report Info. Los dos hooks tienen
   // query key fija, así que reusan lo que ya bajó el header: no piden de nuevo.
@@ -386,7 +384,7 @@ export function GroupedIssuesDataTable({
       errorCount: t('punch.errorCount'),
       fixedCount: t('punch.fixedCount'),
       correctedColumn: t('punch.corrected'),
-      errorTypeNames: { 1: errorTypeLabel(t, 1), 2: errorTypeLabel(t, 2), 3: errorTypeLabel(t, 3) },
+      errorTypeNames: errorTypeNamesForExport,
       roleDept: t('punch.roleDept'),
       date: t('common.date'),
       punchIn: t('punch.punchIn'),
@@ -434,7 +432,7 @@ export function GroupedIssuesDataTable({
         all: t('punch.exportAll'),
       },
     }
-  }, [t])
+  }, [t, errorTypeNamesForExport, groupColumnLabel])
 
   /**
    * Nombres VISIBLES de los filtros, congelados al hacer clic en exportar.
@@ -454,10 +452,16 @@ export function GroupedIssuesDataTable({
       dealers: dealerNames.length > 0 ? dealerNames.join(', ') : all,
       employee: selectedEmployee?.nombre ?? all,
       paymentType: paymentTypeLabelForExport ?? all,
-      errorTypes:
-        includedErrorTypes.length === 3
+      errorTypes: (() => {
+        const visibleCodes: number[] = visibleFlagTypes({
+          canViewPaymentType: canViewPayment,
+          canViewDeleted,
+        }).map((meta) => meta.code)
+        const named = includedErrorTypes.filter((code) => visibleCodes.includes(code))
+        return named.length === visibleCodes.length
           ? all
-          : includedErrorTypes.map((c) => errorTypeLabel(t, c as ErrorTypeCode)).join(', '),
+          : named.map((c) => errorTypeLabel(t, c as FlagTypeCode)).join(', ')
+      })(),
       // Los cinco de abajo faltaban: el Report Info decía "sin filtro" sobre filtros
       // que sí estaban aplicando (`xls-export-report-info` es alwaysApply).
       errorStatus: isCorrectedMode
@@ -484,6 +488,9 @@ export function GroupedIssuesDataTable({
     selectedType,
     minHoursTotal,
     maxHoursTotal,
+    canViewPayment,
+    canViewDeleted,
+    selectedTodayLiveStatus,
   ])
 
   React.useEffect(() => {
@@ -601,13 +608,18 @@ export function GroupedIssuesDataTable({
               >
                 {r.nombreEmployee}
               </button>
-              {!isCorrectedMode && r.errorSummary ? (
+              {!isCorrectedMode && (r.errorSummary || (r.fakeGpsEvents?.length ?? 0) > 0) ? (
                 <span
                   className="shrink-0"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                 >
-                  <PunchErrorIndicator errorText={r.errorSummary} />
+                  <PunchErrorIndicator
+                    errorText={r.errorSummary}
+                    fakeGpsEvents={
+                      includedErrorTypes.includes(8) ? r.fakeGpsEvents : undefined
+                    }
+                  />
                 </span>
               ) : null}
             </div>
@@ -684,7 +696,7 @@ export function GroupedIssuesDataTable({
             }
             return (
               <span className="text-xs">
-                {types.map((type) => errorTypeLabel(t, type as ErrorTypeCode)).join(', ')}
+                {types.map((type) => errorTypeLabel(t, type as FlagTypeCode)).join(', ')}
                 {countBadge}
               </span>
             )
@@ -692,13 +704,18 @@ export function GroupedIssuesDataTable({
           if (!r.hasError) {
             return <span className="text-xs text-muted-foreground">{t('punch.exportNo')}</span>
           }
-          if (r.errorSummary) {
+          if (r.errorSummary || (r.fakeGpsEvents?.length ?? 0) > 0) {
             return (
               <span
                 className="inline-flex items-center"
                 onClick={(e) => e.stopPropagation()}
               >
-                <PunchErrorIndicator errorText={r.errorSummary} />
+                <PunchErrorIndicator
+                  errorText={r.errorSummary}
+                  fakeGpsEvents={
+                    includedErrorTypes.includes(8) ? r.fakeGpsEvents : undefined
+                  }
+                />
                 {countBadge}
               </span>
             )
@@ -719,7 +736,7 @@ export function GroupedIssuesDataTable({
             const suffix = count > 0 ? ` (${count})` : ''
             if (isCorrectedMode) {
               const types = (r.correctedTypes ?? []).map((type) =>
-                errorTypeLabel(t, type as ErrorTypeCode),
+                errorTypeLabel(t, type as FlagTypeCode),
               )
               return types.length === 0 ? t('punch.exportNo') : types.join(', ') + suffix
             }
@@ -802,7 +819,7 @@ export function GroupedIssuesDataTable({
     // Pendientes/Corregidos sin recargar la columna se quedaba con la etiqueta,
     // la fuente o el exportador del modo anterior. Es un defecto preexistente,
     // pero esta linea es justo la que hay que editar.
-    [t, useHoursFormat, isCorrectedMode, groupColumnLabel],
+    [t, useHoursFormat, isCorrectedMode, groupColumnLabel, includedErrorTypes],
   )
 
   const {

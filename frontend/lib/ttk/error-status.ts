@@ -22,14 +22,13 @@ export function isErrorStatus(value: unknown): value is ErrorStatus {
  * El estado que REALMENTE aplica.
  *
  * Única fuente: switch, cards, mappers, grillas, chips, contador de filtros
- * activos y exports leen de acá. Sólo aplica con *Only with errors* marcada
- * (F6): sin ninguna tarjeta, o con *Manual punch*, *Without salary* o *Deleted
- * punches* —esas tarjetas no son errores—, la respuesta es `pending`, aunque el
- * switch esté en la otra posición.
+ * activos y exports leen de acá. Sólo aplica con *Only flagged* (o el deep-link
+ * viejo *Only with errors*): en All punches la respuesta es `pending` para los
+ * números, aunque el switch conserve la posición guardada (BUG-10: se pinta
+ * gris, ninguna opción marcada).
  *
  * El switch NO se resetea al mover el radio: queda donde estaba y vuelve a
- * aplicar cuando el radio vuelve a `only_error`. Resetearlo haría perder la
- * selección por mirar de reojo otra tarjeta.
+ * aplicar cuando el radio vuelve a `only_flagged`.
  */
 export function effectiveErrorStatus(selectedType: string, errorStatus: ErrorStatus): ErrorStatus {
   return errorStatusCrossesType(selectedType) ? errorStatus : DEFAULT_ERROR_STATUS
@@ -43,7 +42,7 @@ export function effectiveErrorStatus(selectedType: string, errorStatus: ErrorSta
  * y que la pantalla no explicaba.
  */
 export function errorStatusCrossesType(selectedType: string): boolean {
-  return selectedType === 'only_error'
+  return selectedType === 'only_flagged' || selectedType === 'only_error'
 }
 
 /**
@@ -52,6 +51,8 @@ export function errorStatusCrossesType(selectedType: string): boolean {
  * | selectedType | errorStatus | issueType   |
  * |--------------|-------------|-------------|
  * | all          | cualquiera  | all         |
+ * | only_flagged | pending     | only_flagged|
+ * | only_flagged | corrected   | only_fixed  |
  * | only_error   | pending     | only_error  |
  * | only_error   | corrected   | only_fixed  |
  * | otro         | cualquiera  | ese tipo    |

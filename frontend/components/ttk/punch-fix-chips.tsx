@@ -3,7 +3,7 @@
 import { CheckCheck, Trash2 } from 'lucide-react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { errorTypeLabel, type ErrorTypeCode } from '@/lib/ttk/error-type-meta'
+import { errorTypeLabel, type FlagTypeCode } from '@/lib/ttk/error-type-meta'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { formatUsDateTimeForExport } from '@/lib/format-us-datetime'
 import type { TtkListRowFix } from '@/lib/ttk/ttk-list-types'
@@ -31,7 +31,7 @@ export function PunchFixChips({ fixes }: { fixes?: TtkListRowFix[] }) {
           <TooltipTrigger asChild>
             <span className="inline-flex cursor-default items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
               <CheckCheck className="h-2.5 w-2.5" />
-              {errorTypeLabel(t, fix.errorType as ErrorTypeCode)}
+              {errorTypeLabel(t, fix.errorType as FlagTypeCode)}
             </span>
           </TooltipTrigger>
           <TooltipContent>

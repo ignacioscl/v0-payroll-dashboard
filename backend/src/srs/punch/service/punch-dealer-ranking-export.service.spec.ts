@@ -202,7 +202,7 @@ describe('PunchDealerRankingExportService', () => {
     expect(info).toContainEqual(['Período', '08/01/2026 hasta 09/30/2026'])
     expect(info).toContainEqual(['Sucursales', DEALER_NAME])
     expect(info).toContainEqual(['Estado', 'Corregidos'])
-    expect(info).toContainEqual(['Tipos de error', 'Todos'])
+    expect(info).toContainEqual(['Tipos de error', 'Sin salida, Sin descanso, Turno 20h+'])
     expect(info).toContainEqual(['Búsqueda', 'Todos'])
     expect(info[info.length - 1]).toEqual(['Aviso', notice])
 

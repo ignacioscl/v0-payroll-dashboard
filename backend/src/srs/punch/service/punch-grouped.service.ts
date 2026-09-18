@@ -33,7 +33,7 @@ export class GroupedPunchService {
     await assertPaymentTypesInCatalog(this.dataSource, ctx.idDealerProvider, idPaymentTypes)
     const filter = buildSrsKpiFilter(ctx, query)
     return this.repository.getGrouped(filter, {
-      errorTypes,
+      errorTypes: access.effectiveErrorTypes,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 25,
       sort: query.sort,

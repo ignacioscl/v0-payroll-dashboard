@@ -41,21 +41,19 @@ export function toPayrollScopeUser(
 }
 
 /**
- * Agrega `error_types` sólo cuando la lista es parcial.
+ * Agrega `error_types` siempre que hay al menos un tipo incluido.
  *
- * Va como helper explícito y NO adentro de `buildTtkScopeParams`: ese builder lo
- * comparten counts, dashboard summary y `useTtkTodayStatus()`, que no tiene nada
- * que ver con tipos de error — heredarlo le mandaría un parámetro ajeno y le
- * ensuciaría la cache key.
+ * Omitir el param sigue significando legacy {1,2,3}. El FE nuevo no puede
+ * omitir el default de 8: si no, el % no incluye sin-salario.
+ *
+ * Va como helper explícito y NO adentro de `buildTtkScopeParams`.
  */
 export function appendErrorTypesParam(
   params: Record<string, string | number>,
   includedErrorTypes?: readonly number[],
 ): void {
   if (!includedErrorTypes) return
-  // Lista completa => no se manda (compatibilidad). Lista vacía => tampoco: en ese
-  // caso el front directamente no pide filas, y un CSV vacío sería un 400.
-  if (includedErrorTypes.length === 0 || includedErrorTypes.length === 3) return
+  if (includedErrorTypes.length === 0) return
   params.error_types = includedErrorTypes.join(',')
 }
 

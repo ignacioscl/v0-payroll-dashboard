@@ -120,6 +120,35 @@ describe('PunchAccessPolicyService', () => {
     expect(partial.includeErrorType).toBe(true)
   })
 
+  it('errorTypes=1,2,3,4 sin permiso de pago recorta 4 y 7, no da 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), {
+      ...BASE_QUERY,
+      errorTypes: [1, 2, 3, 4, 7],
+    })
+    expect(access.effectiveErrorTypes).toEqual([1, 2, 3])
+  })
+
+  it('errorTypes=1,2,3,4,6 sin delete recorta 6; con pago deja 4', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65, 130]), srs as never)
+    const access = await svc.assertAndResolve(ctx(), {
+      ...BASE_QUERY,
+      errorTypes: [1, 2, 3, 4, 6],
+    })
+    expect(access.effectiveErrorTypes).toEqual([1, 2, 3, 4])
+    expect(access.includeDeletedFixes).toBe(false)
+  })
+
+  it('issueType=without_salary sin permiso sigue 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    await expect(
+      svc.assertAndResolve(ctx(), { ...BASE_QUERY, issueType: 'without_salary' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
   it('idPaymentTypes, without_salary o sort=paymentType sin permiso dan 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)

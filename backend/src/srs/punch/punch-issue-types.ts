@@ -4,6 +4,7 @@ export const PUNCH_ISSUE_TYPES = [
   'only_error_clockout',
   'only_error_break',
   'only_error_20h',
+  'only_flagged',
   'manual_punch',
   'only_deletes',
   'without_salary',

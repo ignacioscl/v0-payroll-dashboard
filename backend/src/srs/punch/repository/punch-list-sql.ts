@@ -2,7 +2,7 @@ import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { resolveGroupedIssueFilter } from './punch-grouped-issue-filter'
 import { buildPaymentTypeFilterSql } from './punch-payment-types'
-import { DEFAULT_ERROR_TYPES, errorTypesInList } from './punch-error-types'
+import { DEFAULT_ERROR_TYPES, fixLedgerInList } from './punch-error-types'
 import { PunchListLiveStatus, PunchListSort } from '../dto/punch-list.dto'
 import { coerceAfterValue, PUNCH_SORT_SPECS } from './punch-list-sort'
 
@@ -96,18 +96,19 @@ function dealerNameByProviderExpr(idDealerProvider: number): string {
  *
  * El predicado es el mismo canónico del `EXISTS` que selecciona las filas.
  */
-function correctedColumnsSql(types: string): string {
+function correctedColumnsSql(types: string | null): string {
+  const pred = types ? `AND fx.error_type IN (${types})` : 'AND 1=0'
   return `
   (SELECT GROUP_CONCAT(DISTINCT fx.error_type ORDER BY fx.error_type SEPARATOR ',')
      FROM TTK_PUNCH_ERROR_FIX fx
     WHERE fx.id_ttk_employee_work = tew.id
       AND fx.id_dealer_provider = tew.id_dealer_provider
-      AND fx.error_type IN (${types}))       AS corrected_types,
+      ${pred})       AS corrected_types,
   (SELECT DATE_FORMAT(MAX(fx.fixed_at), '%Y-%m-%d %H:%i:%s')
      FROM TTK_PUNCH_ERROR_FIX fx
     WHERE fx.id_ttk_employee_work = tew.id
       AND fx.id_dealer_provider = tew.id_dealer_provider
-      AND fx.error_type IN (${types}))       AS last_corrected_at,`
+      ${pred})       AS last_corrected_at,`
 }
 
 export function buildPunchListSelectFields(
@@ -123,7 +124,7 @@ export function buildPunchListSelectFields(
   // consulta por página, que además trae quién corrigió y la fecha del ponche.
   const correctedFields =
     opts.includeCorrectedColumns === true && opts.issueType === 'only_fixed'
-      ? correctedColumnsSql(errorTypesInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES))
+      ? correctedColumnsSql(fixLedgerInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES))
       : ''
   // V2 hace un SELECT interno por invocación: sólo se paga cuando hace falta.
   const errorTypeField =
@@ -166,6 +167,10 @@ export function buildPunchListSelectFields(
 
   TTK_PUNCH_WITH_ERROR(tew.id)             AS bad_punch,
   ${errorTypeField}
+  ext.punch_in_mock_gps                    AS punch_in_mock_gps,
+  ext.punch_out_mock_gps                   AS punch_out_mock_gps,
+  ext.break_start_mock_gps                 AS break_start_mock_gps,
+  ext.break_end_mock_gps                   AS break_end_mock_gps,
 
   tew.id_punch_in_log_validation           AS id_punch_in_log_validation,
   tew.id_break_start_log_validation        AS id_break_start_log_validation,
@@ -268,6 +273,7 @@ export function buildPunchListFromWhere(
       FROM TTK_EMPLOYEE_WORK tew
       ${ttk.join}
       INNER JOIN usuarios     u  ON u.id_usuario = tew.id_author
+      LEFT  JOIN TTK_EMPLOYEE_WORK_EXT ext ON ext.id_ttk = tew.id
       LEFT  JOIN usuarios     uf ON uf.id_usuario = tew.fixed_by
       LEFT  JOIN GENERIC_DATA gd ON gd.id = tew.id_payment_type
       WHERE ${estadoSql}tew.id_dealer_provider = ?

@@ -60,6 +60,7 @@ export function TodayLiveStatusFilterCards() {
             variant={card.variant}
             loading={loading}
             filterCard
+            inline
             active={selectedTodayLiveStatus === card.status}
             onClick={() => toggleLiveStatus(card.status)}
           />

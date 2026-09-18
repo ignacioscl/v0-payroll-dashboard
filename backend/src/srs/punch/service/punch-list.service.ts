@@ -38,7 +38,7 @@ export class PunchListService {
     await assertPaymentTypesInCatalog(this.dataSource, ctx.idDealerProvider, idPaymentTypes)
     const filter = buildSrsKpiFilter(ctx, query)
     return this.repository.getList(filter, {
-      errorTypes,
+      errorTypes: access.effectiveErrorTypes,
       includeErrorType: access.includeErrorType,
       includeDeletedFixes: access.includeDeletedFixes,
       pageSize: query.pageSize ?? 25,

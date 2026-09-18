@@ -7,7 +7,7 @@ import type { Writable } from 'stream'
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { PunchAccessPolicyService } from '../punch-access-policy'
+import { PunchAccessPolicyService, type PunchAccessPolicy } from '../punch-access-policy'
 import { PunchExportSemaphore } from '../punch-export-semaphore'
 import { PunchExportTicketStore, type PunchExportStoredFilters } from '../punch-export-ticket.store'
 import {
@@ -30,7 +30,7 @@ import { writePunchExportWorkbook, type PunchExportMetaRow } from '../punch-expo
 import { isPunchIssueType } from '../punch-issue-types'
 import { parsePaymentTypeIds } from '../repository/punch-payment-types'
 import { assertPaymentTypesInCatalog } from '../repository/punch-payment-type-catalog'
-import { isDefaultErrorTypes, parseErrorTypes } from '../repository/punch-error-types'
+import { isCompleteEffectiveList, parseErrorTypes } from '../repository/punch-error-types'
 import type { PunchListRowDto } from '../dto/punch-list.dto'
 
 function metaAll(labels: PunchExportLabels, value?: string | null): string {
@@ -133,7 +133,7 @@ export class PunchExportService {
         search: filters.search,
         idEmployee: filters.idEmployee,
         issueType: filters.issueType,
-        errorTypes,
+        errorTypes: access.effectiveErrorTypes,
         includeErrorType: access.includeErrorType,
         includeDeletedFixes: access.includeDeletedFixes,
         todayLiveStatus: filters.todayLiveStatus,
@@ -148,8 +148,7 @@ export class PunchExportService {
         ctx,
         filters,
         paymentTypeRows.map((r: { name: string }) => r.name),
-        access.canViewPaymentTypeName,
-        access.dealerIds,
+        access,
         locale,
         generatedBy,
         generatedAt,
@@ -215,25 +214,30 @@ export class PunchExportService {
      * ahi se filtraba el nombre de un tipo ajeno al Report Info (4.2.3ter).
      */
     paymentTypeNames: readonly string[],
-    canViewPaymentTypeName: boolean,
-    dealerIds: number[],
+    access: PunchAccessPolicy,
     locale: PunchExportLocale,
     generatedBy: string,
     generatedAt: Date,
   ): Promise<PunchExportMetaRow[]> {
     const labels = punchExportLabels(locale)
-    const dealerNames = await loadDealerNames(this.srs, ctx.idDealerProvider, dealerIds)
+    const dealerNames = await loadDealerNames(this.srs, ctx.idDealerProvider, access.dealerIds)
+    const canViewPaymentTypeName = access.canViewPaymentTypeName
 
     const issueType = (filters.issueType ?? 'all').trim() || 'all'
     const issueLabel = isPunchIssueType(issueType)
       ? labels.issueTypeLabels[issueType]
       : issueType
 
-    // Nombres visibles de los tipos incluidos; "All" cuando están los tres.
-    const includedErrorTypes = parseErrorTypes(filters.errorTypes).values
-    const errorTypesLabel = isDefaultErrorTypes(includedErrorTypes)
+    const includedErrorTypes = access.effectiveErrorTypes
+    const errorTypesLabel = isCompleteEffectiveList(includedErrorTypes, {
+      canViewPaymentType: access.canViewPaymentTypeName,
+      includeDeletedFixes: access.includeDeletedFixes,
+      isExternal: ctx.isUserDealer,
+    })
       ? labels.all
-      : includedErrorTypes.map((t) => labels.errorTypeNames[t as 1 | 2 | 3]).join(', ')
+      : includedErrorTypes
+          .map((t) => labels.errorTypeNames[t as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8] ?? String(t))
+          .join(', ')
 
     const liveLabel = filters.todayLiveStatus
       ? labels.liveStatusLabels[filters.todayLiveStatus] ?? filters.todayLiveStatus

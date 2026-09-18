@@ -54,6 +54,8 @@ describe('PunchAccessPolicyService.assertDashboardRanking', () => {
       dealerIds: [85],
       skipDealerRestriction: false,
       includeDeletedFixes: false,
+      canViewPaymentTypeName: false,
+      effectiveErrorTypes: [1, 2, 3],
     })
   })
 

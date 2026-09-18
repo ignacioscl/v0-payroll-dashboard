@@ -20,7 +20,7 @@ import {
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
 import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
-import { isErrorIssueType, punchErrorVisible } from '@/lib/ttk/error-type-meta'
+import { isErrorIssueType, punchErrorVisible, punchLacksPaymentType } from '@/lib/ttk/error-type-meta'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import {
   buildPunchListParams,
@@ -214,17 +214,6 @@ function roleLabel(row: TtkListRow): string {
   if (!row.rolDpto) return ''
   const parts = [row.rolDpto.role, row.rolDpto.department].filter(Boolean)
   return parts.join(' / ')
-}
-
-/**
- * Texto del ⚠, o null si esta fila no debe marcarse.
- *
- * Con lista parcial el backend manda `errorType` y la marca se apaga para el
- * tipo excluido: la ponchada sigue en el listado sin filtro, pero sin triángulo.
- */
-function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
-  if (!punchErrorVisible(row, includedErrorTypes)) return null
-  return row.badPunch?.res?.trim() || null
 }
 
 function formatTimeWorkBreak(
@@ -516,8 +505,16 @@ export function IssuesDataTable({
                   <span className="truncate font-medium">
                     {r.usuario?.nombre ?? '—'}
                   </span>
-                  {punchErrorLabel(r, includedErrorTypes) ? (
-                    <PunchErrorIndicator errorText={punchErrorLabel(r, includedErrorTypes)!} />
+                  {punchErrorVisible(r, includedErrorTypes) ? (
+                    <PunchErrorIndicator
+                      errorText={r.badPunch?.res?.trim() || ''}
+                      fakeGpsEvents={
+                        includedErrorTypes.includes(8) ? r.fakeGpsEvents : undefined
+                      }
+                      withoutSalary={
+                        includedErrorTypes.includes(4) && punchLacksPaymentType(r)
+                      }
+                    />
                   ) : null}
                   {Number(r.manualCreate) === 1 ? <PunchManualIndicator /> : null}
                   {r.fixedAt ? (

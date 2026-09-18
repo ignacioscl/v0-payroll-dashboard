@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { ERROR_TYPE_META } from '@/lib/ttk/error-type-meta'
+import { FLAG_TYPE_META, flagEnabledIn } from '@/lib/ttk/error-type-meta'
 import {
   DEALER_RANKING_BY_TYPE_KEY,
   type DealerRankingQueryParams,
@@ -176,17 +176,18 @@ export function DealersRankingDialog({
 
     // Una columna por tipo INCLUIDO: los excluidos con las tarjetas de tipo del
     // Dashboard no tienen columna, igual que no suman en la tarjeta.
-    for (const typeMeta of ERROR_TYPE_META) {
+    for (const typeMeta of FLAG_TYPE_META) {
       if (!includedErrorTypes.includes(typeMeta.code)) continue
+      if (!flagEnabledIn(typeMeta, isCorrected ? 'corrected' : 'pending')) continue
       const key = DEALER_RANKING_BY_TYPE_KEY[typeMeta.code]
       const label = t(typeMeta.chartLabelKey)
       list.push({
         id: key,
-        accessorFn: (row) => row.byType[key],
+        accessorFn: (row) => row.byType[key] ?? 0,
         size: headerFitSize(label),
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title={label} />,
-        cell: ({ row }) => countCell(row.original.byType[key]),
+        cell: ({ row }) => countCell(row.original.byType[key] ?? 0),
         meta: { label, numeric: true } satisfies DataTableColumnMeta<RankedDealerRow>,
       })
     }

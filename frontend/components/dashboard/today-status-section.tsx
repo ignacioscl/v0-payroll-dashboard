@@ -85,6 +85,7 @@ export function TodayStatusSection() {
             icon={CARD_ICONS[card.status]}
             variant={card.variant}
             loading={loading}
+            inline
             onClick={() => openPunchReport(card.status)}
           />
         ))}
