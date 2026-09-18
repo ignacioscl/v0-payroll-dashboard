@@ -21,6 +21,17 @@ function startOfIsoWeek(date: Date): Date {
   return weekStart
 }
 
+/** Inclusive last day of the ISO week of `weekStart`, capped at `rangeEnd`. */
+export function weekEndInclusive(weekStart: string, rangeEnd: string): string {
+  const start = parseDateOnly(weekStart)
+  const day = start.getUTCDay()
+  const daysUntilSunday = day === 0 ? 0 : 7 - day
+  const sunday = new Date(start)
+  sunday.setUTCDate(start.getUTCDate() + daysUntilSunday)
+  const sundayStr = formatDateOnly(sunday)
+  return sundayStr < rangeEnd ? sundayStr : rangeEnd
+}
+
 /** Lista ordenada de weekStart (YYYY-MM-DD) que cubren el rango, igual que el SQL. */
 export function enumerateWeekBuckets(fechaDesde: string, fechaHasta: string): string[] {
   const rangeStart = parseDateOnly(fechaDesde)

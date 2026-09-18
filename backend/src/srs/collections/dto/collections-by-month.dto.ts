@@ -23,9 +23,12 @@ export class CollectionsByMonthQueryDto extends SrsKpiQueryDto {
 
 export class CollectionsByMonthRowDto {
   @ApiProperty({ example: '2026-03-01' }) monthStart!: string
-  @ApiProperty({ example: 12 }) statementsIssued!: number
-  @ApiProperty({ example: 48500 }) invoicedValue!: number
-  @ApiProperty({ example: 9 }) collectedStatements!: number
-  @ApiProperty({ example: 39200 }) collectedValue!: number
+  @ApiProperty({ example: 25781 }) woInvoicedValue!: number
+  @ApiProperty({ example: 46739.76 }) ttkInvoicedValue!: number
+  @ApiProperty({ example: 625285.89 }) genericInvoicedValue!: number
+  @ApiProperty({ example: 50996 }) woUnbilledValue!: number
+  @ApiProperty({ example: 758802.65 }) producedValue!: number
+  @ApiProperty({ example: 697806.65 }) collectedValue!: number
+  @ApiProperty({ example: 10000 }) pendingCollectionValue!: number
   @ApiProperty({ example: 80.8 }) collectionRatePct!: number
 }

@@ -1268,6 +1268,7 @@ export const es: Messages = {
     neverSent: '{count} creados pero nunca enviados',
     invoicedOverProduction: 'facturado / valor de producción',
     tableUnbilledWos: 'OT sin facturar',
+    tableUnbilledServices: 'Servicios sin facturar',
     tableUnbilledValue: 'Valor sin facturar',
     tableOldestDays: 'Más antiguo (días)',
     outstandingAr: 'CxC pendiente',
@@ -1278,6 +1279,7 @@ export const es: Messages = {
     cashGap: 'Brecha de efectivo',
     openStatements: '{count} facturas abiertas',
     outstandingArSubtitle: 'Sin fecha · AR completo · {count} facturas abiertas',
+    outstandingArOutsideChart: '{count} facturas abiertas · fuera de los meses del gráfico: {amount}',
     unpaidInPeriod: 'Sin pago del período',
     unpaidInPeriodStatements: '{count} facturas sin pago en el período',
     dsoVsPrevCheck: '{value}d vs anterior — factura → cheque',
@@ -1321,9 +1323,6 @@ export const es: Messages = {
     chartProductionDollar: 'Producción $',
     chartInvoicedDollar: 'Facturado $',
     chartCollectedDollar: 'Cobrado $',
-    chartInvoicedVsCollectedByMonth: 'Facturado vs cobrado por mes',
-    chartStatementsIssued: 'facturas',
-    chartStatementsCollected: 'cobradas al 100%',
     chartOutstandingDollar: 'Pendiente $',
     chartValueDollar: 'Valor $',
     chartWos: 'OT',
@@ -1379,30 +1378,31 @@ export const es: Messages = {
     inspectionFail:
       'Porcentaje de inspecciones fallidas sobre todas las inspeccionadas en el período.',
     invoiced:
-      'Total facturado de facturas WO, TTK y genéricas cuyo período cae enteramente dentro de las fechas seleccionadas (inicio y fin dentro del rango). Incluye descuentos e impuestos de la factura. Solo entran facturas incluidas por completo — las que se superponen parcialmente quedan fuera.',
+      'Trabajo facturado en las fechas seleccionadas (servicios de OT por fecha de creación, ponchadas por fecha de punch, líneas libres genéricas por los días de su período), con descuento e impuesto de la factura. Las mismas líneas que WO / TTK / Generic Invoiced y que Open AR.',
     statements:
-      'Cantidad de facturas emitidas en el período. El subtítulo muestra el valor promedio por factura.',
+      'Cantidad de facturas que tienen al menos una línea facturada cuya fecha de trabajo cae en el rango seleccionado. El subtítulo es Facturado dividido por esa cantidad.',
     unbilled:
-      'Órdenes creadas en el rango de fechas seleccionado que están en estado terminado y aún no están totalmente facturadas. Filtra por fecha de creación (mismo criterio que el listado de billing para OT). El subtítulo muestra el valor pendiente de facturar.',
-    doneToInvoiced: 'Días promedio entre completar la orden de trabajo y facturarla.',
-    sent: 'Porcentaje de facturas enviadas al cliente. El subtítulo muestra cuántas nunca se enviaron.',
+      'Órdenes creadas en el rango de fechas seleccionado que están en estado terminado y aún no están totalmente facturadas. Filtra por fecha de creación (mismo criterio que el listado de billing para OT). El subtítulo muestra el total de esas OT y, aparte, cuántos servicios faltan facturar y por cuánto.',
+    doneToInvoiced:
+      'Días promedio entre completar la orden de trabajo y facturarla, para servicios WO cuya fecha de trabajo cae en el rango seleccionado.',
+    sent: 'Porcentaje de esas facturas (trabajo del período) enviadas al cliente. El subtítulo muestra cuántas de ellas nunca se enviaron.',
     partialOverlapWo:
-      'Facturas de órdenes de trabajo cuyo período se superpone con las fechas seleccionadas pero no entran en Facturado ni en Facturas emitidas porque empiezan antes o terminan después del rango (misma regla que el listado de billing).',
+      'Facturas de órdenes de trabajo con trabajo en las fechas seleccionadas cuyo período no está entero dentro del rango.',
     woInvoiced:
-      '¿Cuánto facturé por OT creadas en estas fechas? Suma los montos de servicios WO cuando la fecha de creación de la OT cae en el rango seleccionado (mismo criterio que el listado de billing para OT). No usa el período de la factura; por eso no coincide con Facturado.',
+      'Servicios de OT en facturas activas (tipos 1–4), netos de descuento, por fecha de creación de la OT. Un servicio en más de una factura activa cuenta una sola vez. El subtítulo separa facturas incluidas vs fuera.',
     ttkInvoiced:
-      '¿Cuánto facturé por ponchadas en estas fechas? Suma los montos de ponchadas en facturas TTK cuando la ponchada cae en el rango seleccionado. No usa el período de la factura; por eso no coincide con Facturado.',
+      'Ponchadas en facturas TTK o genéricas activas, netas de descuento, por fecha de punch. Las ponchadas facturadas en una genérica cuentan acá, no en Generic Invoiced.',
     genericInvoiced:
-      '¿Cuánto de lo genérico corresponde a estos días (aunque la factura sea más larga)? Si la factura cubre más días que el rango, solo cuenta la parte que cae dentro de tus fechas. No coincide con Facturado.',
+      'Líneas libres de facturas genéricas (no ponchadas), netas de descuento e impuesto, repartidas por los días del período. Los créditos (líneas negativas) siempre cuentan.',
     outstandingAr:
-      'Total facturado que aún no se ha cobrado en todas las facturas abiertas. Instantánea actual — no depende del rango de fechas del header. El subtítulo indica sin fecha y AR completo.',
+      'Monto neto sin cobrar de todas las líneas facturadas, de toda la historia. Las mismas líneas que Billing. El subtítulo es facturas abiertas y lo no cobrado fuera de los meses del gráfico. No depende del rango del header.',
     unpaidInPeriod:
-      'Saldo pendiente de facturas cuyo período cae enteramente dentro de las fechas seleccionadas (misma regla que Facturado).',
+      'Facturado menos cobrado del trabajo en las fechas seleccionadas. El subtítulo es cuántas facturas tienen al menos una línea del período sin cobrar.',
     dso: 'Días promedio desde la emisión de la factura hasta recibir el pago.',
     collected:
-      'Monto cobrado de esas facturas del período (facturado menos lo que sigue impago). No importa en qué fecha se recibió el pago.',
+      'Monto cobrado de esas mismas líneas facturadas del período. Una línea está cobrada si tiene su propio pago activo o su factura está paga entera. Un pago de trabajo de otro mes no cuenta acá.',
     collectionRate: 'Porcentaje del total facturado en el período que ya se cobró.',
-    arOver60: 'Porcentaje de cuentas por cobrar con más de 60 días de vencimiento.',
+    arOver60: 'Porcentaje del Outstanding AR cuya fecha de trabajo es de hace más de 60 días.',
     punchError:
       'Porcentaje de ponchadas con error (salida faltante, descanso incompleto o turno inusualmente largo). El subtítulo muestra el total de ponchadas.',
     missingOut:
@@ -1421,7 +1421,7 @@ export const es: Messages = {
       'Empleados activos con ponchadas en el período. El subtítulo muestra la tarifa horaria promedio.',
     revenuePerEmployee: 'Valor de producción dividido por empleados activos.',
     collectionsByMonth:
-      'Por cada mes se agrupan las facturas según su fecha desde (inicio del período de facturación). El cobrado es solo de esas mismas facturas — un pago recibido en enero sobre una factura de diciembre no entra en enero. Una factura puede cubrir un período que se extiende más allá del mes donde se contabiliza. La cantidad cobrada cuenta solo facturas pagadas al 100%; el monto incluye pagos parciales.',
+      'Cada mes es cuándo se hizo el trabajo: órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período. Lo facturado incluye descuento e impuesto de la factura. Cobrado es solo lo cobrado de esas mismas líneas (pago de la línea o factura paga entera). Sin facturar son servicios de OT terminadas que no están en ninguna factura activa, en bruto. Los cards de Billing y Open AR usan estas mismas líneas. El último mes se corta en la fecha hasta del encabezado.',
   },
   businessKpis: {
     filterDateDone: 'Filtrar por fecha de terminación',
@@ -1429,13 +1429,25 @@ export const es: Messages = {
     betaBadge: 'Beta',
     betaDisclaimer:
       'Estos KPIs están en versión beta. Los valores deben corroborarse con los reportes legacy de SRS antes de tomar decisiones.',
-    billingPeriodSummary: 'Facturado vs cobrado (mismas facturas del período)',
+    billingPeriodSummary: 'Facturado vs cobrado (trabajo del período)',
     collectionsSnapshotNote:
       'Snapshot de CxC abierta — no limitado al rango de fechas del encabezado.',
     collectionsHistoryMonths: 'Historial',
     collectionsHistoryMonthsOption: '{count} meses',
     collectionsByMonthNote:
-      'Agrupado por mes de inicio del período de facturación — el cobrado es solo de esas mismas facturas, no de pagos recibidos en el mes sobre facturas de otros meses.',
+      'El mes es cuándo se hizo el trabajo (órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período). Lo facturado incluye descuento e impuesto. Cobrado es solo lo cobrado de esas mismas líneas. Sin facturar va bruto. El último mes se corta en la fecha hasta del encabezado.',
+    producedVsCollectedByMonth: 'Producido vs cobrado por mes',
+    seriesWoInvoiced: 'WO facturadas',
+    seriesTtkInvoiced: 'TTK facturado',
+    seriesGenerics: 'Generics',
+    seriesWoUnbilled: 'WO terminadas sin facturar',
+    seriesCollected: 'Cobrado',
+    tooltipProduced: 'Producido',
+    tooltipPendingCollection: 'Pendiente de cobro',
+    tooltipNotInvoiced: 'Sin facturar',
+    tooltipPctCollected: '% cobrado',
+    unbilledWoTotal: 'Total WO: {amount}',
+    unbilledServices: '{count} servicios sin facturar: {amount}',
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

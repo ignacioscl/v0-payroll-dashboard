@@ -71,9 +71,10 @@ import {
   type CollectionsHistoryMonths,
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
+import { dollars, fmtDollars, shownPending, sumShown } from '@/lib/kpi-money'
 
 const fmtMoney = (n: number | undefined) =>
-  n === undefined ? '—' : `$${Math.round(n).toLocaleString()}`
+  n === undefined ? '—' : fmtDollars(n)
 const fmtMoneyK = (n: number | undefined) =>
   n === undefined ? '—' : n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`
 
@@ -87,17 +88,18 @@ function kpiMoneyProps(n: number | undefined): { value: string; valueFull?: stri
 
 function billingSplitSubtitle(
   b: BillingKpi | undefined,
+  total: number | undefined,
   inRange: number | undefined,
-  outside: number | undefined,
   t: TranslateFn,
 ): string {
-  if (!b || inRange === undefined) return ''
-  if (!outside || outside <= 0) {
-    return t('mockKpis.billingAllInRange', { inRange: fmtMoneyK(inRange) })
+  if (!b || total === undefined || inRange === undefined) return ''
+  const shownOut = dollars(total) - dollars(inRange)
+  if (shownOut === 0) {
+    return t('mockKpis.billingAllInRange', { inRange: fmtDollars(inRange) })
   }
   return t('mockKpis.billingInRangeOutside', {
-    inRange: fmtMoneyK(inRange),
-    outside: fmtMoneyK(outside),
+    inRange: fmtDollars(inRange),
+    outside: fmtDollars(shownOut),
   })
 }
 
@@ -238,6 +240,18 @@ export default function BusinessKpisPage() {
   const c = coll.data
   const k = punch.data
   const y = pay.data
+  const invoicedShown = b
+    ? sumShown(b.woInvoicedValue, b.ttkInvoicedValue, b.genericInvoicedValue)
+    : undefined
+  const collectedShown = pc ? dollars(pc.collectedValue) : undefined
+  const unpaidShown =
+    invoicedShown !== undefined && collectedShown !== undefined
+      ? invoicedShown - collectedShown
+      : undefined
+  const outstandingOutsideChart =
+    c && collByMonth.data
+      ? dollars(c.outstandingAr) - collByMonth.data.reduce((acc, point) => acc + shownPending(point), 0)
+      : undefined
 
   return (
     <div className="space-y-6">
@@ -363,9 +377,9 @@ export default function BusinessKpisPage() {
               <KPICard
                 compact
                 help={t('businessKpisHelp.invoiced')}
-                loading={periodColl.isLoading}
+                loading={bill.isLoading}
                 title={t('mockKpis.invoiced')}
-                {...kpiMoneyProps(pc?.invoicedValue)}
+                value={invoicedShown === undefined ? '—' : fmtDollars(invoicedShown)}
                 icon={<Receipt className="h-5 w-5" />}
                 variant="success"
                 subtitle={
@@ -379,7 +393,7 @@ export default function BusinessKpisPage() {
                 help={t('businessKpisHelp.collected')}
                 loading={periodColl.isLoading}
                 title={t('mockKpis.collected')}
-                {...kpiMoneyProps(pc?.collectedValue)}
+                value={pc ? fmtDollars(pc.collectedValue) : '—'}
                 icon={<DollarSign className="h-5 w-5" />}
                 variant="info"
                 subtitle={
@@ -391,9 +405,9 @@ export default function BusinessKpisPage() {
               <KPICard
                 compact
                 help={t('businessKpisHelp.unpaidInPeriod')}
-                loading={periodColl.isLoading}
+                loading={bill.isLoading || periodColl.isLoading}
                 title={t('mockKpis.unpaidInPeriod')}
-                {...kpiMoneyProps(pc?.unpaidInPeriodValue)}
+                value={unpaidShown === undefined ? '—' : fmtDollars(unpaidShown)}
                 icon={<Banknote className="h-5 w-5" />}
                 variant="danger"
                 subtitle={
@@ -409,12 +423,35 @@ export default function BusinessKpisPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KPICard compact help={t('businessKpisHelp.statements')} loading={bill.isLoading} title={t('mockKpis.statementsIssued')} value={b ? b.statementsIssued.toLocaleString() : '—'} icon={<Receipt className="h-5 w-5" />} variant="default" subtitle={b ? t('mockKpis.avgPerStatement', { amount: fmtMoney(b.avgInvoiceValue) }) : ''} />
-            <KPICard compact help={t('businessKpisHelp.unbilled')} loading={bill.isLoading} title={t('mockKpis.doneNotInvoiced')} value={b ? b.unbilledWos : '—'} icon={<Hourglass className="h-5 w-5" />} variant="danger" subtitle={b ? fmtMoney(b.unbilledValue) : ''} />
+            <KPICard
+              compact
+              help={t('businessKpisHelp.unbilled')}
+              loading={bill.isLoading}
+              title={t('mockKpis.doneNotInvoiced')}
+              value={b ? b.unbilledWos : '—'}
+              icon={<Hourglass className="h-5 w-5" />}
+              variant="danger"
+              subtitle={
+                b ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span>{t('businessKpis.unbilledWoTotal', { amount: fmtDollars(b.unbilledWoTotalValue) })}</span>
+                    <span>
+                      {t('businessKpis.unbilledServices', {
+                        count: b.unbilledServices,
+                        amount: fmtDollars(b.unbilledValue),
+                      })}
+                    </span>
+                  </div>
+                ) : (
+                  ''
+                )
+              }
+            />
             <KPICard compact help={t('businessKpisHelp.doneToInvoiced')} loading={bill.isLoading} title={t('mockKpis.woDoneToInvoiced')} value={b ? `${b.avgDoneToInvoicedDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="warning" />
             <KPICard compact help={t('businessKpisHelp.sent')} loading={bill.isLoading} title={t('mockKpis.statementsSent')} value={b ? `${b.sentPct}%` : '—'} icon={<Send className="h-5 w-5" />} variant="info" subtitle={b ? t('mockKpis.neverSent', { count: b.unsentStatements }) : ''} />
-            <KPICard compact help={t('businessKpisHelp.woInvoiced')} loading={bill.isLoading} title={t('mockKpis.woInvoiced')} {...kpiMoneyProps(b?.woInvoicedValue)} icon={<Wrench className="h-5 w-5" />} variant="success" subtitle={billingSplitSubtitle(b, b?.woInvoicedInRangeValue, b?.woInvoicedOutsideRangeValue, t)} />
-            <KPICard compact help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} {...kpiMoneyProps(b?.ttkInvoicedValue)} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedInRangeValue, b?.ttkInvoicedOutsideRangeValue, t)} />
-            <KPICard compact help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} {...kpiMoneyProps(b?.genericInvoicedValue)} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedInRangeValue, b?.genericInvoicedOutsideRangeValue, t)} />
+            <KPICard compact help={t('businessKpisHelp.woInvoiced')} loading={bill.isLoading} title={t('mockKpis.woInvoiced')} value={b ? fmtDollars(b.woInvoicedValue) : '—'} icon={<Wrench className="h-5 w-5" />} variant="success" subtitle={billingSplitSubtitle(b, b?.woInvoicedValue, b?.woInvoicedInRangeValue, t)} />
+            <KPICard compact help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} value={b ? fmtDollars(b.ttkInvoicedValue) : '—'} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedValue, b?.ttkInvoicedInRangeValue, t)} />
+            <KPICard compact help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} value={b ? fmtDollars(b.genericInvoicedValue) : '—'} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedValue, b?.genericInvoicedInRangeValue, t)} />
             <KPICard compact help={t('businessKpisHelp.partialOverlapWo')} loading={bill.isLoading} title={t('mockKpis.partialOverlapWoStatements')} value={b ? b.partialOverlapWoStatements.toLocaleString() : '—'} icon={<CalendarRange className="h-5 w-5" />} variant="default" />
           </div>
 
@@ -434,7 +471,7 @@ export default function BusinessKpisPage() {
           <KpiErrorBanner q={coll} />
           <p className="text-sm text-muted-foreground">{t('businessKpis.collectionsSnapshotNote')}</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard compact help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} {...kpiMoneyProps(c?.outstandingAr)} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements }) : ''} />
+            <KPICard compact help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} value={c ? fmtDollars(c.outstandingAr) : '—'} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? (outstandingOutsideChart === undefined ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements }) : t('mockKpis.outstandingArOutsideChart', { count: c.openStatements, amount: fmtDollars(outstandingOutsideChart) })) : ''} />
             <KPICard compact help={t('businessKpisHelp.dso')} loading={coll.isLoading} title={t('mockKpis.dsoDaysToCollect')} value={c ? `${c.dsoDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="danger" />
             <KPICard compact help={t('businessKpisHelp.arOver60')} loading={coll.isLoading} title={t('mockKpis.arOver60')} value={c ? `${c.arOver60Pct}%` : '—'} icon={<AlertTriangle className="h-5 w-5" />} variant="violet" />
           </div>

@@ -46,6 +46,8 @@ export interface BillingKpi {
   avgInvoiceValue: number
   unbilledWos: number
   unbilledValue: number
+  unbilledServices: number
+  unbilledWoTotalValue: number
   avgDoneToInvoicedDays: number
   sentPct: number
   unsentStatements: number
@@ -79,6 +81,7 @@ export interface UnbilledDealerRow {
   dealerId: number
   dealer: string
   wos: number
+  services: number
   value: number
   oldestDays: number
 }
@@ -102,10 +105,13 @@ export interface CollectionsKpi {
 
 export interface CollectionsByMonthPoint {
   monthStart: string
-  statementsIssued: number
-  invoicedValue: number
-  collectedStatements: number
+  woInvoicedValue: number
+  ttkInvoicedValue: number
+  genericInvoicedValue: number
+  woUnbilledValue: number
+  producedValue: number
   collectedValue: number
+  pendingCollectionValue: number
   collectionRatePct: number
 }
 

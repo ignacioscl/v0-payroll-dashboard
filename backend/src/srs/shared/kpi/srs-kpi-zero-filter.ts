@@ -31,6 +31,23 @@ export function genericLinePositiveSql(): string {
   return ' AND (IFNULL(isir.amount, 0) * IFNULL(CASE WHEN isir.id_employee_work IS NULL THEN isir.generic_qty ELSE 1 END, 1)) > 0'
 }
 
+/** Billed-line base: drop zeros only, never credits. */
+export function woServiceLineNonZeroSql(): string {
+  return ' AND (isr.price * IFNULL(isr.qty, 1)) <> 0'
+}
+
+export function ttkAmountNonZeroSql(): string {
+  return ' AND IFNULL(isir.amount, 0) <> 0'
+}
+
+export function genericLineNonZeroSql(): string {
+  return ' AND (IFNULL(isir.amount, 0) * IFNULL(isir.generic_qty, 1)) <> 0'
+}
+
+export function statementNetNonZeroSql(alias = 's'): string {
+  return ` AND ${statementTotalExpr(alias)} <> 0`
+}
+
 export function dailyReportPositiveSql(): string {
   return ' AND GET_SERVICES_TOTAL_BY_DAILY_REPORT(ldr.id) > 0'
 }

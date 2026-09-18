@@ -53,6 +53,18 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },
       {
+        accessorKey: 'services',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('mockKpis.tableUnbilledServices')} />
+        ),
+        cell: ({ row }) => row.original.services.toLocaleString(),
+        meta: {
+          label: t('mockKpis.tableUnbilledServices'),
+          numeric: true,
+          exportValue: (row) => row.services,
+        } satisfies DataTableColumnMeta<UnbilledDealerRow>,
+      },
+      {
         accessorKey: 'value',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('mockKpis.tableUnbilledValue')} />

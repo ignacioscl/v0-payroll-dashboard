@@ -1265,6 +1265,7 @@ export const en: Messages = {
     neverSent: '{count} created but never sent',
     invoicedOverProduction: 'invoiced / production value',
     tableUnbilledWos: 'Unbilled WOs',
+    tableUnbilledServices: 'Unbilled services',
     tableUnbilledValue: 'Unbilled Value',
     tableOldestDays: 'Oldest (days)',
     outstandingAr: 'Outstanding AR',
@@ -1275,6 +1276,7 @@ export const en: Messages = {
     cashGap: 'Cash Gap',
     openStatements: '{count} open invoices',
     outstandingArSubtitle: 'No date filter · Complete snapshot · {count} open invoices',
+    outstandingArOutsideChart: '{count} open invoices · outside chart months: {amount}',
     unpaidInPeriod: 'Unpaid in Period',
     unpaidInPeriodStatements: '{count} unpaid invoices in period',
     dsoVsPrevCheck: '{value}d vs prev — invoice → check',
@@ -1318,9 +1320,6 @@ export const en: Messages = {
     chartProductionDollar: 'Production $',
     chartInvoicedDollar: 'Invoiced $',
     chartCollectedDollar: 'Collected $',
-    chartInvoicedVsCollectedByMonth: 'Invoiced vs collected by month',
-    chartStatementsIssued: 'statements',
-    chartStatementsCollected: 'fully collected',
     chartOutstandingDollar: 'Outstanding $',
     chartValueDollar: 'Value $',
     chartWos: 'WOs',
@@ -1376,30 +1375,31 @@ export const en: Messages = {
     inspectionFail:
       'Share of inspections that failed among all inspected work orders in the period.',
     invoiced:
-      'Total billed from work-order, time-tracking, and generic invoices whose billing period falls entirely within the selected dates (start and end both inside the range). Includes invoice discounts and taxes. Only fully included invoices count — partially overlapping ones are excluded.',
+      'Work billed in the selected dates (work-order services by creation date, time punches by punch date, generic free lines by the days in their period), after invoice discount and tax. Same billed lines as WO / TTK / Generic Invoiced and as Open AR.',
     statements:
-      'Number of invoices issued in the period. Subtitle shows average value per invoice.',
+      'Number of invoices that have at least one billed line whose work date falls in the selected range. Subtitle is Invoiced divided by that count.',
     unbilled:
-      'Work orders created in the selected date range that are in Done status and not yet fully billed. Filters by creation date (same rule as the billing list for WOs). Subtitle shows the dollar value still unbilled.',
-    doneToInvoiced: 'Average days from work order completion to billing.',
-    sent: 'Share of invoices sent to the customer. Subtitle shows how many were never sent.',
+      'Work orders created in the selected date range that are in Done status and not yet fully billed. Filters by creation date (same rule as the billing list for WOs). The subtitle shows the total value of those work orders and, separately, how many services are still unbilled and for how much.',
+    doneToInvoiced:
+      'Average days from work order completion to billing, for WO services whose work date falls in the selected range.',
+    sent: 'Share of the invoices with work in the period that were sent to the customer. Subtitle shows how many of them were never sent.',
     partialOverlapWo:
-      'Work-order invoices whose billing period overlaps the selected dates but are excluded from Invoiced and Invoices Issued because the period starts before or ends after the range (same rule as the billing list).',
+      'Work-order invoices with work in the selected dates whose billing period is not fully inside the range.',
     woInvoiced:
-      'How much was billed from work orders created in these dates? Adds WO line amounts when the work order creation date falls in your selected range (same rule as the billing list for WOs). It does not use the invoice period, so it will not match Invoiced.',
+      'WO service lines on active invoices (types 1–4), net of discount, dated by work-order creation. A service on more than one active invoice counts once. Subtitle splits included invoices vs outside.',
     ttkInvoiced:
-      'How much was billed from time punches in these dates? Adds punch amounts on TTK invoices when the punch falls in your selected range. It does not use the invoice period, so it will not match Invoiced.',
+      'Time-punch lines on active TTK or generic invoices, net of discount, dated by punch-in. Punches billed on a generic invoice count here, not in Generic Invoiced.',
     genericInvoiced:
-      'How much generic billing applies to these days (even if the invoice spans longer)? If the invoice covers more days than your range, only the portion within your dates is counted. It will not match Invoiced.',
+      'Free lines of generic invoices (not punches), net of discount and tax, split across the days of the invoice period. Credits (negative lines) always count.',
     outstandingAr:
-      'Total billed amount not yet collected across all open invoices. Current snapshot — not limited to the date range in the header. Subtitle indicates no date filter and complete open AR.',
+      'Uncollected net amount of every billed line, all history. Same lines as Billing. Subtitle is open invoices and the uncollected amount outside the months shown on the chart. Not limited to the header date range.',
     unpaidInPeriod:
-      'Remaining balance on invoices whose billing period falls entirely within the selected dates (same rule as Invoiced).',
+      'Invoiced minus collected for work in the selected dates. Subtitle is how many invoices have at least one uncollected line in the period.',
     dso: 'Average days from issuing an invoice to receiving payment.',
     collected:
-      'Amount collected on those period invoices (invoiced minus still unpaid). When the payment was received does not matter.',
+      'Amount collected on those same billed lines of the period. A line is collected if it has its own active payment or its invoice was paid in full. Payments on work from other months do not count here.',
     collectionRate: 'Share of the period invoice total that has been collected.',
-    arOver60: 'Share of receivables overdue more than 60 days.',
+    arOver60: 'Share of Outstanding AR whose work date is more than 60 days ago.',
     punchError:
       'Share of time punches with errors (missing clock-out, incomplete break, or unusually long shift). Subtitle shows total punches.',
     missingOut:
@@ -1418,7 +1418,7 @@ export const en: Messages = {
       'Active employees with punches in the period. Subtitle shows average hourly rate.',
     revenuePerEmployee: 'Production value divided by active employees.',
     collectionsByMonth:
-      'Each month groups statements by their fecha desde (billing period start). Collected amounts apply only to those same statements — a payment received in January on a December statement does not count in January. A statement may cover a period that extends beyond the month it is counted in. The collected count includes only fully paid statements; the amount includes partial payments.',
+      'Each month is when the work was done: work orders by creation date, time punches by punch date, generics by the days in their period. Billed amounts include invoice discount and tax. Collected is only collections of those same lines (line payment or invoice paid in full). Unbilled is services on completed work orders not on any active invoice, at gross value. Billing and Open AR cards use these same lines. The last month stops at the header end date.',
   },
   businessKpis: {
     filterDateDone: 'Filter by completion date',
@@ -1426,13 +1426,25 @@ export const en: Messages = {
     betaBadge: 'Beta',
     betaDisclaimer:
       'These KPIs are in beta. Values should be verified against legacy SRS reports before making business decisions.',
-    billingPeriodSummary: 'Invoiced vs collected (same invoice cohort)',
+    billingPeriodSummary: 'Invoiced vs collected (work in the period)',
     collectionsSnapshotNote:
       'Open receivables snapshot — not limited to the header date range.',
     collectionsHistoryMonths: 'History',
     collectionsHistoryMonthsOption: '{count} months',
     collectionsByMonthNote:
-      'Grouped by invoice billing-period start month — collected reflects only those same invoices, not any payments received in the month on invoices from other months.',
+      'Month is when the work was done (work orders by creation date, time punches by punch date, generics by the days in the period). Billed amounts include invoice discount and tax. Collected is only collections of those same lines. Unbilled is gross. The last month stops at the header end date.',
+    producedVsCollectedByMonth: 'Produced vs collected by month',
+    seriesWoInvoiced: 'WO invoiced',
+    seriesTtkInvoiced: 'TTK invoiced',
+    seriesGenerics: 'Generics',
+    seriesWoUnbilled: 'Done WO not invoiced',
+    seriesCollected: 'Collected',
+    tooltipProduced: 'Produced',
+    tooltipPendingCollection: 'Pending collection',
+    tooltipNotInvoiced: 'Not invoiced',
+    tooltipPctCollected: '% collected',
+    unbilledWoTotal: 'WO total: {amount}',
+    unbilledServices: '{count} services not invoiced: {amount}',
   },
   mockPayrollReport: {
     title: 'Payroll Report',

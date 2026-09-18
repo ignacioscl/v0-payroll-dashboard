@@ -1268,6 +1268,7 @@ export interface Messages {
     neverSent: string
     invoicedOverProduction: string
     tableUnbilledWos: string
+    tableUnbilledServices: string
     tableUnbilledValue: string
     tableOldestDays: string
     outstandingAr: string
@@ -1278,6 +1279,7 @@ export interface Messages {
     cashGap: string
     openStatements: string
     outstandingArSubtitle: string
+    outstandingArOutsideChart: string
     unpaidInPeriod: string
     unpaidInPeriodStatements: string
     dsoVsPrevCheck: string
@@ -1321,9 +1323,6 @@ export interface Messages {
     chartProductionDollar: string
     chartInvoicedDollar: string
     chartCollectedDollar: string
-    chartInvoicedVsCollectedByMonth: string
-    chartStatementsIssued: string
-    chartStatementsCollected: string
     chartOutstandingDollar: string
     chartValueDollar: string
     chartWos: string
@@ -1411,6 +1410,18 @@ export interface Messages {
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string
     collectionsByMonthNote: string
+    producedVsCollectedByMonth: string
+    seriesWoInvoiced: string
+    seriesTtkInvoiced: string
+    seriesGenerics: string
+    seriesWoUnbilled: string
+    seriesCollected: string
+    tooltipProduced: string
+    tooltipPendingCollection: string
+    tooltipNotInvoiced: string
+    tooltipPctCollected: string
+    unbilledWoTotal: string
+    unbilledServices: string
   }
   mockPayrollReport: {
     title: string

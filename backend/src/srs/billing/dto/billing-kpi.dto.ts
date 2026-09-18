@@ -18,7 +18,11 @@ export class BillingKpiDto {
   @ApiProperty({ example: 312 }) statementsIssued!: number
   @ApiProperty({ example: 816 }) avgInvoiceValue!: number
   @ApiProperty({ example: 391 }) unbilledWos!: number
+  /** Unbilled service lines only (not the whole WO). */
   @ApiProperty({ example: 20460 }) unbilledValue!: number
+  @ApiProperty({ example: 7605 }) unbilledServices!: number
+  /** Gross value of the unbilled WOs including already-invoiced services. */
+  @ApiProperty({ example: 75343.5 }) unbilledWoTotalValue!: number
   @ApiProperty({ example: 4.6 }) avgDoneToInvoicedDays!: number
   @ApiProperty({ example: 93.6 }) sentPct!: number
   @ApiProperty({ example: 20 }) unsentStatements!: number
@@ -58,6 +62,7 @@ export class UnbilledDealerRowDto {
   @ApiProperty({ example: 42 }) dealerId!: number
   @ApiProperty({ example: 'Ford Hollywood' }) dealer!: string
   @ApiProperty({ example: 84 }) wos!: number
+  @ApiProperty({ example: 120 }) services!: number
   @ApiProperty({ example: 4690 }) value!: number
   @ApiProperty({ example: 38, description: 'Días desde el Done más antiguo sin facturar' })
   oldestDays!: number

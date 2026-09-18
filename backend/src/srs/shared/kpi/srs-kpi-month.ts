@@ -48,6 +48,18 @@ export function buildMonthWindow(fechaHasta: string, historyMonths: SrsKpiHistor
   }
 }
 
+/**
+ * Inclusive last day of the month of `monthStart`, capped at `rangeEnd`.
+ * UTC calendar arithmetic, same as the rest of this file.
+ */
+export function monthEndInclusive(monthStart: string, rangeEnd: string): string {
+  const start = parseDateOnly(monthStart)
+  const lastOfMonth = formatDateOnly(
+    new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)),
+  )
+  return lastOfMonth < rangeEnd ? lastOfMonth : rangeEnd
+}
+
 export function fillMonthlyGaps<T extends { monthStart: string }>(
   rows: T[],
   monthStarts: string[],
