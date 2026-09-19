@@ -90,18 +90,28 @@ describe('isCompleteEffectiveList', () => {
       isCompleteEffectiveList([1, 2, 3, 4, 5, 6, 7, 8], {
         canViewPaymentType: true,
         includeDeletedFixes: true,
+        canViewFakeGps: true,
       }),
     ).toBe(true)
     expect(
       isCompleteEffectiveList([1, 2, 3, 4], {
         canViewPaymentType: true,
         includeDeletedFixes: true,
+        canViewFakeGps: true,
       }),
     ).toBe(false)
     expect(
       isCompleteEffectiveList([1, 2, 3, 5, 8], {
         canViewPaymentType: false,
         includeDeletedFixes: false,
+        canViewFakeGps: true,
+      }),
+    ).toBe(true)
+    expect(
+      isCompleteEffectiveList([1, 2, 3, 4, 5, 6, 7], {
+        canViewPaymentType: true,
+        includeDeletedFixes: true,
+        canViewFakeGps: false,
       }),
     ).toBe(true)
   })
@@ -112,14 +122,43 @@ describe('effectiveErrorTypes', () => {
 
   it('saca 4 y 7 sin permiso de pago, 6 sin delete', () => {
     expect(
-      effectiveErrorTypes(all, { canViewPaymentType: false, includeDeletedFixes: false }),
+      effectiveErrorTypes(all, {
+        canViewPaymentType: false,
+        includeDeletedFixes: false,
+        canViewFakeGps: true,
+      }),
     ).toEqual([1, 2, 3, 5, 8])
     expect(
-      effectiveErrorTypes(all, { canViewPaymentType: true, includeDeletedFixes: false }),
+      effectiveErrorTypes(all, {
+        canViewPaymentType: true,
+        includeDeletedFixes: false,
+        canViewFakeGps: true,
+      }),
     ).toEqual([1, 2, 3, 4, 5, 7, 8])
     expect(
-      effectiveErrorTypes(all, { canViewPaymentType: true, includeDeletedFixes: true }),
+      effectiveErrorTypes(all, {
+        canViewPaymentType: true,
+        includeDeletedFixes: true,
+        canViewFakeGps: true,
+      }),
     ).toEqual(all)
+  })
+
+  it('saca 8 sin Time Tracking > View Fake GPS', () => {
+    expect(
+      effectiveErrorTypes(all, {
+        canViewPaymentType: true,
+        includeDeletedFixes: true,
+        canViewFakeGps: false,
+      }),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(
+      effectiveErrorTypes([8], {
+        canViewPaymentType: true,
+        includeDeletedFixes: true,
+        canViewFakeGps: false,
+      }),
+    ).toEqual([])
   })
 
   it('externo se queda en 1-3', () => {
@@ -127,6 +166,7 @@ describe('effectiveErrorTypes', () => {
       effectiveErrorTypes(all, {
         canViewPaymentType: true,
         includeDeletedFixes: true,
+        canViewFakeGps: true,
         isExternal: true,
       }),
     ).toEqual([1, 2, 3])

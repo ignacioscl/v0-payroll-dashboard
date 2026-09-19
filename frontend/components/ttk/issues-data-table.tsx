@@ -19,7 +19,7 @@ import {
 } from '@/components/shared/data-table'
 import { usePunchListInfinite } from '@/hooks/use-punch-list-infinite'
 import { useFilters } from '@/lib/filter-context'
-import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
 import { isErrorIssueType, punchErrorVisible, punchLacksPaymentType } from '@/lib/ttk/error-type-meta'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import {
@@ -289,6 +289,7 @@ export function IssuesDataTable({
     dateRange,
     filtersHydrated,
     includedErrorTypes: storedIncludedErrorTypes,
+    allowedFlagTypes,
     errorTypesReady,
   } = useFilters()
 
@@ -309,7 +310,7 @@ export function IssuesDataTable({
   const isCorrectedMode = effectiveErrorStatus(effectiveSelectedType, errorStatus) === 'corrected'
   const includedErrorTypes = isErrorIssueType(crossedIssueType)
     ? storedIncludedErrorTypes
-    : ALL_ERROR_TYPES
+    : allowedFlagTypes
   const emptyByErrorTypes = includedErrorTypes.length === 0
 
   const [pageSize, setPageSize] = React.useState(defaultPageSize)

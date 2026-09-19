@@ -7,11 +7,13 @@ import {
   writeSelectedDealersCookie,
 } from '@/lib/filters/dealer-selection-cookie'
 import {
+  ALL_FLAG_TYPES,
   includedErrorTypesFrom,
   readExcludedErrorTypesCookie,
   writeExcludedErrorTypesCookie,
 } from '@/lib/filters/error-types-cookie'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canViewFakeGps } from '@/lib/auth/ttk-permissions'
 import { getDefaultDateRange, isTodayOnlyDateRange } from '@/lib/filters/date-range-presets'
 import {
   TODAY_LIVE_STATUS_ALL,
@@ -57,7 +59,9 @@ interface FilterContextType {
    * Para un usuario externo esto vale siempre `[]`.
    */
   excludedErrorTypes: number[]
-  /** Derivado, nunca persistido: `{1..8} − excluidos`. */
+  /** Tipos que este usuario puede ver: `{1..8}` sin Fake GPS (8) si no tiene su permiso. */
+  allowedFlagTypes: readonly number[]
+  /** Derivado, nunca persistido: `allowedFlagTypes − excluidos`. */
   includedErrorTypes: number[]
   toggleErrorType: (type: number) => void
   /** Vuelve a incluir todos. Lo usa el "Clear all" del panel de filtros. */
@@ -87,8 +91,15 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined)
 const EMPTY_EXCLUDED: number[] = []
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const { user, loading: meLoading } = useSrsMe()
+  const { user, hasPermission, loading: meLoading } = useSrsMe()
   const isExternal = Boolean(user?.isCompanyTypeCompany)
+  // Sin el permiso, Fake GPS (8) no existe para este usuario: ni tarjeta, ni ⚠, ni
+  // columna del ranking. Se resuelve acá para que ninguna pantalla lo pida.
+  const canSeeFakeGps = canViewFakeGps(hasPermission, user?.isSystemAdmin)
+  const allowedFlagTypes = useMemo(
+    () => (canSeeFakeGps ? ALL_FLAG_TYPES : ALL_FLAG_TYPES.filter((t) => t !== 8)),
+    [canSeeFakeGps],
+  )
   // Mientras no se sepa quién es, ninguna query afectada por la exclusión arranca:
   // un effect corre DESPUÉS del render, así que sin este gate pasaría un pedido
   // con la exclusión puesta antes de poder limpiarla.
@@ -150,8 +161,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   // Mismo patrón que la línea de arriba, por el mismo motivo.
   const errorStatus: ErrorStatus = isExternal ? DEFAULT_ERROR_STATUS : errorStatusState
   const includedErrorTypes = useMemo(
-    () => includedErrorTypesFrom(excludedErrorTypes),
-    [excludedErrorTypes],
+    () => includedErrorTypesFrom(excludedErrorTypes, allowedFlagTypes),
+    [excludedErrorTypes, allowedFlagTypes],
   )
 
   // El updater es PURO: la cookie se escribe en un effect. Con el write adentro,
@@ -226,6 +237,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       errorStatus,
       setErrorStatus,
       excludedErrorTypes,
+      allowedFlagTypes,
       includedErrorTypes,
       toggleErrorType,
       resetErrorTypes,

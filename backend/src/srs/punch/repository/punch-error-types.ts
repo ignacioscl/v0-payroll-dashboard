@@ -54,24 +54,28 @@ export function isFlagType(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 8
 }
 
+export type ErrorTypesPermissionOpts = {
+  canViewPaymentType: boolean
+  includeDeletedFixes: boolean
+  canViewFakeGps: boolean
+  isExternal?: boolean
+}
+
 /**
  * Recorte por permiso, ANTES de filtrar / agregar / exportar.
  *
- * 6 sale sin Delete. 4 y 7 salen sin permiso de ver tipo de pago.
- * Externos: sólo 1-3 (sin fila de tipos).
+ * 6 sale sin Delete. 4 y 7 salen sin permiso de ver tipo de pago. 8 sale sin
+ * Time Tracking > View Fake GPS. Externos: sólo 1-3 (sin fila de tipos).
  */
 export function effectiveErrorTypes(
   values: readonly number[],
-  opts: {
-    canViewPaymentType: boolean
-    includeDeletedFixes: boolean
-    isExternal?: boolean
-  },
+  opts: ErrorTypesPermissionOpts,
 ): number[] {
   return values.filter((code) => {
     if (opts.isExternal && (code < 1 || code > 3)) return false
     if (code === 6 && !opts.includeDeletedFixes) return false
     if ((code === 4 || code === 7) && !opts.canViewPaymentType) return false
+    if (code === 8 && !opts.canViewFakeGps) return false
     return isFlagType(code)
   })
 }
@@ -164,11 +168,7 @@ export function typesForMode(
  */
 export function isCompleteEffectiveList(
   effective: readonly number[],
-  opts: {
-    canViewPaymentType: boolean
-    includeDeletedFixes: boolean
-    isExternal?: boolean
-  },
+  opts: ErrorTypesPermissionOpts,
 ): boolean {
   const allowed = effectiveErrorTypes(ALL_FLAG_TYPES, opts)
   if (effective.length !== allowed.length) return false

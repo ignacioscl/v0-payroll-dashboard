@@ -32,6 +32,9 @@ export const ROL_ACCION_VIEW_PAYMENT_TYPE = 130
 /** Edit payment type without viewing amounts (legacy 136). */
 export const ROL_ACCION_EDIT_PAYMENT_TYPE_ALT = 136
 
+/** Time Tracking > View Fake GPS (migration 004). Sin él, Fake GPS (flag 8) no se ve. */
+export const ROL_ACCION_VIEW_FAKE_GPS = 146
+
 /**
  * Port parcial de `PayrollPermissionService::userHasRolAccion` /
  * `getPermissionIds` → `loadAssignedRolAccionesForRole` → `RolDao::loadRolAccion`

@@ -228,6 +228,7 @@ function buildReportMeta(
   const errorTypesLabel = isCompleteEffectiveList(errorTypes, {
     canViewPaymentType: access.canViewPaymentTypeName,
     includeDeletedFixes: access.includeDeletedFixes,
+    canViewFakeGps: access.canViewFakeGps,
   })
     ? labels.all
     : errorTypes

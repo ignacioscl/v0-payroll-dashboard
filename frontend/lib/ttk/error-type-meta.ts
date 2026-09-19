@@ -38,8 +38,8 @@ export type FlagTypeMeta = {
   chartLabelKey: string
   color: string
   variant: KpiVariant
-  /** Permiso extra: `payment` (4,7) o `delete` (6). */
-  requires?: 'payment' | 'delete'
+  /** Permiso extra: `payment` (4,7), `delete` (6) o `fake_gps` (8). */
+  requires?: 'payment' | 'delete' | 'fake_gps'
 }
 
 export type ErrorTypeMeta = FlagTypeMeta
@@ -177,6 +177,7 @@ export const FLAG_TYPE_META: readonly FlagTypeMeta[] = [
     chartLabelKey: 'dashboard.fakeGpsChart',
     color: '#f97316',
     variant: 'warning',
+    requires: 'fake_gps',
   },
 ]
 
@@ -198,10 +199,12 @@ export function errorTypeLabel(t: TranslateFn, code: FlagTypeCode): string {
 export function visibleFlagTypes(opts: {
   canViewPaymentType: boolean
   canViewDeleted: boolean
+  canViewFakeGps: boolean
 }): FlagTypeMeta[] {
   return FLAG_TYPE_META.filter((meta) => {
     if (meta.requires === 'payment' && !opts.canViewPaymentType) return false
     if (meta.requires === 'delete' && !opts.canViewDeleted) return false
+    if (meta.requires === 'fake_gps' && !opts.canViewFakeGps) return false
     return true
   })
 }

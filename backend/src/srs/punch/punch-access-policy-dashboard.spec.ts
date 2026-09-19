@@ -55,6 +55,7 @@ describe('PunchAccessPolicyService.assertDashboardRanking', () => {
       skipDealerRestriction: false,
       includeDeletedFixes: false,
       canViewPaymentTypeName: false,
+      canViewFakeGps: false,
       effectiveErrorTypes: [1, 2, 3],
     })
   })
@@ -109,6 +110,19 @@ describe('PunchAccessPolicyService.assertDashboardRanking', () => {
 
     const sin68 = new PunchAccessPolicyService(mockPerms([65]), mockSrs(1, 1) as never)
     expect((await sin68.assertDashboardRanking(ctx(), '85')).includeDeletedFixes).toBe(false)
+  })
+
+  it('Fake GPS (8) en el ranking sólo con Time Tracking > View Fake GPS (146)', async () => {
+    const all = [1, 2, 3, 4, 5, 6, 7, 8]
+    const con146 = new PunchAccessPolicyService(mockPerms([146]), mockSrs(1, 1) as never)
+    const accessCon = await con146.assertDashboardRanking(ctx(), '85', all)
+    expect(accessCon.canViewFakeGps).toBe(true)
+    expect(accessCon.effectiveErrorTypes).toContain(8)
+
+    const sin146 = new PunchAccessPolicyService(mockPerms([68, 130]), mockSrs(1, 1) as never)
+    const accessSin = await sin146.assertDashboardRanking(ctx(), '85', all)
+    expect(accessSin.canViewFakeGps).toBe(false)
+    expect(accessSin.effectiveErrorTypes).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
   it('assertDealersRelatedToProvider con la lista vacía da 403 sin consultar', async () => {

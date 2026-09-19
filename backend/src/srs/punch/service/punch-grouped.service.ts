@@ -32,7 +32,7 @@ export class GroupedPunchService {
     // del catalogo de ESTE provider, no cualquier entero (4.2.3ter).
     await assertPaymentTypesInCatalog(this.dataSource, ctx.idDealerProvider, idPaymentTypes)
     const filter = buildSrsKpiFilter(ctx, query)
-    return this.repository.getGrouped(filter, {
+    const response = await this.repository.getGrouped(filter, {
       errorTypes: access.effectiveErrorTypes,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 25,
@@ -49,5 +49,10 @@ export class GroupedPunchService {
       includeDeletedFixes: access.includeDeletedFixes,
       includePaymentTypeName: access.canViewPaymentTypeName,
     })
+    // Sin Time Tracking > View Fake GPS la fila no lleva ni el dato (el ⚠ lo leería).
+    if (!access.canViewFakeGps) {
+      for (const row of response.results) delete row.fakeGpsEvents
+    }
+    return response
   }
 }

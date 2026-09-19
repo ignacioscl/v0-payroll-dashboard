@@ -141,6 +141,27 @@ describe('PunchAccessPolicyService', () => {
     expect(access.includeDeletedFixes).toBe(false)
   })
 
+  it('Fake GPS (8) sale de la lista sin Time Tracking > View Fake GPS (146), no da 403', async () => {
+    const srs = mockSrs(async () => [{ n: 1 }])
+    const sin146 = new PunchAccessPolicyService(mockPerms([65]), srs as never)
+    const accessSin = await sin146.assertAndResolve(ctx(), {
+      ...BASE_QUERY,
+      issueType: 'only_flagged',
+      errorTypes: [1, 2, 3, 8],
+    })
+    expect(accessSin.canViewFakeGps).toBe(false)
+    expect(accessSin.effectiveErrorTypes).toEqual([1, 2, 3])
+
+    const con146 = new PunchAccessPolicyService(mockPerms([65, 146]), srs as never)
+    const accessCon = await con146.assertAndResolve(ctx(), {
+      ...BASE_QUERY,
+      issueType: 'only_flagged',
+      errorTypes: [1, 2, 3, 8],
+    })
+    expect(accessCon.canViewFakeGps).toBe(true)
+    expect(accessCon.effectiveErrorTypes).toEqual([1, 2, 3, 8])
+  })
+
   it('issueType=without_salary sin permiso sigue 403', async () => {
     const srs = mockSrs(async () => [{ n: 1 }])
     const svc = new PunchAccessPolicyService(mockPerms([65]), srs as never)

@@ -11,7 +11,7 @@ import {
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { useFilters } from '@/lib/filter-context'
-import { ALL_ERROR_TYPES, errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
+import { errorTypesQueryKey } from '@/lib/filters/error-types-cookie'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { fetchPunchGrouped } from '@/lib/srs-kpis-api'
 import { buildPunchGroupedParams } from '@/lib/ttk/punch-grouped-filters'
@@ -40,7 +40,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { canDeletePunch, canViewFakeGps, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { effectiveErrorStatus, resolveIssueType } from '@/lib/ttk/error-status'
 import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
@@ -180,6 +180,7 @@ export function GroupedIssuesDataTable({
     dateRange,
     filtersHydrated,
     includedErrorTypes: storedIncludedErrorTypes,
+    allowedFlagTypes,
     errorTypesReady,
   } = useFilters()
 
@@ -201,12 +202,13 @@ export function GroupedIssuesDataTable({
   // de error; con `all` la tabla trae todo y las tarjetas están inactivas.
   const includedErrorTypes = isErrorIssueType(crossedIssueType)
     ? storedIncludedErrorTypes
-    : ALL_ERROR_TYPES
+    : allowedFlagTypes
   const emptyByErrorTypes = includedErrorTypes.length === 0
 
   const { user, hasPermission } = useSrsMe()
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
+  const canViewFakeGpsCard = canViewFakeGps(hasPermission, user?.isSystemAdmin)
 
   // Catálogos para los nombres VISIBLES del Report Info. Los dos hooks tienen
   // query key fija, así que reusan lo que ya bajó el header: no piden de nuevo.
@@ -456,6 +458,7 @@ export function GroupedIssuesDataTable({
         const visibleCodes: number[] = visibleFlagTypes({
           canViewPaymentType: canViewPayment,
           canViewDeleted,
+          canViewFakeGps: canViewFakeGpsCard,
         }).map((meta) => meta.code)
         const named = includedErrorTypes.filter((code) => visibleCodes.includes(code))
         return named.length === visibleCodes.length
@@ -490,6 +493,7 @@ export function GroupedIssuesDataTable({
     maxHoursTotal,
     canViewPayment,
     canViewDeleted,
+    canViewFakeGpsCard,
     selectedTodayLiveStatus,
   ])
 

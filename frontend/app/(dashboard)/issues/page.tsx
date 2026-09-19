@@ -12,7 +12,7 @@ import { PageHeading } from '@/components/layout/page-heading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { canDeletePunch, canViewFakeGps, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { usePaymentTypesCatalog } from '@/hooks/use-payment-types-catalog'
 import {
   PAYMENT_TYPE_FILTER_ALL,
@@ -26,7 +26,6 @@ import {
   LayoutList,
   Users,
 } from 'lucide-react'
-import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
 import { visibleFlagTypes } from '@/lib/ttk/error-type-meta'
 import { FlagTypeCards } from '@/components/ttk/flag-type-cards'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -60,6 +59,7 @@ function IssuesPageContent() {
     setSelectedTodayLiveStatus,
     filtersHydrated,
     includedErrorTypes,
+    allowedFlagTypes,
     toggleErrorType,
     errorTypesReady,
   } = useFilters()
@@ -67,10 +67,16 @@ function IssuesPageContent() {
   const { user, hasPermission, loading: meLoading } = useSrsMe()
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+  const canViewFakeGpsCard = canViewFakeGps(hasPermission, user?.isSystemAdmin)
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const visibleTypes = useMemo(
-    () => visibleFlagTypes({ canViewPaymentType: canViewPayment, canViewDeleted }),
-    [canViewPayment, canViewDeleted],
+    () =>
+      visibleFlagTypes({
+        canViewPaymentType: canViewPayment,
+        canViewDeleted,
+        canViewFakeGps: canViewFakeGpsCard,
+      }),
+    [canViewPayment, canViewDeleted, canViewFakeGpsCard],
   )
 
   const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
@@ -116,7 +122,7 @@ function IssuesPageContent() {
   const activeErrorStatus = effectiveErrorStatus(selectedType, errorStatus)
   const isCorrectedMode = activeErrorStatus === 'corrected'
   const errorTypesActive = selectedType === 'only_flagged' || selectedType === 'only_error'
-  const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : ALL_ERROR_TYPES
+  const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : allowedFlagTypes
 
   const { counts, loading } = useTtkIssueCounts({
     search,

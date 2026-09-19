@@ -232,6 +232,7 @@ export class PunchExportService {
     const errorTypesLabel = isCompleteEffectiveList(includedErrorTypes, {
       canViewPaymentType: access.canViewPaymentTypeName,
       includeDeletedFixes: access.includeDeletedFixes,
+      canViewFakeGps: access.canViewFakeGps,
       isExternal: ctx.isUserDealer,
     })
       ? labels.all

@@ -46,7 +46,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTtkDashboardSummary } from '@/hooks/use-ttk-dashboard-summary'
 import { useTtkDealerRanking } from '@/hooks/use-ttk-dealer-ranking'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAccessDailyPunch, canDeletePunch, canViewPaymentType } from '@/lib/auth/ttk-permissions'
+import { canAccessDailyPunch, canDeletePunch, canViewFakeGps, canViewPaymentType } from '@/lib/auth/ttk-permissions'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { rangeStartsBeforeCorrectionsLog, type ErrorStatus } from '@/lib/ttk/error-status'
 import { EMPTY_DEALER_RANKING_ROWS } from '@/lib/ttk/dealer-ranking-types'
@@ -226,9 +226,15 @@ export default function DashboardPage() {
   const { user, hasPermission } = useSrsMe()
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
+  const canViewFakeGpsCard = canViewFakeGps(hasPermission, user?.isSystemAdmin)
   const visibleTypes = useMemo(
-    () => visibleFlagTypes({ canViewPaymentType: canViewPayment, canViewDeleted }),
-    [canViewPayment, canViewDeleted],
+    () =>
+      visibleFlagTypes({
+        canViewPaymentType: canViewPayment,
+        canViewDeleted,
+        canViewFakeGps: canViewFakeGpsCard,
+      }),
+    [canViewPayment, canViewDeleted, canViewFakeGpsCard],
   )
   const canAccessPunchReport = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
   const [rankingOpen, setRankingOpen] = useState(false)

@@ -9,6 +9,7 @@ import {
   ROL_ACCION_EDIT_PAYMENT_TYPE,
   ROL_ACCION_EDIT_PAYMENT_TYPE_ALT,
   ROL_ACCION_TTK_ADMIN_HOURS,
+  ROL_ACCION_VIEW_FAKE_GPS,
   ROL_ACCION_VIEW_PAYMENT_TYPE,
   SrsPermissionRepository,
 } from '../auth/srs-permission.repository'
@@ -47,8 +48,14 @@ export type PunchAccessPolicy = {
    */
   includeDeletedFixes: boolean
   /**
+   * Time Tracking > View Fake GPS (o Admin General / Admin Company). Sin él, Fake
+   * GPS no se ve en ningún lado: sale de la lista blanca y de `fakeGpsEvents`.
+   */
+  canViewFakeGps: boolean
+  /**
    * Lista blanca YA recortada por permiso (T.0.6). Es la que entra a filtros,
-   * agregados, ranking y export. 4/7 salen sin pago; 6 sale sin delete.
+   * agregados, ranking y export. 4/7 salen sin pago; 6 sale sin delete; 8 sale
+   * sin Fake GPS.
    */
   effectiveErrorTypes: readonly number[]
 }
@@ -116,9 +123,12 @@ export class PunchAccessPolicyService {
       await this.assertEmployeeInScope(ctx, query.idEmployee, dealerIds, skipDealerRestriction)
     }
 
+    const canViewFakeGps = await this.resolveFakeGpsVisibility(ctx)
+
     const resolvedTypes = effectiveErrorTypes(errorTypes, {
       canViewPaymentType: canViewPaymentTypeName,
       includeDeletedFixes,
+      canViewFakeGps,
       isExternal: ctx.isUserDealer,
     })
 
@@ -129,8 +139,14 @@ export class PunchAccessPolicyService {
       skipDealerRestriction,
       includeErrorType,
       includeDeletedFixes,
+      canViewFakeGps,
       effectiveErrorTypes: resolvedTypes,
     }
+  }
+
+  /** Admin General / Admin Company pasan solos (`userHasRolAccion`, roles 1 y 2). */
+  async resolveFakeGpsVisibility(ctx: SrsContext): Promise<boolean> {
+    return this.permissions.userHasRolAccion(ctx, ROL_ACCION_VIEW_FAKE_GPS)
   }
 
   /**
@@ -168,6 +184,7 @@ export class PunchAccessPolicyService {
       | 'includeDeletedFixes'
       | 'effectiveErrorTypes'
       | 'canViewPaymentTypeName'
+      | 'canViewFakeGps'
     >
   > {
     // Externos afuera: Punch Report ya les prohíbe mirar por errores, y el ranking
@@ -190,9 +207,12 @@ export class PunchAccessPolicyService {
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE)) ||
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE_ALT))
 
+    const canViewFakeGps = await this.resolveFakeGpsVisibility(ctx)
+
     const resolvedTypes = effectiveErrorTypes(errorTypes, {
       canViewPaymentType: canViewPaymentTypeName,
       includeDeletedFixes,
+      canViewFakeGps,
       isExternal: false,
     })
 
@@ -201,6 +221,7 @@ export class PunchAccessPolicyService {
       skipDealerRestriction,
       includeDeletedFixes,
       canViewPaymentTypeName,
+      canViewFakeGps,
       effectiveErrorTypes: resolvedTypes,
     }
   }
