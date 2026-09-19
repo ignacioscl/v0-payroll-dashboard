@@ -1429,6 +1429,7 @@ export interface Messages {
     betaBadge: string
     betaDisclaimer: string
     billingPeriodSummary: string
+    incomeTitle: string
     collectionsSnapshotNote: string
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string

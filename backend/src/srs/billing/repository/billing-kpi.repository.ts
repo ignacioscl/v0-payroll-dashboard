@@ -254,9 +254,9 @@ export class BillingKpiRepository {
   async getPeriodCollectionKpis(filter: SrsKpiFilter): Promise<BillingPeriodCollectionKpiDto> {
     const { includeZero } = filter
     const { wo, ttk, gen } = this.billedBase(filter)
-    const woMoney = woBilledLinesSql(wo)
-    const ttkMoney = ttkBilledLinesSql(ttk)
-    const genMoney = genericBilledLinesSql(gen)
+    const woMoney = woBilledLinesSql({ ...wo, withPeriodSplit: true })
+    const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true })
+    const genMoney = genericBilledLinesSql({ ...gen, withPeriodSplit: true })
     const woIds = woBilledLinesSql({ ...wo, idsOnly: true })
     const ttkIds = ttkBilledLinesSql({ ...ttk, idsOnly: true })
     const genIds = genericBilledLinesSql({ ...gen, idsOnly: true })
@@ -282,8 +282,18 @@ export class BillingKpiRepository {
     )
     const unpaidInPeriodValue = roundMoney(invoicedValue - collectedValue)
     const statementsIssued = Number(issued[0]?.statementsIssued ?? 0)
+    // Misma base que las cards de Income: solo invoices cuyo período cae entero en el rango.
+    const invoicedInRangeValue = roundMoney(
+      money(woRows[0]?.invoicedInRange) + money(ttkRows[0]?.invoicedInRange) + money(genRows[0]?.invoicedInRange),
+    )
+    const collectedInRangeValue = roundMoney(
+      money(woRows[0]?.collectedInRange) + money(ttkRows[0]?.collectedInRange) + money(genRows[0]?.collectedInRange),
+    )
 
     return {
+      invoicedInRangeValue,
+      collectedInRangeValue,
+      collectionRateInRangePct: collectionRatePct(collectedInRangeValue, invoicedInRangeValue),
       invoicedValue,
       statementsIssued,
       avgInvoiceValue: statementsIssued > 0 ? Math.round(invoicedValue / statementsIssued) : 0,

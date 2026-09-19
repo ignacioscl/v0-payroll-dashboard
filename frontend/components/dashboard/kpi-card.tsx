@@ -190,7 +190,7 @@ export function KPICard({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'text-[22px] font-extrabold leading-none tracking-tight tabular-nums',
+        'text-lg font-extrabold leading-none tracking-tight tabular-nums sm:text-[22px]',
         excluded && !inactive ? 'text-muted-foreground line-through' : 'text-foreground',
       )}
     >
@@ -204,7 +204,7 @@ export function KPICard({
     <div className="relative flex items-center gap-2.5">
       <div
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] [&_svg]:h-4 [&_svg]:w-4',
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] [&_svg]:h-3.5 [&_svg]:w-3.5 sm:h-8 sm:w-8 sm:rounded-[10px] sm:[&_svg]:h-4 sm:[&_svg]:w-4',
           config.iconBg,
           config.iconShadow,
           config.iconColor,
@@ -215,7 +215,7 @@ export function KPICard({
       <div className="min-w-6 shrink-0">{valueNode}</div>
       <div className="min-w-0 flex-1 border-l border-slate-400/20 pl-2.5">
         <div className="flex items-center gap-1">
-          <p className="text-[11px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground sm:text-[11px]">
             {title}
           </p>
           {help ? (
@@ -247,7 +247,7 @@ export function KPICard({
           </p>
         ) : null}
         {subtitle ? (
-          <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{subtitle}</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground sm:text-[11px]">{subtitle}</div>
         ) : null}
       </div>
     </div>

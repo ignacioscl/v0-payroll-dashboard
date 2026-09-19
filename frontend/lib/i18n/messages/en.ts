@@ -1273,7 +1273,7 @@ export const en: Messages = {
     tableAttainment: 'Attainment',
     tableAttainmentPct: 'Attainment %',
     statementsIssued: 'Invoices Issued',
-    doneNotInvoiced: 'Done, Not Invoiced',
+    doneNotInvoiced: 'WO Not Invoiced',
     woDoneToInvoiced: 'WO Done → Invoiced',
     statementsSent: 'Invoices Sent',
     partialOverlapWoStatements: 'WO Invoices Outside Period',
@@ -1451,6 +1451,7 @@ export const en: Messages = {
     betaDisclaimer:
       'These KPIs are in beta. Values should be verified against legacy SRS reports before making business decisions.',
     billingPeriodSummary: 'Invoiced vs collected (work in the period)',
+    incomeTitle: 'Income',
     collectionsSnapshotNote:
       'Open receivables snapshot — not limited to the header date range.',
     collectionsHistoryMonths: 'History',

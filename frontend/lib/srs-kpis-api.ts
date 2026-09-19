@@ -94,6 +94,10 @@ export interface BillingPeriodCollectionKpi {
   collectionRatePct: number
   unpaidInPeriodValue: number
   unpaidInPeriodStatements: number
+  /** Solo invoices cuyo período cae entero en el rango (la base de las cards de Income). */
+  invoicedInRangeValue: number
+  collectedInRangeValue: number
+  collectionRateInRangePct: number
 }
 
 export interface CollectionsKpi {

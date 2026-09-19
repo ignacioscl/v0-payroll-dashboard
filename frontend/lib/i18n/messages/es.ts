@@ -1277,7 +1277,7 @@ export const es: Messages = {
     tableAttainment: 'Cumplimiento',
     tableAttainmentPct: 'Cumplimiento %',
     statementsIssued: 'Facturas emitidas',
-    doneNotInvoiced: 'Terminado, sin facturar',
+    doneNotInvoiced: 'WO sin facturar',
     woDoneToInvoiced: 'OT terminada → facturada',
     statementsSent: 'Facturas enviadas',
     partialOverlapWoStatements: 'Facturas WO fuera del período',
@@ -1455,6 +1455,7 @@ export const es: Messages = {
     betaDisclaimer:
       'Estos KPIs están en versión beta. Los valores deben corroborarse con los reportes legacy de SRS antes de tomar decisiones.',
     billingPeriodSummary: 'Facturado vs cobrado (trabajo del período)',
+    incomeTitle: 'Ingresos',
     collectionsSnapshotNote:
       'Snapshot de CxC abierta — no limitado al rango de fechas del encabezado.',
     collectionsHistoryMonths: 'Historial',

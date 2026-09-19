@@ -523,7 +523,7 @@ export default function DashboardPage() {
 
       <motion.div variants={item} className="space-y-6 border-t border-border pt-8">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
             {reportPeriodText ?? '…'}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">{t('dashboard.reportUsesFilters')}</p>
