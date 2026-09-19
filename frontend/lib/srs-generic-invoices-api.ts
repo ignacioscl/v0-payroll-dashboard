@@ -14,7 +14,7 @@ export interface GenericInvoiceConfig {
 }
 
 export type GenericInvoiceItemPayload =
-  | { kind?: 'free'; idRel?: number; description: string; qty?: number; unitAmount: number }
+  | { kind?: 'free'; idRel?: number; description: string; qty: number; unitAmount: number }
   | { kind: 'ttk'; idEmployee: number; onlyTimecard?: boolean }
 
 export interface CreateGenericInvoicePayload {

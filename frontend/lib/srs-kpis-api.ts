@@ -94,10 +94,17 @@ export interface BillingPeriodCollectionKpi {
   collectionRatePct: number
   unpaidInPeriodValue: number
   unpaidInPeriodStatements: number
-  /** Solo invoices cuyo período cae entero en el rango (la base de las cards de Income). */
-  invoicedInRangeValue: number
-  collectedInRangeValue: number
-  collectionRateInRangePct: number
+  /**
+   * Las mismas líneas que las tres cards facturadas de Income (WO Invoiced: todo el trabajo de WO
+   * del rango; TTK y Generic Invoiced: solo invoices enteras en el rango), valoradas como Income.
+   * incomeCollectedValue es el número grande de Collected.
+   */
+  incomeInvoicedValue: number
+  incomeCollectedValue: number
+  /** Las mismas líneas, con tax y descuento (plata real): los subtítulos de Collected y Unpaid. */
+  incomeInvoicedRealValue: number
+  incomeCollectedRealValue: number
+  incomeCollectionRatePct: number
 }
 
 export interface CollectionsKpi {

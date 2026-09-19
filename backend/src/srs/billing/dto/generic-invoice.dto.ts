@@ -85,13 +85,12 @@ export class GenericFreeItemDto {
   @MaxLength(128)
   description!: string
 
-  @ApiPropertyOptional({ minimum: 0.01, maximum: 9999999.99 })
-  @IsOptional()
-  @Transform(emptyToUndefined)
+  /** Required on free lines: missing, empty or 0 is a 400 (TTK and only-timecard lines have their own DTO). */
+  @ApiProperty({ minimum: 0.01, maximum: 9999999.99 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   @Max(9999999.99)
-  qty?: number
+  qty!: number
 
   @ApiProperty({ minimum: -999999.99, maximum: 999999.99 })
   @IsNumber({ maxDecimalPlaces: 2 })

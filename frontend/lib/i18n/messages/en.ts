@@ -555,7 +555,7 @@ export const en: Messages = {
       discardConfirm: 'Unsaved changes will be lost.',
       discardAction: 'Discard',
       amountRequired: 'Unit amount is required.',
-      qtyInvalid: 'Qty / Hrs must be at least 0.01.',
+      qtyInvalid: 'Qty / Hrs is required and must be at least 0.01.',
       taxInvalid: 'Tax must be between 0 and 99.999.',
       useCustom: 'Use “{term}”',
       deleteCatalogTitle: 'Delete saved service?',
@@ -1303,6 +1303,8 @@ export const en: Messages = {
     outstandingArOutsideChart: '{count} open invoices · outside chart months: {amount}',
     unpaidInPeriod: 'Unpaid in Period',
     unpaidInPeriodStatements: '{count} unpaid invoices in period',
+    withTaxDiscount: 'With tax & discount: {amount}',
+    unpaidNotInvoiced: 'WO not invoiced: {amount}',
     dsoVsPrevCheck: '{value}d vs prev — invoice → check',
     collectedOverInvoiced: 'collected / invoiced',
     ofTotalOutstanding: 'of total outstanding',
@@ -1403,25 +1405,25 @@ export const en: Messages = {
     statements:
       'Number of invoices that have at least one billed line whose work date falls in the selected range. Subtitle is Invoiced divided by that count.',
     unbilled:
-      'Work orders created in the selected date range that are in Done status and not yet fully billed. Filters by creation date (same rule as the billing list for WOs). The subtitle shows the total value of those work orders and, separately, how many services are still unbilled and for how much.',
+      'Value of the services not yet billed on work orders created in the selected date range, in any status (same as the Production Report). Filters by creation date (same rule as the billing list for WOs).',
     doneToInvoiced:
       'Average days from work order completion to billing, for WO services whose work date falls in the selected range.',
     sent: 'Share of the invoices with work in the period that were sent to the customer. Subtitle shows how many of them were never sent.',
     partialOverlapWo:
       'Work-order invoices with work in the selected dates whose billing period is not fully inside the range.',
     woInvoiced:
-      'WO service lines on active invoices (types 1–4), net of discount, dated by work-order creation. A service on more than one active invoice counts once. Subtitle splits included invoices vs outside.',
+      'WO service lines on active invoices (types 1–4), at price × qty without discount (same value as the Production Report), dated by work-order creation. A service on more than one active invoice counts once. Subtitle splits included invoices vs outside.',
     ttkInvoiced:
-      'Time-punch lines on active TTK or generic invoices, net of discount, dated by punch-in. Punches billed on a generic invoice count here, not in Generic Invoiced.',
+      'Time-punch lines on active TTK or generic invoices, dated by punch-in. A TTK invoice keeps its discount; punches on a generic invoice count at their amount, without tax or discount (same value as the Production Report). Punches billed on a generic invoice count here, not in Generic Invoiced.',
     genericInvoiced:
-      'Free lines of generic invoices (not punches), net of discount and tax, split across the days of the invoice period. Credits (negative lines) always count.',
+      'Free lines of generic invoices (not punches), at qty × price without tax or discount (same value as the Production Report; an empty or 0 qty counts as 1), split across the days of the invoice period. Credits (negative lines) always count.',
     outstandingAr:
       'Uncollected net amount of every billed line, all history. Same lines as Billing. Subtitle is open invoices and the uncollected amount outside the months shown on the chart. Not limited to the header date range.',
     unpaidInPeriod:
-      'Invoiced minus collected for work in the selected dates. Subtitle is how many invoices have at least one uncollected line in the period.',
+      'WO Invoiced + TTK Invoiced + Generic Invoiced, minus Collected: the same numbers shown on those cards. Subtitle: the same with tax and discount, how many invoices have at least one uncollected line in the period, and the WO value not invoiced yet (WO Not Invoiced).',
     dso: 'Average days from issuing an invoice to receiving payment.',
     collected:
-      'Amount collected on those same billed lines of the period. A line is collected if it has its own active payment or its invoice was paid in full. Payments on work from other months do not count here.',
+      'Amount collected on exactly the lines of WO Invoiced, TTK Invoiced and Generic Invoiced, valued like those cards (WO and generic lines without tax or discount; TTK invoices with their discount). Subtitle is the actual money, with tax and discount. A line is collected if it has its own active payment or its invoice was paid in full. Payments on work from other months do not count here.',
     collectionRate: 'Share of the period invoice total that has been collected.',
     arOver60: 'Share of Outstanding AR whose work date is more than 60 days ago.',
     punchError:

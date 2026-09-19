@@ -555,7 +555,7 @@ export const es: Messages = {
       discardConfirm: 'Se perderán los cambios no guardados.',
       discardAction: 'Descartar',
       amountRequired: 'El importe unitario es obligatorio.',
-      qtyInvalid: 'Cant. / Hrs debe ser al menos 0.01.',
+      qtyInvalid: 'Cant. / Hrs es obligatoria y debe ser al menos 0.01.',
       taxInvalid: 'El tax debe estar entre 0 y 99.999.',
       useCustom: 'Usar “{term}”',
       deleteCatalogTitle: '¿Borrar servicio guardado?',
@@ -1307,6 +1307,8 @@ export const es: Messages = {
     outstandingArOutsideChart: '{count} facturas abiertas · fuera de los meses del gráfico: {amount}',
     unpaidInPeriod: 'Sin pago del período',
     unpaidInPeriodStatements: '{count} facturas sin pago en el período',
+    withTaxDiscount: 'Con tax y descuento: {amount}',
+    unpaidNotInvoiced: 'WO sin facturar: {amount}',
     dsoVsPrevCheck: '{value}d vs anterior — factura → cheque',
     collectedOverInvoiced: 'cobrado / facturado',
     ofTotalOutstanding: 'del total pendiente',
@@ -1407,25 +1409,25 @@ export const es: Messages = {
     statements:
       'Cantidad de facturas que tienen al menos una línea facturada cuya fecha de trabajo cae en el rango seleccionado. El subtítulo es Facturado dividido por esa cantidad.',
     unbilled:
-      'Órdenes creadas en el rango de fechas seleccionado que están en estado terminado y aún no están totalmente facturadas. Filtra por fecha de creación (mismo criterio que el listado de billing para OT). El subtítulo muestra el total de esas OT y, aparte, cuántos servicios faltan facturar y por cuánto.',
+      'Valor de los servicios todavía sin facturar de las órdenes creadas en el rango de fechas seleccionado, en cualquier estado (igual que el Production Report). Filtra por fecha de creación (mismo criterio que el listado de billing para OT).',
     doneToInvoiced:
       'Días promedio entre completar la orden de trabajo y facturarla, para servicios WO cuya fecha de trabajo cae en el rango seleccionado.',
     sent: 'Porcentaje de esas facturas (trabajo del período) enviadas al cliente. El subtítulo muestra cuántas de ellas nunca se enviaron.',
     partialOverlapWo:
       'Facturas de órdenes de trabajo con trabajo en las fechas seleccionadas cuyo período no está entero dentro del rango.',
     woInvoiced:
-      'Servicios de OT en facturas activas (tipos 1–4), netos de descuento, por fecha de creación de la OT. Un servicio en más de una factura activa cuenta una sola vez. El subtítulo separa facturas incluidas vs fuera.',
+      'Servicios de OT en facturas activas (tipos 1–4), a precio × cantidad sin descuento (el mismo valor del Production Report), por fecha de creación de la OT. Un servicio en más de una factura activa cuenta una sola vez. El subtítulo separa facturas incluidas vs fuera.',
     ttkInvoiced:
-      'Ponchadas en facturas TTK o genéricas activas, netas de descuento, por fecha de punch. Las ponchadas facturadas en una genérica cuentan acá, no en Generic Invoiced.',
+      'Ponchadas en facturas TTK o genéricas activas, por fecha de punch. Una factura TTK conserva su descuento; las ponchadas de una genérica valen su importe, sin impuesto ni descuento (el mismo valor del Production Report). Las ponchadas facturadas en una genérica cuentan acá, no en Generic Invoiced.',
     genericInvoiced:
-      'Líneas libres de facturas genéricas (no ponchadas), netas de descuento e impuesto, repartidas por los días del período. Los créditos (líneas negativas) siempre cuentan.',
+      'Líneas libres de facturas genéricas (no ponchadas), a cantidad × precio sin impuesto ni descuento (el mismo valor del Production Report; una cantidad vacía o 0 cuenta como 1), repartidas por los días del período. Los créditos (líneas negativas) siempre cuentan.',
     outstandingAr:
       'Monto neto sin cobrar de todas las líneas facturadas, de toda la historia. Las mismas líneas que Billing. El subtítulo es facturas abiertas y lo no cobrado fuera de los meses del gráfico. No depende del rango del header.',
     unpaidInPeriod:
-      'Facturado menos cobrado del trabajo en las fechas seleccionadas. El subtítulo es cuántas facturas tienen al menos una línea del período sin cobrar.',
+      'WO Invoiced + TTK Invoiced + Generic Invoiced, menos Cobrado: los mismos números que muestran esas cards. Subtítulo: lo mismo con impuesto y descuento, cuántas facturas tienen al menos una línea del período sin cobrar, y el valor de OT todavía sin facturar (WO sin facturar).',
     dso: 'Días promedio desde la emisión de la factura hasta recibir el pago.',
     collected:
-      'Monto cobrado de esas mismas líneas facturadas del período. Una línea está cobrada si tiene su propio pago activo o su factura está paga entera. Un pago de trabajo de otro mes no cuenta acá.',
+      'Monto cobrado de exactamente las líneas de WO Invoiced, TTK Invoiced y Generic Invoiced, valorado como esas cards (OT y genéricas sin impuesto ni descuento; facturas TTK con su descuento). El subtítulo es la plata real, con impuesto y descuento. Una línea está cobrada si tiene su propio pago activo o su factura está paga entera. Un pago de trabajo de otro mes no cuenta acá.',
     collectionRate: 'Porcentaje del total facturado en el período que ya se cobró.',
     arOver60: 'Porcentaje del Outstanding AR cuya fecha de trabajo es de hace más de 60 días.',
     punchError:

@@ -1,6 +1,7 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common'
 import { QueryFailedError } from 'typeorm'
 
+import { CreateGenericInvoiceDto, UpdateGenericInvoiceDto } from '../dto/generic-invoice.dto'
 import { GenericInvoiceService } from './generic-invoice.service'
 import { GenericInvoiceConflictError } from '../generic-invoice-conflict.error'
 import { assertRelWriteAffected, conflictFromMysql } from '../generic-invoice-write-errors'
@@ -62,7 +63,7 @@ const happyDto = {
   dateTo: '2026-08-07',
   items: [
     { description: 'Detail', unitAmount: 50, qty: 2 },
-    { description: 'Wax', unitAmount: -10 },
+    { description: 'Wax', unitAmount: -10, qty: 1 },
   ],
 }
 
@@ -266,6 +267,69 @@ describe('GenericInvoiceService.update validations', () => {
         ],
       } as any),
     ).rejects.toThrow('Duplicate TTK employee.')
+  })
+})
+
+describe('generic invoice DTO — qty required on free lines', () => {
+  // Same options as the global pipe in main.ts; its exceptionFactory also answers 400.
+  const pipe = new ValidationPipe({ transform: true, whitelist: true })
+
+  async function statusOf(metatype: new () => object, body: object): Promise<number> {
+    try {
+      await pipe.transform(body, { type: 'body', metatype })
+      return 200
+    } catch (err) {
+      return err instanceof BadRequestException ? err.getStatus() : 500
+    }
+  }
+
+  const createBody = (item: object) => ({
+    idDealer: 100,
+    dateFrom: '2026-08-01',
+    dateTo: '2026-08-07',
+    items: [item],
+  })
+  const updateBody = (item: object) => ({
+    dateFrom: '2026-08-01',
+    dateTo: '2026-08-07',
+    items: [item],
+  })
+
+  it('POST: free item without qty ⇒ 400', async () => {
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'free', description: 'Wash', unitAmount: 1900 })),
+    ).toBe(400)
+  })
+
+  it('POST: legacy item without kind and without qty ⇒ 400', async () => {
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ description: 'Wash', unitAmount: 1900 })),
+    ).toBe(400)
+  })
+
+  it('POST: free item with qty 0 or empty ⇒ 400', async () => {
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'free', description: 'Wash', unitAmount: 1900, qty: 0 })),
+    ).toBe(400)
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'free', description: 'Wash', unitAmount: 1900, qty: '' })),
+    ).toBe(400)
+  })
+
+  it('PUT: free item without qty ⇒ 400', async () => {
+    expect(
+      await statusOf(UpdateGenericInvoiceDto, updateBody({ kind: 'free', idRel: 5, description: 'Wash', unitAmount: 1900 })),
+    ).toBe(400)
+  })
+
+  it('free item with a decimal qty passes; ttk item needs no qty', async () => {
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'free', description: 'Hours', unitAmount: 40, qty: 1.5 })),
+    ).toBe(200)
+    expect(await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'ttk', idEmployee: 8 }))).toBe(200)
+    expect(
+      await statusOf(CreateGenericInvoiceDto, createBody({ kind: 'ttk', idEmployee: 8, onlyTimecard: true })),
+    ).toBe(200)
   })
 })
 

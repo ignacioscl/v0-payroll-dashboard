@@ -132,7 +132,8 @@ function draftsFromDetail(detail: GenericInvoiceDetail): GenericItemDraft[] {
       key: `free:${item.idRel}`,
       idRel: item.idRel,
       description: item.description,
-      qty: item.qty,
+      // Empty or 0 qty is worth the price: preload 1 so an old invoice saves without error.
+      qty: item.qty && item.qty > 0 ? item.qty : 1,
       unitAmount: item.unitAmount,
       isPaid: item.isPaid,
     }
@@ -518,7 +519,7 @@ export function GenericInvoiceDialog({
           ...(item.idRel != null ? { idRel: item.idRel } : {}),
           description: item.description,
           unitAmount: item.unitAmount,
-          ...(item.qty != null ? { qty: item.qty } : {}),
+          qty: item.qty,
         }
       })
     if (!isEdit) {

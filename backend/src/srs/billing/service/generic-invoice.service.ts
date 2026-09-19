@@ -254,7 +254,7 @@ export class GenericInvoiceService {
         freeItems: dto.items.filter(isFreeItem).map((item) => ({
           idRel: item.idRel,
           description: item.description,
-          qty: item.qty ?? null,
+          qty: item.qty,
           unitAmount: item.unitAmount,
         })),
         ttkItems: ttkItems.map((item) => ({
@@ -437,7 +437,7 @@ export class GenericInvoiceService {
       lines.push({
         kind: 'free',
         description: item.description,
-        qty: item.qty ?? null,
+        qty: item.qty,
         unitAmount: item.unitAmount,
       })
     }

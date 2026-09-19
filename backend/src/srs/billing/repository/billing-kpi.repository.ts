@@ -81,9 +81,15 @@ export class BillingKpiRepository {
     const invPeriodParams = [idDealerProvider, ...inv.params, fechaDesde, fechaHasta]
     const { wo, ttk, gen } = this.billedBase(filter)
 
-    const woMoney = woBilledLinesSql({ ...wo, withPeriodSplit: true, withAvgDoneToInvoiced: true })
-    const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true })
-    const genMoney = genericBilledLinesSql({ ...gen, withPeriodSplit: true })
+    // Income cards value lines like the legacy Production Report (V19).
+    const woMoney = woBilledLinesSql({
+      ...wo,
+      withPeriodSplit: true,
+      withAvgDoneToInvoiced: true,
+      productionValue: true,
+    })
+    const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true, productionValue: true })
+    const genMoney = genericBilledLinesSql({ ...gen, withPeriodSplit: true, productionValue: true })
     const woIds = woBilledLinesSql({ ...wo, idsOnly: true })
     const ttkIds = ttkBilledLinesSql({ ...ttk, idsOnly: true })
     const genIds = genericBilledLinesSql({ ...gen, idsOnly: true })
@@ -100,7 +106,7 @@ export class BillingKpiRepository {
        FROM INVOICE i
        ${inv.join}
        LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
-       WHERE i.estado = 1 AND i.id_workflow = ${WorkflowStatus.DONE}
+       WHERE i.estado = 1
          AND i.id_dealer_provider = ?
          ${inv.and}
          AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
@@ -254,9 +260,10 @@ export class BillingKpiRepository {
   async getPeriodCollectionKpis(filter: SrsKpiFilter): Promise<BillingPeriodCollectionKpiDto> {
     const { includeZero } = filter
     const { wo, ttk, gen } = this.billedBase(filter)
-    const woMoney = woBilledLinesSql({ ...wo, withPeriodSplit: true })
-    const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true })
-    const genMoney = genericBilledLinesSql({ ...gen, withPeriodSplit: true })
+    // Billed valuation (real money) plus the Income valuation in the same pass (V21).
+    const woMoney = woBilledLinesSql({ ...wo, withPeriodSplit: true, withProductionSplit: true })
+    const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true, withProductionSplit: true })
+    const genMoney = genericBilledLinesSql({ ...gen, withPeriodSplit: true, withProductionSplit: true })
     const woIds = woBilledLinesSql({ ...wo, idsOnly: true })
     const ttkIds = ttkBilledLinesSql({ ...ttk, idsOnly: true })
     const genIds = genericBilledLinesSql({ ...gen, idsOnly: true })
@@ -282,18 +289,35 @@ export class BillingKpiRepository {
     )
     const unpaidInPeriodValue = roundMoney(invoicedValue - collectedValue)
     const statementsIssued = Number(issued[0]?.statementsIssued ?? 0)
-    // Misma base que las cards de Income: solo invoices cuyo período cae entero en el rango.
-    const invoicedInRangeValue = roundMoney(
-      money(woRows[0]?.invoicedInRange) + money(ttkRows[0]?.invoicedInRange) + money(genRows[0]?.invoicedInRange),
+    // Same lines as the three Income invoiced cards, so Unpaid = WO + TTK + Generic Invoiced −
+    // Collected closes with the numbers on screen: WO Invoiced is all WO work of the range (by WO
+    // date, invoices crossing the range included); TTK and Generic Invoiced only count invoices
+    // whose period is inside the range (legacy Production Report rule).
+    // Income valuation (WO and generic without tax or discount, TTK type 5 with its discount):
+    // the big Collected number and the collection rate.
+    const w = woRows[0] ?? {}
+    const tk = ttkRows[0] ?? {}
+    const g = genRows[0] ?? {}
+    const incomeInvoicedValue = roundMoney(
+      money(w.invoicedProduction) + money(tk.invoicedInRangeProduction) + money(g.invoicedInRangeProduction),
     )
-    const collectedInRangeValue = roundMoney(
-      money(woRows[0]?.collectedInRange) + money(ttkRows[0]?.collectedInRange) + money(genRows[0]?.collectedInRange),
+    const incomeCollectedValue = roundMoney(
+      money(w.collectedProduction) + money(tk.collectedInRangeProduction) + money(g.collectedInRangeProduction),
+    )
+    // Same lines, actual money (with tax and discount): the subtitles.
+    const incomeInvoicedRealValue = roundMoney(
+      money(w.invoiced) + money(tk.invoicedInRange) + money(g.invoicedInRange),
+    )
+    const incomeCollectedRealValue = roundMoney(
+      money(w.collected) + money(tk.collectedInRange) + money(g.collectedInRange),
     )
 
     return {
-      invoicedInRangeValue,
-      collectedInRangeValue,
-      collectionRateInRangePct: collectionRatePct(collectedInRangeValue, invoicedInRangeValue),
+      incomeInvoicedValue,
+      incomeCollectedValue,
+      incomeInvoicedRealValue,
+      incomeCollectedRealValue,
+      incomeCollectionRatePct: collectionRatePct(incomeCollectedValue, incomeInvoicedValue),
       invoicedValue,
       statementsIssued,
       avgInvoiceValue: statementsIssued > 0 ? Math.round(invoicedValue / statementsIssued) : 0,

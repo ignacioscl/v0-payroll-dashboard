@@ -28,7 +28,7 @@ export function ttkAmountPositiveSql(): string {
 }
 
 export function genericLinePositiveSql(): string {
-  return ' AND (IFNULL(isir.amount, 0) * IFNULL(CASE WHEN isir.id_employee_work IS NULL THEN isir.generic_qty ELSE 1 END, 1)) > 0'
+  return ' AND (IFNULL(isir.amount, 0) * IF(isir.id_employee_work IS NULL AND IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)) > 0'
 }
 
 /** Billed-line base: drop zeros only, never credits. */
@@ -41,7 +41,7 @@ export function ttkAmountNonZeroSql(): string {
 }
 
 export function genericLineNonZeroSql(): string {
-  return ' AND (IFNULL(isir.amount, 0) * IFNULL(isir.generic_qty, 1)) <> 0'
+  return ' AND (IFNULL(isir.amount, 0) * IF(IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)) <> 0'
 }
 
 export function statementNetNonZeroSql(alias = 's'): string {

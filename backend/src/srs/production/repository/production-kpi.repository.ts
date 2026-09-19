@@ -176,7 +176,7 @@ export class ProductionKpiRepository {
       ),
       this.srs.query(
         `SELECT IFNULL(SUM(
-           IFNULL(CASE WHEN isir.id_employee_work IS NULL THEN isir.generic_qty ELSE 1 END, 0)
+           IF(isir.id_employee_work IS NULL AND IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)
            * IFNULL(isir.amount, 0)
          ), 0) AS value
          FROM INVOICE_STATEMENT invs
@@ -296,7 +296,7 @@ export class ProductionKpiRepository {
         `SELECT c.id AS dealerId,
                 GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer,
                 IFNULL(SUM(
-                  IFNULL(CASE WHEN isir.id_employee_work IS NULL THEN isir.generic_qty ELSE 1 END, 0)
+                  IF(isir.id_employee_work IS NULL AND IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)
                   * IFNULL(isir.amount, 0)
                 ), 0) AS value
          FROM INVOICE_STATEMENT invs
@@ -437,7 +437,7 @@ export class ProductionKpiRepository {
       this.srs.query(
         `SELECT ${stmtWeekStart} AS weekStart,
                 IFNULL(SUM(
-                  IFNULL(CASE WHEN isir.id_employee_work IS NULL THEN isir.generic_qty ELSE 1 END, 0)
+                  IF(isir.id_employee_work IS NULL AND IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)
                   * IFNULL(isir.amount, 0)
                 ), 0) AS value
          FROM INVOICE_STATEMENT invs

@@ -249,16 +249,22 @@ export default function BusinessKpisPage() {
   const c = coll.data
   const k = punch.data
   const y = pay.data
-  // Misma base que las cards de Income (invoices incluidas en el período), así
-  // Unpaid = suma de Income − Collected, con los números que se ven.
+  // Unpaid = WO Invoiced + TTK Invoiced + Generic Invoiced − Collected, con los números
+  // grandes que se ven: Collected mira exactamente las líneas de esas tres cards (WO: todo
+  // el trabajo del rango; TTK y Generic: invoices enteras) con la misma valoración. WO Not
+  // Invoiced no es plata facturada: va aparte, como número chico de Unpaid.
   const invoicedShown = b
-    ? sumShown(b.woInvoicedInRangeValue, b.ttkInvoicedInRangeValue, b.genericInvoicedInRangeValue)
+    ? sumShown(b.woInvoicedValue, b.ttkInvoicedInRangeValue, b.genericInvoicedInRangeValue)
     : undefined
-  const collectedShown = pc ? dollars(pc.collectedInRangeValue) : undefined
+  const collectedShown = pc ? dollars(pc.incomeCollectedValue) : undefined
   const unpaidShown =
     invoicedShown !== undefined && collectedShown !== undefined
       ? invoicedShown - collectedShown
       : undefined
+  // Plata real (con tax y descuento) de esas mismas líneas: subtítulos de Collected y Unpaid.
+  const unpaidRealShown = pc
+    ? dollars(pc.incomeInvoicedRealValue) - dollars(pc.incomeCollectedRealValue)
+    : undefined
   const outstandingOutsideChart =
     c && collByMonth.data
       ? dollars(c.outstandingAr) - collByMonth.data.reduce((acc, point) => acc + shownPending(point), 0)
@@ -384,13 +390,18 @@ export default function BusinessKpisPage() {
                 help={t('businessKpisHelp.collected')}
                 loading={periodColl.isLoading}
                 title={t('mockKpis.collected')}
-                value={pc ? fmtDollars(pc.collectedInRangeValue) : '—'}
+                value={pc ? fmtDollars(pc.incomeCollectedValue) : '—'}
                 icon={<DollarSign className="h-5 w-5" />}
                 variant="info"
                 subtitle={
-                  pc
-                    ? t('mockKpis.collectionRate') + ': ' + pc.collectionRateInRangePct + '%'
-                    : ''
+                  pc ? (
+                    <>
+                      <p>{t('mockKpis.withTaxDiscount', { amount: fmtDollars(pc.incomeCollectedRealValue) })}</p>
+                      <p>{t('mockKpis.collectionRate') + ': ' + pc.incomeCollectionRatePct + '%'}</p>
+                    </>
+                  ) : (
+                    ''
+                  )
                 }
               />
               <KPICard
@@ -402,11 +413,22 @@ export default function BusinessKpisPage() {
                 icon={<Banknote className="h-5 w-5" />}
                 variant="danger"
                 subtitle={
-                  pc
-                    ? t('mockKpis.unpaidInPeriodStatements', {
-                        count: pc.unpaidInPeriodStatements,
-                      })
-                    : ''
+                  pc && unpaidRealShown !== undefined ? (
+                    <>
+                      <p>
+                        {t('mockKpis.withTaxDiscount', { amount: fmtDollars(unpaidRealShown) })}
+                        {' · '}
+                        {t('mockKpis.unpaidInPeriodStatements', {
+                          count: pc.unpaidInPeriodStatements,
+                        })}
+                      </p>
+                      {b ? (
+                        <p>{t('mockKpis.unpaidNotInvoiced', { amount: fmtDollars(b.unbilledValue) })}</p>
+                      ) : null}
+                    </>
+                  ) : (
+                    ''
+                  )
                 }
               />
             </div>
