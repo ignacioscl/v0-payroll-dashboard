@@ -66,7 +66,7 @@ export function TodayStatusSection() {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
           {t('dashboard.todayStatus')}
         </h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
@@ -85,6 +85,7 @@ export function TodayStatusSection() {
             icon={CARD_ICONS[card.status]}
             variant={card.variant}
             loading={loading}
+            inline
             onClick={() => openPunchReport(card.status)}
           />
         ))}

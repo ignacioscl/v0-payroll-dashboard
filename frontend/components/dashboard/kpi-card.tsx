@@ -65,6 +65,11 @@ interface KPICardProps {
    * localStorage con esta clave. Sin `hintKey` la ayuda siempre se muestra.
    */
   hintKey?: string
+  /**
+   * Una sola fila: ícono, número y al lado título y subtítulo. Ocupa la mitad de
+   * alto; se usa en el Dashboard y en Punch Report.
+   */
+  inline?: boolean
   className?: string
 }
 
@@ -87,6 +92,7 @@ export function KPICard({
   inactive = false,
   hint,
   hintKey,
+  inline = false,
   className,
 }: KPICardProps) {
   const { t } = useTranslation()
@@ -176,6 +182,77 @@ export function KPICard({
 
   const isInteractive = typeof onClick === 'function'
 
+  const valueNode = loading ? (
+    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+  ) : (
+    <motion.span
+      key={String(value)}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={cn(
+        'text-lg font-extrabold leading-none tracking-tight tabular-nums sm:text-[22px]',
+        excluded && !inactive ? 'text-muted-foreground line-through' : 'text-foreground',
+      )}
+    >
+      {value}
+    </motion.span>
+  )
+
+  // Una sola fila: ícono, número y al lado el título con el subtítulo. El número va
+  // pegado al ícono y no en la otra punta, para que el texto use el ancho que sobra.
+  const inlineBody = (
+    <div className="relative flex items-center gap-2.5">
+      <div
+        className={cn(
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] [&_svg]:h-3.5 [&_svg]:w-3.5 sm:h-8 sm:w-8 sm:rounded-[10px] sm:[&_svg]:h-4 sm:[&_svg]:w-4',
+          config.iconBg,
+          config.iconShadow,
+          config.iconColor,
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-6 shrink-0">{valueNode}</div>
+      <div className="min-w-0 flex-1 border-l border-slate-400/20 pl-2.5">
+        <div className="flex items-center gap-1">
+          <p className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground sm:text-[11px]">
+            {title}
+          </p>
+          {help ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={t('common.kpiHelpAria')}
+                  className="shrink-0 cursor-pointer rounded text-muted-foreground/50 transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-72 text-xs leading-relaxed text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="mb-1 text-sm font-semibold text-foreground">{title}</p>
+                {help}
+              </PopoverContent>
+            </Popover>
+          ) : null}
+        </div>
+        {excluded && !inactive ? (
+          <p className="text-[10px] text-muted-foreground">
+            {t('punch.excluded')} · {t('punch.clickToInclude')}
+          </p>
+        ) : null}
+        {subtitle ? (
+          <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground sm:text-[11px]">{subtitle}</div>
+        ) : null}
+      </div>
+    </div>
+  )
+
   const card = (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -197,8 +274,13 @@ export function KPICard({
       aria-pressed={isInteractive ? active : undefined}
       className={cn(
         'group relative overflow-hidden border transition-all duration-300',
-        filterCard ? 'rounded-[14px] p-5 hover:scale-[1.01]' : 'rounded-xl',
-        !filterCard && (compact ? 'p-4 hover:shadow-lg hover:scale-[1.01]' : 'p-5 hover:shadow-xl hover:scale-[1.02]'),
+        inline
+          ? cn('rounded-[14px] py-2.5 pl-2.5 hover:scale-[1.01]', filterCard ? 'pr-8' : 'pr-3.5')
+          : filterCard
+            ? 'rounded-[14px] p-5 hover:scale-[1.01]'
+            : 'rounded-xl',
+        !filterCard && !inline && (compact ? 'p-4 hover:shadow-lg hover:scale-[1.01]' : 'p-5 hover:shadow-xl hover:scale-[1.02]'),
+        inline && !filterCard && 'hover:shadow-md',
         filterCard && 'hover:shadow-md',
         'hover:border-border/80',
         config.bg,
@@ -233,6 +315,7 @@ export function KPICard({
         />
       ) : null}
 
+      {inline ? inlineBody : (
       <div className="relative flex items-start justify-between gap-2">
         <div className={cn('min-w-0 flex-1', filterCard ? 'space-y-1.5' : 'space-y-2')}>
           <div className="flex items-center gap-1">
@@ -377,6 +460,7 @@ export function KPICard({
           </span>
         </div>
       </div>
+      )}
 
       {active && filterCard ? (
         <div

@@ -6,6 +6,7 @@ import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { IsValidPunchDateRange } from '../punch-date-range'
 import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 import { PUNCH_LIST_LIVE_STATUS, type PunchListLiveStatus } from './punch-list.dto'
+import { ERROR_TYPES_CSV_PATTERN } from '../repository/punch-error-types'
 
 /**
  * Columnas por las que se puede ordenar la vista agrupada (whitelist).
@@ -124,12 +125,12 @@ export class PunchGroupedQueryDto extends SrsKpiQueryDto {
   issueType?: string
 
   @ApiPropertyOptional({
-    description: 'Lista blanca de tipos de error (1,2,3). Ausente = 1,2,3.',
-    example: '1,3',
+    description: 'Lista blanca de tipos de flag (1..8). Ausente = 1,2,3.',
+    example: '1,3,4,8',
   })
   @IsOptional()
-  @Matches(/^[123](,[123]){0,2}$/, {
-    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  @Matches(ERROR_TYPES_CSV_PATTERN, {
+    message: 'errorTypes must be a comma-separated list of 1-8.',
   })
   errorTypes?: string
 
@@ -209,6 +210,9 @@ export class PunchGroupedRowDto {
       'and here it answers "what was corrected?".',
   })
   correctedTypes?: number[] | null
+
+  @ApiPropertyOptional({ example: ['clock_in'] })
+  fakeGpsEvents?: string[]
 
   @ApiProperty({ type: [PunchGroupedPaymentTypeRowDto] })
   byPaymentType!: PunchGroupedPaymentTypeRowDto[]

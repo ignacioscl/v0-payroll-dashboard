@@ -53,16 +53,14 @@ interface FilterContextType {
   setErrorStatus: (value: ErrorStatus) => void
   /**
    * Tipos de error DESTILDADOS por el usuario (lo que se persiste).
-   * `[]` = los tres visibles; `[1,2,3]` = los tres excluidos.
-   * Para un usuario externo esto vale siempre `[]`: la policy le prohíbe
-   * filtrar por tipo de error, así que la preferencia se ignora sin esperar
-   * a un effect (si no, pasa un render con el filtro puesto).
+   * `[]` = nada excluido (los 8, recortados por permiso en cada pantalla).
+   * Para un usuario externo esto vale siempre `[]`.
    */
   excludedErrorTypes: number[]
-  /** Derivado, nunca persistido: `{1,2,3} − excluidos`. */
+  /** Derivado, nunca persistido: `{1..8} − excluidos`. */
   includedErrorTypes: number[]
   toggleErrorType: (type: number) => void
-  /** Vuelve a incluir los tres. Lo usa el "Clear all" del panel de filtros. */
+  /** Vuelve a incluir todos. Lo usa el "Clear all" del panel de filtros. */
   resetErrorTypes: () => void
   /** False mientras `/me` no resolvió: ninguna query afectada se habilita. */
   errorTypesReady: boolean

@@ -15,7 +15,7 @@ import {
 import { PunchExportPrepareResponseDto, PunchExportStatusDto } from '../dto/punch-export.dto'
 import { PunchDealerRankingExportPrepareDto } from '../dto/punch-dealer-ranking.dto'
 import { PunchDealerRankingRepository } from '../repository/punch-dealer-ranking.repository'
-import { isDefaultErrorTypes, parseErrorTypes } from '../repository/punch-error-types'
+import { isCompleteEffectiveList, parseErrorTypes } from '../repository/punch-error-types'
 import {
   buildDealerRankingExportFilename,
   contentDispositionAttachment,
@@ -117,10 +117,9 @@ export class PunchDealerRankingExportService {
       // Se revalida en la descarga, igual que Punch Report: el permiso o un dealer
       // pueden haber cambiado entre el `prepare` y el click.
       const access = await this.assertExportAccess(ctx, filters)
-      const errorTypes = parseErrorTypes(filters.errorTypes).values
       const filter = buildSrsKpiFilter(ctx, filters)
       const opts = {
-        errorTypes,
+        errorTypes: access.effectiveErrorTypes,
         search: filters.search,
         includeDeletedFixes: access.includeDeletedFixes,
       }
@@ -149,12 +148,12 @@ export class PunchDealerRankingExportService {
       const workbook = buildDealerRankingWorkbook({
         locale,
         status: filters.status,
-        errorTypes,
+        errorTypes: access.effectiveErrorTypes,
         generatedAt,
         reportMeta: buildReportMeta(
           labels,
           filters,
-          errorTypes,
+          access,
           dealerNames,
           generatedBy,
           generatedAt,
@@ -219,16 +218,21 @@ export class PunchDealerRankingExportService {
 function buildReportMeta(
   labels: PunchDealerRankingLabels,
   filters: DealerRankingExportStoredFilters,
-  errorTypes: readonly number[],
+  access: PunchAccessPolicy,
   dealerNames: readonly string[],
   generatedBy: string,
   generatedAt: Date,
   notice: string | null,
 ): PunchExportMetaRow[] {
-  // Nombres visibles de los tipos incluidos; "All" cuando están los tres.
-  const errorTypesLabel = isDefaultErrorTypes(errorTypes)
+  const errorTypes = access.effectiveErrorTypes
+  const errorTypesLabel = isCompleteEffectiveList(errorTypes, {
+    canViewPaymentType: access.canViewPaymentTypeName,
+    includeDeletedFixes: access.includeDeletedFixes,
+  })
     ? labels.all
-    : errorTypes.map((t) => labels.errorTypeNames[t as 1 | 2 | 3]).join(', ')
+    : errorTypes
+        .map((t) => labels.errorTypeNames[t as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8] ?? String(t))
+        .join(', ')
   const search = filters.search?.trim()
 
   const meta: PunchExportMetaRow[] = [

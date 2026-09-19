@@ -12,7 +12,7 @@ import {
   PunchListRowDto,
   PunchListSort,
 } from '../dto/punch-list.dto'
-import { errorTypesInList, DEFAULT_ERROR_TYPES } from './punch-error-types'
+import { DEFAULT_ERROR_TYPES, fixLedgerInList } from './punch-error-types'
 import { mapPunchListRow } from './punch-list-row'
 import {
   buildPunchListExportSql,
@@ -109,7 +109,12 @@ export class PunchListRepository {
     const ids = rows.map((r) => r.id).filter((id) => Number.isFinite(id) && id > 0)
     if (ids.length === 0) return
 
-    const types = errorTypesInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES)
+    const ledger = fixLedgerInList(opts.errorTypes ?? DEFAULT_ERROR_TYPES)
+    if (!ledger) {
+      for (const row of rows) row.fixes = []
+      return
+    }
+    const types = ledger
     const params: (string | number)[] = [filter.idDealerProvider, ...ids]
     let sql =
       `SELECT f.id_ttk_employee_work                        AS punch_id,

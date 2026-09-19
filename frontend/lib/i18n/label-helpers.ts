@@ -6,6 +6,8 @@ import type { TranslateFn } from './locale-context'
 
 const ISSUE_FILTER_KEYS: Record<string, string> = {
   only_error: 'punch.onlyWithErrors',
+  only_flagged: 'punch.onlyFlagged',
+  all: 'punch.allPunches',
   only_error_clockout: 'punch.withoutClockOut',
   only_error_break: 'punch.withoutBreak',
   only_error_20h: 'punch.shift20h',

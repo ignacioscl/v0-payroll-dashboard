@@ -29,10 +29,10 @@ export class PunchDealerRankingService {
     // Se parsea UNA vez, antes del gate, y después circula la forma canónica.
     const errorTypes = parseErrorTypes(query.errorTypes).values
     // Gate SIN la acción de Punch Report: paridad con el resumen PHP (ver la policy).
-    const access = await this.policy.assertDashboardRanking(ctx, query.idDealer)
+    const access = await this.policy.assertDashboardRanking(ctx, query.idDealer, errorTypes)
     const filter = buildSrsKpiFilter(ctx, query)
     const opts = {
-      errorTypes,
+      errorTypes: access.effectiveErrorTypes,
       search: query.search,
       includeDeletedFixes: access.includeDeletedFixes,
     }

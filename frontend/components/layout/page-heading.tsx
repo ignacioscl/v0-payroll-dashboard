@@ -61,22 +61,24 @@ export function PageHeading({
   const config = variantConfig[variant]
 
   return (
-    <div className={cn('flex items-start justify-between gap-4', className)}>
-      <div className="flex min-w-0 items-start gap-4">
+    // Mobile: ícono, título y subtítulo más chicos, y las acciones bajan de renglón
+    // si no entran. Desde `sm` queda el tamaño de escritorio.
+    <div className={cn('flex flex-wrap items-start justify-between gap-3 sm:gap-4', className)}>
+      <div className="flex min-w-0 items-start gap-3 sm:gap-4">
         <div
           className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white',
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white sm:h-12 sm:w-12 sm:rounded-2xl',
             config.iconBg,
             config.iconShadow,
           )}
           aria-hidden
         >
-          <span className="drop-shadow-sm [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
+          <span className="drop-shadow-sm [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6">{icon}</span>
         </div>
         <div className="min-w-0 pt-0.5">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
           {subtitle ? (
-            <div className="mt-1 text-sm text-muted-foreground">{subtitle}</div>
+            <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</div>
           ) : null}
         </div>
       </div>

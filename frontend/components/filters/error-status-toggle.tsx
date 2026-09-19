@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useFilters } from '@/lib/filter-context'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { errorStatusCrossesType, isErrorStatus } from '@/lib/ttk/error-status'
+import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import { cn } from '@/lib/utils'
 
 /**
@@ -14,18 +15,15 @@ import { cn } from '@/lib/utils'
  * la misma naturaleza que dealers y rango y tiene que valer igual en las dos
  * pantallas que lo usan.
  *
- * Cuando el radio de Punch Report no está en *Only with errors* (ninguna
- * tarjeta, *Manual punch*, *Without salary*, *Deleted punches*) se muestra
- * **deshabilitado con su hint, no oculto**: si desaparece, el usuario no entiende
- * por qué dejó de filtrar.
+ * Cuando Punch Report no está en *Only flagged* (All punches) el eje no filtra,
+ * así que no marca ninguna opción. Igual se puede clickear: elegir un estado pasa
+ * la lista a *Only flagged*, lo mismo que clickear esa tarjeta, y fija el estado.
  */
 export function ErrorStatusToggle({
   className,
   /**
-   * El deshabilitado por tipo es exclusivo de `/issues`. En el Dashboard
-   * `selectedType` sólo arma deep-links y no filtra nada, así que un usuario que
-   * vuelve de Punch Report con *Manual punch* puesto se encontraría el switch
-   * trabado sin ninguna causa visible.
+   * El cruce con el tipo es exclusivo de `/issues`. En el Dashboard `selectedType`
+   * sólo arma deep-links y no filtra nada, así que ahí el switch no mira el tipo.
    */
   respectSelectedType = false,
 }: {
@@ -33,21 +31,27 @@ export function ErrorStatusToggle({
   respectSelectedType?: boolean
 }) {
   const { t } = useTranslation()
-  const { errorStatus, setErrorStatus, selectedType } = useFilters()
+  const { errorStatus, setErrorStatus, selectedType, setSelectedType, setSelectedTodayLiveStatus } =
+    useFilters()
 
-  const disabled = respectSelectedType && !errorStatusCrossesType(selectedType)
+  const notApplied = respectSelectedType && !errorStatusCrossesType(selectedType)
 
   const control = (
     <ToggleGroup
       type="single"
       variant="outline"
       size="sm"
-      value={errorStatus}
-      disabled={disabled}
+      value={notApplied ? '' : errorStatus}
       onValueChange={(value) => {
         // Radix emite '' al des-seleccionar el ítem activo: sin este guard el eje
         // se queda sin valor y la grilla pide un issueType vacío.
-        if (isErrorStatus(value)) setErrorStatus(value)
+        if (!isErrorStatus(value)) return
+        setErrorStatus(value)
+        if (notApplied) {
+          // Igual que clickear la tarjeta Only flagged (`selectShow` de /issues).
+          setSelectedType('only_flagged')
+          setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
+        }
       }}
       className={cn('shrink-0', className)}
       aria-label={t('punch.errorStatus')}
@@ -61,11 +65,10 @@ export function ErrorStatusToggle({
     </ToggleGroup>
   )
 
-  if (!disabled) return control
+  if (!notApplied) return control
 
   return (
     <Tooltip>
-      {/* El wrapper hace falta: un control deshabilitado no emite eventos de hover. */}
       <TooltipTrigger asChild>
         <span className="inline-flex">{control}</span>
       </TooltipTrigger>

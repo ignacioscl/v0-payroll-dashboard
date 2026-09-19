@@ -45,16 +45,6 @@ function roleLabel(row: TtkListRow): string {
   return [row.rolDpto.role, row.rolDpto.department].filter(Boolean).join(' / ')
 }
 
-/**
- * Misma regla que el ⚠ de la grilla (punchErrorVisible): con lista parcial el
- * backend manda `errorType` y la marca se apaga para el tipo excluido. Sin esto
- * la misma ponchada decía "No" en pantalla y "Yes" en el Excel.
- */
-function punchErrorLabel(row: TtkListRow, includedErrorTypes: readonly number[]): string | null {
-  if (!punchErrorVisible(row, includedErrorTypes)) return null
-  return row.badPunch?.res?.trim() || null
-}
-
 /** Flat row for XLS export — mirrors IssuesDataTable column export values. */
 export function ttkListRowToExportRecord(
   row: TtkListRow,
@@ -92,7 +82,7 @@ export function ttkListRowToExportRecord(
     })(),
     [labels.timeWork]: formatDurationDisplay(row.timeWork),
     [labels.timeBreak]: formatDurationDisplay(row.timeBreak),
-    [labels.hasError]: punchErrorLabel(row, included) ? labels.yes : labels.no,
+    [labels.hasError]: punchErrorVisible(row, included) ? labels.yes : labels.no,
   }
 
   if (options.includePaymentType) {

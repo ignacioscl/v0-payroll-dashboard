@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsIn, IsOptional, IsString, Matches } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+import { ERROR_TYPES_CSV_PATTERN } from '../repository/punch-error-types'
 
 /** Posición del switch Pending/Corrected del Dashboard. */
 export const DEALER_RANKING_STATUSES = ['pending', 'corrected'] as const
@@ -17,12 +18,12 @@ export type DealerRankingStatus = (typeof DEALER_RANKING_STATUSES)[number]
  */
 export class PunchDealerRankingQueryDto extends SrsKpiQueryDto {
   @ApiPropertyOptional({
-    description: 'Lista blanca de tipos de error (1,2,3). Ausente = 1,2,3.',
-    example: '1,3',
+    description: 'Lista blanca de tipos de flag (1..8). Ausente = 1,2,3.',
+    example: '1,3,4,8',
   })
   @IsOptional()
-  @Matches(/^[123](,[123]){0,2}$/, {
-    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  @Matches(ERROR_TYPES_CSV_PATTERN, {
+    message: 'errorTypes must be a comma-separated list of 1-8.',
   })
   errorTypes?: string
 
@@ -43,9 +44,14 @@ export class PunchDealerRankingExportPrepareDto extends PunchDealerRankingQueryD
 }
 
 export class PunchDealerRankingByTypeDto {
-  @ApiProperty({ example: 1 }) clockOutMissing!: number
-  @ApiProperty({ example: 403 }) breakMissing!: number
-  @ApiProperty({ example: 0 }) shift20hPlus!: number
+  @ApiPropertyOptional({ example: 1 }) clockOutMissing?: number
+  @ApiPropertyOptional({ example: 403 }) breakMissing?: number
+  @ApiPropertyOptional({ example: 0 }) shift20hPlus?: number
+  @ApiPropertyOptional({ example: 12 }) withoutSalary?: number
+  @ApiPropertyOptional({ example: 4 }) manual?: number
+  @ApiPropertyOptional({ example: 2 }) deleted?: number
+  @ApiPropertyOptional({ example: 1 }) paymentTypeChange?: number
+  @ApiPropertyOptional({ example: 3 }) fakeGps?: number
 }
 
 export class PunchDealerRankingRowDto {

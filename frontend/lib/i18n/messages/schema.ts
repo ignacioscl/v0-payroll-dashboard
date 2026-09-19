@@ -716,6 +716,24 @@ export interface Messages {
     withoutClockOut: string
     withoutBreak: string
     shift20h: string
+    paymentTypeChange: string
+    fakeGps: string
+    fakeGpsWithData: string
+    errors: string
+    correctedKpi: string
+    allPunches: string
+    onlyFlagged: string
+    allPunchesHint: string
+    onlyFlaggedHint: string
+    flagGroupErrors: string
+    flagGroupErrorsHint: string
+    flagGroupCorrectedOnly: string
+    flagGroupCorrectedOnlyHint: string
+    flagGroupAlerts: string
+    flagGroupAlertsHint: string
+    flagOnlyInCorrected: string
+    flagNotCorrected: string
+    breakdownNote: string
     excluded: string
     clickToInclude: string
     errorTypeExcludedChip: string
@@ -929,6 +947,11 @@ export interface Messages {
     withoutClockOutChart: string
     breakMissingChart: string
     shift20hChart: string
+    withoutSalaryChart: string
+    manualChart: string
+    deletedChart: string
+    paymentTypeChangeChart: string
+    fakeGpsChart: string
     /** Desglose del tooltip del trend: total, pendientes y corregidos. */
     errorTrendTooltipBreakdown: string
     errorTypesHint: string
@@ -1406,6 +1429,7 @@ export interface Messages {
     betaBadge: string
     betaDisclaimer: string
     billingPeriodSummary: string
+    incomeTitle: string
     collectionsSnapshotNote: string
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string

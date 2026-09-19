@@ -110,7 +110,7 @@ export function punchRowToCells(
     const l = punchExportLabels(locale)
     cells.push(
       (row.correctedTypes ?? [])
-        .map((t) => l.errorTypeNames[t as 1 | 2 | 3] ?? String(t))
+        .map((t) => l.errorTypeNames[t as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8] ?? String(t))
         .join(', '),
     )
     // Nunca el string crudo de la base: el resto de la planilla usa MM/DD/YYYY.

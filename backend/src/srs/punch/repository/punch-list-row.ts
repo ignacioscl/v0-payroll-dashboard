@@ -22,6 +22,21 @@ function toStringOrNull(raw: unknown): string | null {
   return String(raw)
 }
 
+const FAKE_GPS_COLS: readonly [string, string][] = [
+  ['punch_in_mock_gps', 'clock_in'],
+  ['punch_out_mock_gps', 'clock_out'],
+  ['break_start_mock_gps', 'break_start'],
+  ['break_end_mock_gps', 'break_end'],
+]
+
+function fakeGpsEventsFromRow(r: Record<string, unknown>): string[] {
+  const events: string[] = []
+  for (const [col, key] of FAKE_GPS_COLS) {
+    if (Number(r[col]) === 1) events.push(key)
+  }
+  return events
+}
+
 export type PunchListRowFlags = {
   includeAmounts: boolean
   includePaymentTypeName: boolean
@@ -74,7 +89,7 @@ export function mapPunchListRow(
         : String(r.corrected_types)
             .split(',')
             .map((t) => Number(t.trim()))
-            .filter((t) => t === 1 || t === 2 || t === 3),
+            .filter((t) => t === 1 || t === 2 || t === 3 || t === 4 || t === 7),
     lastCorrectedAt: toStringOrNull(r.last_corrected_at),
 
     usuario: {
@@ -85,6 +100,7 @@ export function mapPunchListRow(
     rolDpto: rolDpto ? { role: rolDpto.role ?? null, department: rolDpto.department ?? null } : null,
     dealer: { id: Number(r.id_dealer), razonSocial: String(r.razon_social ?? '') },
     badPunch: badPunch?.res ? { res: String(badPunch.res) } : null,
+    fakeGpsEvents: fakeGpsEventsFromRow(r),
     objPaymentType: null,
 
     hourlyRate: null,

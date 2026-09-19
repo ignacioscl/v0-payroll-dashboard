@@ -77,4 +77,8 @@ export class BillingPeriodCollectionKpiDto {
   @ApiProperty({ example: 77.9 }) collectionRatePct!: number
   @ApiProperty({ example: 56400 }) unpaidInPeriodValue!: number
   @ApiProperty({ example: 48 }) unpaidInPeriodStatements!: number
+  /** Solo invoices cuyo período cae entero en el rango (la base de las cards de Income). */
+  @ApiProperty({ example: 230000 }) invoicedInRangeValue!: number
+  @ApiProperty({ example: 180000 }) collectedInRangeValue!: number
+  @ApiProperty({ example: 78.3 }) collectionRateInRangePct!: number
 }

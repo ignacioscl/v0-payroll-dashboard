@@ -1,0 +1,53 @@
+---
+description: Every frontend change must work on mobile (375px wide) — no horizontal page scroll, nothing cut off — and is checked at mobile width before delivering.
+globs: v0-payroll-dashboard/frontend/**/*.{ts,tsx,css}
+alwaysApply: true
+---
+
+# Everything in the frontend works on mobile
+
+Any screen, section, card, table, dialog or control you add or change in v0 **must work on a
+phone (375px wide)**, not only on desktop. A change that only looks right on desktop is not done.
+
+## Do
+
+- **Grids start at one column** and add columns at breakpoints: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
+  Never a bare `grid-cols-3` / `grid-cols-4` without a `grid-cols-1` (or `grid-cols-2` for tiny tiles) base.
+- **Card grids flow by available width, not by a fixed column count.** Cards (KPI cards, tiles) use
+  `grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))]` (pick the min width the card needs), so a
+  card drops to the next row when it no longer fits instead of squeezing its text — this matters at
+  every width (1200px with the sidebar open too), not only on phones. A fixed `lg:grid-cols-4` is only
+  OK when every card is guaranteed to fit at that breakpoint.
+- **Flex rows that hold several items wrap or stack** on small screens: `flex-wrap`, or `flex-col sm:flex-row`.
+- **Flex children with text get `min-w-0`** (and `truncate` or wrapping), so long text shrinks instead of
+  pushing the row past the screen.
+- **Fixed widths only with a mobile fallback**: `w-full sm:w-[240px]`, never a bare `w-[480px]` on a container.
+- **Wide content scrolls inside its own box**, not the page: tables go in `DataTable` / `overflow-x-auto`
+  containers; charts use responsive containers.
+- **Dialogs and sheets fit the screen**: `max-w-[calc(100%-2rem)]` / full width on mobile.
+- **Type scales down on mobile.** Page titles, section headings, big KPI numbers and icons are
+  smaller below `sm`: e.g. `text-2xl sm:text-3xl` for a page title, `text-lg sm:text-xl` for a section
+  heading, `text-lg sm:text-[22px]` for a KPI value, `h-10 w-10 sm:h-14 sm:w-14` for a heading icon.
+  Desktop sizes never apply unchanged to a 375px screen.
+- **Tabs and toolbars** with many items use a grid or wrap that fits 375px (e.g. `grid-cols-2 sm:grid-cols-4`).
+
+## Check before delivering
+
+1. Open the screen in the Browser pane and switch to mobile: `resize_window` with `preset: "mobile"` (375×812).
+2. Confirm there is **no horizontal page scroll** (`document.documentElement.scrollWidth <= window.innerWidth`)
+   and that nothing is cut at the right edge.
+3. Take a mobile screenshot as proof, then reset with `preset: "desktop"`.
+
+If you cannot open the screen (for example it needs a login you can't enter), say so explicitly — do not
+report the change as verified on mobile.
+
+## Do NOT
+
+- Ship a layout that was only looked at on desktop.
+- Let a single wide element (long title, fixed-width input, table, chart) widen the whole page.
+- Hide content on mobile to "fix" overflow unless the user asked for it.
+
+## Why
+
+On 2026-09-18 Ignacio found the Dashboard cut off at the right on a phone right after a KPI card change
+was delivered without a mobile check.

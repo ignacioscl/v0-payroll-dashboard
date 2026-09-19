@@ -6,6 +6,7 @@ import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { SrsCursorDto, SrsCursorPagedResponseDto } from '../../shared/dto/srs-paged-response.dto'
 import { IsValidPunchDateRange } from '../punch-date-range'
 import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
+import { ERROR_TYPES_CSV_PATTERN } from '../repository/punch-error-types'
 
 /**
  * Columnas por las que se puede ordenar el listado (whitelist).
@@ -135,13 +136,13 @@ export class PunchListQueryDto extends SrsKpiQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Lista blanca de tipos de error (1=sin salida, 2=sin descanso, 3=turno 20h+). ' +
-      'Ausente = 1,2,3. Duplicados o tokens fuera de {1,2,3} => 400.',
-    example: '1,3',
+      'Lista blanca de tipos de flag (1..8). Ausente = 1,2,3 (legacy). ' +
+      'Duplicados o tokens fuera de {1..8} => 400.',
+    example: '1,3,4,8',
   })
   @IsOptional()
-  @Matches(/^[123](,[123]){0,2}$/, {
-    message: 'errorTypes must be a comma-separated list of 1, 2 and/or 3.',
+  @Matches(ERROR_TYPES_CSV_PATTERN, {
+    message: 'errorTypes must be a comma-separated list of 1-8.',
   })
   errorTypes?: string
 
@@ -278,6 +279,13 @@ export class PunchListRowDto {
   dealer!: PunchListDealerDto | null
   @ApiPropertyOptional({ type: PunchListBadPunchDto, nullable: true })
   badPunch!: PunchListBadPunchDto | null
+
+  /**
+   * Eventos de Fake GPS (`*_mock_gps = 1`) en TTK_EMPLOYEE_WORK_EXT.
+   * Vacío si no hay fila EXT o ningún flag en 1. `0` y `NULL` no entran.
+   */
+  @ApiPropertyOptional({ example: ['clock_in', 'clock_out'] })
+  fakeGpsEvents?: string[]
 
   /**
    * Codigo de TTK_PUNCH_WITH_ERROR_V2 (1 sin salida, 2 sin descanso, 3 turno 20h+).

@@ -49,8 +49,8 @@ export type PunchExportLabels = {
   /** Columnas de datos que sólo aparecen en modo Corrected. */
   colCorrectedTypes: string
   colLastCorrectedAt: string
-  /** Nombre visible de cada codigo de TTK_PUNCH_WITH_ERROR_V2. */
-  errorTypeNames: Record<1 | 2 | 3, string>
+  /** Nombre visible de cada código de flag 1..8. */
+  errorTypeNames: Record<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8, string>
 }
 
 const EN: PunchExportLabels = {
@@ -96,6 +96,7 @@ const EN: PunchExportLabels = {
     manual_punch: 'Manual punch',
     only_deletes: 'Deleted punches',
     without_salary: 'Without salary',
+    only_flagged: 'Only flagged',
     only_fixed: 'Corrected punches',
   },
   errorTypes: 'Error types',
@@ -107,6 +108,11 @@ const EN: PunchExportLabels = {
     1: 'Without clock out',
     2: 'Break missing',
     3: 'Shift 20h+',
+    4: 'Without salary',
+    5: 'Manual punch',
+    6: 'Deleted punches',
+    7: 'Payment type change',
+    8: 'Fake GPS',
   },
   liveStatusLabels: {
     working: 'Working',
@@ -158,6 +164,7 @@ const ES: PunchExportLabels = {
     manual_punch: 'Ponchada manual',
     only_deletes: 'Ponchadas eliminadas',
     without_salary: 'Sin sueldo',
+    only_flagged: 'Solo marcadas',
     only_fixed: 'Ponchadas corregidas',
   },
   errorTypes: 'Tipos de error',
@@ -169,6 +176,11 @@ const ES: PunchExportLabels = {
     1: 'Sin salida',
     2: 'Sin descanso',
     3: 'Turno 20h+',
+    4: 'Sin salario',
+    5: 'Ponchada manual',
+    6: 'Ponchadas eliminadas',
+    7: 'Cambio de tipo de pago',
+    8: 'Fake GPS',
   },
   liveStatusLabels: {
     working: 'Trabajando',

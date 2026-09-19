@@ -1,11 +1,12 @@
 'use client'
 
 import type { LucideIcon } from 'lucide-react'
-import { AlertTriangle, Clock, Coffee, Timer } from 'lucide-react'
+import { AlertTriangle, Clock, Coffee, MapPin, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { formatFakeGpsLabel } from '@/lib/ttk/error-type-meta'
 
 type PunchErrorBadge = {
   label: string
@@ -54,9 +55,38 @@ export function parsePunchErrorBadges(res: string): PunchErrorBadge[] {
     .map(classifyPunchError)
 }
 
-export function PunchErrorIndicator({ errorText }: { errorText: string }) {
+export function PunchErrorIndicator({
+  errorText,
+  fakeGpsEvents,
+  withoutSalary,
+}: {
+  errorText?: string | null
+  fakeGpsEvents?: string[] | null
+  withoutSalary?: boolean
+}) {
   const { t } = useTranslation()
-  const badges = parsePunchErrorBadges(errorText)
+  const badges = parsePunchErrorBadges(errorText ?? '')
+  const fakeGpsLabel = formatFakeGpsLabel(t, fakeGpsEvents)
+  if (fakeGpsLabel) {
+    badges.push({
+      label: fakeGpsLabel,
+      className:
+        'border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-200',
+      icon: MapPin,
+    })
+  }
+  if (withoutSalary) {
+    badges.push({
+      label: t('punch.withoutSalary'),
+      className:
+        'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
+      icon: AlertTriangle,
+    })
+  }
+
+  if (badges.length === 0) return null
+
+  const aria = badges.map((badge) => badge.label).join(', ')
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
@@ -64,7 +94,7 @@ export function PunchErrorIndicator({ errorText }: { errorText: string }) {
         <button
           type="button"
           className="inline-flex shrink-0 cursor-pointer rounded-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`${t('punch.issues')}: ${errorText}`}
+          aria-label={`${t('punch.issues')}: ${aria}`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
         </button>

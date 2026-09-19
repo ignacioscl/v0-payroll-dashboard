@@ -148,7 +148,8 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   } else {
     const split = opts.withPeriodSplit
       ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange`
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange,
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND w.paid = 1 THEN ${lineAmt} ELSE 0 END), 0), 2) AS collectedInRange`
       : ''
     const lag = opts.withAvgDoneToInvoiced
       ? `,
@@ -201,7 +202,8 @@ export function ttkBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   } else {
     const split = opts.withPeriodSplit
       ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange`
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange,
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND (${PAID}) THEN ${lineAmt} ELSE 0 END), 0), 2) AS collectedInRange`
       : ''
     const over60 = opts.withOver60
       ? `,
@@ -291,7 +293,8 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
   const valueExpr = genericValueForOpts(opts, buckets)
   const split = opts.withPeriodSplit
     ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${valueExpr} ELSE 0 END), 0), 2) AS invoicedInRange`
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${valueExpr} ELSE 0 END), 0), 2) AS invoicedInRange,
+      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND (${PAID}) THEN ${valueExpr} ELSE 0 END), 0), 2) AS collectedInRange`
     : ''
   const over60 = opts.withOver60
     ? `,

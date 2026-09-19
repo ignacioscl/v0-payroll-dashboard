@@ -13,7 +13,7 @@ import {
   SrsPermissionRepository,
 } from '../auth/srs-permission.repository'
 import { parseDealerIds, skipDealerRestrictionForRol } from '../shared/kpi/srs-kpi-dealer-filter'
-import { DEFAULT_ERROR_TYPES, isDefaultErrorTypes } from './repository/punch-error-types'
+import { DEFAULT_ERROR_TYPES, effectiveErrorTypes, isDefaultErrorTypes } from './repository/punch-error-types'
 
 export type PunchAccessQuery = {
   idDealer: string
@@ -36,7 +36,7 @@ export type PunchAccessPolicy = {
   canViewPaymentAmounts: boolean
   dealerIds: number[]
   skipDealerRestriction: boolean
-  /** `interno && lista parcial` — ver T.0.5 del plan. */
+  /** `interno && lista V2 parcial` — ver T.0.5 del plan. */
   includeErrorType: boolean
   /**
    * Si las correcciones sobre ponchadas ya eliminadas entran a la lista.
@@ -46,6 +46,11 @@ export type PunchAccessPolicy = {
    * corrección, pero VERLA exige `Punch > Delete Punch`.
    */
   includeDeletedFixes: boolean
+  /**
+   * Lista blanca YA recortada por permiso (T.0.6). Es la que entra a filtros,
+   * agregados, ranking y export. 4/7 salen sin pago; 6 sale sin delete.
+   */
+  effectiveErrorTypes: readonly number[]
 }
 
 @Injectable()
@@ -80,8 +85,7 @@ export class PunchAccessPolicyService {
     if (ctx.isUserDealer && !defaultErrorTypes) {
       throw new ForbiddenException('External users can only view all punches.')
     }
-    // El código de error por fila sólo existe cuando hay algo que re-decidir, y
-    // nunca para un externo (que ni siquiera puede filtrar por tipo).
+    // El código de error V2 por fila sólo existe cuando hay algo que re-decidir.
     const includeErrorType = !ctx.isUserDealer && !defaultErrorTypes
 
     const canViewPaymentTypeName =
@@ -112,6 +116,12 @@ export class PunchAccessPolicyService {
       await this.assertEmployeeInScope(ctx, query.idEmployee, dealerIds, skipDealerRestriction)
     }
 
+    const resolvedTypes = effectiveErrorTypes(errorTypes, {
+      canViewPaymentType: canViewPaymentTypeName,
+      includeDeletedFixes,
+      isExternal: ctx.isUserDealer,
+    })
+
     return {
       canViewPaymentTypeName,
       canViewPaymentAmounts,
@@ -119,6 +129,7 @@ export class PunchAccessPolicyService {
       skipDealerRestriction,
       includeErrorType,
       includeDeletedFixes,
+      effectiveErrorTypes: resolvedTypes,
     }
   }
 
@@ -148,7 +159,17 @@ export class PunchAccessPolicyService {
   async assertDashboardRanking(
     ctx: SrsContext,
     idDealer: string,
-  ): Promise<Pick<PunchAccessPolicy, 'dealerIds' | 'skipDealerRestriction' | 'includeDeletedFixes'>> {
+    errorTypes: readonly number[] = DEFAULT_ERROR_TYPES,
+  ): Promise<
+    Pick<
+      PunchAccessPolicy,
+      | 'dealerIds'
+      | 'skipDealerRestriction'
+      | 'includeDeletedFixes'
+      | 'effectiveErrorTypes'
+      | 'canViewPaymentTypeName'
+    >
+  > {
     // Externos afuera: Punch Report ya les prohíbe mirar por errores, y el ranking
     // no es otra cosa. Tampoco ven el Dashboard (el front los manda a /issues).
     if (ctx.isUserDealer) {
@@ -164,7 +185,24 @@ export class PunchAccessPolicyService {
     // `getFixFrom()` en PHP.
     const includeDeletedFixes = await this.resolveDeletedVisibility(ctx)
 
-    return { dealerIds, skipDealerRestriction, includeDeletedFixes }
+    const canViewPaymentTypeName =
+      (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_VIEW_PAYMENT_TYPE)) ||
+      (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE)) ||
+      (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EDIT_PAYMENT_TYPE_ALT))
+
+    const resolvedTypes = effectiveErrorTypes(errorTypes, {
+      canViewPaymentType: canViewPaymentTypeName,
+      includeDeletedFixes,
+      isExternal: false,
+    })
+
+    return {
+      dealerIds,
+      skipDealerRestriction,
+      includeDeletedFixes,
+      canViewPaymentTypeName,
+      effectiveErrorTypes: resolvedTypes,
+    }
   }
 
   /**

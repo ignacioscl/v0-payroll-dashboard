@@ -4,7 +4,8 @@ import { PUNCH_ISSUE_TYPES } from '../punch-issue-types'
 import { resolveGroupedIssueFilter } from './punch-grouped-issue-filter'
 
 const ALL = [1, 2, 3]
-const MARK_ALL = "TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1,2,3)"
+const V2_MARK = "TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1,2,3)"
+const MARK_ALL = `(${V2_MARK})`
 
 /** Rango obligatorio en modo Corrected: el filtro baja al ledger. */
 const RANGE = { fechaDesde: '2026-08-01', fechaHasta: '2026-08-31' }
@@ -90,7 +91,7 @@ describe('resolveGroupedIssueFilter', () => {
 
     it('la marca de error SIEMPRE sigue la lista, aun con issueType=all', () => {
       expect(resolveGroupedIssueFilter({ issueType: 'all', errorTypes: [1, 3] }).markSql).toBe(
-        "TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1,3)",
+        "(TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1,3))",
       )
     })
 
@@ -142,10 +143,13 @@ describe('resolveGroupedIssueFilter', () => {
       expect(res.extraSql).toContain('= 3')
     })
 
-    it('una lista vacia no llega al SQL: tira 400 en vez de IN ()', () => {
-      expect(() =>
-        resolveGroupedIssueFilter({ issueType: 'only_error', errorTypes: [] }),
-      ).toThrow(BadRequestException)
+    it('una lista vacia es vacio duro, no IN ()', () => {
+      expect(resolveGroupedIssueFilter({ issueType: 'only_error', errorTypes: [] }).extraSql).toBe(
+        ' AND 1=0',
+      )
+      expect(
+        resolveGroupedIssueFilter({ issueType: 'only_flagged', errorTypes: [] }).extraSql,
+      ).toBe(' AND 1=0')
     })
 
     it('un codigo fuera de {1,2,3} tira 400 antes de interpolar', () => {
@@ -162,6 +166,18 @@ describe('resolveGroupedIssueFilter', () => {
         expect(res.extraSql).not.toContain('?')
         expect(res.markSql).not.toContain('?')
       }
+    })
+
+    it('only_flagged pending OR-ea V2, sin salario y Fake GPS', () => {
+      const res = resolveGroupedIssueFilter({
+        issueType: 'only_flagged',
+        errorTypes: [1, 4, 8],
+      })
+      expect(res.estado).toBe(1)
+      expect(res.extraSql).toContain("TTK_PUNCH_WITH_ERROR_V2(tew.id, '') IN (1)")
+      expect(res.extraSql).toContain('id_payment_type IS NULL')
+      expect(res.extraSql).toContain('TTK_EMPLOYEE_WORK_EXT')
+      expect(res.skipOuterDateRange).toBe(false)
     })
   })
 
@@ -257,6 +273,34 @@ describe('resolveGroupedIssueFilter', () => {
       expect(res.marksCorrections).toBe(false)
       expect(res.markDetailSql).toContain('TTK_PUNCH_WITH_ERROR(tew.id)')
       expect(res.markDetailParams).toEqual([])
+    })
+
+    it('Manual va scoped a punch_in y dealers; el exterior de estado sigue 1 sin delete', () => {
+      const res = resolveGroupedIssueFilter({
+        issueType: 'only_fixed',
+        errorTypes: [5],
+        ...RANGE,
+        dealerIds: [10, 20],
+        includeDeletedFixes: false,
+      })
+      expect(res.estado).toBe(1)
+      expect(res.skipOuterDateRange).toBe(true)
+      expect(res.extraSql).toContain('tew.manual_create = 1')
+      expect(res.extraSql).toContain('tew.estado = 1')
+      expect(res.extraSql).toContain('tew.punch_in >= ?')
+      expect(res.extraSql).toContain('tew.id_dealer IN (?,?)')
+      expect(res.extraSql).not.toContain('TTK_PUNCH_ERROR_FIX')
+      expect(res.extraParams).toEqual(['2026-08-01', '2026-08-31', 10, 20])
+    })
+
+    it('sin permiso, Manual incluido no abre el estado exterior', () => {
+      const res = resolveGroupedIssueFilter({
+        issueType: 'only_fixed',
+        errorTypes: [1, 5],
+        ...RANGE,
+        includeDeletedFixes: false,
+      })
+      expect(res.estado).toBe(1)
     })
   })
 })

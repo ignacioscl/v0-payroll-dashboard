@@ -7,7 +7,7 @@ import { useTtkIssueCounts } from '@/hooks/use-ttk-issue-counts'
 import { IssuesDataTable } from '@/components/ttk/issues-data-table'
 import { GroupedIssuesDataTable } from '@/components/ttk/grouped-issues-table'
 import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
-import { KPICard, type KPICardVariant } from '@/components/dashboard/kpi-card'
+import { KPICard } from '@/components/dashboard/kpi-card'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,88 +21,19 @@ import {
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
 import {
   AlertTriangle,
-  LogOut,
-  Hand,
+  List,
   Info,
-  Trash2,
-  DollarSign,
-  CheckCheck,
-  Coffee,
-  Timer,
   LayoutList,
   Users,
 } from 'lucide-react'
-import { ERROR_TYPE_META } from '@/lib/ttk/error-type-meta'
 import { ALL_ERROR_TYPES } from '@/lib/filters/error-types-cookie'
+import { visibleFlagTypes } from '@/lib/ttk/error-type-meta'
+import { FlagTypeCards } from '@/components/ttk/flag-type-cards'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { getIssueFilterLabel } from '@/lib/i18n/label-helpers'
 import { effectiveErrorStatus, rangeStartsBeforeCorrectionsLog } from '@/lib/ttk/error-status'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-type IssueType =
-  | 'only_error'
-  | 'only_error_clockout'
-  | 'only_error_break'
-  | 'manual_punch'
-  | 'only_deletes'
-  | 'without_salary'
-  | 'only_fixed'
-
 type IssuesViewMode = 'individual' | 'grouped'
-
-interface IssueCardConfig {
-  type: IssueType
-  title: string
-  icon: React.ReactNode
-  variant: KPICardVariant
-}
-
-/**
- * Tarjetas que siguen siendo filtro radio de un clic.
- *
- * Los tres tipos de error salieron de acá: ahora son incluir/excluir y se
- * renderizan aparte (ERROR_TYPE_META). El 20h+ NUNCA entra a la unión
- * `IssueType`: si entrara, rompe el `Record<IssueType,...>` exhaustivo de
- * ISSUE_CARD_META y en runtime `counts[card.type].pending` sería
- * `undefined.pending`, porque TtkIssueCountsData no tiene ese bucket.
- */
-/**
- * `only_fixed` YA NO es una posición del radio: ese eje es el switch del header.
- * `ISSUE_CARD_META` sí conserva su entrada, porque el `Record<IssueType,…>` es
- * exhaustivo y sacarla rompe el tipado.
- */
-const ISSUE_CARD_TYPES: IssueType[] = [
-  'only_error',
-  'manual_punch',
-  'only_deletes',
-  'without_salary',
-]
-
-/** Ícono y variante de cada tipo de error, por código (no por posición). */
-const ERROR_TYPE_ICONS: Record<1 | 2 | 3, React.ReactNode> = {
-  1: <LogOut className="h-5 w-5" />,
-  2: <Coffee className="h-5 w-5" />,
-  3: <Timer className="h-5 w-5" />,
-}
-
-const ERROR_TYPE_VARIANTS: Record<1 | 2 | 3, KPICardVariant> = {
-  1: 'danger',
-  2: 'warning',
-  3: 'violet',
-}
-
-const ISSUE_CARD_META: Record<
-  IssueType,
-  { icon: React.ReactNode; variant: KPICardVariant }
-> = {
-  only_error: { icon: <AlertTriangle className="h-5 w-5" />, variant: 'warning' },
-  only_error_clockout: { icon: <LogOut className="h-5 w-5" />, variant: 'danger' },
-  only_error_break: { icon: <Coffee className="h-5 w-5" />, variant: 'warning' },
-  manual_punch: { icon: <Hand className="h-5 w-5" />, variant: 'info' },
-  only_deletes: { icon: <Trash2 className="h-5 w-5" />, variant: 'violet' },
-  without_salary: { icon: <DollarSign className="h-5 w-5" />, variant: 'success' },
-  only_fixed: { icon: <CheckCheck className="h-5 w-5" />, variant: 'info' },
-}
 
 function IssuesPageContent() {
   const { t } = useTranslation()
@@ -126,10 +57,8 @@ function IssuesPageContent() {
     selectedType,
     setSelectedType,
     errorStatus,
-    setErrorStatus,
     setSelectedTodayLiveStatus,
     filtersHydrated,
-    excludedErrorTypes,
     includedErrorTypes,
     toggleErrorType,
     errorTypesReady,
@@ -139,11 +68,14 @@ function IssuesPageContent() {
   const canViewDeleted = canDeletePunch(hasPermission, user?.isSystemAdmin)
   const canViewPayment = canViewPaymentType(hasPermission, user?.isSystemAdmin)
   const isExternal = Boolean(user?.isCompanyTypeCompany)
+  const visibleTypes = useMemo(
+    () => visibleFlagTypes({ canViewPaymentType: canViewPayment, canViewDeleted }),
+    [canViewPayment, canViewDeleted],
+  )
 
   const { data: paymentTypeOptions = [], isLoading: paymentTypesLoading } =
     usePaymentTypesCatalog(filtersHydrated && canViewPayment && !meLoading)
 
-  // Externals cannot use issue-type KPI filters — clear any persisted selection.
   useEffect(() => {
     if (!isExternal || meLoading) return
     if (selectedType !== 'all') {
@@ -151,21 +83,22 @@ function IssuesPageContent() {
     }
   }, [isExternal, meLoading, selectedType, setSelectedType])
 
-  // La URL se limpia apenas se leyó: un reload no tiene que reabrir Grouped por un
-  // parámetro viejo.
+  useEffect(() => {
+    if (selectedType === 'only_error') setSelectedType('only_flagged')
+    if (
+      selectedType === 'manual_punch' ||
+      selectedType === 'only_deletes' ||
+      selectedType === 'without_salary'
+    ) {
+      setSelectedType('all')
+    }
+  }, [selectedType, setSelectedType])
+
   useEffect(() => {
     if (viewFromUrl == null) return
     router.replace('/issues', { scroll: false })
   }, [viewFromUrl, router])
 
-  // D-6 - EXCLUSION MUTUA con la tarjeta *Without salary*: los dos piden lo
-  // mismo (`id_payment_type IS NULL` vs `IN (...)`), asi que no pueden estar
-  // activos a la vez. Ver PLAN.md 4.2.2bis.
-  //
-  // OJO: este efecto NO puede tener rama `else`. Con `else` la secuencia
-  // "tarjeta prendida -> tildo un tipo" se rompe: el handler apaga la tarjeta,
-  // `selectedType` cambia, este efecto corre y el `else` pisaria el combo,
-  // borrando el tipo que el usuario acaba de tildar.
   useEffect(() => {
     if (!canViewPayment) return
     if (selectedType === 'without_salary') {
@@ -180,30 +113,11 @@ function IssuesPageContent() {
     }
   }
 
-  const visibleIssueCards = useMemo((): IssueCardConfig[] => {
-    return ISSUE_CARD_TYPES.filter((type) => type !== 'only_deletes' || canViewDeleted).map(
-      (type) => ({
-        type,
-        title: getIssueFilterLabel(t, type),
-        ...ISSUE_CARD_META[type],
-      }),
-    )
-  }, [canViewDeleted, t])
-
-  // Fuente única (§T9bis): sin *Only with errors* —ninguna tarjeta, o Manual/Without
-  // salary/Deleted— el estado no aplica, así que `effectiveErrorStatus` devuelve
-  // 'pending' y las tarjetas no se activan por el switch (F6).
   const activeErrorStatus = effectiveErrorStatus(selectedType, errorStatus)
   const isCorrectedMode = activeErrorStatus === 'corrected'
-  // Con F6 el modo corregido sólo existe bajo `Only with errors`, así que alcanza
-  // con esa tarjeta: el `isCorrectedMode ||` de antes ya no agrega ningún caso.
-  const errorTypesActive = selectedType === 'only_error'
-  // La exclusión sólo cuenta bajo `Only with errors`; si no, los contadores
-  // muestran los números de siempre.
+  const errorTypesActive = selectedType === 'only_flagged' || selectedType === 'only_error'
   const activeIncludedErrorTypes = errorTypesActive ? includedErrorTypes : ALL_ERROR_TYPES
 
-  // Los contadores se piden SIEMPRE, incluso con los tres tipos destildados: son
-  // la única fuente del número real que muestra cada tarjeta tachada.
   const { counts, loading } = useTtkIssueCounts({
     search,
     selectedDealers,
@@ -214,75 +128,21 @@ function IssuesPageContent() {
     errorTypesReady,
   })
 
-  /**
-   * Las tres tarjetas de tipo viven DENTRO de `Only with errors`.
-   *
-   * Sin ese filtro la tabla lista todas las ponchadas, así que "excluir un tipo"
-   * no tiene sobre qué actuar: se muestran grisadas y sin efecto. Al prender
-   * `Only with errors` se activan, arrancan las tres tildadas (o con la
-   * exclusión guardada) y el usuario destilda la que no quiere ver.
-   */
   const noErrorTypes = errorTypesActive && includedErrorTypes.length === 0
 
-  const isExcluded = (code: number) => errorTypesActive && excludedErrorTypes.includes(code)
-
-  const selectFilter = (type: string) => {
-    const next = selectedType === type ? 'all' : type
-    setSelectedType(next)
-    if (next !== 'all') {
+  const selectShow = (type: 'all' | 'only_flagged') => {
+    setSelectedType(type)
+    if (type !== 'all') {
       setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     }
   }
 
-  /**
-   * Con los tres tipos destildados el front NO manda `error_types` (un CSV vacío
-   * sería un 400), así que el backend devuelve los agregados COMPLETOS. La
-   * proyección a cero la hace el cliente: los contadores se siguen pidiendo
-   * porque `by_type` es la única fuente del número real que muestra cada
-   * tarjeta tachada.
-   */
-  const totalPending = noErrorTypes ? 0 : counts.only_error.pending
-
-  /**
-   * En modo Corrected las cards cambian de BUCKET, no sólo de título: sin esto el
-   * switch cambiaba la grilla y dejaba las cards mintiendo.
-   */
+  const flaggedTotal = noErrorTypes
+    ? 0
+    : isCorrectedMode
+      ? counts.only_fixed.pending
+      : counts.only_flagged.pending
   const activeErrorBucket = isCorrectedMode ? counts.only_fixed : counts.only_error
-  const activeErrorTotal = noErrorTypes ? 0 : activeErrorBucket.pending
-  const statusSuffix = isCorrectedMode ? ` ${t('punch.errorStatusCorrected')}` : ''
-
-  const renderSubtitle = (type: IssueType): React.ReactNode => {
-    if (type === 'only_deletes' && counts.only_deletes.by_type) {
-      const bt = counts.only_deletes.by_type
-      const withError = bt.clock_out_missing + bt.break_missing + bt.shift_20h_plus
-      // El número grande son TODAS las eliminadas (D-A); el desglose puede sumar menos.
-      return (
-        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
-          <span>{t('punch.deletedWithError', { count: withError })}</span>
-        </div>
-      )
-    }
-    if (type === 'only_error' && activeErrorBucket.by_type) {
-      const { clock_out_missing, break_missing, shift_20h_plus } = activeErrorBucket.by_type
-      return (
-        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
-          <span>
-            {t('punch.clockOutBreakdown')}{' '}
-            <span className="font-medium text-foreground">{clock_out_missing}</span>
-          </span>
-          <span>
-            {t('punch.breakBreakdown')}{' '}
-            <span className="font-medium text-foreground">{break_missing}</span>
-          </span>
-          <span>
-            {t('punch.shift20hBreakdown')}{' '}
-            <span className="font-medium text-foreground">{shift_20h_plus}</span>
-          </span>
-        </div>
-      )
-    }
-    return null
-  }
 
   return (
     <div className="space-y-8">
@@ -298,14 +158,10 @@ function IssuesPageContent() {
               {loading
                 ? '…'
                 : isCorrectedMode
-                  ? // La grilla lista PONCHADAS y el card cuenta EVENTOS: una
-                    // ponchada con dos correcciones son dos eventos y una fila.
-                    // Las dos cifras se singularizan por separado: "2 correcciones
-                    // · 1 ponchada" es un caso real y frecuente.
-                    [
+                  ? [
                       t(
-                        activeErrorTotal === 1 ? 'punch.correctionsOne' : 'punch.correctionsMany',
-                        { count: activeErrorTotal },
+                        flaggedTotal === 1 ? 'punch.correctionsOne' : 'punch.correctionsMany',
+                        { count: flaggedTotal },
                       ),
                       t(
                         (counts.only_fixed.punches ?? 0) === 1
@@ -314,7 +170,12 @@ function IssuesPageContent() {
                         { count: counts.only_fixed.punches ?? 0 },
                       ),
                     ].join(' · ')
-                  : t('punch.withErrorsCount', { count: totalPending })}
+                  : errorTypesActive
+                    ? t('punch.withErrorsCount', { count: flaggedTotal })
+                    : t(
+                        counts.total_punches === 1 ? 'punch.punchesOne' : 'punch.punchesMany',
+                        { count: counts.total_punches },
+                      )}
             </span>
           </Badge>
         }
@@ -352,76 +213,45 @@ function IssuesPageContent() {
               // del área de contenido, no el del viewport. Con el sidebar abierto
               // el viewport puede tener 1540 y el panel sólo 1280.
               // A partir de 1280 de ANCHO PROPIO las cinco entran en una fila.
-              <div className="@container/issue-cards space-y-5">
-              <div className="grid grid-cols-1 gap-3 @[640px]/issue-cards:grid-cols-2 @[900px]/issue-cards:grid-cols-4 @[1280px]/issue-cards:grid-cols-5">
-                {visibleIssueCards.map((card) => (
-                  <KPICard
-                    key={card.type}
-                    title={card.type === 'only_error' ? `${card.title}${statusSuffix}` : card.title}
-                    value={
-                      // "Only with errors" es el único agregado de esta lista que
-                      // depende de los tipos: con los tres destildados va a 0.
-                      // Los otros cuatro no miran tipo de error.
-                      card.type === 'only_error' ? activeErrorTotal : counts[card.type].pending
-                    }
-                    icon={card.icon}
-                    variant={card.variant}
-                    loading={loading}
-                    filterCard
-                    onClick={() => selectFilter(card.type)}
-                    active={selectedType === card.type}
-                    subtitle={renderSubtitle(card.type)}
-                    hint={card.type === 'only_error' ? t('punch.onlyWithErrorsHint') : undefined}
-                    hintKey={card.type === 'only_error' ? 'issues.only-with-errors' : undefined}
-                  />
-                ))}
+              <div className="@container/flag-types space-y-5">
+              <div className="grid grid-cols-1 gap-3 @[640px]/flag-types:grid-cols-2">
+                <KPICard
+                  title={t('punch.allPunches')}
+                  value={counts.total_punches}
+                  icon={<List className="h-5 w-5" />}
+                  variant="default"
+                  loading={loading}
+                  filterCard
+                  inline
+                  onClick={() => selectShow('all')}
+                  active={selectedType === 'all'}
+                  hint={t('punch.allPunchesHint')}
+                  hintKey="issues.all-punches"
+                />
+                <KPICard
+                  title={`${t('punch.onlyFlagged')}${isCorrectedMode ? ` ${t('punch.errorStatusCorrected')}` : ''}`}
+                  value={flaggedTotal}
+                  icon={<AlertTriangle className="h-5 w-5" />}
+                  variant="warning"
+                  loading={loading}
+                  filterCard
+                  inline
+                  onClick={() => selectShow('only_flagged')}
+                  active={errorTypesActive}
+                  hint={t('punch.onlyFlaggedHint')}
+                  hintKey="issues.only-flagged"
+                />
               </div>
-
-              {/*
-                Segundo grupo, con su propio encabezado: estas tres NO son un
-                filtro más de la lista, son un sub-filtro de `Only with errors`.
-                Sin ese filtro se ven grisadas, para que no parezca que filtran.
-              */}
-              <div>
-                <div className="mb-3 flex flex-wrap items-baseline gap-2">
-                  <h4 className="text-[13px] font-semibold text-foreground">
-                    {t('punch.errorTypesGroupTitle')}
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    {errorTypesActive
-                      ? t('punch.errorTypesGroupHintOn')
-                      : t('punch.errorTypesGroupHintOff')}
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 @[640px]/issue-cards:grid-cols-2 @[900px]/issue-cards:grid-cols-3">
-                {ERROR_TYPE_META.map((meta) => {
-                  const excluded = isExcluded(meta.code)
-                  return (
-                    <KPICard
-                      key={`error-type-${meta.code}`}
-                      title={t(meta.labelKey)}
-                      value={activeErrorBucket.by_type?.[meta.byTypeKey] ?? 0}
-                      icon={ERROR_TYPE_ICONS[meta.code]}
-                      variant={ERROR_TYPE_VARIANTS[meta.code]}
-                      loading={loading}
-                      filterCard
-                      onClick={errorTypesActive ? () => toggleErrorType(meta.code) : undefined}
-                      active={errorTypesActive && !excluded}
-                      excluded={excluded}
-                      inactive={!errorTypesActive}
-                      hintKey="issues.error-types"
-                      hint={
-                        !errorTypesActive
-                          ? t('punch.errorTypeHintInactive')
-                          : excluded
-                            ? t('punch.errorTypeHintExcluded', { type: t(meta.labelKey) })
-                            : t('punch.errorTypeHintIncluded', { type: t(meta.labelKey) })
-                      }
-                    />
-                  )
-                })}
-                </div>
-              </div>
+              <FlagTypeCards
+                status={activeErrorStatus}
+                visibleMetas={visibleTypes}
+                byType={activeErrorBucket.by_type}
+                fakeGpsWithData={counts.fake_gps.with_data}
+                includedErrorTypes={includedErrorTypes}
+                typesActive={errorTypesActive}
+                onToggle={toggleErrorType}
+                loading={loading}
+              />
               </div>
             )
         }

@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs'
 
 import type {
   DealerRankingStatus,
+  PunchDealerRankingByTypeDto,
   PunchDealerRankingEmployeeRow,
   PunchDealerRankingRowDto,
 } from './dto/punch-dealer-ranking.dto'
@@ -17,6 +18,7 @@ import {
   punchDealerRankingLabels,
   type PunchDealerRankingLabels,
 } from './punch-dealer-ranking-labels'
+import { typesForMode } from './repository/punch-error-types'
 
 export type DealerRankingWorkbookOptions = {
   locale: PunchExportLocale
@@ -40,12 +42,17 @@ type RankingColumn = {
   value: (row: RankingRow, index: number) => string | number
 }
 
-/** Código de `TTK_PUNCH_WITH_ERROR_V2` → campo del desglose por tipo. */
-const BY_TYPE_KEY = {
+/** Código de flag → campo del desglose por tipo. */
+const BY_TYPE_KEY: Record<number, keyof PunchDealerRankingByTypeDto> = {
   1: 'clockOutMissing',
   2: 'breakMissing',
   3: 'shift20hPlus',
-} as const
+  4: 'withoutSalary',
+  5: 'manual',
+  6: 'deleted',
+  7: 'paymentTypeChange',
+  8: 'fakeGps',
+}
 
 /**
  * Columnas de las hojas de datos, las mismas del modal: `#` (la posición en el
@@ -72,13 +79,14 @@ function rankingColumns(
   } else {
     columns.push({ header: labels.colErrors, width: 14, value: (row) => row.total })
   }
-  for (const type of errorTypes) {
-    const code = type as 1 | 2 | 3
-    const key = BY_TYPE_KEY[code]
+  for (const type of typesForMode(errorTypes, status)) {
+    const key = BY_TYPE_KEY[type]
+    if (!key) continue
+    const name = labels.errorTypeNames[type as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8] ?? String(type)
     columns.push({
-      header: labels.errorTypeNames[code],
+      header: name,
       width: 18,
-      value: (row) => row.byType[key],
+      value: (row) => row.byType[key] ?? 0,
     })
   }
   return columns

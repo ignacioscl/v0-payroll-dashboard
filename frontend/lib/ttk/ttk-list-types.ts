@@ -53,6 +53,8 @@ export type TtkListRow = {
   objPaymentType?: { id?: number; name?: string } | null
   hourlyRate?: number | null
   typePayment?: number | null
+  errorType?: number | null
+  fakeGpsEvents?: string[] | null
 }
 
 export type TtkListResponse = {
