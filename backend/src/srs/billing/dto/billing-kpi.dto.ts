@@ -77,8 +77,17 @@ export class BillingPeriodCollectionKpiDto {
   @ApiProperty({ example: 77.9 }) collectionRatePct!: number
   @ApiProperty({ example: 56400 }) unpaidInPeriodValue!: number
   @ApiProperty({ example: 48 }) unpaidInPeriodStatements!: number
-  /** Solo invoices cuyo período cae entero en el rango (la base de las cards de Income). */
-  @ApiProperty({ example: 230000 }) invoicedInRangeValue!: number
-  @ApiProperty({ example: 180000 }) collectedInRangeValue!: number
-  @ApiProperty({ example: 78.3 }) collectionRateInRangePct!: number
+  /**
+   * Las mismas líneas que las tres cards facturadas de Income: WO Invoiced (todo el trabajo de WO
+   * del rango, también de invoices que cruzan el rango), TTK y Generic Invoiced (solo invoices con el
+   * período entero en el rango). Valoradas como Income: WO y generic sin tax ni descuento, TTK tipo 5
+   * con descuento. `incomeCollectedValue` es el número grande de Collected.
+   */
+  @ApiProperty({ example: 228000 }) incomeInvoicedValue!: number
+  @ApiProperty({ example: 178500 }) incomeCollectedValue!: number
+  /** Las mismas líneas, con tax y descuento (plata real): los subtítulos de Collected y Unpaid. */
+  @ApiProperty({ example: 230000 }) incomeInvoicedRealValue!: number
+  @ApiProperty({ example: 180000 }) incomeCollectedRealValue!: number
+  /** incomeCollectedValue / incomeInvoicedValue. */
+  @ApiProperty({ example: 78.3 }) incomeCollectionRatePct!: number
 }

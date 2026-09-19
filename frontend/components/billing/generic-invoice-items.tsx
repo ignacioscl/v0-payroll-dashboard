@@ -33,7 +33,7 @@ export type GenericFreeDraft = {
   key: string
   idRel?: number
   description: string
-  qty: number | null
+  qty: number
   unitAmount: number
   isPaid?: boolean
 }
@@ -79,9 +79,10 @@ export function lineDisplayTotal(item: GenericItemDraft): number {
 const EYEBROW =
   'text-[10.5px] font-semibold uppercase tracking-[0.085em] text-muted-foreground leading-none'
 
-function parseOptionalQty(raw: string): { ok: true; value: number | null } | { ok: false } {
+/** Qty is required on free lines: empty, 0 or negative is rejected. */
+function parseQty(raw: string): { ok: true; value: number } | { ok: false } {
   const trimmed = raw.trim()
-  if (trimmed === '') return { ok: true, value: null }
+  if (trimmed === '') return { ok: false }
   const n = Number(trimmed)
   if (!Number.isFinite(n) || n < 0.01 || n > 9999999.99) return { ok: false }
   return { ok: true, value: Math.round(n * 100) / 100 }
@@ -177,7 +178,7 @@ export function GenericInvoiceItems({
       toast.error(t('invoices.generic.descriptionTooLong'))
       return
     }
-    const parsedQty = parseOptionalQty(qty)
+    const parsedQty = parseQty(qty)
     if (!parsedQty.ok) {
       toast.error(t('invoices.generic.qtyInvalid'))
       return
@@ -213,7 +214,7 @@ export function GenericInvoiceItems({
     const currentDescription = (descItem?.name ?? descTerm).trim()
     let nextItems = items.filter((item) => item.key !== row.key)
     if (currentDescription) {
-      const parsedQty = parseOptionalQty(qty)
+      const parsedQty = parseQty(qty)
       const amount = parseUnitAmount(unitAmount)
       const exists = nextItems.some(
         (item) =>
@@ -238,7 +239,7 @@ export function GenericInvoiceItems({
     onChange(nextItems)
     setDescItem(toCustomCatalogItem(row.description))
     setDescTerm('')
-    setQty(row.qty == null ? '' : String(row.qty))
+    setQty(String(row.qty))
     setUnitAmount(String(row.unitAmount))
   }
 
@@ -407,13 +408,7 @@ export function GenericInvoiceItems({
                       )}
                     </TableCell>
                     <TableCell className="py-2.5 pr-0 pl-3 text-right font-mono text-[13.5px] tabular-nums">
-                      {item.kind === 'ttk' ? (
-                        fmtNum(item.hoursReg)
-                      ) : item.qty == null ? (
-                        <span className="text-muted-foreground/50">—</span>
-                      ) : (
-                        item.qty
-                      )}
+                      {item.kind === 'ttk' ? fmtNum(item.hoursReg) : item.qty}
                     </TableCell>
                     <TableCell className="py-2.5 pr-0 pl-3 text-right font-mono text-[13.5px] font-medium tabular-nums">
                       {fmtNum(lineDisplayTotal(item))}

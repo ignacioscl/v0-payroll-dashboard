@@ -1305,6 +1305,8 @@ export interface Messages {
     outstandingArOutsideChart: string
     unpaidInPeriod: string
     unpaidInPeriodStatements: string
+    withTaxDiscount: string
+    unpaidNotInvoiced: string
     dsoVsPrevCheck: string
     collectedOverInvoiced: string
     ofTotalOutstanding: string

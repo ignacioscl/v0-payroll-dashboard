@@ -9,10 +9,15 @@
  */
 export function statementNetFactorSql(s = 's'): string {
   return `((CASE WHEN ${s}.statement_type = 6 THEN 1 + IFNULL(${s}.tax, 0) / 100 ELSE 1 END)
-    * (CASE WHEN IFNULL(${s}.discount, 0) = 0 THEN 1
+    * ${statementDiscountFactorSql(s)})`
+}
+
+/** Discount of GET_TOTAL_BY_STATEMENT as a per-line factor (no tax). */
+export function statementDiscountFactorSql(s = 's'): string {
+  return `(CASE WHEN IFNULL(${s}.discount, 0) = 0 THEN 1
       WHEN ${s}.discount_type = 2
         THEN IFNULL(1 - ${s}.discount / NULLIF(GET_SUBTOTAL_BY_STATEMENT(${s}.id, NULL), 0), 1)
-      ELSE 1 - 0.01 * ${s}.discount END))`
+      ELSE 1 - 0.01 * ${s}.discount END)`
 }
 
 /** BILLING.estado = 1 on the statement or the line. Two LEFT JOINs — no OR + correlated IN. */
@@ -30,9 +35,17 @@ export function billedJoinsParams(idDealerProvider: number): number[] {
   return [idDealerProvider, idDealerProvider]
 }
 
-/** Line amount for a generic (qty × amount × invoice net factor). */
-export function genericLineAmountSql(lineAlias = 'isir', statementAlias = 's'): string {
-  return `IFNULL(${lineAlias}.generic_qty, 1) * ${lineAlias}.amount * ${statementNetFactorSql(statementAlias)}`
+/**
+ * Line amount for a generic: effective qty (empty or 0 = 1) × amount × invoice net factor.
+ * withNetFactor = false values it like the legacy Production Report: no tax, no discount.
+ */
+export function genericLineAmountSql(
+  lineAlias = 'isir',
+  statementAlias = 's',
+  withNetFactor = true,
+): string {
+  const base = `IF(IFNULL(${lineAlias}.generic_qty, 0) > 0, ${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
+  return withNetFactor ? `${base} * ${statementNetFactorSql(statementAlias)}` : base
 }
 
 /**
@@ -45,8 +58,9 @@ export function genericProratedValueSql(
   toExpr: string,
   statementAlias = 's',
   lineAlias = 'isir',
+  withNetFactor = true,
 ): string {
-  const amount = genericLineAmountSql(lineAlias, statementAlias)
+  const amount = genericLineAmountSql(lineAlias, statementAlias, withNetFactor)
   return `CASE WHEN ${statementAlias}.fecha_desde = ${statementAlias}.fecha_hasta
      THEN ${amount}
      ELSE GET_TOTAL_INV_GENERIC_DATE_RAGE(1, ${statementAlias}.fecha_desde, DATE_SUB(${statementAlias}.fecha_hasta, INTERVAL 1 DAY),

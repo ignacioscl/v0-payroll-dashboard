@@ -9,8 +9,9 @@ export function dividirYRedondear(numerador: number, divisor: number): number {
   return signo * Math.trunc((Math.abs(numerador) + divisor / 2) / divisor)
 }
 
+/** Empty or 0 qty counts as 1: the line is worth its price. */
 export function valorLinea(importe: number, cantidad: number | null): number {
-  return aCentavos(importe) * (cantidad == null ? 100 : aCentavos(cantidad))
+  return aCentavos(importe) * (cantidad == null || cantidad <= 0 ? 100 : aCentavos(cantidad))
 }
 
 export function valorLineaTtk(amountDealer: number): number {

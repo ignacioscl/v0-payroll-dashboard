@@ -1,6 +1,7 @@
 /**
  * Single source of billed money for Billing and Open AR KPIs.
  * WO / TTK / generic lines with invoice net factor, unique WO services, and paid = line or statement.
+ * productionValue switches to the legacy Production Report valuation (Income cards).
  */
 
 import {
@@ -16,6 +17,7 @@ import {
   genericLineAmountSql,
   genericProratedValueSql,
   genericRangeOverlapSql,
+  statementDiscountFactorSql,
   statementNetFactorSql,
 } from './srs-kpi-generic'
 import {
@@ -50,6 +52,17 @@ export interface BilledLinesOpts {
   idsOnly?: boolean
   monthBuckets?: DateBucket[]
   weekBuckets?: DateBucket[]
+  /**
+   * Value lines like the legacy Production Report: WO and generic lines without tax or
+   * discount; TTK statement (type 5) lines keep the statement discount.
+   */
+  productionValue?: boolean
+  /**
+   * With withPeriodSplit: also return invoicedProduction / collectedProduction (all lines) and
+   * invoicedInRangeProduction / collectedInRangeProduction (whole invoices), valued like
+   * productionValue, in the same pass as the billed columns.
+   */
+  withProductionSplit?: boolean
 }
 
 const PAID = 'ps.id_statement IS NOT NULL OR pl.id_statement_inv_rel IS NOT NULL'
@@ -112,10 +125,34 @@ function periodContainedSql(s: string, range?: DateRange | null): string {
   return `${s}.fecha_desde >= ${sqlDateLit(range.fechaDesde)} AND ${s}.fecha_hasta <= ${sqlDateLit(range.fechaHasta)}`
 }
 
+/** In-range invoiced / collected columns for one valuation, with a column-name suffix. */
+function periodSplitCols(
+  range: DateRange | null | undefined,
+  amt: string,
+  paidExpr: string,
+  suffix = '',
+): string {
+  const inRange = periodContainedSql('s', range)
+  return `,
+      ROUND(IFNULL(SUM(CASE WHEN ${inRange} THEN ${amt} ELSE 0 END), 0), 2) AS invoicedInRange${suffix},
+      ROUND(IFNULL(SUM(CASE WHEN ${inRange} AND ${paidExpr} THEN ${amt} ELSE 0 END), 0), 2) AS collectedInRange${suffix}`
+}
+
+function periodSplitSql(opts: BilledLinesOpts, lineAmt: string, productionAmt: string, paidExpr: string): string {
+  if (!opts.withPeriodSplit) return ''
+  const billed = periodSplitCols(opts.range, lineAmt, paidExpr)
+  if (!opts.withProductionSplit) return billed
+  return `${billed},
+      ROUND(IFNULL(SUM(${productionAmt}), 0), 2) AS invoicedProduction,
+      ROUND(IFNULL(SUM(CASE WHEN ${paidExpr} THEN ${productionAmt} END), 0), 2) AS collectedProduction${periodSplitCols(opts.range, productionAmt, paidExpr, 'Production')}`
+}
+
 export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   const groupBy = opts.groupBy ?? 'none'
   const factor = statementNetFactorSql('s')
-  const lineAmt = `isr.price * IFNULL(isr.qty, 1) * ${factor}`
+  // Production Report value of a WO service: price × qty, no discount.
+  const productionAmt = 'isr.price * IFNULL(isr.qty, 1)'
+  const lineAmt = opts.productionValue ? productionAmt : `${productionAmt} * ${factor}`
   const lineZero = applyZeroFilter(opts.includeZero, woServiceLineNonZeroSql())
   const unpaid = opts.debtOnly
   const idsOnly = opts.idsOnly
@@ -128,6 +165,13 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
     params.push(opts.range.fechaDesde)
   }
 
+  // With a range, keep the window functions to the in-range invoices: partitions are per invoice,
+  // so each one enters whole or not at all and rn / paid stay the same.
+  const invScope = opts.range
+    ? `JOIN INVOICE i0 ON i0.id = r.id_invoice AND i0.estado = 1 AND i0.id_dealer_provider = ?
+      AND i0.fecha_alta >= ? AND i0.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)`
+    : ''
+
   const derived = `(
     SELECT r.id AS rel_id, s.id AS stmt_id, r.id_invoice, r.id_invoice_service,
       ROW_NUMBER() OVER (PARTITION BY r.id_invoice, r.id_invoice_service ORDER BY s.id) AS rn,
@@ -136,21 +180,22 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
     FROM INVOICE_STATEMENT s
     JOIN INVOICE_STATEMENT_INV_REL r ON r.id_statement = s.id AND IFNULL(r.only_timecard, 0) = 0
     ${billedJoinsSql('s.id', 'r.id')}
+    ${invScope}
     WHERE s.estado = 1 AND s.id_dealer_provider = ?
       AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
   ) w`
 
-  params.push(...billedJoinsParams(opts.idDealerProvider), opts.idDealerProvider)
+  params.push(
+    ...billedJoinsParams(opts.idDealerProvider),
+    ...(opts.range ? [opts.idDealerProvider, opts.range.fechaDesde, opts.range.fechaHasta] : []),
+    opts.idDealerProvider,
+  )
 
   let selectSql: string
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT w.stmt_id AS id'
   } else {
-    const split = opts.withPeriodSplit
-      ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND w.paid = 1 THEN ${lineAmt} ELSE 0 END), 0), 2) AS collectedInRange`
-      : ''
+    const split = periodSplitSql(opts, lineAmt, productionAmt, 'w.paid = 1')
     const lag = opts.withAvgDoneToInvoiced
       ? `,
       ROUND(AVG(DATEDIFF(s.fecha_create, i.date_last_chg_workflow)), 1) AS avgDoneToInvoicedDays`
@@ -183,7 +228,10 @@ WHERE w.rn = 1
 export function ttkBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   const groupBy = opts.groupBy ?? 'none'
   const factor = statementNetFactorSql('s')
-  const lineAmt = `isir.amount * ${factor}`
+  // Production Report value: a TTK line inside a generic is its amount (no tax, no discount);
+  // a TTK statement (type 5) line keeps the statement discount, like GET_TOTAL_BY_STATEMENT.
+  const productionAmt = `isir.amount * (CASE WHEN s.statement_type = ${StatementType.GENERIC} THEN 1 ELSE ${statementDiscountFactorSql('s')} END)`
+  const lineAmt = opts.productionValue ? productionAmt : `isir.amount * ${factor}`
   const lineZero = applyZeroFilter(opts.includeZero, ttkAmountNonZeroSql())
   const unpaid = opts.debtOnly
   const idsOnly = opts.idsOnly
@@ -200,11 +248,7 @@ export function ttkBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT s.id AS id'
   } else {
-    const split = opts.withPeriodSplit
-      ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedInRange,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND (${PAID}) THEN ${lineAmt} ELSE 0 END), 0), 2) AS collectedInRange`
-      : ''
+    const split = periodSplitSql(opts, lineAmt, productionAmt, `(${PAID})`)
     const over60 = opts.withOver60
       ? `,
       ROUND(IFNULL(SUM(CASE WHEN tew.punch_in < DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN ${lineAmt} ELSE 0 END), 0), 2) AS invoicedOver60`
@@ -240,14 +284,24 @@ function genericOver60Expr(): string {
   return `CASE WHEN ${overlap} THEN ${prorated} ELSE 0 END`
 }
 
-function genericValueForOpts(opts: BilledLinesOpts, buckets: DateBucket[] | undefined): string {
+function genericValueForOpts(
+  opts: BilledLinesOpts,
+  buckets: DateBucket[] | undefined,
+  withNetFactor: boolean,
+): string {
   if (buckets) {
-    return genericProratedValueSql('mo.ms', 'mo.me')
+    return genericProratedValueSql('mo.ms', 'mo.me', 's', 'isir', withNetFactor)
   }
   if (opts.range) {
-    return genericProratedValueSql(sqlDateLit(opts.range.fechaDesde), sqlDateLit(opts.range.fechaHasta))
+    return genericProratedValueSql(
+      sqlDateLit(opts.range.fechaDesde),
+      sqlDateLit(opts.range.fechaHasta),
+      's',
+      'isir',
+      withNetFactor,
+    )
   }
-  return genericLineAmountSql()
+  return genericLineAmountSql('isir', 's', withNetFactor)
 }
 
 export function genericBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
@@ -290,12 +344,10 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
     return { sql, params }
   }
 
-  const valueExpr = genericValueForOpts(opts, buckets)
-  const split = opts.withPeriodSplit
-    ? `,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} THEN ${valueExpr} ELSE 0 END), 0), 2) AS invoicedInRange,
-      ROUND(IFNULL(SUM(CASE WHEN ${periodContainedSql('s', opts.range)} AND (${PAID}) THEN ${valueExpr} ELSE 0 END), 0), 2) AS collectedInRange`
-    : ''
+  // Production Report value of a generic line: effective qty × amount, no tax, no discount.
+  const valueExpr = genericValueForOpts(opts, buckets, !opts.productionValue)
+  const productionExpr = genericValueForOpts(opts, buckets, false)
+  const split = periodSplitSql(opts, valueExpr, productionExpr, `(${PAID})`)
   const over60 = opts.withOver60
     ? `,
       ROUND(IFNULL(SUM(${genericOver60Expr()}), 0), 2) AS invoicedOver60`
@@ -364,7 +416,7 @@ export function billedStatementCohortSql(
             ROUND(100 * SUM(s.sended = 1) / NULLIF(COUNT(*), 0), 1) AS sentPct,
             IFNULL(SUM(s.sended = 0), 0) AS unsentStatements
           FROM (${woIds.sql} UNION ${ttkIds.sql} UNION ${genIds.sql}) ids
-          JOIN INVOICE_STATEMENT s ON s.id = ids.id
+          STRAIGHT_JOIN INVOICE_STATEMENT s ON s.id = ids.id
           WHERE 1=1${zero}`,
     params: [...woIds.params, ...ttkIds.params, ...genIds.params],
   }
@@ -406,7 +458,7 @@ export function woPartialOverlapCountSql(
   return {
     sql: `SELECT COUNT(*) AS partialOverlapWoStatements
           FROM (${woIds.sql}) ids
-          JOIN INVOICE_STATEMENT s ON s.id = ids.id
+          STRAIGHT_JOIN INVOICE_STATEMENT s ON s.id = ids.id
           WHERE (s.fecha_desde < ${sqlDateLit(fechaDesde)} OR s.fecha_hasta > ${sqlDateLit(fechaHasta)})${zero}`,
     params: [...woIds.params],
   }
