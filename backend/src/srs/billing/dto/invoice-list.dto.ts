@@ -6,6 +6,7 @@ import { SrsContext } from '../../auth/srs-auth-context.service'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import {
   parseDealerIds,
+  parseFilterDateDone,
   parseIncludeZero,
   skipDealerRestrictionForRol,
 } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -201,6 +202,16 @@ export class InvoiceListQueryDto extends SrsKpiQueryDto {
   @Transform(({ value }) => parseFlag01(value))
   ignorePeriod?: boolean
 
+  @ApiPropertyOptional({
+    description:
+      'When 1: also list the invoices that only partly fall in the period (at least one line ' +
+      'in range) and return partialInvoiced per row. Ignored with ignorePeriod or a number ' +
+      'search, because then there is no period to be partial about.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseFlag01(value))
+  includePartial?: boolean
+
   @ApiPropertyOptional({ description: 'Server-side sort column', enum: ['invoiceNro', 'dateFrom'] })
   @IsOptional()
   @IsIn(['invoiceNro', 'dateFrom'])
@@ -248,6 +259,10 @@ export interface InvoiceListFilter {
   employeeWorkedIds: number[]
   /** When true, do not add fecha_desde/fecha_hasta to the list WHERE. */
   ignorePeriod: boolean
+  /** When true, invoices with at least one line in range are listed too, with Partial Invoiced. */
+  includePartial: boolean
+  /** WO lines by Done date instead of created date (Closing "Filter Date Completed"). */
+  filterDateDone: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir: 'asc' | 'desc'
 }
@@ -273,6 +288,8 @@ export function buildInvoiceListFilter(
   query: InvoiceListQueryDto,
 ): InvoiceListFilter {
   const dealerIds = parseDealerIds(query.idDealer)
+  const search = query.search?.trim() || undefined
+  const ignorePeriod = parseFlag01(query.ignorePeriod)
   const page = query.page && query.page > 0 ? query.page : 1
   const pageSize =
     query.pageSize === -1
@@ -287,7 +304,7 @@ export function buildInvoiceListFilter(
     fechaDesde: query.fechaDesde,
     fechaHasta: query.fechaHasta,
     statementTypes: parseStatementTypes(query.types),
-    search: query.search?.trim() || undefined,
+    search,
     payed: query.payed as '0' | '1' | undefined,
     sended: query.sended as '0' | '1' | undefined,
     page,
@@ -313,7 +330,11 @@ export function buildInvoiceListFilter(
       if (query.employeeWorkedId && query.employeeWorkedId > 0) ids.push(query.employeeWorkedId)
       return [...new Set(ids)]
     })(),
-    ignorePeriod: parseFlag01(query.ignorePeriod),
+    ignorePeriod,
+    // Sin rango no hay parcial: «Ignore date range» y la búsqueda por número apagan el switch,
+    // porque las dos hacen que el listado ignore el período (C8).
+    includePartial: parseFlag01(query.includePartial) && !ignorePeriod && !search,
+    filterDateDone: parseFilterDateDone(query.filterDateDone),
     orderBy: query.orderBy,
     orderDir: query.orderDir === 'asc' ? 'asc' : 'desc',
   }
@@ -385,6 +406,18 @@ export class InvoiceRowDto {
   @ApiProperty({ nullable: true }) fechaPago?: string
   @ApiProperty({ nullable: true }) checkNumber?: string
   @ApiProperty({ nullable: true }) amount?: number
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Only with includePartial: work of this row that falls inside the period, with the ' +
+      'discount of the invoice and no tax. null when the switch is off.',
+  })
+  partialInvoiced?: number | null
+  @ApiProperty({
+    nullable: true,
+    description: 'Only with includePartial: the period of the invoice is not wholly in range.',
+  })
+  outsideRange?: boolean
 }
 
 export class InvoiceSummaryDto {
@@ -394,6 +427,11 @@ export class InvoiceSummaryDto {
   @ApiProperty() total!: number
   @ApiProperty({ description: 'Rows in the list WHERE with estado=0 (deleted)' })
   deletedInList!: number
+  @ApiProperty({
+    nullable: true,
+    description: 'Only with includePartial: Partial Invoiced over the whole filter, not the page.',
+  })
+  partialInvoiced?: number | null
 }
 
 export class InvoiceListResponseDto {

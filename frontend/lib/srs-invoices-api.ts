@@ -47,6 +47,10 @@ export interface InvoiceRow {
   nroBilled?: number | null
   idBillingWoRel?: number | null
   displayFullNro?: string
+  /** Con el switch de parciales: el trabajo de esta fila que cae en el rango. */
+  partialInvoiced?: number | null
+  /** Con el switch de parciales: el período de la invoice no entra entero en el rango. */
+  outsideRange?: boolean
 }
 
 export interface InvoiceSummary {
@@ -55,6 +59,14 @@ export interface InvoiceSummary {
   discount: number
   total: number
   deletedInList: number
+  /** Con el switch de parciales: Partial Invoiced de todo el filtro, no de la página. */
+  partialInvoiced?: number | null
+}
+
+/** Lo que se debe sin filtro de fecha (Outstanding AR), para la tarjeta del listado. */
+export interface InvoiceOutstanding {
+  outstandingAr: number
+  openStatements: number
 }
 
 export interface InvoiceListResponse {
@@ -141,6 +153,10 @@ export interface InvoiceListParams {
   deleted?: 'hide' | 'only' | 'all'
   employeeWorkedIn?: string
   ignorePeriod?: boolean
+  /** Suma las invoices que caen en parte en el rango y devuelve partialInvoiced por fila. */
+  includePartial?: boolean
+  /** WO por fecha de terminado en vez de por fecha de alta (Filter Date Completed). */
+  filterDateDone?: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir?: 'asc' | 'desc'
   page: number
@@ -190,6 +206,8 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.deleted) qs.set('deleted', params.deleted)
   if (params.employeeWorkedIn) qs.set('employeeWorkedIn', params.employeeWorkedIn)
   if (params.ignorePeriod) qs.set('ignorePeriod', 'true')
+  if (params.includePartial) qs.set('includePartial', 'true')
+  if (params.filterDateDone) qs.set('filterDateDone', 'true')
   if (params.orderBy) qs.set('orderBy', params.orderBy)
   if (params.orderDir) qs.set('orderDir', params.orderDir)
   return `?${qs.toString()}`
@@ -220,6 +238,27 @@ export async function fetchInvoiceSummary(
     throw new Error(`Invoice summary (${res.status})`)
   }
   return res.json() as Promise<InvoiceSummaryResponse>
+}
+
+/**
+ * Lo que se debe sin filtro de fecha (toda la historia). Va por un endpoint aparte, sin fechas:
+ * si tarda, el resto de la pantalla ya se ve y sólo la tarjeta queda cargando.
+ */
+export async function fetchInvoiceOutstanding(params: {
+  idDealer: string
+  includeZero?: boolean
+}): Promise<InvoiceOutstanding> {
+  const qs = new URLSearchParams({ idDealer: params.idDealer })
+  if (params.includeZero !== undefined) {
+    qs.set('includeZero', params.includeZero ? 'true' : 'false')
+  }
+  const res = await fetch(`/api/srs-kpis/kpis/collections/outstanding?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    throw new Error(`Outstanding AR (${res.status})`)
+  }
+  return res.json() as Promise<InvoiceOutstanding>
 }
 
 export type InvoiceDetailParams = {

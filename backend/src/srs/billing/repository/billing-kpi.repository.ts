@@ -12,11 +12,16 @@ import {
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  buildDealerFilterSql,
+  woPeriodColumn,
+  woStatusFilterSql,
+} from '../../shared/kpi/srs-kpi-dealer-filter'
 import { enumerateWeekBuckets, fillWeeklyGaps, weekEndInclusive } from '../../shared/kpi/srs-kpi-week'
 import { applyZeroFilter, woHasPositiveTotalSql } from '../../shared/kpi/srs-kpi-zero-filter'
 import { woServiceNotInvoicedSql } from '../../shared/kpi/srs-kpi-generic'
 import {
+  billedBaseOpts,
   billedStatementCohortSql,
   billedOpenCountSql,
   collectionRatePct,
@@ -25,7 +30,6 @@ import {
   ttkBilledLinesSql,
   woBilledLinesSql,
   woPartialOverlapCountSql,
-  type BilledLinesOpts,
 } from '../../shared/kpi/srs-kpi-billed-lines'
 
 /** Ventana hacia atrás para WOs Done sin facturar (aging / por dealer). */
@@ -39,33 +43,6 @@ function money(v: unknown): number {
 export class BillingKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
-  private billedBase(filter: SrsKpiFilter): {
-    range: { fechaDesde: string; fechaHasta: string }
-    wo: BilledLinesOpts
-    ttk: BilledLinesOpts
-    gen: BilledLinesOpts
-  } {
-    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, skipDealerRestriction } =
-      filter
-    const range = { fechaDesde, fechaHasta }
-    const common = { idDealerProvider, includeZero, range }
-    return {
-      range,
-      wo: {
-        ...common,
-        dealer: buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      ttk: {
-        ...common,
-        dealer: buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      gen: {
-        ...common,
-        dealer: buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction),
-      },
-    }
-  }
-
   async getBillingKpis(filter: SrsKpiFilter): Promise<BillingKpiDto> {
     const {
       idDealerProvider,
@@ -74,14 +51,18 @@ export class BillingKpiRepository {
       fechaDesde,
       fechaHasta,
       includeZero,
+      filterDateDone,
       skipDealerRestriction,
     } = filter
     const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
     const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
     const invPeriodParams = [idDealerProvider, ...inv.params, fechaDesde, fechaHasta]
-    const { wo, ttk, gen } = this.billedBase(filter)
+    // WO Not Invoiced follows the same "Filter Date Completed" switch as the cards and the
+    // Closing Report, so the three still add up with the box ticked (Tarea 10).
+    const unbilledPeriodCol = woPeriodColumn(filterDateDone)
+    const { wo, ttk, gen } = billedBaseOpts(filter)
 
-    // Income cards value lines like the legacy Production Report (V19).
+    // Income cards value the work billed with the discount of its invoice (C1).
     const woMoney = woBilledLinesSql({
       ...wo,
       withPeriodSplit: true,
@@ -109,7 +90,8 @@ export class BillingKpiRepository {
        WHERE i.estado = 1
          AND i.id_dealer_provider = ?
          ${inv.and}
-         AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
+         ${woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)}
+         AND ${unbilledPeriodCol} >= ? AND ${unbilledPeriodCol} < DATE_ADD(?, INTERVAL 1 DAY)
          AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}`,
         invPeriodParams,
       ),
@@ -191,7 +173,7 @@ export class BillingKpiRepository {
 
   async getBillingByWeek(filter: SrsKpiFilter): Promise<BillingWeekRowDto[]> {
     const { fechaDesde, fechaHasta } = filter
-    const { wo, ttk, gen } = this.billedBase(filter)
+    const { wo, ttk, gen } = billedBaseOpts(filter)
     const weekBuckets = enumerateWeekBuckets(fechaDesde, fechaHasta).map((start) => ({
       start,
       end: weekEndInclusive(start, fechaHasta),
@@ -259,7 +241,7 @@ export class BillingKpiRepository {
 
   async getPeriodCollectionKpis(filter: SrsKpiFilter): Promise<BillingPeriodCollectionKpiDto> {
     const { includeZero } = filter
-    const { wo, ttk, gen } = this.billedBase(filter)
+    const { wo, ttk, gen } = billedBaseOpts(filter)
     // Billed valuation (real money) plus the Income valuation in the same pass (V21).
     const woMoney = woBilledLinesSql({ ...wo, withPeriodSplit: true, withProductionSplit: true })
     const ttkMoney = ttkBilledLinesSql({ ...ttk, withPeriodSplit: true, withProductionSplit: true })
@@ -290,26 +272,27 @@ export class BillingKpiRepository {
     const unpaidInPeriodValue = roundMoney(invoicedValue - collectedValue)
     const statementsIssued = Number(issued[0]?.statementsIssued ?? 0)
     // Same lines as the three Income invoiced cards, so Unpaid = WO + TTK + Generic Invoiced −
-    // Collected closes with the numbers on screen: WO Invoiced is all WO work of the range (by WO
-    // date, invoices crossing the range included); TTK and Generic Invoiced only count invoices
-    // whose period is inside the range (legacy Production Report rule).
-    // Income valuation (WO and generic without tax or discount, TTK type 5 with its discount):
-    // the big Collected number and the collection rate.
+    // Collected closes with the numbers on screen. The three cards now count every line of the
+    // range — WO by its date, punches by their punch date and the free lines of a generic
+    // prorated over the days that fall inside — so Collected and Unpaid follow those same lines
+    // (D2/D3), not only the invoices whose period is wholly inside the range.
+    // Production valuation (work × the discount of its invoice, no tax): the big Collected
+    // number and the collection rate.
     const w = woRows[0] ?? {}
     const tk = ttkRows[0] ?? {}
     const g = genRows[0] ?? {}
     const incomeInvoicedValue = roundMoney(
-      money(w.invoicedProduction) + money(tk.invoicedInRangeProduction) + money(g.invoicedInRangeProduction),
+      money(w.invoicedProduction) + money(tk.invoicedProduction) + money(g.invoicedProduction),
     )
     const incomeCollectedValue = roundMoney(
-      money(w.collectedProduction) + money(tk.collectedInRangeProduction) + money(g.collectedInRangeProduction),
+      money(w.collectedProduction) + money(tk.collectedProduction) + money(g.collectedProduction),
     )
     // Same lines, actual money (with tax and discount): the subtitles.
     const incomeInvoicedRealValue = roundMoney(
-      money(w.invoiced) + money(tk.invoicedInRange) + money(g.invoicedInRange),
+      money(w.invoiced) + money(tk.invoiced) + money(g.invoiced),
     )
     const incomeCollectedRealValue = roundMoney(
-      money(w.collected) + money(tk.collectedInRange) + money(g.collectedInRange),
+      money(w.collected) + money(tk.collected) + money(g.collected),
     )
 
     return {

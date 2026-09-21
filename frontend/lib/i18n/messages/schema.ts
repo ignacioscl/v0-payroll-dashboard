@@ -190,6 +190,7 @@ export interface Messages {
   invoices: {
     title: string
     subtitle: string
+    subtitleAllDates: string
     searchPlaceholder: string
     typesLabel: string
     typeWo: string
@@ -222,6 +223,7 @@ export interface Messages {
     colSubtotal: string
     colDiscount: string
     colTotal: string
+    colPartialInvoiced: string
     colPaid: string
     colCheckNumber: string
     colCheckAmount: string
@@ -384,6 +386,7 @@ export interface Messages {
     summaryFilteredTotal: string
     totalsShowing: string
     totalsSubtotal: string
+    totalsPartialInvoiced: string
     totalsDiscount: string
     totalsTotal: string
     loadingMore: string
@@ -491,6 +494,16 @@ export interface Messages {
     filterIgnoreDatesTooltip: string
     filterIgnoreDatesForced: string
     filterIgnoreDatesChip: string
+    includePartialLabel: string
+    includePartialTooltip: string
+    includePartialChip: string
+    includePartialLocked: string
+    includePartialLegend: string
+    filterDateDoneLabel: string
+    filterDateDoneTooltip: string
+    filterDateDoneChip: string
+    summaryPartialInvoiced: string
+    summaryOwedAllDates: string
     filterSearchLockHint: string
     summaryExcludesDeleted: string
     rowDeletedBadge: string
@@ -973,6 +986,8 @@ export interface Messages {
     lastMonth: string
     openFilters: string
     dateRange: string
+    ignoreDateRange: string
+    dateRangeIgnored: string
     allStatus: string
     pending: string
     reviewed: string

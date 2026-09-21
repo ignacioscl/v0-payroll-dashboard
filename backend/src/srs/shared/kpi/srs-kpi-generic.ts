@@ -1,7 +1,16 @@
 /**
- * Shared KPI SQL: generic proration (reuses GET_TOTAL_INV_GENERIC_DATE_RAGE without
- * changing it), invoice net factor, billed joins, and “service not on any active invoice”.
+ * Shared KPI SQL: generic proration (GET_TOTAL_INV_GENERIC_DATE_RAGE), invoice net factor,
+ * billed joins, and “service not on any active invoice”.
  */
+
+/**
+ * How a line is valued.
+ * - 'net': tax (type 6) × invoice discount — real money, like GET_TOTAL_BY_STATEMENT (Open AR,
+ *   the money subtitles).
+ * - 'production': the work billed, with the invoice discount and without tax (C1 of
+ *   plans/plan-invoices-parcial-rango/PLAN.md: Income cards, Partial Invoiced and the Closing).
+ */
+export type LineValuation = 'net' | 'production'
 
 /**
  * Tax (type 6) × discount of GET_TOTAL_BY_STATEMENT, applied per line.
@@ -20,6 +29,11 @@ export function statementDiscountFactorSql(s = 's'): string {
       ELSE 1 - 0.01 * ${s}.discount END)`
 }
 
+/** Factor for one valuation mode. */
+export function lineValuationFactorSql(valuation: LineValuation, s = 's'): string {
+  return valuation === 'net' ? statementNetFactorSql(s) : statementDiscountFactorSql(s)
+}
+
 /** BILLING.estado = 1 on the statement or the line. Two LEFT JOINs — no OR + correlated IN. */
 export function billedJoinsSql(statementIdExpr: string, lineIdExpr: string): string {
   return `
@@ -36,36 +50,54 @@ export function billedJoinsParams(idDealerProvider: number): number[] {
 }
 
 /**
- * Line amount for a generic: effective qty (empty or 0 = 1) × amount × invoice net factor.
- * withNetFactor = false values it like the legacy Production Report: no tax, no discount.
+ * Same two payments as billedJoinsSql, but carrying which payment (and which nro_billed) pays the
+ * line — that is what tells in which row of the invoice list a line counts (3.1 of the plan).
+ * DISTINCT is mandatory: 8 lines share a repeated BILLING_WO_REL row.
+ */
+export function payingBillingJoinsSql(statementIdExpr: string, lineIdExpr: string): string {
+  return `
+LEFT JOIN (SELECT DISTINCT bwr.id_statement_inv_rel, bwr.id_billing, bwr.nro_billed
+  FROM BILLING_WO_REL bwr
+  JOIN BILLING b ON b.id = bwr.id_billing AND b.estado = 1 AND b.id_dealer_provider = ?
+  WHERE bwr.id_statement_inv_rel IS NOT NULL) plr ON plr.id_statement_inv_rel = ${lineIdExpr}
+LEFT JOIN (SELECT DISTINCT bwr.id_statement, bwr.id_billing
+  FROM BILLING_WO_REL bwr
+  JOIN BILLING b ON b.id = bwr.id_billing AND b.estado = 1 AND b.id_dealer_provider = ?
+  WHERE bwr.id_statement IS NOT NULL) psr ON psr.id_statement = ${statementIdExpr}`
+}
+
+export function payingBillingJoinsParams(idDealerProvider: number): number[] {
+  return [idDealerProvider, idDealerProvider]
+}
+
+/**
+ * Line amount for a generic: effective qty (empty or 0 = 1) × amount × the valuation factor.
  */
 export function genericLineAmountSql(
   lineAlias = 'isir',
   statementAlias = 's',
-  withNetFactor = true,
+  valuation: LineValuation = 'net',
 ): string {
   const base = `IF(IFNULL(${lineAlias}.generic_qty, 0) > 0, ${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
-  return withNetFactor ? `${base} * ${statementNetFactorSql(statementAlias)}` : base
+  return `${base} * ${lineValuationFactorSql(valuation, statementAlias)}`
 }
 
 /**
  * Prorate a generic line into [fromExpr, toExpr] (inclusive calendar days).
- * Passes qty=1 and amount=qty×amount so SMALLINT rounding does not apply;
- * shifts date_to / filter_to by −1 day so the function’s extra day matches the real period.
+ * Passes qty=1 and amount=qty×amount×factor so the function only splits by days.
+ * Needs migration 005: the old body counted one extra day and rounded qty to an integer, and v0
+ * compensated for it here (Tarea 3 of plans/plan-invoices-parcial-rango/PLAN.md).
  */
 export function genericProratedValueSql(
   fromExpr: string,
   toExpr: string,
   statementAlias = 's',
   lineAlias = 'isir',
-  withNetFactor = true,
+  valuation: LineValuation = 'net',
 ): string {
-  const amount = genericLineAmountSql(lineAlias, statementAlias, withNetFactor)
-  return `CASE WHEN ${statementAlias}.fecha_desde = ${statementAlias}.fecha_hasta
-     THEN ${amount}
-     ELSE GET_TOTAL_INV_GENERIC_DATE_RAGE(1, ${statementAlias}.fecha_desde, DATE_SUB(${statementAlias}.fecha_hasta, INTERVAL 1 DAY),
-            ${amount}, ${fromExpr}, DATE_SUB(${toExpr}, INTERVAL 1 DAY))
-END`
+  const amount = genericLineAmountSql(lineAlias, statementAlias, valuation)
+  return `GET_TOTAL_INV_GENERIC_DATE_RAGE(1, ${statementAlias}.fecha_desde, ${statementAlias}.fecha_hasta,
+            ${amount}, ${fromExpr}, ${toExpr})`
 }
 
 /** Generic period overlaps the filter range (DATE columns, both ends inclusive). */

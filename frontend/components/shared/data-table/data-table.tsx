@@ -412,6 +412,14 @@ export interface DataTableProps<TData, TValue = unknown> {
   // ---------- Interactivity ----------
   onRowClick?: (row: TData) => void
 
+  /**
+   * Extra classes per row, to mark a subset (e.g. the invoices that only partly fall in the
+   * period). The class goes AFTER the zebra background so it wins, and the row should set
+   * `--dt-row-bg` with an OPAQUE colour: the pinned cells paint their own background and would
+   * otherwise show the plain card colour over the tint.
+   */
+  getRowClassName?: (row: TData, index: number) => string | undefined
+
   // ---------- Row expansion (sub-table / drilldown) ----------
   /**
    * When provided, expandable rows render this content in a full-width row
@@ -537,6 +545,7 @@ export function DataTable<TData, TValue = unknown>({
   onRowSelectionChange,
   getRowId,
   onRowClick,
+  getRowClassName,
   renderSubComponent,
   getRowCanExpand,
   subComponentLayout = 'content',
@@ -978,6 +987,7 @@ export function DataTable<TData, TValue = unknown>({
         className={cn(
           'border-b border-border/50 transition-colors',
           baseBg,
+          getRowClassName?.(row.original, index),
           isExpanded && 'bg-accent/30',
           onRowClick && 'cursor-pointer hover:bg-accent/40',
         )}
@@ -1003,8 +1013,9 @@ export function DataTable<TData, TValue = unknown>({
               style={{
                 ...cellPinStyles,
                 ...(sizingStyle ?? {}),
+                // Las celdas fijadas son opacas: si la fila está pintada, toman su color.
                 backgroundColor: pin
-                  ? 'var(--card)'
+                  ? 'var(--dt-row-bg, var(--card))'
                   : cellPinStyles.backgroundColor,
                 ...(isLastLeftPinned
                   ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }

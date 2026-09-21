@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { Column, ColumnDef, Row, SortingState } from '@tanstack/react-table'
 import {
   AlertTriangle,
   ChevronDown,
@@ -584,6 +584,7 @@ function TotalsBar({
   subtotal,
   discount,
   grandTotal,
+  partialInvoiced,
   showExcludesDeleted,
   isLoading,
 }: {
@@ -595,6 +596,8 @@ function TotalsBar({
   subtotal: number | null
   discount: number | null
   grandTotal: number | null
+  /** undefined = the partial switch is off, so the total is not shown. */
+  partialInvoiced?: number | null
 }) {
   const { t } = useTranslation()
   const money = (n: number | null) => (isLoading || n == null ? '—' : fmtMoney(n))
@@ -634,6 +637,16 @@ function TotalsBar({
                 : fmtMoney(0)}
           </span>
         </div>
+        {partialInvoiced !== undefined ? (
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {t('invoices.totalsPartialInvoiced')}
+            </span>
+            <span className="text-xs font-medium text-sky-700 dark:text-sky-300">
+              {money(partialInvoiced)}
+            </span>
+          </div>
+        ) : null}
         <div className="flex items-baseline gap-2 border-l border-border/80 pl-4">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsTotal')}
@@ -668,9 +681,12 @@ export function InvoiceListTable({
   summary,
   summaryTotal,
   summaryLoading,
+  includePartial,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
+  /** Switch de parciales: agrega la columna Partial Invoiced y pinta las filas parciales. */
+  includePartial?: boolean
   /** Computed once in the page and shared with the top summary strip. */
   showExcludesDeleted?: boolean
   summary?: InvoiceSummary
@@ -1145,6 +1161,36 @@ export function InvoiceListTable({
           exportValue: (r) => r.total,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
+      ...(includePartial
+        ? [
+            {
+              id: 'partialInvoiced',
+              accessorFn: (row: InvoiceRow) => row.partialInvoiced ?? 0,
+              size: 96,
+              minSize: 80,
+              maxSize: 120,
+              enableSorting: false,
+              header: ({ column }: { column: Column<InvoiceRow, unknown> }) => (
+                <DataTableColumnHeader column={column} title={t('invoices.colPartialInvoiced')} />
+              ),
+              cell: ({ row }: { row: Row<InvoiceRow> }) => (
+                <span
+                  className={cn(
+                    'font-semibold text-sky-700 dark:text-sky-300',
+                    row.original.estado === 0 && 'text-muted-foreground line-through',
+                  )}
+                >
+                  {fmtMoney(row.original.partialInvoiced ?? 0)}
+                </span>
+              ),
+              meta: {
+                label: t('invoices.colPartialInvoiced'),
+                numeric: true,
+                exportValue: (r: InvoiceRow) => r.partialInvoiced ?? 0,
+              } satisfies DataTableColumnMeta<InvoiceRow>,
+            } as ColumnDef<InvoiceRow>,
+          ]
+        : []),
       {
         id: 'paid',
         accessorFn: (row) => paidMeta(row, t).label,
@@ -1246,7 +1292,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input],
+    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input, includePartial],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -1378,6 +1424,26 @@ export function InvoiceListTable({
       </Button>
     ) : null
 
+  // La fila pintada no lleva etiqueta, así que el color se explica al lado del contador.
+  const partialLegend =
+    includePartial && rows.some((r) => r.outsideRange) ? (
+      <span className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span
+          aria-hidden
+          className="inline-block size-3 rounded-sm border border-border/60 bg-[var(--partial-row-bg)]"
+        />
+        {t('invoices.includePartialLegend')}
+      </span>
+    ) : null
+
+  const recordsNote =
+    deleteSelectedNote || partialLegend ? (
+      <>
+        {deleteSelectedNote}
+        {partialLegend}
+      </>
+    ) : null
+
   return (
     <>
       <DataTable<InvoiceRow>
@@ -1390,7 +1456,15 @@ export function InvoiceListTable({
         enableGlobalFilter={false}
         recordsCount={gateReady && summaryTotal != null ? summaryTotal : undefined}
         recordsCountLabel={t('nav.invoices')}
-        recordsCountNote={deleteSelectedNote}
+        recordsCountNote={recordsNote}
+        getRowClassName={
+          includePartial
+            ? (row) =>
+                row.outsideRange
+                  ? '[--dt-row-bg:var(--partial-row-bg)] bg-[var(--partial-row-bg)]'
+                  : undefined
+            : undefined
+        }
         pageSize={pageSize}
         onPageSizeChange={onPageSizeChange}
         showPageSizeInInfiniteScroll
@@ -1430,6 +1504,7 @@ export function InvoiceListTable({
               subtotal={summary?.subtotal ?? null}
               discount={summary?.discount ?? null}
               grandTotal={summary?.total ?? null}
+              partialInvoiced={includePartial ? (summary?.partialInvoiced ?? null) : undefined}
               showExcludesDeleted={showExcludesDeleted}
               isLoading={Boolean(summaryLoading && !summary)}
             />

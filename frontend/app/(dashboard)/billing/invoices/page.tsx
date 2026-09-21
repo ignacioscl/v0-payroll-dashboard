@@ -27,6 +27,7 @@ import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
 import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
+import { useInvoiceOutstanding } from '@/hooks/use-invoice-outstanding'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
 
@@ -59,13 +60,19 @@ export default function InvoicesPage() {
     selectedDealers,
     filtersHydrated,
     setDealerIdAllowList,
+    // Vive en el contexto porque el switch está en el control de fechas del header.
+    invoiceIgnorePeriod: ignorePeriod,
+    setInvoiceIgnorePeriod: setIgnorePeriod,
+    setInvoiceIgnorePeriodLocked,
   } = useFilters()
 
   const [types, setTypes] = useState<InvoiceTypeState>(ALL_TYPES)
   const [payed, setPayed] = useState<TriState>('0')
   const [sended, setSended] = useState<TriState>('all')
   const [hideZero, setHideZero] = useState(true)
-  const [ignorePeriod, setIgnorePeriod] = useState(false)
+  // Arranca apagado: apagado, el listado es exactamente el de hoy.
+  const [includePartial, setIncludePartial] = useState(false)
+  const [filterDateDone, setFilterDateDone] = useState(false)
   const [deleted, setDeleted] = useState<InvoiceDeletedMode>('hide')
   const [employeeWorkedIds, setEmployeeWorkedIds] = useState<number[]>([])
   const [advanced, setAdvanced] = useState<InvoiceAdvancedFilterState>(EMPTY_ADVANCED_FILTERS)
@@ -79,8 +86,13 @@ export default function InvoicesPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'period', desc: true }])
 
   useEffect(() => {
-    return () => setDealerIdAllowList(null)
-  }, [setDealerIdAllowList])
+    return () => {
+      setDealerIdAllowList(null)
+      // Al salir de Invoices el header deja de mostrar el rango ignorado.
+      setInvoiceIgnorePeriodLocked(false)
+      setIgnorePeriod(false)
+    }
+  }, [setDealerIdAllowList, setInvoiceIgnorePeriodLocked, setIgnorePeriod])
 
   const handleAdvancedChange = (next: InvoiceAdvancedFilterState) => {
     setAdvanced(next)
@@ -138,6 +150,12 @@ export default function InvoicesPage() {
   })
   const ignorePeriodEffective = searchLock || ignorePeriod
   const includeZeroEffective = searchLock || !hideZero
+  // El header no conoce la búsqueda: le avisamos cuándo el rango queda forzado.
+  useEffect(() => {
+    setInvoiceIgnorePeriodLocked(searchLock)
+  }, [searchLock, setInvoiceIgnorePeriodLocked])
+  // Sin rango no hay parcial (C8): buscar por número o ignorar el período lo apagan.
+  const includePartialEffective = includePartial && !ignorePeriodEffective && !search
   const deletedBeforeSearchLock = useRef<InvoiceDeletedMode>('hide')
   const payedBeforeSearchLock = useRef<TriState>('0')
   const wasSearchLock = useRef(false)
@@ -203,6 +221,8 @@ export default function InvoicesPage() {
       deleted,
       employeeWorkedIn: idsToCsv(employeeWorkedIds),
       ignorePeriod: ignorePeriodEffective || undefined,
+      includePartial: includePartialEffective || undefined,
+      filterDateDone: filterDateDone || undefined,
       ...sortParams,
     }
   }, [
@@ -216,6 +236,8 @@ export default function InvoicesPage() {
     includeZeroEffective,
     deleted,
     ignorePeriodEffective,
+    includePartialEffective,
+    filterDateDone,
     employeeWorkedIds,
     advanced.departmentIds,
     advanced.serviceIds,
@@ -235,6 +257,9 @@ export default function InvoicesPage() {
   const query = useInvoiceList(input, pageSize)
   const summaryQuery = useInvoiceSummary(input)
   const summary = summaryQuery.data?.summary
+  // Con Payment = Unpaid, la tarjeta de lo que se debe sin filtro de fecha. Pedido aparte.
+  const showOwedAllDates = ready && payed === '0'
+  const outstandingQuery = useInvoiceOutstanding(idDealer, includeZeroEffective, showOwedAllDates)
   // Money excludes deleted only in `all` (F.6): in `hide` there are none, and in
   // `only` the amounts ARE the deleted ones, so the note would be misleading.
   // Shared by the top strip and the table footer so the rule lives in one place.
@@ -247,7 +272,13 @@ export default function InvoicesPage() {
       <PageHeading
         title={t('invoices.title')}
         subtitle={
-          headerRangeLabel ? (
+          // Con el rango ignorado, imprimir fechas que no filtran es el mismo engaño
+          // que el botón de arriba ya dejó de hacer.
+          ignorePeriodEffective ? (
+            <span className="font-medium text-amber-700 dark:text-amber-300">
+              {t('invoices.subtitleAllDates')}
+            </span>
+          ) : headerRangeLabel ? (
             <span className="tabular-nums">{headerRangeLabel}</span>
           ) : (
             t('invoices.subtitle')
@@ -279,6 +310,10 @@ export default function InvoicesPage() {
         onHideZeroChange={setHideZero}
         ignorePeriod={ignorePeriod}
         onIgnorePeriodChange={setIgnorePeriod}
+        includePartial={includePartial}
+        onIncludePartialChange={setIncludePartial}
+        filterDateDone={filterDateDone}
+        onFilterDateDoneChange={setFilterDateDone}
         deleted={deleted}
         onDeletedChange={setDeleted}
         employeeWorkedIds={employeeWorkedIds}
@@ -295,6 +330,8 @@ export default function InvoicesPage() {
           summary={summary}
           isLoading={summaryQuery.isFetching && !summary}
           showExcludesDeleted={excludesDeleted}
+          owedAllDates={showOwedAllDates ? outstandingQuery.data?.outstandingAr : undefined}
+          owedAllDatesLoading={showOwedAllDates && outstandingQuery.isFetching}
         />
       ) : null}
 
@@ -319,6 +356,7 @@ export default function InvoicesPage() {
         summary={summary}
         summaryTotal={summaryQuery.data?.total}
         summaryLoading={summaryQuery.isFetching}
+        includePartial={includePartialEffective}
       />
     </div>
   )

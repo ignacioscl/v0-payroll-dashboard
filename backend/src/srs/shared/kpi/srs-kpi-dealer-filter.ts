@@ -93,8 +93,10 @@ export function buildDealerFilterSql(
 }
 
 /** WO date column: Done (legacy chk_date_type=1) vs created (fecha_alta). */
-export function woPeriodColumn(filterDateDone: boolean): string {
-  return filterDateDone ? 'DATE(i.date_last_chg_workflow)' : 'DATE(i.fecha_alta)'
+export function woPeriodColumn(filterDateDone: boolean, alias = 'i'): string {
+  return filterDateDone
+    ? `DATE(${alias}.date_last_chg_workflow)`
+    : `DATE(${alias}.fecha_alta)`
 }
 
 /** Monday of the calendar week for a SQL date expression (MySQL WEEKDAY: Mon=0). */
@@ -117,8 +119,12 @@ export function woCompletedPeriodColumn(filterDateDone: boolean): string {
 }
 
 /** When Filter Date DONE: only WOs in Done workflow; otherwise any active workflow. */
-export function woStatusFilterSql(filterDateDone: boolean, doneWorkflowId: number): string {
-  return filterDateDone ? ` AND i.id_workflow = ${doneWorkflowId}` : ''
+export function woStatusFilterSql(
+  filterDateDone: boolean,
+  doneWorkflowId: number,
+  alias = 'i',
+): string {
+  return filterDateDone ? ` AND ${alias}.id_workflow = ${doneWorkflowId}` : ''
 }
 
 /**

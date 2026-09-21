@@ -22,10 +22,14 @@ import {
 import {
   buildUnionBranches,
   concatBranches,
+  identityRowKey,
   identityTupleSql,
   mapIdentityRow,
   mapInvoiceListRow,
   orderBySql,
+  partialRowsSql,
+  partialSqlRowKey,
+  partialSummarySql,
   summarySelectSql,
   type InvoiceRowIdentity,
 } from '../invoice-list-sql'
@@ -143,18 +147,61 @@ export class InvoiceRepository {
        ${orderBySql(f)}`,
       fullBranches.params,
     )
-    return { results: rows.map(mapInvoiceListRow), hasMore }
+    const results = rows.map(mapInvoiceListRow)
+    if (f.includePartial) {
+      await this.addPartialInvoiced(f, statementIds, results)
+    }
+    return { results, hasMore }
+  }
+
+  /**
+   * Partial Invoiced per row (3.1): one pass over the three builders grouped by row, restricted
+   * to the invoices of the page, summed by key in TS. A row with no line in range gets 0.
+   */
+  private async addPartialInvoiced(
+    f: InvoiceListFilter,
+    statementIds: number[],
+    results: InvoiceRowDto[],
+  ): Promise<void> {
+    const rowsQ = partialRowsSql(f, statementIds)
+    const partialRows = await this.srs.query(rowsQ.sql, rowsQ.params)
+    const byKey = new Map<string, number>()
+    for (const r of partialRows) {
+      const key = partialSqlRowKey(r)
+      byKey.set(key, (byKey.get(key) ?? 0) + Number(r.partialInvoiced ?? 0))
+    }
+    const inRange = (row: InvoiceRowDto): boolean =>
+      Boolean(
+        row.fechaDesde &&
+          row.fechaHasta &&
+          row.fechaDesde >= f.fechaDesde &&
+          row.fechaHasta <= f.fechaHasta,
+      )
+    for (const row of results) {
+      const key = identityRowKey({
+        id: row.id,
+        idBilling: row.idBilling ?? null,
+        nroBilled: row.nroBilled ?? null,
+        idBillingWoRel: row.idBillingWoRel ?? null,
+      })
+      row.partialInvoiced = Math.round((byKey.get(key) ?? 0) * 100) / 100
+      row.outsideRange = !inRange(row)
+    }
   }
 
   async summary(f: InvoiceListFilter): Promise<{ total: number; summary: InvoiceSummaryDto }> {
     const branches = concatBranches(buildUnionBranches(f, 'full'))
-    const [row] = await this.srs.query(
-      `${summarySelectSql(f.deleted)}
+    const partialQ = f.includePartial ? partialSummarySql(f) : null
+    const [[row], partial] = await Promise.all([
+      this.srs.query(
+        `${summarySelectSql(f.deleted)}
        FROM (
          ${branches.sql}
        ) t`,
-      branches.params,
-    )
+        branches.params,
+      ),
+      partialQ ? this.srs.query(partialQ.sql, partialQ.params) : Promise.resolve(null),
+    ])
     const count = Number(row?.cnt ?? 0)
     return {
       total: count,
@@ -164,6 +211,7 @@ export class InvoiceRepository {
         discount: Number(row?.discount ?? 0),
         total: Number(row?.total ?? 0),
         deletedInList: Number(row?.deleted_in_list ?? 0),
+        partialInvoiced: partial ? Number(partial[0]?.partial_invoiced ?? 0) : null,
       },
     }
   }

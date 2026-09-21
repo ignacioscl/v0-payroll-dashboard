@@ -145,6 +145,10 @@ export function InvoiceFilterDeck({
   onHideZeroChange,
   ignorePeriod,
   onIgnorePeriodChange,
+  includePartial,
+  onIncludePartialChange,
+  filterDateDone,
+  onFilterDateDoneChange,
   deleted,
   onDeletedChange,
   employeeWorkedIds,
@@ -168,6 +172,12 @@ export function InvoiceFilterDeck({
   onHideZeroChange: (value: boolean) => void
   ignorePeriod: boolean
   onIgnorePeriodChange: (value: boolean) => void
+  /** Suma las invoices que caen en parte en el rango, pintadas, con Partial Invoiced. */
+  includePartial: boolean
+  onIncludePartialChange: (value: boolean) => void
+  /** WO por fecha de terminado, como «Filter Date Completed» del Closing. */
+  filterDateDone: boolean
+  onFilterDateDoneChange: (value: boolean) => void
   deleted: InvoiceDeletedMode
   onDeletedChange: (value: InvoiceDeletedMode) => void
   employeeWorkedIds: number[]
@@ -194,6 +204,10 @@ export function InvoiceFilterDeck({
 
   const effectiveIgnorePeriod = searchLock || ignorePeriod
   const effectiveHideZero = searchLock ? false : hideZero
+  // Sin rango no hay parcial: con «Ignore date range», buscando por número o con el filtro de
+  // empleado (que fuerza ignorar el período), el switch queda trabado y apagado.
+  const partialLocked = searchLock || effectiveIgnorePeriod || Boolean(searchInput.trim())
+  const effectiveIncludePartial = partialLocked ? false : includePartial
 
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
@@ -272,6 +286,22 @@ export function InvoiceFilterDeck({
         label: t('invoices.filterIgnoreDatesChip'),
         locked: searchLock,
         onRemove: searchLock ? undefined : () => onIgnorePeriodChange(false),
+      })
+    }
+
+    if (effectiveIncludePartial) {
+      list.push({
+        key: 'partial',
+        label: t('invoices.includePartialChip'),
+        onRemove: () => onIncludePartialChange(false),
+      })
+    }
+
+    if (filterDateDone) {
+      list.push({
+        key: 'dateDone',
+        label: t('invoices.filterDateDoneChip'),
+        onRemove: () => onFilterDateDoneChange(false),
       })
     }
 
@@ -405,6 +435,8 @@ export function InvoiceFilterDeck({
     sended,
     effectiveHideZero,
     effectiveIgnorePeriod,
+    effectiveIncludePartial,
+    filterDateDone,
     deleted,
     searchLock,
     advanced,
@@ -415,6 +447,8 @@ export function InvoiceFilterDeck({
     onSendedChange,
     onHideZeroChange,
     onIgnorePeriodChange,
+    onIncludePartialChange,
+    onFilterDateDoneChange,
     onDeletedChange,
     onAdvancedChange,
     t,
@@ -430,6 +464,8 @@ export function InvoiceFilterDeck({
     onSendedChange('all')
     onHideZeroChange(true)
     onIgnorePeriodChange(false)
+    onIncludePartialChange(false)
+    onFilterDateDoneChange(false)
     onDeletedChange('hide')
     onEmployeeWorkedChange([])
     onAdvancedChange(EMPTY_ADVANCED_FILTERS)
@@ -440,6 +476,8 @@ export function InvoiceFilterDeck({
     onSendedChange,
     onHideZeroChange,
     onIgnorePeriodChange,
+    onIncludePartialChange,
+    onFilterDateDoneChange,
     onDeletedChange,
     onEmployeeWorkedChange,
     onAdvancedChange,
@@ -665,18 +703,28 @@ export function InvoiceFilterDeck({
                     : t('invoices.hideZeroInvoices')
                 }
               />
+              {/* «Ignore date range» vive en el control de fechas del header, junto a lo
+                  que gobierna. Acá queda sólo su chip, como el de cualquier otro filtro. */}
               <LockableSwitchRow
-                id="invoice-ignore-period"
-                checked={effectiveIgnorePeriod}
-                onCheckedChange={onIgnorePeriodChange}
+                id="invoice-include-partial"
+                checked={effectiveIncludePartial}
+                onCheckedChange={onIncludePartialChange}
                 disabled={disabled}
-                locked={searchLock}
-                label={t('invoices.filterIgnoreDatesLabel')}
+                locked={partialLocked}
+                label={t('invoices.includePartialLabel')}
                 tooltip={
-                  searchLock
-                    ? t('invoices.filterIgnoreDatesForced')
-                    : t('invoices.filterIgnoreDatesTooltip')
+                  partialLocked
+                    ? t('invoices.includePartialLocked')
+                    : t('invoices.includePartialTooltip')
                 }
+              />
+              <LockableSwitchRow
+                id="invoice-filter-date-done"
+                checked={filterDateDone}
+                onCheckedChange={onFilterDateDoneChange}
+                disabled={disabled}
+                label={t('invoices.filterDateDoneLabel')}
+                tooltip={t('invoices.filterDateDoneTooltip')}
               />
               <InvoiceDeletedFilter
                 value={deleted}

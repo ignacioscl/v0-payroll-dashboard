@@ -25,6 +25,7 @@ import {
   statementTypesSqlIn,
 } from '../../billing/entity/invoice-statement.srsentity'
 import {
+  billedBaseOpts,
   billedOpenCountSql,
   collectionRatePct,
   genericBilledLinesSql,
@@ -33,6 +34,13 @@ import {
   woBilledLinesSql,
   type BilledLinesOpts,
 } from '../../shared/kpi/srs-kpi-billed-lines'
+
+/** What the Outstanding AR pass returns; arOver60Pct needs debtOver60 from the same run. */
+export interface OutstandingArResult {
+  outstandingAr: number
+  openStatements: number
+  debtOver60: number
+}
 
 /** BILLING_WO_REL → statement id without OR + correlated IN (full-table killer). */
 const BILLING_STATEMENT_LINK = `
@@ -71,40 +79,23 @@ function monthKey(value: unknown): string {
 export class CollectionsKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
+  /**
+   * Same options as the Billing KPIs, without the Filter Date Completed switch: Collections and
+   * Open AR count every invoice, whatever the workflow of its WOs, exactly like before.
+   */
   private billedBase(
     filter: SrsKpiFilter,
     range: { fechaDesde: string; fechaHasta: string } | null,
   ): { wo: BilledLinesOpts; ttk: BilledLinesOpts; gen: BilledLinesOpts } {
-    const { idDealerProvider, idUsuario, dealerIds, includeZero, skipDealerRestriction } = filter
-    const common = { idDealerProvider, includeZero, range }
-    return {
-      wo: {
-        ...common,
-        dealer: buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      ttk: {
-        ...common,
-        dealer: buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      gen: {
-        ...common,
-        dealer: buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction),
-      },
-    }
+    const { wo, ttk, gen } = billedBaseOpts({ ...filter, filterDateDone: false }, range)
+    return { wo, ttk, gen }
   }
 
-  async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
-    const {
-      idDealerProvider,
-      idUsuario,
-      dealerIds,
-      fechaDesde,
-      fechaHasta,
-      includeZero,
-      skipDealerRestriction,
-    } = filter
-    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
-    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+  /**
+   * What the dealers still owe, over the whole history (no period): the same pass feeds the
+   * Outstanding AR card, the open-invoice count and the over-60 share (arOver60Pct).
+   */
+  async getOutstanding(filter: SrsKpiFilter): Promise<OutstandingArResult> {
     const { wo, ttk, gen } = this.billedBase(filter, null)
     const owingOpts = { debtOnly: true, groupBy: 'statement' as const, withOver60: true }
     const woOwing = woBilledLinesSql({ ...wo, ...owingOpts })
@@ -113,6 +104,19 @@ export class CollectionsKpiRepository {
     // One pass per invoice: total debt, over-60 debt and open invoices (net unpaid ≠ 0,
     // with the toggle on or off).
     const debtQ = billedOpenCountSql(woOwing, ttkOwing, genOwing, true)
+    const debt = await this.srs.query(debtQ.sql, debtQ.params)
+    return {
+      outstandingAr: roundMoney(money(debt[0]?.debt)),
+      openStatements: Number(debt[0]?.unpaidStatements ?? 0),
+      debtOver60: roundMoney(money(debt[0]?.debtOver60)),
+    }
+  }
+
+  async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, skipDealerRestriction } =
+      filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
+    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
 
     // Drive from payments in range, then STRAIGHT_JOIN statements. MariaDB 10.3 otherwise
     // nested-loops CONTRATISTA → every invoice and runs IS_STATEMENT_BILLED /
@@ -135,17 +139,16 @@ export class CollectionsKpiRepository {
            AND IS_STATEMENT_BILLED(s.id) = 1${stmtZero}`,
         [idDealerProvider, fechaDesde, fechaHasta, idDealerProvider, ...stmt.params],
       ),
-      this.srs.query(debtQ.sql, debtQ.params),
+      this.getOutstanding(filter),
     ])
 
-    const outstandingAr = roundMoney(money(debt[0]?.debt))
-    const over60 = roundMoney(money(debt[0]?.debtOver60))
+    const { outstandingAr, openStatements, debtOver60 } = debt
 
     return {
       outstandingAr,
       dsoDays: Number(dso[0]?.dsoDays ?? 0),
-      arOver60Pct: outstandingAr > 0 ? Math.round((over60 / outstandingAr) * 1000) / 10 : 0,
-      openStatements: Number(debt[0]?.unpaidStatements ?? 0),
+      arOver60Pct: outstandingAr > 0 ? Math.round((debtOver60 / outstandingAr) * 1000) / 10 : 0,
+      openStatements,
     }
   }
 
