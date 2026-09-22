@@ -156,6 +156,9 @@ export default function InvoicesPage() {
   }, [searchLock, setInvoiceIgnorePeriodLocked])
   // Sin rango no hay parcial (C8): buscar por número o ignorar el período lo apagan.
   const includePartialEffective = includePartial && !ignorePeriodEffective && !search
+  // «Filter Date Completed» sólo mueve Parcial facturado: sin el switch de parciales queda
+  // trabada y apagada (T12), porque el listado elige las invoices por su período, no por sus WO.
+  const filterDateDoneEffective = filterDateDone && includePartialEffective
   const deletedBeforeSearchLock = useRef<InvoiceDeletedMode>('hide')
   const payedBeforeSearchLock = useRef<TriState>('0')
   const wasSearchLock = useRef(false)
@@ -222,7 +225,7 @@ export default function InvoicesPage() {
       employeeWorkedIn: idsToCsv(employeeWorkedIds),
       ignorePeriod: ignorePeriodEffective || undefined,
       includePartial: includePartialEffective || undefined,
-      filterDateDone: filterDateDone || undefined,
+      filterDateDone: filterDateDoneEffective || undefined,
       ...sortParams,
     }
   }, [
@@ -237,7 +240,7 @@ export default function InvoicesPage() {
     deleted,
     ignorePeriodEffective,
     includePartialEffective,
-    filterDateDone,
+    filterDateDoneEffective,
     employeeWorkedIds,
     advanced.departmentIds,
     advanced.serviceIds,
@@ -260,11 +263,10 @@ export default function InvoicesPage() {
   // Con Payment = Unpaid, la tarjeta de lo que se debe sin filtro de fecha. Pedido aparte.
   const showOwedAllDates = ready && payed === '0'
   const outstandingQuery = useInvoiceOutstanding(idDealer, includeZeroEffective, showOwedAllDates)
-  // Money excludes deleted only in `all` (F.6): in `hide` there are none, and in
-  // `only` the amounts ARE the deleted ones, so the note would be misleading.
-  // Shared by the top strip and the table footer so the rule lives in one place.
-  const excludesDeleted =
-    deleted === 'all' && (summary?.deletedInList ?? 0) > 0
+  // A deleted invoice never adds up in the money (rule 15): with Only and Show all its total goes
+  // to the Deleted card instead. Shared by the top strip and the table footer so the rule lives
+  // in one place.
+  const excludesDeleted = deleted !== 'hide' && (summary?.deletedInList ?? 0) > 0
   const showSummary = ready
 
   return (
@@ -332,6 +334,7 @@ export default function InvoicesPage() {
           showExcludesDeleted={excludesDeleted}
           owedAllDates={showOwedAllDates ? outstandingQuery.data?.outstandingAr : undefined}
           owedAllDatesLoading={showOwedAllDates && outstandingQuery.isFetching}
+          showDeleted={deleted !== 'hide'}
         />
       ) : null}
 

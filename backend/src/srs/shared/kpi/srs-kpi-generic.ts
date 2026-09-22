@@ -21,6 +21,14 @@ export function statementNetFactorSql(s = 's'): string {
     * ${statementDiscountFactorSql(s)})`
 }
 
+/**
+ * Tax of a generic (type 6) as a per-line factor, no discount: a line at price with its tax, the
+ * way GET_SUBTOTAL_BY_STATEMENT counts it. Same CASE as the first half of statementNetFactorSql.
+ */
+export function statementTaxFactorSql(s = 's'): string {
+  return `(CASE WHEN ${s}.statement_type = 6 THEN 1 + IFNULL(${s}.tax, 0) / 100 ELSE 1 END)`
+}
+
 /** Discount of GET_TOTAL_BY_STATEMENT as a per-line factor (no tax). */
 export function statementDiscountFactorSql(s = 's'): string {
   return `(CASE WHEN IFNULL(${s}.discount, 0) = 0 THEN 1
@@ -70,6 +78,11 @@ export function payingBillingJoinsParams(idDealerProvider: number): number[] {
   return [idDealerProvider, idDealerProvider]
 }
 
+/** A free line of a generic at price: effective qty (empty or 0 = 1) × amount, no factor. */
+export function genericLineBaseSql(lineAlias = 'isir'): string {
+  return `IF(IFNULL(${lineAlias}.generic_qty, 0) > 0, ${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
+}
+
 /**
  * Line amount for a generic: effective qty (empty or 0 = 1) × amount × the valuation factor.
  */
@@ -78,8 +91,7 @@ export function genericLineAmountSql(
   statementAlias = 's',
   valuation: LineValuation = 'net',
 ): string {
-  const base = `IF(IFNULL(${lineAlias}.generic_qty, 0) > 0, ${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
-  return `${base} * ${lineValuationFactorSql(valuation, statementAlias)}`
+  return `${genericLineBaseSql(lineAlias)} * ${lineValuationFactorSql(valuation, statementAlias)}`
 }
 
 /**

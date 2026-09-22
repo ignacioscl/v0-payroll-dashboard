@@ -208,6 +208,10 @@ export function InvoiceFilterDeck({
   // empleado (que fuerza ignorar el período), el switch queda trabado y apagado.
   const partialLocked = searchLock || effectiveIgnorePeriod || Boolean(searchInput.trim())
   const effectiveIncludePartial = partialLocked ? false : includePartial
+  // «Filter Date Completed» sólo mueve Parcial facturado: con el switch de parciales apagado
+  // queda trabada y apagada, como el switch de parciales con «Ignore date range» (T12).
+  const dateDoneLocked = !effectiveIncludePartial
+  const effectiveFilterDateDone = dateDoneLocked ? false : filterDateDone
 
   const chips = React.useMemo((): FilterChip[] => {
     const list: FilterChip[] = []
@@ -297,7 +301,7 @@ export function InvoiceFilterDeck({
       })
     }
 
-    if (filterDateDone) {
+    if (effectiveFilterDateDone) {
       list.push({
         key: 'dateDone',
         label: t('invoices.filterDateDoneChip'),
@@ -436,7 +440,7 @@ export function InvoiceFilterDeck({
     effectiveHideZero,
     effectiveIgnorePeriod,
     effectiveIncludePartial,
-    filterDateDone,
+    effectiveFilterDateDone,
     deleted,
     searchLock,
     advanced,
@@ -720,11 +724,16 @@ export function InvoiceFilterDeck({
               />
               <LockableSwitchRow
                 id="invoice-filter-date-done"
-                checked={filterDateDone}
+                checked={effectiveFilterDateDone}
                 onCheckedChange={onFilterDateDoneChange}
                 disabled={disabled}
+                locked={dateDoneLocked}
                 label={t('invoices.filterDateDoneLabel')}
-                tooltip={t('invoices.filterDateDoneTooltip')}
+                tooltip={
+                  dateDoneLocked
+                    ? t('invoices.filterDateDoneLocked')
+                    : t('invoices.filterDateDoneTooltip')
+                }
               />
               <InvoiceDeletedFilter
                 value={deleted}

@@ -21,18 +21,44 @@ import {
 } from '../dto/invoice-detail.dto'
 import {
   buildUnionBranches,
+  compareRowsOfInvoice,
   concatBranches,
+  deletedStatementMoneySql,
   identityRowKey,
   identityTupleSql,
   mapIdentityRow,
   mapInvoiceListRow,
+  mapSummaryIdentityRow,
   orderBySql,
   partialRowsSql,
   partialSqlRowKey,
-  partialSummarySql,
-  summarySelectSql,
+  summaryIdentitySql,
   type InvoiceRowIdentity,
+  type InvoiceSummaryIdentity,
 } from '../invoice-list-sql'
+import { billedRowMoneySql } from '../../shared/kpi/srs-kpi-billed-lines'
+import {
+  centsToMoney,
+  moneyToCents,
+  rowMoneyByKey,
+  rowMoneyIdsOrAll,
+  ZERO_ROW_MONEY,
+  type RowMoneyCents,
+} from '../../shared/kpi/srs-kpi-row-money'
+
+function rowIdentity(row: InvoiceRowDto): InvoiceRowIdentity {
+  return {
+    id: row.id,
+    idBilling: row.idBilling ?? null,
+    nroBilled: row.nroBilled ?? null,
+    idBillingWoRel: row.idBillingWoRel ?? null,
+  }
+}
+
+/** The whole identity of a row (not its money key: two balance rows would share that). */
+function identityTupleKey(r: InvoiceRowIdentity): string {
+  return `${r.id}|${r.idBilling ?? ''}|${r.nroBilled ?? ''}|${r.idBillingWoRel ?? ''}`
+}
 
 function effectiveDetailPayed(slice: InvoiceDetailSlice): '0' | '1' | undefined {
   if (slice.payed === '0' || slice.payed === '1') return slice.payed
@@ -40,13 +66,40 @@ function effectiveDetailPayed(slice: InvoiceDetailSlice): '0' | '1' | undefined 
   return undefined
 }
 
-function detailMembershipSql(): string {
-  return ` AND ( EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+/**
+ * Lines of the row that was expanded — the same lines that make up its Total (T8/T11 of
+ * plans/plan-invoices-totales-listado/PLAN.md):
+ * - line-payment row: the lines with their own active payment of that check and nro_billed;
+ * - whole-invoice row: the lines with NO own active payment, when that check pays the invoice.
+ *   Before it also brought the lines paid by other checks (M1, billing 1249: 95 lines, not 14).
+ * A payment counts only if it is active and from the caller's provider.
+ */
+function detailMembershipSql(
+  slice: InvoiceDetailSlice,
+  idDealerProvider: number,
+): { sql: string; params: any[] } {
+  const byNro = slice.nroBilled != null
+  const ownOfThis = `EXISTS (SELECT 1 FROM BILLING_WO_REL bx
                 INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
-                 WHERE bx.id_statement_inv_rel = isir.id AND bx.id_billing = ?)
-        OR EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                  AND bb.id_dealer_provider = ?
+                 WHERE bx.id_statement_inv_rel = isir.id AND bx.id_billing = ?${byNro ? ' AND bx.nro_billed = ?' : ''})`
+  const ownParams: any[] = [idDealerProvider, slice.idBilling, ...(byNro ? [slice.nroBilled] : [])]
+  const wholeOfThis = `EXISTS (SELECT 1 FROM BILLING_WO_REL bx
                    INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
-                    WHERE bx.id_statement = isir.id_statement AND bx.id_billing = ?) )`
+                     AND bb.id_dealer_provider = ?
+                    WHERE bx.id_statement = isir.id_statement AND bx.id_billing = ?)
+        AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bx
+                   INNER JOIN BILLING bb ON bb.id = bx.id_billing AND bb.estado = 1
+                     AND bb.id_dealer_provider = ?
+                    WHERE bx.id_statement_inv_rel = isir.id)`
+  const wholeParams: any[] = [idDealerProvider, slice.idBilling, idDealerProvider]
+  if (slice.paymentKind === 'line') return { sql: ` AND ${ownOfThis}`, params: ownParams }
+  if (slice.paymentKind === 'whole') return { sql: ` AND ${wholeOfThis}`, params: wholeParams }
+  return {
+    sql: ` AND ( ${ownOfThis}
+        OR ( ${wholeOfThis} ) )`,
+    params: [...ownParams, ...wholeParams],
+  }
 }
 
 function detailPayedWoSql(payed: '0' | '1'): string {
@@ -148,10 +201,107 @@ export class InvoiceRepository {
       fullBranches.params,
     )
     const results = rows.map(mapInvoiceListRow)
-    if (f.includePartial) {
-      await this.addPartialInvoiced(f, statementIds, results)
-    }
+    await Promise.all([
+      this.addRowMoney(f, results),
+      f.includePartial ? this.addPartialInvoiced(f, statementIds, results) : Promise.resolve(),
+    ])
     return { results, hasMore }
+  }
+
+  /**
+   * Subtotal / Discount / Total of each row from its own lines (T2), the balance row by
+   * subtraction (T4). A deleted invoice shows its total once, on its first row (T7).
+   */
+  private async addRowMoney(f: InvoiceListFilter, results: InvoiceRowDto[]): Promise<void> {
+    const activeIds = [...new Set(results.filter((r) => r.estado !== 0).map((r) => r.id))]
+    const deletedIds = [...new Set(results.filter((r) => r.estado === 0).map((r) => r.id))]
+    const [money, deleted] = await Promise.all([
+      this.rowMoneyOf(f, activeIds),
+      this.deletedFirstRows(f, deletedIds),
+    ])
+    for (const row of results) {
+      const identity = rowIdentity(row)
+      const cents =
+        row.estado === 0
+          ? deleted.firstRows.has(identityTupleKey(identity))
+            ? (deleted.money.get(row.id) ?? ZERO_ROW_MONEY)
+            : ZERO_ROW_MONEY
+          : (money.get(identityRowKey(identity)) ?? ZERO_ROW_MONEY)
+      row.subtotal = centsToMoney(cents.subtotal)
+      row.total = centsToMoney(cents.total)
+      row.discountAmount = centsToMoney(cents.subtotal - cents.total)
+    }
+  }
+
+  /** Money of each row of these (active) invoices, by row key. */
+  private async rowMoneyOf(
+    f: InvoiceListFilter,
+    statementIds: number[],
+  ): Promise<Map<string, RowMoneyCents>> {
+    if (statementIds.length === 0) return new Map()
+    const q = billedRowMoneySql(f, rowMoneyIdsOrAll(statementIds))
+    return rowMoneyByKey(await this.srs.query(q.sql, q.params))
+  }
+
+  /** Total and subtotal of each deleted invoice, from the legacy functions (T7). */
+  private async deletedMoneyOf(
+    f: InvoiceListFilter,
+    statementIds: number[],
+  ): Promise<Map<number, RowMoneyCents>> {
+    if (statementIds.length === 0) return new Map()
+    const q = deletedStatementMoneySql(f.idDealerProvider, statementIds)
+    const rows = await this.srs.query(q.sql, q.params)
+    return new Map(
+      rows.map((r: any) => [
+        Number(r.id),
+        { subtotal: moneyToCents(r.sub_total), total: moneyToCents(r.total) },
+      ]),
+    )
+  }
+
+  /**
+   * A deleted invoice can have several rows (ST486, id 446506: two payments). Its total goes on
+   * the first of its rows under this same filter — the order of the list — and $0 on the rest,
+   * so its rows add up to its total once, not once per row (T7).
+   */
+  private async deletedFirstRows(
+    f: InvoiceListFilter,
+    statementIds: number[],
+  ): Promise<{ firstRows: Set<string>; money: Map<number, RowMoneyCents> }> {
+    if (statementIds.length === 0) return { firstRows: new Set(), money: new Map() }
+    const identity = concatBranches(buildUnionBranches(f, 'identity', statementIds))
+    const [identityRows, money] = await Promise.all([
+      this.srs.query(
+        `SELECT t.id, t.id_billing, t.nro_billed, t.id_billing_wo_rel
+         FROM (
+           ${identity.sql}
+         ) t`,
+        identity.params,
+      ),
+      this.deletedMoneyOf(f, statementIds),
+    ])
+    const first = new Map<number, InvoiceRowIdentity>()
+    for (const r of identityRows.map(mapIdentityRow) as InvoiceRowIdentity[]) {
+      const prev = first.get(r.id)
+      if (!prev || compareRowsOfInvoice(r, prev) < 0) first.set(r.id, r)
+    }
+    return { firstRows: new Set([...first.values()].map(identityTupleKey)), money }
+  }
+
+  /** Partial Invoiced by row key, in cents: the builders grouped by row, with the range (C1). */
+  private async partialCentsByKey(
+    f: InvoiceListFilter,
+    statementIds: number[],
+  ): Promise<Map<string, number>> {
+    if (statementIds.length === 0) return new Map()
+    const rowsQ = partialRowsSql(f, rowMoneyIdsOrAll(statementIds))
+    const partialRows = await this.srs.query(rowsQ.sql, rowsQ.params)
+    const byKey = new Map<string, number>()
+    for (const r of partialRows) {
+      const key = partialSqlRowKey(r)
+      byKey.set(key, (byKey.get(key) ?? 0) + moneyToCents(r.partialInvoiced))
+    }
+    return byKey
   }
 
   /**
@@ -163,13 +313,7 @@ export class InvoiceRepository {
     statementIds: number[],
     results: InvoiceRowDto[],
   ): Promise<void> {
-    const rowsQ = partialRowsSql(f, statementIds)
-    const partialRows = await this.srs.query(rowsQ.sql, rowsQ.params)
-    const byKey = new Map<string, number>()
-    for (const r of partialRows) {
-      const key = partialSqlRowKey(r)
-      byKey.set(key, (byKey.get(key) ?? 0) + Number(r.partialInvoiced ?? 0))
-    }
+    const byKey = await this.partialCentsByKey(f, statementIds)
     const inRange = (row: InvoiceRowDto): boolean =>
       Boolean(
         row.fechaDesde &&
@@ -178,40 +322,55 @@ export class InvoiceRepository {
           row.fechaHasta <= f.fechaHasta,
       )
     for (const row of results) {
-      const key = identityRowKey({
-        id: row.id,
-        idBilling: row.idBilling ?? null,
-        nroBilled: row.nroBilled ?? null,
-        idBillingWoRel: row.idBillingWoRel ?? null,
-      })
-      row.partialInvoiced = Math.round((byKey.get(key) ?? 0) * 100) / 100
+      row.partialInvoiced = centsToMoney(byKey.get(identityRowKey(rowIdentity(row))) ?? 0)
       row.outsideRange = !inRange(row)
     }
   }
 
+  /**
+   * Totals over the WHOLE filter, not the page, in two phases (T5): the identity of every row,
+   * then the money of their invoices from the builders. Before, it ran the `full` branch with the
+   * legacy functions on each row of the filter. Totals are the sum of the rows with their sign;
+   * deleted invoices do not add up (rule 15): they go to deletedTotal, once per invoice.
+   */
   async summary(f: InvoiceListFilter): Promise<{ total: number; summary: InvoiceSummaryDto }> {
-    const branches = concatBranches(buildUnionBranches(f, 'full'))
-    const partialQ = f.includePartial ? partialSummarySql(f) : null
-    const [[row], partial] = await Promise.all([
-      this.srs.query(
-        `${summarySelectSql(f.deleted)}
-       FROM (
-         ${branches.sql}
-       ) t`,
-        branches.params,
-      ),
-      partialQ ? this.srs.query(partialQ.sql, partialQ.params) : Promise.resolve(null),
+    const identityQ = summaryIdentitySql(f)
+    const rows: InvoiceSummaryIdentity[] = (
+      await this.srs.query(identityQ.sql, identityQ.params)
+    ).map(mapSummaryIdentityRow)
+    const active = rows.filter((r) => r.estado !== 0)
+    const deletedCount = rows.length - active.length
+    const activeIds = [...new Set(active.map((r) => r.id))]
+    const deletedIds = [...new Set(rows.filter((r) => r.estado === 0).map((r) => r.id))]
+    const [money, partial, deletedMoney] = await Promise.all([
+      this.rowMoneyOf(f, activeIds),
+      f.includePartial ? this.partialCentsByKey(f, activeIds) : Promise.resolve(null),
+      this.deletedMoneyOf(f, deletedIds),
     ])
-    const count = Number(row?.cnt ?? 0)
+    let subtotal = 0
+    let total = 0
+    let partialCents = 0
+    for (const r of active) {
+      const key = identityRowKey(r)
+      const m = money.get(key)
+      if (m) {
+        subtotal += m.subtotal
+        total += m.total
+      }
+      if (partial) partialCents += partial.get(key) ?? 0
+    }
+    let deletedTotal = 0
+    for (const m of deletedMoney.values()) deletedTotal += m.total
     return {
-      total: count,
+      total: rows.length,
       summary: {
-        count,
-        subtotal: Number(row?.subtotal ?? 0),
-        discount: Number(row?.discount ?? 0),
-        total: Number(row?.total ?? 0),
-        deletedInList: Number(row?.deleted_in_list ?? 0),
-        partialInvoiced: partial ? Number(partial[0]?.partial_invoiced ?? 0) : null,
+        count: rows.length,
+        subtotal: centsToMoney(subtotal),
+        discount: centsToMoney(subtotal - total),
+        total: centsToMoney(total),
+        deletedInList: deletedCount,
+        deletedTotal: f.deleted === 'hide' ? null : centsToMoney(deletedTotal),
+        partialInvoiced: partial ? centsToMoney(partialCents) : null,
       },
     }
   }
@@ -252,8 +411,9 @@ export class InvoiceRepository {
     const params: any[] = [slice.idBilling, idDealerProvider, idStatement, idDealerProvider]
     let extra = ''
     if (slice.idBilling > 0) {
-      extra += detailMembershipSql()
-      params.push(slice.idBilling, slice.idBilling)
+      const membership = detailMembershipSql(slice, idDealerProvider)
+      extra += membership.sql
+      params.push(...membership.params)
     }
     if (payed === '0' || payed === '1') extra += detailPayedWoSql(payed)
     extra += detailScreenFiltersSql(slice, { wo: true })
@@ -318,16 +478,18 @@ export class InvoiceRepository {
     const genericParams: any[] = [slice.idBilling, idDealerProvider, idStatement, idDealerProvider]
     let genericExtra = ''
     if (slice.idBilling > 0) {
-      genericExtra += detailMembershipSql()
-      genericParams.push(slice.idBilling, slice.idBilling)
+      const membership = detailMembershipSql(slice, idDealerProvider)
+      genericExtra += membership.sql
+      genericParams.push(...membership.params)
     }
     if (payed === '0' || payed === '1') genericExtra += detailPayedGenericSql(payed)
 
     const ttkInnerParams: any[] = [idStatement, idStatement, idDealerProvider]
     let ttkInnerExtra = ''
     if (slice.idBilling > 0) {
-      ttkInnerExtra += detailMembershipSql()
-      ttkInnerParams.push(slice.idBilling, slice.idBilling)
+      const membership = detailMembershipSql(slice, idDealerProvider)
+      ttkInnerExtra += membership.sql
+      ttkInnerParams.push(...membership.params)
     }
     if (payed === '0' || payed === '1') ttkInnerExtra += detailPayedGenericSql(payed)
     const ttkOuterParams = [slice.idBilling, idDealerProvider]

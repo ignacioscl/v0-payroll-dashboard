@@ -10,6 +10,9 @@
  *
  * TTK statements (type 5) and the punches inside a generic (type 6) are split: the punches of a
  * generic belong to the generic builder, like in the Closing Report.
+ *
+ * groupBy 'row' + rowMoney is the money of each row of the invoice list (T1/T2 of
+ * plans/plan-invoices-totales-listado/PLAN.md): an opt-in mode, so the KPIs above do not change.
  */
 
 import {
@@ -29,12 +32,14 @@ import {
   billedJoinsParams,
   billedJoinsSql,
   genericLineAmountSql,
+  genericLineBaseSql,
   genericProratedValueSql,
   genericRangeOverlapSql,
   lineValuationFactorSql,
   payingBillingJoinsParams,
   payingBillingJoinsSql,
   statementNetFactorSql,
+  statementTaxFactorSql,
 } from './srs-kpi-generic'
 import type { LineValuation } from './srs-kpi-generic'
 import {
@@ -85,10 +90,22 @@ export interface BilledLinesOpts {
    * productionValue, in the same pass as the billed columns.
    */
   withProductionSplit?: boolean
-  /** Restrict to these statement ids (the page of the invoice list). */
+  /**
+   * Restrict to these statement ids (the page of the invoice list). The WO window is cropped to
+   * the work orders of those statements too (T3): its partitions are per work order service, so
+   * each one still enters whole and rn / paid do not change.
+   */
   statementIdIn?: number[]
   /** WO lines by Done date (i.date_last_chg_workflow + workflow DONE) instead of created date. */
   filterDateDone?: boolean
+  /**
+   * With groupBy 'row': the money of each row of the invoice list instead of Partial Invoiced —
+   * rowSubtotal (lines at price, with the tax of a generic, like GET_SUBTOTAL_BY_STATEMENT) and
+   * rowTotal (net: tax × the invoice discount spread over its lines), NOT rounded, so the list
+   * rounds once per row. The whole line, never prorated: needs range null and filterDateDone off,
+   * because the Total of an invoice does not change with the dates (rule 13).
+   */
+  rowMoney?: boolean
 }
 
 /** What billedBaseOpts needs from a KPI filter or from the invoice list filter. */
@@ -116,6 +133,24 @@ const ROW_KEYS_SELECT = `s.id AS stmtId,
       CASE WHEN plr.id_billing IS NOT NULL THEN plr.nro_billed END AS rowNroBilled`
 
 export const ROW_KEY_COLUMNS = ['stmtId', 'rowKind', 'rowIdBilling', 'rowNroBilled'] as const
+
+/** Money columns of the rowMoney mode, in SELECT order. */
+export const ROW_MONEY_COLUMNS = ['rowSubtotal', 'rowTotal'] as const
+
+/**
+ * Key of a row of the invoice list: which invoice and which of its three rows (balance,
+ * whole-invoice payment, own payment). A line payment row is told apart by its nro_billed too.
+ */
+export function billedRowKey(
+  stmtId: number,
+  rowKind: number,
+  idBilling: number | null,
+  nroBilled: number | null,
+): string {
+  if (rowKind === 1) return `${stmtId}|1||`
+  if (rowKind === 2) return `${stmtId}|2|${idBilling ?? ''}|`
+  return `${stmtId}|3|${idBilling ?? ''}|${nroBilled ?? ''}`
+}
 
 export function roundMoney(n: number): number {
   return Math.round(n * 100) / 100
@@ -146,6 +181,31 @@ function statementIdInSql(opts: BilledLinesOpts, idExpr: string): string {
   if (!opts.statementIdIn) return ''
   if (opts.statementIdIn.length === 0) return ' AND 1 = 0'
   return ` AND ${idExpr} IN (${sqlIdList(opts.statementIdIn)})`
+}
+
+/**
+ * T3: with statementIdIn, the WO window only reads the work orders of those statements. Without a
+ * range it would otherwise number every WO service of the provider on each page of the list.
+ */
+function woWindowCropSql(opts: BilledLinesOpts): string {
+  if (!opts.statementIdIn) return ''
+  if (opts.statementIdIn.length === 0) return ' AND 1 = 0'
+  return ` AND r.id_invoice IN (SELECT r2.id_invoice FROM INVOICE_STATEMENT_INV_REL r2
+        WHERE r2.id_statement IN (${sqlIdList(opts.statementIdIn)}))`
+}
+
+/** rowMoney only makes sense per row, over the whole line: no range, no Done-date filter. */
+function assertRowMoneyOpts(opts: BilledLinesOpts): void {
+  if (!opts.rowMoney) return
+  if (opts.groupBy !== 'row' || opts.range || opts.filterDateDone || opts.debtOnly || opts.idsOnly) {
+    throw new Error('rowMoney needs groupBy row, range null and filterDateDone off')
+  }
+}
+
+function rowMoneySelectSql(subtotalExpr: string, totalExpr: string): string {
+  return `SELECT ${ROW_KEYS_SELECT},
+      SUM(${subtotalExpr}) AS rowSubtotal,
+      SUM(${totalExpr}) AS rowTotal`
 }
 
 function bucketSelect(groupBy: BilledGroupBy | undefined, dateExpr: string): string {
@@ -213,7 +273,7 @@ function periodSplitSql(opts: BilledLinesOpts, lineAmt: string, productionAmt: s
 
 /** Money columns a builder returns, in SELECT order — the generic wrapper re-sums them. */
 function billedValueColumns(opts: BilledLinesOpts): string[] {
-  if (opts.groupBy === 'row') return ['partialInvoiced']
+  if (opts.groupBy === 'row') return opts.rowMoney ? [...ROW_MONEY_COLUMNS] : ['partialInvoiced']
   const cols = ['invoiced', 'collected']
   if (opts.withPeriodSplit) {
     cols.push('invoicedInRange', 'collectedInRange')
@@ -236,11 +296,23 @@ function billedKeyColumns(opts: BilledLinesOpts): string[] {
   return g === 'month' || g === 'week' || g === 'statement' ? ['bucketStart'] : []
 }
 
-/** Re-aggregate the two generic sources (free lines + punches) into one result set. */
-function sumParts(parts: BilledLinesSql[], keyCols: string[], valueCols: string[]): BilledLinesSql {
+/**
+ * Re-aggregate the two generic sources (free lines + punches) into one result set. round = false
+ * keeps the exact sums (rowMoney), so free lines and punches of one row are rounded only once.
+ */
+function sumParts(
+  parts: BilledLinesSql[],
+  keyCols: string[],
+  valueCols: string[],
+  round = true,
+): BilledLinesSql {
   if (parts.length === 1) return parts[0]
   const keys = keyCols.map((c) => `g.${c}`).join(', ')
-  const values = valueCols.map((c) => `ROUND(IFNULL(SUM(g.${c}), 0), 2) AS ${c}`).join(',\n      ')
+  const values = valueCols
+    .map((c) =>
+      round ? `ROUND(IFNULL(SUM(g.${c}), 0), 2) AS ${c}` : `IFNULL(SUM(g.${c}), 0) AS ${c}`,
+    )
+    .join(',\n      ')
   const group = keyCols.length ? ` GROUP BY ${keyCols.map((_, i) => i + 1).join(', ')}` : ''
   return {
     sql: `SELECT ${keys ? `${keys},\n      ` : ''}${values}
@@ -292,6 +364,7 @@ export function billedBaseOpts(
 }
 
 export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
+  assertRowMoneyOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
   const factor = statementNetFactorSql('s')
   const production = 'isr.price * IFNULL(isr.qty, 1)'
@@ -331,7 +404,7 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
     ${billedJoinsSql('s.id', 'r.id')}
     ${invScope}
     WHERE s.estado = 1 AND s.id_dealer_provider = ?
-      AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})
+      AND s.statement_type IN (${statementTypesSqlIn(WO_STATEMENT_TYPES)})${woWindowCropSql(opts)}
   ) w`
 
   params.push(
@@ -347,6 +420,11 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   let selectSql: string
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT w.stmt_id AS id'
+  } else if (rowMode && opts.rowMoney) {
+    selectSql = rowMoneySelectSql(
+      `${production} * ${statementTaxFactorSql('s')}`,
+      `${production} * ${factor}`,
+    )
   } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionAmt}), 2) AS partialInvoiced`
@@ -385,6 +463,7 @@ WHERE w.rn = 1${statementIdInSql(opts, 'w.stmt_id')}
 
 /** Punch lines (TTK statements, or the punches inside a generic) — one statement_type list. */
 function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType): BilledLinesSql {
+  assertRowMoneyOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
   const factor = statementNetFactorSql('s')
   // Billed production of a punch: its amount × the discount of its invoice, to the cent.
@@ -408,6 +487,8 @@ function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType
   let selectSql: string
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT s.id AS id'
+  } else if (rowMode && opts.rowMoney) {
+    selectSql = rowMoneySelectSql(`isir.amount * ${statementTaxFactorSql('s')}`, `isir.amount * ${factor}`)
   } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionAmt}), 2) AS partialInvoiced`
@@ -479,6 +560,7 @@ function genericValueForOpts(
 
 /** Free lines (no punch) of a generic, prorated over the days of its period. */
 function genericFreeLinesSql(opts: BilledLinesOpts): BilledLinesSql {
+  assertRowMoneyOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
   const lineZero = applyZeroFilter(opts.includeZero, genericLineNonZeroSql())
   const unpaid = opts.debtOnly
@@ -526,7 +608,12 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
   const rowParams = rowMode ? payingBillingJoinsParams(opts.idDealerProvider) : []
 
   let selectSql: string
-  if (rowMode) {
+  if (rowMode && opts.rowMoney) {
+    selectSql = rowMoneySelectSql(
+      `${genericLineBaseSql('isir')} * ${statementTaxFactorSql('s')}`,
+      genericLineAmountSql('isir', 's', 'net'),
+    )
+  } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionExpr}), 2) AS partialInvoiced`
   } else {
@@ -611,7 +698,49 @@ ${punches.sql}`,
       params: [...free.params, ...punches.params],
     }
   }
-  return sumParts([free, punches], billedKeyColumns(opts), billedValueColumns(opts))
+  return sumParts([free, punches], billedKeyColumns(opts), billedValueColumns(opts), !opts.rowMoney)
+}
+
+/**
+ * Money of each row of the invoice list (T2): the three builders in rowMoney mode over the whole
+ * lines, with no range and without «Filter Date Completed» (T6) — the Total of an invoice does
+ * not change with the dates (rule 13). statementIds restricts it (and crops the WO window, T3);
+ * undefined = every invoice of the dealers.
+ */
+export function billedRowMoneySql(filter: BilledBaseFilter, statementIds?: number[]): BilledLinesSql {
+  const { wo, ttk, gen } = billedBaseOpts({ ...filter, filterDateDone: false }, null)
+  const rowOpts = {
+    groupBy: 'row' as const,
+    rowMoney: true,
+    ...(statementIds ? { statementIdIn: statementIds } : {}),
+  }
+  const parts = [
+    woBilledLinesSql({ ...wo, ...rowOpts }),
+    ttkBilledLinesSql({ ...ttk, ...rowOpts }),
+    genericBilledLinesSql({ ...gen, ...rowOpts }),
+  ]
+  return {
+    sql: parts.map((p) => p.sql).join('\nUNION ALL\n'),
+    params: parts.flatMap((p) => p.params),
+  }
+}
+
+/**
+ * What each invoice owes, one row per invoice (stmtId, debt, debtOver60): the same pass as
+ * billedOpenCountSql, before adding it up. Pass the three sources with debtOnly + groupBy
+ * 'statement' + withOver60.
+ */
+export function billedOwingByStatementSql(
+  woDebt: BilledLinesSql,
+  ttkDebt: BilledLinesSql,
+  genDebt: BilledLinesSql,
+): BilledLinesSql {
+  return {
+    sql: `SELECT x.bucketStart AS stmtId, SUM(x.invoiced) AS debt, SUM(x.invoicedOver60) AS debtOver60
+          FROM (${woDebt.sql} UNION ALL ${ttkDebt.sql} UNION ALL ${genDebt.sql}) x
+          GROUP BY x.bucketStart`,
+    params: [...woDebt.params, ...ttkDebt.params, ...genDebt.params],
+  }
 }
 
 export function billedStatementCohortSql(

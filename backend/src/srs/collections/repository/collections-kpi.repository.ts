@@ -26,7 +26,8 @@ import {
 } from '../../billing/entity/invoice-statement.srsentity'
 import {
   billedBaseOpts,
-  billedOpenCountSql,
+  billedOwingByStatementSql,
+  billedRowMoneySql,
   collectionRatePct,
   genericBilledLinesSql,
   roundMoney,
@@ -34,6 +35,14 @@ import {
   woBilledLinesSql,
   type BilledLinesOpts,
 } from '../../shared/kpi/srs-kpi-billed-lines'
+import {
+  balanceCents,
+  centsToMoney,
+  moneyToCents,
+  rowMoneyByKey,
+  rowMoneyIdsOrAll,
+  type RowMoneyCents,
+} from '../../shared/kpi/srs-kpi-row-money'
 
 /** What the Outstanding AR pass returns; arOver60Pct needs debtOver60 from the same run. */
 export interface OutstandingArResult {
@@ -94,6 +103,11 @@ export class CollectionsKpiRepository {
   /**
    * What the dealers still owe, over the whole history (no period): the same pass feeds the
    * Outstanding AR card, the open-invoice count and the over-60 share (arOver60Pct).
+   *
+   * T4 of plans/plan-invoices-totales-listado/PLAN.md: what an invoice owes is its total minus
+   * its payment rows, exactly like the balance row of the invoice list, so the Deuda total card
+   * and the Unpaid tab give the same number invoice by invoice. Two passes: the invoices that
+   * owe something (unpaid lines, as before), then the money of their rows.
    */
   async getOutstanding(filter: SrsKpiFilter): Promise<OutstandingArResult> {
     const { wo, ttk, gen } = this.billedBase(filter, null)
@@ -101,14 +115,31 @@ export class CollectionsKpiRepository {
     const woOwing = woBilledLinesSql({ ...wo, ...owingOpts })
     const ttkOwing = ttkBilledLinesSql({ ...ttk, ...owingOpts })
     const genOwing = genericBilledLinesSql({ ...gen, ...owingOpts })
-    // One pass per invoice: total debt, over-60 debt and open invoices (net unpaid ≠ 0,
-    // with the toggle on or off).
-    const debtQ = billedOpenCountSql(woOwing, ttkOwing, genOwing, true)
-    const debt = await this.srs.query(debtQ.sql, debtQ.params)
+    const owingQ = billedOwingByStatementSql(woOwing, ttkOwing, genOwing)
+    const owing: any[] = await this.srs.query(owingQ.sql, owingQ.params)
+    const ids = owing.map((r) => Number(r.stmtId))
+    let rowMoney = new Map<string, RowMoneyCents>()
+    if (ids.length) {
+      const moneyQ = billedRowMoneySql({ ...filter, filterDateDone: false }, rowMoneyIdsOrAll(ids))
+      rowMoney = rowMoneyByKey(await this.srs.query(moneyQ.sql, moneyQ.params))
+    }
+    let debtCents = 0
+    let over60Cents = 0
+    let openStatements = 0
+    for (const r of owing) {
+      const before = moneyToCents(r.debt)
+      const beforeOver60 = moneyToCents(r.debtOver60)
+      const debt = balanceCents(rowMoney, Number(r.stmtId))
+      // The cent of rounding follows the debt into Over60 when the invoice owes work that old.
+      const over60 = beforeOver60 === 0 ? 0 : beforeOver60 + (debt - before)
+      debtCents += debt
+      over60Cents += over60
+      if (debt !== 0) openStatements += 1
+    }
     return {
-      outstandingAr: roundMoney(money(debt[0]?.debt)),
-      openStatements: Number(debt[0]?.unpaidStatements ?? 0),
-      debtOver60: roundMoney(money(debt[0]?.debtOver60)),
+      outstandingAr: centsToMoney(debtCents),
+      openStatements,
+      debtOver60: centsToMoney(over60Cents),
     }
   }
 

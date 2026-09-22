@@ -514,8 +514,25 @@ export const es: Messages = {
     filterDateDoneTooltip:
       'Cuenta las work orders por la fecha en que se terminaron, no por la de creación. Es la misma casilla del Closing Report.',
     filterDateDoneChip: 'Por fecha de terminado',
+    filterDateDoneLocked:
+      'Sólo aplica con las invoices parciales incluidas: sin ellas el listado elige las invoices por su propio período, no por las fechas de sus WO.',
     summaryPartialInvoiced: 'Parcial facturado',
     summaryOwedAllDates: 'Deuda total',
+    summaryDeleted: 'Eliminadas',
+    summaryStatementsHelp:
+      'Filas del listado con estos filtros. Una invoice con cobros tiene una fila por cobro, más una por lo que todavía se debe.',
+    summaryFilteredTotalHelp:
+      'Suma el Total de todas las filas del listado con estos filtros, no sólo de la página cargada. Los créditos restan. Deja afuera las invoices eliminadas.',
+    summarySubtotalHelp:
+      'Las filas a precio, con el tax de las invoices genéricas y antes del descuento. Deja afuera las eliminadas.',
+    summaryDiscountHelp:
+      'Descuento de las filas: cada fila lleva su parte del descuento de su invoice, así Subtotal − Discount = Total filtrado.',
+    summaryPartialInvoicedHelp:
+      'Sólo la parte del trabajo de cada invoice que cae dentro del rango de fechas, con el descuento de la invoice y sin tax. Deja afuera el trabajo fuera del rango.',
+    summaryOwedAllDatesHelp:
+      'Todo lo que los dealers elegidos todavía deben de sus invoices, de todas las fechas: el rango de fechas no aplica. No incluye el trabajo terminado que todavía no se facturó, ni WO ni ponchadas de TTK: lo que no se facturó todavía no se debe. Las WO terminadas sin facturar se ven en la tarjeta WO sin facturar (KPIs de negocio › Facturación).',
+    summaryDeletedHelp:
+      'Total de las invoices eliminadas de este listado, contado una vez por invoice. Se muestran tachadas y no suman en las otras tarjetas ni en la barra de totales.',
     filterSearchLockHint:
       'Al buscar por número o empleado: pagas e impagas, se incluyen las de $0 y todas las fechas. Eliminadas arranca en Ver todas — lo podés cambiar.',
     summaryExcludesDeleted: 'No incluye eliminadas',
@@ -1440,7 +1457,7 @@ export const es: Messages = {
     genericInvoiced:
       'Líneas libres de facturas genéricas, a cantidad × precio con el descuento de la factura y sin impuesto (una cantidad vacía o 0 cuenta como 1), repartidas por los días del período que caen en el rango, más las ponchadas facturadas en esas genéricas, contadas por el día de la ponchada. Los créditos (líneas negativas) siempre cuentan. El subtítulo separa las facturas con el período entero en el rango del resto.',
     outstandingAr:
-      'Monto neto sin cobrar de todas las líneas facturadas, de toda la historia. Las mismas líneas que Billing. El subtítulo es facturas abiertas y lo no cobrado fuera de los meses del gráfico. No depende del rango del header.',
+      'Monto neto sin cobrar de todas las líneas facturadas, de toda la historia. Las mismas líneas que Billing. El subtítulo es facturas abiertas y lo no cobrado fuera de los meses del gráfico. No depende del rango del header. No incluye el trabajo terminado que todavía no se facturó, ni WO ni ponchadas de TTK: lo que no se facturó todavía no se debe. Las WO terminadas sin facturar se ven en la tarjeta WO sin facturar (solapa Facturación).',
     unpaidInPeriod:
       'WO Invoiced + TTK Invoiced + Generic Invoiced, menos Cobrado: los mismos números que muestran esas cards, con el descuento de cada factura y sin impuesto. Subtítulo: lo mismo con impuesto y descuento, cuántas facturas tienen al menos una línea del período sin cobrar, y el valor de OT todavía sin facturar (WO sin facturar).',
     dso: 'Días promedio desde la emisión de la factura hasta recibir el pago.',

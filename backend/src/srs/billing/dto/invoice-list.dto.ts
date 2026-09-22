@@ -375,11 +375,26 @@ export class InvoiceRowDto {
   @ApiProperty() fechaCreate!: string
   @ApiProperty({ nullable: true }) fechaDesde?: string
   @ApiProperty({ nullable: true }) fechaHasta?: string
-  @ApiProperty() subtotal!: number
-  @ApiProperty({ nullable: true }) discount?: number
+  @ApiProperty({
+    description:
+      'Lines of this row at price, with the tax of a generic. Balance row: the invoice subtotal ' +
+      'minus its payment rows. Deleted invoice: its whole subtotal on its first row, 0 on the rest.',
+  })
+  subtotal!: number
+  @ApiProperty({ nullable: true, description: 'Discount set on the invoice (% or amount, see discountType)' })
+  discount?: number
   @ApiProperty({ nullable: true }) discountType?: number
   @ApiProperty({ nullable: true }) discountDetail?: string
-  @ApiProperty() total!: number
+  @ApiProperty({
+    description: 'Discount of this row in money: subtotal − total (its share of the invoice discount)',
+  })
+  discountAmount!: number
+  @ApiProperty({
+    description:
+      'Net money of this row: its lines with tax and their share of the discount. Balance row: ' +
+      'the invoice total minus its payment rows, so the rows of an invoice add up to its total.',
+  })
+  total!: number
   @ApiProperty() tax!: number
   @ApiProperty({ nullable: true }) po?: string
   @ApiProperty({ nullable: true }) ro?: string
@@ -422,11 +437,18 @@ export class InvoiceRowDto {
 
 export class InvoiceSummaryDto {
   @ApiProperty() count!: number
-  @ApiProperty() subtotal!: number
-  @ApiProperty() discount!: number
-  @ApiProperty() total!: number
+  @ApiProperty({ description: 'Sum of the rows that are not deleted' }) subtotal!: number
+  @ApiProperty({ description: 'Sum of discountAmount of the rows that are not deleted' })
+  discount!: number
+  @ApiProperty({ description: 'Sum of the rows that are not deleted, with their sign' }) total!: number
   @ApiProperty({ description: 'Rows in the list WHERE with estado=0 (deleted)' })
   deletedInList!: number
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Total of the deleted invoices listed, once per invoice (not per row). null with deleted=hide.',
+  })
+  deletedTotal?: number | null
   @ApiProperty({
     nullable: true,
     description: 'Only with includePartial: Partial Invoiced over the whole filter, not the page.',

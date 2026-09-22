@@ -1,6 +1,7 @@
 import { buildDealerFilterSql } from '../shared/kpi/srs-kpi-dealer-filter'
 import {
   billedBaseOpts,
+  billedRowKey,
   genericBilledLinesSql,
   ttkBilledLinesSql,
   woBilledLinesSql,
@@ -74,11 +75,14 @@ function billingJoinSql(kind: UnionKind): string {
         AND b.id_dealer_provider = s.id_dealer_provider`
 }
 
+// La plata de cada fila (Subtotal / Discount / Total) ya no sale de las funciones legacy
+// (GET_TOTAL_BY_STATEMENT_NOT_BILLED, _PARCIAL_BILLED…): la calcula el repositorio desde las
+// líneas, con billedRowMoneySql (T2 de plans/plan-invoices-totales-listado/PLAN.md).
 function moneySelectSql(kind: UnionKind): string {
   if (kind === 1) {
     return `
-      GET_SUBTOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.statement_type, NULL) AS sub_total,
-      GET_TOTAL_BY_STATEMENT_NOT_BILLED(s.id, s.discount, NULL, s.discount_type, s.statement_type, NULL) AS total,
+      NULL AS sub_total,
+      NULL AS total,
       0 AS is_billed,
       IS_STATEMENT_PARTIAL_OR_FULL_BILLED(s.id) AS is_partial_billed,
       (SELECT COUNT(*) FROM INVOICE_STATEMENT_NOTE isn WHERE isn.id_statement = s.id AND isn.estado = 1) AS notes_count,
@@ -92,8 +96,8 @@ function moneySelectSql(kind: UnionKind): string {
   }
   if (kind === 2) {
     return `
-      GET_SUBTOTAL_BY_STATEMENT(s.id, NULL) AS sub_total,
-      GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total,
+      NULL AS sub_total,
+      NULL AS total,
       1 AS is_billed,
       IS_STATEMENT_PARTIAL_OR_FULL_BILLED(s.id) AS is_partial_billed,
       (SELECT COUNT(*) FROM INVOICE_STATEMENT_NOTE isn WHERE isn.id_statement = s.id AND isn.estado = 1) AS notes_count,
@@ -106,7 +110,7 @@ function moneySelectSql(kind: UnionKind): string {
       bwr.id AS id_billing_wo_rel`
   }
   return `
-      GET_TOTAL_BY_STATEMENT_PARCIAL_BILLED(s.id, b.id, NULL) AS sub_total,
+      NULL AS sub_total,
       NULL AS total,
       1 AS is_billed,
       IS_STATEMENT_PARTIAL_OR_FULL_BILLED(s.id) AS is_partial_billed,
@@ -120,17 +124,18 @@ function moneySelectSql(kind: UnionKind): string {
       -1 AS id_billing_wo_rel`
 }
 
+// estado va en la identidad para que el summary separe las borradas sin la rama `full` (T5/T7).
 function identitySelectSql(kind: UnionKind): string {
   if (kind === 1) {
     return `s.id, b.id AS id_billing, NULL AS nro_billed, NULL AS id_billing_wo_rel,
-            s.fecha_desde, s.fecha_create, s.full_nro`
+            s.fecha_desde, s.fecha_create, s.full_nro, s.estado`
   }
   if (kind === 2) {
     return `s.id, b.id AS id_billing, 1 AS nro_billed, bwr.id AS id_billing_wo_rel,
-            s.fecha_desde, s.fecha_create, s.full_nro`
+            s.fecha_desde, s.fecha_create, s.full_nro, s.estado`
   }
   return `s.id, b.id AS id_billing, bwr.nro_billed AS nro_billed, -1 AS id_billing_wo_rel,
-          s.fecha_desde, s.fecha_create, s.full_nro`
+          s.fecha_desde, s.fecha_create, s.full_nro, s.estado`
 }
 
 function sharedSelectSql(kind: UnionKind): string {
@@ -413,12 +418,13 @@ function buildBranchWhere(
 
   // Mismo criterio que el período: buscando por número no se esconde nada por valer $0. El
   // descuento va en 0, así que la función devuelve el subtotal: el filtro mira el subtotal, no
-  // el total. Con el switch prendido esconde sólo los ceros y deja pasar los créditos (C5), como
-  // «Exclude ceros» corregido del Closing.
+  // el total. Esconde sólo los ceros y deja pasar los créditos, con o sin el switch de parciales
+  // (regla 5 y punto 6.1 de plans/plan-invoices-totales-listado/PLAN.md: con `> 0` se perdían
+  // MRNI1974 en la 79 y 34 notas de crédito en la 188).
   parts.push(
     applyZeroFilter(
       f.includeZero || Boolean(f.search),
-      `GET_TOTAL_BY_STATEMENT(s.id, 0, 0, s.discount_type, NULL) ${f.includePartial ? '<>' : '>'} 0`,
+      'GET_TOTAL_BY_STATEMENT(s.id, 0, 0, s.discount_type, NULL) <> 0',
     ).replace(/^\s+AND /, '') || '1=1',
   )
 
@@ -506,15 +512,32 @@ export function partialRowKey(
   idBilling: number | null,
   nroBilled: number | null,
 ): string {
-  if (rowKind === 1) return `${stmtId}|1||`
-  if (rowKind === 2) return `${stmtId}|2|${idBilling ?? ''}|`
-  return `${stmtId}|3|${idBilling ?? ''}|${nroBilled ?? ''}`
+  return billedRowKey(stmtId, rowKind, idBilling, nroBilled)
 }
 
-/** Row of the list → its key. id_billing_wo_rel: null balance, -1 line payment, otherwise whole. */
+/** id_billing_wo_rel: null balance (1), -1 line payment (3), otherwise whole payment (2). */
+export function identityRowKind(r: Pick<InvoiceRowIdentity, 'idBillingWoRel'>): 1 | 2 | 3 {
+  return r.idBillingWoRel == null ? 1 : r.idBillingWoRel === -1 ? 3 : 2
+}
+
+/** Row of the list → its key. */
 export function identityRowKey(r: InvoiceRowIdentity): string {
-  const kind = r.idBillingWoRel == null ? 1 : r.idBillingWoRel === -1 ? 3 : 2
-  return partialRowKey(r.id, kind, r.idBilling, r.nroBilled)
+  return partialRowKey(r.id, identityRowKind(r), r.idBilling, r.nroBilled)
+}
+
+/**
+ * Order of the rows of ONE invoice in the list: the tie-break of orderBySql (id_billing,
+ * nro_billed, id_billing_wo_rel ascending, NULL first). A deleted invoice shows its total on the
+ * first of its rows (T7).
+ */
+export function compareRowsOfInvoice(a: InvoiceRowIdentity, b: InvoiceRowIdentity): number {
+  const cmp = (x: number | null, y: number | null) =>
+    x === y ? 0 : x == null ? -1 : y == null ? 1 : x - y
+  return (
+    cmp(a.idBilling, b.idBilling) ||
+    cmp(a.nroBilled, b.nroBilled) ||
+    cmp(a.idBillingWoRel, b.idBillingWoRel)
+  )
 }
 
 /** Partial Invoiced row → its key. */
@@ -534,6 +557,13 @@ export function mapIdentityRow(r: any): InvoiceRowIdentity {
     nroBilled: r.nro_billed == null ? null : Number(r.nro_billed),
     idBillingWoRel: r.id_billing_wo_rel == null ? null : Number(r.id_billing_wo_rel),
   }
+}
+
+/** Identity of a row plus whether its invoice is deleted — what the summary needs (T5). */
+export type InvoiceSummaryIdentity = InvoiceRowIdentity & { estado: number }
+
+export function mapSummaryIdentityRow(r: any): InvoiceSummaryIdentity {
+  return { ...mapIdentityRow(r), estado: Number(r.estado ?? 1) }
 }
 
 export function mapInvoiceListRow(r: any): InvoiceRowDto {
@@ -558,10 +588,12 @@ export function mapInvoiceListRow(r: any): InvoiceRowDto {
     fechaCreate: r.fecha_create ?? '',
     fechaDesde: r.fecha_desde ?? undefined,
     fechaHasta: r.fecha_hasta ?? undefined,
+    // Subtotal / discountAmount / total los pone el repositorio desde las líneas (T2).
     subtotal: Number(r.sub_total ?? 0),
     discount: r.discount == null ? undefined : Number(r.discount),
     discountType: r.discount_type == null ? undefined : Number(r.discount_type),
     discountDetail: r.discount_detail ?? undefined,
+    discountAmount: 0,
     total: Number(r.total ?? r.sub_total ?? 0),
     tax: Number(r.tax ?? 0),
     po: r.po ?? undefined,
@@ -582,51 +614,34 @@ export function mapInvoiceListRow(r: any): InvoiceRowDto {
   }
 }
 
-/** InvoiceStatement::getDiscountAmount() transcribed for summary. */
-export const DISCOUNT_AMOUNT_SQL = `(CASE WHEN t.discount IS NULL OR t.discount = 0 THEN 0
-      WHEN t.discount_type = 2 THEN t.discount
-      ELSE t.discount * 0.01 * t.sub_total END)`
-
 /**
- * Partial Invoiced over the whole filter (the card and the totals bar), not just the page:
- * every row of the list joined to its lines, by the same key as partialRowKey.
+ * Identity of every row of the filter, with estado: the first phase of the summary (T5). It skips
+ * the `full` branch, which ran GET_DEALER_NAME_BY_PROVIDER, GET_NRO_WO_FROM_INVOICE,
+ * get_invoice_ro… on each row of the filter only to add up the money.
  */
-export function partialSummarySql(f: InvoiceListFilter): SqlChunk {
+export function summaryIdentitySql(f: InvoiceListFilter): SqlChunk {
   const identity = concatBranches(buildUnionBranches(f, 'identity'))
-  const rows = partialRowsSql(f)
   return {
-    sql: `SELECT ROUND(IFNULL(SUM(p.partialInvoiced), 0), 2) AS partial_invoiced
+    sql: `SELECT t.id, t.id_billing, t.nro_billed, t.id_billing_wo_rel, t.estado
        FROM (
          ${identity.sql}
-       ) t
-       JOIN (
-         ${rows.sql}
-       ) p
-         ON p.stmtId = t.id
-        AND p.rowKind = CASE WHEN t.id_billing_wo_rel IS NULL THEN 1
-                             WHEN t.id_billing_wo_rel = -1 THEN 3 ELSE 2 END
-        AND (p.rowKind = 1 OR p.rowIdBilling = t.id_billing)
-        AND (p.rowKind <> 3 OR p.rowNroBilled <=> t.nro_billed)`,
-    params: [...identity.params, ...rows.params],
+       ) t`,
+    params: identity.params,
   }
 }
 
 /**
- * Los totales son la suma de las filas que se están viendo, con su signo. Antes sumaban sólo las
- * positivas, así que una nota de crédito aparecía en la grilla y no se restaba del total: el
- * número de la tarjeta quedaba más alto que la suma de las filas. Es el mismo error que el B4 del
- * Closing Report, donde «Exclude ceros» también se comía los créditos.
+ * A deleted invoice is not in the builders (they start from estado = 1, and adding estado 0 there
+ * would break the rn = 1 of rule 10). Its total comes from the legacy functions, once per invoice
+ * (T7), scoped to the caller's provider.
  */
-export function summarySelectSql(deleted: InvoiceDeletedMode): string {
-  const moneyPred = deleted === 'all' ? 't.estado = 1' : '1=1'
-  return `SELECT
-    COUNT(*) AS cnt,
-    SUM(CASE WHEN t.estado = 0 THEN 1 ELSE 0 END) AS deleted_in_list,
-    ROUND(IFNULL(SUM(CASE WHEN ${moneyPred} THEN t.sub_total ELSE 0 END), 0), 2) AS subtotal,
-    ROUND(IFNULL(SUM(CASE WHEN ${moneyPred}
-                         AND t.nro_billed IS NULL
-                        THEN ${DISCOUNT_AMOUNT_SQL}
-                        ELSE 0 END), 0), 2) AS discount,
-    ROUND(IFNULL(SUM(CASE WHEN ${moneyPred}
-                        THEN COALESCE(t.total, t.sub_total) ELSE 0 END), 0), 2) AS total`
+export function deletedStatementMoneySql(idDealerProvider: number, ids: number[]): SqlChunk {
+  return {
+    sql: `SELECT s.id,
+              GET_SUBTOTAL_BY_STATEMENT(s.id, NULL) AS sub_total,
+              GET_TOTAL_BY_STATEMENT(s.id, s.discount, NULL, s.discount_type, NULL) AS total
+       FROM INVOICE_STATEMENT s
+       WHERE s.id IN (${sqlInInts(ids)}) AND s.id_dealer_provider = ? AND s.estado = 0`,
+    params: [idDealerProvider],
+  }
 }

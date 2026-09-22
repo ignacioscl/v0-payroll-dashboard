@@ -502,8 +502,17 @@ export interface Messages {
     filterDateDoneLabel: string
     filterDateDoneTooltip: string
     filterDateDoneChip: string
+    filterDateDoneLocked: string
     summaryPartialInvoiced: string
     summaryOwedAllDates: string
+    summaryDeleted: string
+    summaryStatementsHelp: string
+    summaryFilteredTotalHelp: string
+    summarySubtotalHelp: string
+    summaryDiscountHelp: string
+    summaryPartialInvoicedHelp: string
+    summaryOwedAllDatesHelp: string
+    summaryDeletedHelp: string
     filterSearchLockHint: string
     summaryExcludesDeleted: string
     rowDeletedBadge: string

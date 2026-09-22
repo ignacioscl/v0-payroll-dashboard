@@ -514,8 +514,25 @@ export const en: Messages = {
     filterDateDoneTooltip:
       'Counts work orders by the date they were completed instead of the date they were created. Same box as the Closing Report.',
     filterDateDoneChip: 'By date completed',
+    filterDateDoneLocked:
+      'Only applies with partial invoices included: without them the list picks invoices by their own period, not by the dates of their work orders.',
     summaryPartialInvoiced: 'Partial invoiced',
     summaryOwedAllDates: 'Total debt',
+    summaryDeleted: 'Deleted',
+    summaryStatementsHelp:
+      'Rows in the list with these filters. An invoice with payments has one row per payment, plus one for what is still owed.',
+    summaryFilteredTotalHelp:
+      'Adds up the Total of every row in the list with these filters, not only the loaded page. Credits subtract. Deleted invoices are left out.',
+    summarySubtotalHelp:
+      'The rows at price, with the tax of generic invoices and before discounts. Deleted invoices are left out.',
+    summaryDiscountHelp:
+      'Discount of the rows: each row carries its share of the discount of its invoice, so Subtotal − Discount = Filtered total.',
+    summaryPartialInvoicedHelp:
+      'Only the part of the work of each invoice that falls inside the date range, with the discount of the invoice and no tax. Work outside the range is left out.',
+    summaryOwedAllDatesHelp:
+      'Everything the selected dealers still owe on their invoices, over all dates: the date range does not apply. It does not include completed work that has not been invoiced yet, neither work orders nor TTK punches: what is not invoiced is not owed yet. Completed work orders not invoiced show in WO Not Invoiced (Business KPIs › Billing).',
+    summaryDeletedHelp:
+      'Total of the deleted invoices in this list, counted once per invoice. They show struck through and do not add up in the other cards or in the totals bar.',
     filterSearchLockHint:
       'Searching by invoice # or employee: paid and unpaid, including $0 invoices and all dates. Deleted starts on Show all — you can change it.',
     summaryExcludesDeleted: 'Does not include deleted',
@@ -1436,7 +1453,7 @@ export const en: Messages = {
     genericInvoiced:
       'Free lines of generic invoices, at qty × price with the discount of the invoice and no tax (an empty or 0 qty counts as 1), split across the days of the invoice period that fall inside the range, plus the punches billed on those generic invoices, counted by the day of the punch. Credits (negative lines) always count. Subtitle splits invoices whose period is wholly in range vs the rest.',
     outstandingAr:
-      'Uncollected net amount of every billed line, all history. Same lines as Billing. Subtitle is open invoices and the uncollected amount outside the months shown on the chart. Not limited to the header date range.',
+      'Uncollected net amount of every billed line, all history. Same lines as Billing. Subtitle is open invoices and the uncollected amount outside the months shown on the chart. Not limited to the header date range. It does not include completed work that has not been invoiced yet, neither work orders nor TTK punches: what is not invoiced is not owed yet. Completed work orders not invoiced show in WO Not Invoiced (Billing tab).',
     unpaidInPeriod:
       'WO Invoiced + TTK Invoiced + Generic Invoiced, minus Collected: the same numbers shown on those cards, with the discount of each invoice and no tax. Subtitle: the same with tax and discount, how many invoices have at least one uncollected line in the period, and the WO value not invoiced yet (WO Not Invoiced).',
     dso: 'Average days from issuing an invoice to receiving payment.',

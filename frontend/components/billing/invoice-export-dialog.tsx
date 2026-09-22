@@ -37,6 +37,7 @@ import {
   persistInvoiceEmailPrefsAfterSend,
 } from '@/lib/billing/invoice-email-prefs'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { discountExportValue } from '@/lib/billing/invoice-discount'
 import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 
@@ -140,7 +141,8 @@ export function InvoiceExportDialog({
         [t('invoices.colDetail')]:
           r.invoiceServiceSelRel || r.invoiceService || r.invoiceServicesByWo || '',
         [t('invoices.colSubtotal')]: r.subtotal,
-        [t('invoices.colDiscount')]: r.nroBilled == null ? (r.discount ?? '') : '',
+        // La parte del descuento de esta fila en plata, con el signo de la grilla (T9).
+        [t('invoices.colDiscount')]: discountExportValue(r.discountAmount),
         [t('invoices.colTotal')]: r.total,
         [t('invoices.colCheckAmount')]: r.amount ?? '',
         [t('invoices.colCheckNumber')]: r.checkNumber ?? '',

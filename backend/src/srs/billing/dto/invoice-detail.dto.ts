@@ -31,6 +31,27 @@ export class InvoiceDetailQueryDto {
   @IsIn(['0', '1'])
   payed?: '0' | '1'
 
+  @ApiPropertyOptional({
+    description:
+      'nro_billed of the row. On a line-payment row it tells apart two rows of the same check ' +
+      '(TW641-3 and TW641-5 of billing 2871).',
+  })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  nroBilled?: number
+
+  @ApiPropertyOptional({
+    description:
+      'id_billing_wo_rel of the row: -1 line-payment row, > 0 whole-invoice payment row. ' +
+      'Omitted: either kind (lines with their own payment of idBilling, or with no own payment ' +
+      'when idBilling pays the whole invoice).',
+  })
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  idBillingWoRel?: number
+
   @ApiPropertyOptional({ description: 'Department ids (comma-separated), same as the list' })
   @IsOptional()
   @IsString()
@@ -47,9 +68,15 @@ export class InvoiceDetailQueryDto {
   stock?: string
 }
 
+/** Which payment a row of the list is: its own line payments, or the whole invoice (T8). */
+export type InvoiceDetailPaymentKind = 'line' | 'whole' | 'any'
+
 export type InvoiceDetailSlice = {
   idBilling: number
   payed?: '0' | '1'
+  /** Only on a line-payment row: the lines of that check with this nro_billed (T11). */
+  nroBilled?: number
+  paymentKind: InvoiceDetailPaymentKind
   departmentIds: number[]
   invoiceServiceIds: number[]
   stock?: string
@@ -58,9 +85,15 @@ export type InvoiceDetailSlice = {
 export function buildInvoiceDetailSlice(query: InvoiceDetailQueryDto): InvoiceDetailSlice {
   const idBilling =
     query.idBilling != null && Number.isFinite(query.idBilling) ? Math.max(0, query.idBilling) : 0
+  const rel = query.idBillingWoRel
+  const paymentKind: InvoiceDetailPaymentKind =
+    rel == null ? 'any' : rel === -1 ? 'line' : rel > 0 ? 'whole' : 'any'
   return {
     idBilling,
     payed: query.payed,
+    // A whole-invoice row carries nro_billed 1 as a label only: it does not filter lines.
+    nroBilled: paymentKind === 'whole' ? undefined : query.nroBilled,
+    paymentKind,
     departmentIds: parseCsvPositiveInts(query.idDepartment),
     invoiceServiceIds: parseCsvPositiveInts(query.idInvoiceService),
     stock: parseOptionalTrimmed(query.stock),

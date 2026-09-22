@@ -57,11 +57,8 @@ import {
   type InvoiceRow,
   type InvoiceSummary,
 } from '@/lib/srs-invoices-api'
-import {
-  invoiceRowKey,
-  isInvoiceRemainder,
-  uniqueStatementIds,
-} from '@/lib/billing/invoice-nro-billed'
+import { discountExportValue } from '@/lib/billing/invoice-discount'
+import { invoiceRowKey, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -79,6 +76,12 @@ function fmtMoney(n: number | undefined | null): string {
     maximumFractionDigits: 2,
   })
   return n < 0 ? `-$${abs}` : `$${abs}`
+}
+
+/** A discount in money: −$40.00 when it lowers the total, +$10.00 when a credit's raises it. */
+function fmtDiscount(n: number | undefined | null): string {
+  if (n === undefined || n === null || n === 0) return '—'
+  return n > 0 ? `−${fmtMoney(n)}` : `+${fmtMoney(-n)}`
 }
 
 function fmtDate(value: string | undefined | null): string {
@@ -327,11 +330,15 @@ function InvoiceDetailBody({
     row.estado !== 0 &&
     row.isBilled !== 1
 
+  // La fila entera va en el pedido: el cheque, su nro_billed y si es cobro por línea o de la
+  // invoice entera. Así el detalle trae las mismas líneas que suman el Total de la fila (T8/T11).
   const detail = useQuery({
     queryKey: [
       'srs-invoice-detail',
       row.id,
       row.idBilling ?? 0,
+      row.nroBilled ?? null,
+      row.idBillingWoRel ?? null,
       row.isBilled,
       listInput?.idDepartment,
       listInput?.idInvoiceService,
@@ -341,6 +348,8 @@ function InvoiceDetailBody({
       fetchInvoiceDetail(row.id, {
         idBilling: row.idBilling ?? 0,
         payed: row.isBilled === 1 ? '1' : undefined,
+        nroBilled: row.nroBilled,
+        idBillingWoRel: row.idBillingWoRel,
         idDepartment: listInput?.idDepartment,
         idInvoiceService: listInput?.idInvoiceService,
         stock: listInput?.stock,
@@ -632,9 +641,9 @@ function TotalsBar({
           <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
             {isLoading || discount == null
               ? '—'
-              : discount > 0
-                ? `−${fmtMoney(discount)}`
-                : fmtMoney(0)}
+              : discount === 0
+                ? fmtMoney(0)
+                : fmtDiscount(discount)}
           </span>
         </div>
         {partialInvoiced !== undefined ? (
@@ -1112,8 +1121,10 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
+        // La parte del descuento de la invoice que le toca a esta fila, en plata (T9). Antes
+        // mostraba la configuración cruda y sólo en la fila de saldo: un 10 % salía «−$10,00».
         id: 'discount',
-        accessorFn: (row) => row.discount ?? 0,
+        accessorFn: (row) => row.discountAmount,
         size: 80,
         minSize: 68,
         maxSize: 84,
@@ -1121,18 +1132,21 @@ export function InvoiceListTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colDiscount')} />
         ),
-        cell: ({ row }) => {
-          const d = isInvoiceRemainder(row.original) ? row.original.discount : null
-          return (
-            <span className="text-amber-600 dark:text-amber-400">
-              {d && d > 0 ? `−${fmtMoney(d)}` : '—'}
-            </span>
-          )
-        },
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              'text-amber-600 dark:text-amber-400',
+              row.original.estado === 0 && 'text-muted-foreground line-through',
+            )}
+          >
+            {fmtDiscount(row.original.discountAmount)}
+          </span>
+        ),
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,
-          exportValue: (r) => (isInvoiceRemainder(r) ? (r.discount ?? 0) : ''),
+          // Con el signo de la pantalla: −$2,421.06 en la grilla es −2421.06 en el Excel.
+          exportValue: (r) => discountExportValue(r.discountAmount),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1438,10 +1452,10 @@ export function InvoiceListTable({
 
   const recordsNote =
     deleteSelectedNote || partialLegend ? (
-      <>
+      <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
         {deleteSelectedNote}
         {partialLegend}
-      </>
+      </span>
     ) : null
 
   return (
