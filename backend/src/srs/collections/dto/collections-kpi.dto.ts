@@ -17,6 +17,8 @@ export class CollectionsKpiQueryDto {
 /** Open AR snapshot (not period-invoice cohort). Period invoiced/collected → billing/period-collection. */
 export class CollectionsKpiDto {
   @ApiProperty({ example: 78400 }) outstandingAr!: number
+  @ApiProperty({ example: 78325, description: 'Outstanding AR without the tax of the generics' })
+  outstandingArNoTax!: number
   @ApiProperty({ example: 34.2 }) dsoDays!: number
   @ApiProperty({ example: 19.5 }) arOver60Pct!: number
   @ApiProperty({ example: 96 }) openStatements!: number

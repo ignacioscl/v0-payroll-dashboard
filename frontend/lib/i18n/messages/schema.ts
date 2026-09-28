@@ -226,6 +226,8 @@ export interface Messages {
     discountShareTooltip: string
     colTotal: string
     colPartialInvoiced: string
+    /** Título de la columna en la tabla: el largo no entra. Columns y el export usan colPartialInvoiced. */
+    colPartialInvoicedShort: string
     colPaid: string
     colCheckNumber: string
     colCheckAmount: string
@@ -1283,6 +1285,7 @@ export interface Messages {
     chartProductionVsGoal: string
     chartInvoicedVsProduction: string
     chartInvoicedByWeek: string
+    chartNoTaxNote: string
     chartUnbilledAging: string
     unbilledLookbackNote: string
     chartUnbilledByDealer: string
@@ -1329,6 +1332,7 @@ export interface Messages {
     openStatements: string
     outstandingArSubtitle: string
     outstandingArOutsideChart: string
+    outstandingArNoTax: string
     unpaidInPeriod: string
     unpaidInPeriodStatements: string
     withTaxDiscount: string

@@ -49,6 +49,7 @@ export function BillingWeekChart({ data, loading }: BillingWeekChartProps) {
     <Card className="bg-card border-border">
       <CardHeader>
         <CardTitle className="text-base">{t('mockKpis.chartInvoicedByWeek')}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('mockKpis.chartNoTaxNote')}</p>
       </CardHeader>
       <CardContent>
         {loading ? (

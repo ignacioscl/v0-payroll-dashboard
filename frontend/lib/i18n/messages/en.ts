@@ -233,6 +233,7 @@ export const en: Messages = {
     discountShareTooltip: '{part} ({pct}% of {total})',
     colTotal: 'Total',
     colPartialInvoiced: 'Partial Invoiced',
+    colPartialInvoicedShort: 'Partial Inv.',
     colPaid: 'Paid',
     colCheckNumber: 'Check #',
     colCheckAmount: 'Amount',
@@ -393,7 +394,7 @@ export const en: Messages = {
     totalsLabel: 'Filtered totals',
     totalsCount: '{count} invoices',
     summaryStatements: 'Invoices',
-    summaryFilteredTotal: 'Filtered total',
+    summaryFilteredTotal: 'Total',
     totalsShowing: 'Showing {shown} of {total}',
     totalsSubtotal: 'Subtotal',
     totalsPartialInvoiced: 'Partial invoiced',
@@ -506,7 +507,7 @@ export const en: Messages = {
     filterIgnoreDatesChip: 'Date range ignored',
     includePartialLabel: 'Include partial invoices',
     includePartialTooltip:
-      'Also lists the invoices with work inside the period, even if the invoice period crosses it. Partial Invoiced shows how much of each one falls in the period.',
+      'Also lists the invoices with work inside the period, even if the invoice period crosses it. Partial Inv. shows how much of each one falls in the period.',
     includePartialChip: 'Partial invoices included',
     includePartialLocked:
       'Needs a date range: not available while searching by invoice #, by employee, or ignoring the date range.',
@@ -527,7 +528,7 @@ export const en: Messages = {
     summarySubtotalHelp:
       'The rows at price, with the tax of generic invoices and before discounts. Deleted invoices are left out.',
     summaryDiscountHelp:
-      'Discount of the rows: each row carries its share of the discount of its invoice, so Subtotal − Discount = Filtered total.',
+      'Discount of the rows: each row carries its share of the discount of its invoice, so Subtotal − Discount = Total.',
     summaryPartialInvoicedHelp:
       'Only the part of the work of each invoice that falls inside the date range, with the discount of the invoice and no tax. Work outside the range is left out.',
     summaryOwedAllDatesHelp:
@@ -1291,6 +1292,7 @@ export const en: Messages = {
     chartProductionVsGoal: 'Production vs Goal by Dealer',
     chartInvoicedVsProduction: 'Invoiced vs Production Value by Week',
     chartInvoicedByWeek: 'Invoiced by Week',
+    chartNoTaxNote: 'This chart does not include tax.',
     chartUnbilledAging: 'Unbilled WOs Aging (now)',
     unbilledLookbackNote: 'Only counts unbilled WOs done in the last {months} months',
     chartUnbilledByDealer: 'Unbilled Work by Dealer (Done WOs not in any invoice)',
@@ -1328,7 +1330,7 @@ export const en: Messages = {
     tableUnbilledServices: 'Unbilled services',
     tableUnbilledValue: 'Unbilled Value',
     tableOldestDays: 'Oldest (days)',
-    outstandingAr: 'Outstanding AR',
+    outstandingAr: 'Outstanding AR · with tax',
     dso: 'DSO',
     collected: 'Collected',
     collectionRate: 'Collection Rate',
@@ -1337,6 +1339,7 @@ export const en: Messages = {
     openStatements: '{count} open invoices',
     outstandingArSubtitle: 'No date filter · Complete snapshot · {count} open invoices',
     outstandingArOutsideChart: '{count} open invoices · outside chart months: {amount}',
+    outstandingArNoTax: 'No tax: {amount}',
     unpaidInPeriod: 'Unpaid in Period',
     unpaidInPeriodStatements: '{count} unpaid invoices in period',
     withTaxDiscount: 'With tax & discount: {amount}',
@@ -1480,7 +1483,7 @@ export const en: Messages = {
       'Active employees with punches in the period. Subtitle shows average hourly rate.',
     revenuePerEmployee: 'Production value divided by active employees.',
     collectionsByMonth:
-      'Each month is when the work was done: work orders by creation date, time punches by punch date, generics by the days in their period. Billed amounts include invoice discount and tax. Collected is only collections of those same lines (line payment or invoice paid in full). Unbilled is services on completed work orders not on any active invoice, at gross value. Billing and Open AR cards use these same lines. The last month stops at the header end date.',
+      'Each month is when the work was done: work orders by creation date, time punches by punch date, generics by the days in their period. Billed amounts include the invoice discount, no tax. Collected is only collections of those same lines (line payment or invoice paid in full). Unbilled is services on completed work orders not on any active invoice, at gross value. Billing cards use these same lines and amounts; Outstanding AR includes tax. The last month stops at the header end date.',
   },
   businessKpis: {
     filterDateDone: 'Filter by completion date',
@@ -1495,7 +1498,7 @@ export const en: Messages = {
     collectionsHistoryMonths: 'History',
     collectionsHistoryMonthsOption: '{count} months',
     collectionsByMonthNote:
-      'Month is when the work was done (work orders by creation date, time punches by punch date, generics by the days in the period). Billed amounts include invoice discount and tax. Collected is only collections of those same lines. Unbilled is gross. The last month stops at the header end date.',
+      'Month is when the work was done (work orders by creation date, time punches by punch date, generics by the days in the period). Billed and collected amounts include the invoice discount, like the Billing cards. Collected is only collections of those same lines. Unbilled is gross. The last month stops at the header end date.',
     producedVsCollectedByMonth: 'Produced vs collected by month',
     seriesWoInvoiced: 'WO invoiced',
     seriesTtkInvoiced: 'TTK invoiced',

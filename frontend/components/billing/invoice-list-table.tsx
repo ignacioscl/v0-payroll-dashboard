@@ -1199,12 +1199,14 @@ export function InvoiceListTable({
             {
               id: 'partialInvoiced',
               accessorFn: (row: InvoiceRow) => row.partialInvoiced ?? 0,
-              size: 96,
-              minSize: 80,
+              // 104 es lo mínimo en que entra entero «PARCIAL FACT.» (ES); «PARTIAL INV.» pide 90.
+              size: 112,
+              minSize: 104,
               maxSize: 120,
               enableSorting: false,
+              // Título corto: el largo no entra. Columns y el export siguen con meta.label.
               header: ({ column }: { column: Column<InvoiceRow, unknown> }) => (
-                <DataTableColumnHeader column={column} title={t('invoices.colPartialInvoiced')} />
+                <DataTableColumnHeader column={column} title={t('invoices.colPartialInvoicedShort')} />
               ),
               cell: ({ row }: { row: Row<InvoiceRow> }) => (
                 <span

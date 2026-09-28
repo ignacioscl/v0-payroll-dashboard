@@ -272,9 +272,22 @@ export default function BusinessKpisPage() {
   const unpaidRealShown = pc
     ? dollars(pc.incomeInvoicedRealValue) - dollars(pc.incomeCollectedRealValue)
     : undefined
+  // The chart shows the months without tax; the debt has tax, so it subtracts the same months as
+  // real money, series by series like before.
   const outstandingOutsideChart =
     c && collByMonth.data
-      ? dollars(c.outstandingAr) - collByMonth.data.reduce((acc, point) => acc + shownPending(point), 0)
+      ? dollars(c.outstandingAr) -
+        collByMonth.data.reduce(
+          (acc, point) =>
+            acc +
+            shownPending({
+              woInvoicedValue: point.woInvoicedRealValue,
+              ttkInvoicedValue: point.ttkInvoicedRealValue,
+              genericInvoicedValue: point.genericInvoicedRealValue,
+              collectedValue: point.collectedRealValue,
+            }),
+          0,
+        )
       : undefined
 
   return (
@@ -498,7 +511,32 @@ export default function BusinessKpisPage() {
           <KpiErrorBanner q={coll} />
           <p className="text-sm text-muted-foreground">{t('businessKpis.collectionsSnapshotNote')}</p>
           <div className={KPI_CARD_GRID}>
-            <KPICard inline help={t('businessKpisHelp.outstandingAr')} loading={coll.isLoading} title={t('mockKpis.outstandingAr')} value={c ? fmtDollars(c.outstandingAr) : '—'} icon={<Banknote className="h-5 w-5" />} variant="warning" subtitle={c ? (outstandingOutsideChart === undefined ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements }) : t('mockKpis.outstandingArOutsideChart', { count: c.openStatements, amount: fmtDollars(outstandingOutsideChart) })) : ''} />
+            <KPICard
+              inline
+              help={t('businessKpisHelp.outstandingAr')}
+              loading={coll.isLoading}
+              title={t('mockKpis.outstandingAr')}
+              value={c ? fmtDollars(c.outstandingAr) : '—'}
+              icon={<Banknote className="h-5 w-5" />}
+              variant="warning"
+              subtitle={
+                c ? (
+                  <>
+                    <p>
+                      {outstandingOutsideChart === undefined
+                        ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements })
+                        : t('mockKpis.outstandingArOutsideChart', {
+                            count: c.openStatements,
+                            amount: fmtDollars(outstandingOutsideChart),
+                          })}
+                    </p>
+                    <p>{t('mockKpis.outstandingArNoTax', { amount: fmtDollars(c.outstandingArNoTax) })}</p>
+                  </>
+                ) : (
+                  ''
+                )
+              }
+            />
             <KPICard inline help={t('businessKpisHelp.dso')} loading={coll.isLoading} title={t('mockKpis.dsoDaysToCollect')} value={c ? `${c.dsoDays}d` : '—'} icon={<CalendarClock className="h-5 w-5" />} variant="danger" />
             <KPICard inline help={t('businessKpisHelp.arOver60')} loading={coll.isLoading} title={t('mockKpis.arOver60')} value={c ? `${c.arOver60Pct}%` : '—'} icon={<AlertTriangle className="h-5 w-5" />} variant="violet" />
           </div>

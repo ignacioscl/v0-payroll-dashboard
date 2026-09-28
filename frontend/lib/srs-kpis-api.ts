@@ -109,6 +109,8 @@ export interface BillingPeriodCollectionKpi {
 
 export interface CollectionsKpi {
   outstandingAr: number
+  /** The same debt without the tax of the generics. */
+  outstandingArNoTax: number
   dsoDays: number
   arOver60Pct: number
   openStatements: number
@@ -124,6 +126,11 @@ export interface CollectionsByMonthPoint {
   collectedValue: number
   pendingCollectionValue: number
   collectionRatePct: number
+  /** The same month as real money (tax + discount): only for the Outstanding AR subtitle. */
+  woInvoicedRealValue: number
+  ttkInvoicedRealValue: number
+  genericInvoicedRealValue: number
+  collectedRealValue: number
 }
 
 export const COLLECTIONS_HISTORY_MONTHS = [4, 6, 8, 10, 12] as const

@@ -47,6 +47,8 @@ import {
 /** What the Outstanding AR pass returns; arOver60Pct needs debtOver60 from the same run. */
 export interface OutstandingArResult {
   outstandingAr: number
+  /** The same debt without the tax of the generics (discount only): the small line of the card. */
+  outstandingArNoTax: number
   openStatements: number
   debtOver60: number
 }
@@ -77,6 +79,10 @@ function emptyCollectionsMonth(monthStart: string): CollectionsByMonthRowDto {
     collectedValue: 0,
     pendingCollectionValue: 0,
     collectionRatePct: 0,
+    woInvoicedRealValue: 0,
+    ttkInvoicedRealValue: 0,
+    genericInvoicedRealValue: 0,
+    collectedRealValue: 0,
   }
 }
 
@@ -119,11 +125,16 @@ export class CollectionsKpiRepository {
     const owing: any[] = await this.srs.query(owingQ.sql, owingQ.params)
     const ids = owing.map((r) => Number(r.stmtId))
     let rowMoney = new Map<string, RowMoneyCents>()
+    let rowMoneyNoTax = new Map<string, RowMoneyCents>()
     if (ids.length) {
       const moneyQ = billedRowMoneySql({ ...filter, filterDateDone: false }, rowMoneyIdsOrAll(ids))
-      rowMoney = rowMoneyByKey(await this.srs.query(moneyQ.sql, moneyQ.params))
+      const rows: any[] = await this.srs.query(moneyQ.sql, moneyQ.params)
+      rowMoney = rowMoneyByKey(rows)
+      // Same rows and the same subtraction, with the total without tax: the «No tax» line.
+      rowMoneyNoTax = rowMoneyByKey(rows.map((r) => ({ ...r, rowTotal: r.rowTotalNoTax })))
     }
     let debtCents = 0
+    let debtNoTaxCents = 0
     let over60Cents = 0
     let openStatements = 0
     for (const r of owing) {
@@ -133,11 +144,13 @@ export class CollectionsKpiRepository {
       // The cent of rounding follows the debt into Over60 when the invoice owes work that old.
       const over60 = beforeOver60 === 0 ? 0 : beforeOver60 + (debt - before)
       debtCents += debt
+      debtNoTaxCents += balanceCents(rowMoneyNoTax, Number(r.stmtId))
       over60Cents += over60
       if (debt !== 0) openStatements += 1
     }
     return {
       outstandingAr: centsToMoney(debtCents),
+      outstandingArNoTax: centsToMoney(debtNoTaxCents),
       openStatements,
       debtOver60: centsToMoney(over60Cents),
     }
@@ -205,10 +218,11 @@ export class CollectionsKpiRepository {
       this.getOutstanding(filter),
     ])
 
-    const { outstandingAr, openStatements, debtOver60 } = debt
+    const { outstandingAr, outstandingArNoTax, openStatements, debtOver60 } = debt
 
     return {
       outstandingAr,
+      outstandingArNoTax,
       dsoDays: Number(dso[0]?.dsoDays ?? 0),
       arOver60Pct: outstandingAr > 0 ? Math.round((debtOver60 / outstandingAr) * 1000) / 10 : 0,
       openStatements,
@@ -233,9 +247,13 @@ export class CollectionsKpiRepository {
       end: monthEndInclusive(ms, rangeEnd),
     }))
 
-    const woQ = woBilledLinesSql({ ...wo, groupBy: 'month' })
-    const ttkQ = ttkBilledLinesSql({ ...ttk, groupBy: 'month' })
-    const genQ = genericBilledLinesSql({ ...gen, groupBy: 'month', monthBuckets })
+    // The chart counts like the Billing cards (discount, no tax), so each month matches them. The
+    // same pass also returns the real money (tax + discount): the Outstanding AR subtitle subtracts
+    // it from the debt, which is real money.
+    const monthOpts = { groupBy: 'month' as const, productionValue: true, withRealSplit: true }
+    const woQ = woBilledLinesSql({ ...wo, ...monthOpts })
+    const ttkQ = ttkBilledLinesSql({ ...ttk, ...monthOpts })
+    const genQ = genericBilledLinesSql({ ...gen, ...monthOpts, monthBuckets })
 
     const [woRows, ttkRows, genRows, unbilledRows] = await Promise.all([
       this.srs.query(woQ.sql, woQ.params),
@@ -291,6 +309,12 @@ export class CollectionsKpiRepository {
         collectedValue,
         pendingCollectionValue,
         collectionRatePct: collectionRatePct(collectedValue, invoiced),
+        woInvoicedRealValue: money(woRow?.invoicedReal),
+        ttkInvoicedRealValue: money(ttkRow?.invoicedReal),
+        genericInvoicedRealValue: money(genRow?.invoicedReal),
+        collectedRealValue: roundMoney(
+          money(woRow?.collectedReal) + money(ttkRow?.collectedReal) + money(genRow?.collectedReal),
+        ),
       }
     })
 

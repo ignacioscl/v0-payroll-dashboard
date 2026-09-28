@@ -178,9 +178,10 @@ export class BillingKpiRepository {
       start,
       end: weekEndInclusive(start, fechaHasta),
     }))
-    const woQ = woBilledLinesSql({ ...wo, groupBy: 'week' })
-    const ttkQ = ttkBilledLinesSql({ ...ttk, groupBy: 'week' })
-    const genQ = genericBilledLinesSql({ ...gen, groupBy: 'week', weekBuckets })
+    // Same valuation as the Income cards (C1: discount, no tax), so the bars add up to the cards.
+    const woQ = woBilledLinesSql({ ...wo, groupBy: 'week', productionValue: true })
+    const ttkQ = ttkBilledLinesSql({ ...ttk, groupBy: 'week', productionValue: true })
+    const genQ = genericBilledLinesSql({ ...gen, groupBy: 'week', weekBuckets, productionValue: true })
     const [woRows, ttkRows, genRows] = await Promise.all([
       this.srs.query(woQ.sql, woQ.params),
       this.srs.query(ttkQ.sql, ttkQ.params),

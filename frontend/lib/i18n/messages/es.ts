@@ -233,6 +233,7 @@ export const es: Messages = {
     discountShareTooltip: '{part} ({pct}% de {total})',
     colTotal: 'Total',
     colPartialInvoiced: 'Parcial facturado',
+    colPartialInvoicedShort: 'Parcial fact.',
     colPaid: 'Pago',
     colCheckNumber: 'Cheque #',
     colCheckAmount: 'Amount',
@@ -393,7 +394,7 @@ export const es: Messages = {
     totalsLabel: 'Totales filtrados',
     totalsCount: '{count} facturas',
     summaryStatements: 'Facturas',
-    summaryFilteredTotal: 'Total filtrado',
+    summaryFilteredTotal: 'Total',
     totalsShowing: 'Mostrando {shown} de {total}',
     totalsSubtotal: 'Subtotal',
     totalsPartialInvoiced: 'Parcial facturado',
@@ -506,7 +507,7 @@ export const es: Messages = {
     filterIgnoreDatesChip: 'Rango de fechas ignorado',
     includePartialLabel: 'Incluir invoices parciales',
     includePartialTooltip:
-      'Suma también las invoices con trabajo dentro del período, aunque su período cruce el rango. Parcial facturado muestra cuánto de cada una cae en el período.',
+      'Suma también las invoices con trabajo dentro del período, aunque su período cruce el rango. Parcial fact. muestra cuánto de cada una cae en el período.',
     includePartialChip: 'Invoices parciales incluidas',
     includePartialLocked:
       'Necesita un rango de fechas: no aplica al buscar por número, por empleado ni ignorando el rango.',
@@ -527,7 +528,7 @@ export const es: Messages = {
     summarySubtotalHelp:
       'Las filas a precio, con el tax de las invoices genéricas y antes del descuento. Deja afuera las eliminadas.',
     summaryDiscountHelp:
-      'Descuento de las filas: cada fila lleva su parte del descuento de su invoice, así Subtotal − Discount = Total filtrado.',
+      'Descuento de las filas: cada fila lleva su parte del descuento de su invoice, así Subtotal − Discount = Total.',
     summaryPartialInvoicedHelp:
       'Sólo la parte del trabajo de cada invoice que cae dentro del rango de fechas, con el descuento de la invoice y sin tax. Deja afuera el trabajo fuera del rango.',
     summaryOwedAllDatesHelp:
@@ -1295,6 +1296,7 @@ export const es: Messages = {
     chartProductionVsGoal: 'Producción vs meta por sucursal',
     chartInvoicedVsProduction: 'Facturado vs valor de producción por semana',
     chartInvoicedByWeek: 'Facturado por semana',
+    chartNoTaxNote: 'Este gráfico no incluye tax.',
     chartUnbilledAging: 'Antigüedad de OT sin facturar (ahora)',
     unbilledLookbackNote: 'Solo cuenta OT sin facturar terminadas en los últimos {months} meses',
     chartUnbilledByDealer: 'Trabajo sin facturar por sucursal (OT terminadas sin factura)',
@@ -1332,7 +1334,7 @@ export const es: Messages = {
     tableUnbilledServices: 'Servicios sin facturar',
     tableUnbilledValue: 'Valor sin facturar',
     tableOldestDays: 'Más antiguo (días)',
-    outstandingAr: 'CxC pendiente',
+    outstandingAr: 'CxC pendiente · con tax',
     dso: 'DSO',
     collected: 'Cobrado',
     collectionRate: 'Tasa de cobranza',
@@ -1341,6 +1343,7 @@ export const es: Messages = {
     openStatements: '{count} facturas abiertas',
     outstandingArSubtitle: 'Sin fecha · AR completo · {count} facturas abiertas',
     outstandingArOutsideChart: '{count} facturas abiertas · fuera de los meses del gráfico: {amount}',
+    outstandingArNoTax: 'Sin tax: {amount}',
     unpaidInPeriod: 'Sin pago del período',
     unpaidInPeriodStatements: '{count} facturas sin pago en el período',
     withTaxDiscount: 'Con tax y descuento: {amount}',
@@ -1484,7 +1487,7 @@ export const es: Messages = {
       'Empleados activos con ponchadas en el período. El subtítulo muestra la tarifa horaria promedio.',
     revenuePerEmployee: 'Valor de producción dividido por empleados activos.',
     collectionsByMonth:
-      'Cada mes es cuándo se hizo el trabajo: órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período. Lo facturado incluye descuento e impuesto de la factura. Cobrado es solo lo cobrado de esas mismas líneas (pago de la línea o factura paga entera). Sin facturar son servicios de OT terminadas que no están en ninguna factura activa, en bruto. Los cards de Billing y Open AR usan estas mismas líneas. El último mes se corta en la fecha hasta del encabezado.',
+      'Cada mes es cuándo se hizo el trabajo: órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período. Lo facturado incluye el descuento de la factura, sin impuesto. Cobrado es solo lo cobrado de esas mismas líneas (pago de la línea o factura paga entera). Sin facturar son servicios de OT terminadas que no están en ninguna factura activa, en bruto. Las tarjetas de Facturación usan estas mismas líneas y montos; CxC pendiente incluye impuesto. El último mes se corta en la fecha hasta del encabezado.',
   },
   businessKpis: {
     filterDateDone: 'Filtrar por fecha de terminación',
@@ -1499,7 +1502,7 @@ export const es: Messages = {
     collectionsHistoryMonths: 'Historial',
     collectionsHistoryMonthsOption: '{count} meses',
     collectionsByMonthNote:
-      'El mes es cuándo se hizo el trabajo (órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período). Lo facturado incluye descuento e impuesto. Cobrado es solo lo cobrado de esas mismas líneas. Sin facturar va bruto. El último mes se corta en la fecha hasta del encabezado.',
+      'El mes es cuándo se hizo el trabajo (órdenes de trabajo por fecha de creación, ponchadas por fecha de punch, genéricos por los días del período). Lo facturado y lo cobrado incluyen el descuento de la factura, como las tarjetas de Facturación. Cobrado es solo lo cobrado de esas mismas líneas. Sin facturar va bruto. El último mes se corta en la fecha hasta del encabezado.',
     producedVsCollectedByMonth: 'Producido vs cobrado por mes',
     seriesWoInvoiced: 'WO facturadas',
     seriesTtkInvoiced: 'TTK facturado',

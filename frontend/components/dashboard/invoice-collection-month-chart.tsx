@@ -131,6 +131,7 @@ export function InvoiceCollectionMonthChart({ data, loading }: InvoiceCollection
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="space-y-1">
           <CardTitle className="text-base">{t('businessKpis.producedVsCollectedByMonth')}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t('mockKpis.chartNoTaxNote')}</p>
           <p className="text-sm text-muted-foreground">{t('businessKpis.collectionsByMonthNote')}</p>
         </div>
         <Popover>

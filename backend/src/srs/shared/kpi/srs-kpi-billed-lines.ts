@@ -91,6 +91,12 @@ export interface BilledLinesOpts {
    */
   withProductionSplit?: boolean
   /**
+   * With productionValue: also return invoicedReal / collectedReal, the same lines valued like
+   * today's billed money (tax + discount), in the same pass. The Open AR chart shows production
+   * (no tax) but the Outstanding AR subtitle still subtracts the real money of its months.
+   */
+  withRealSplit?: boolean
+  /**
    * Restrict to these statement ids (the page of the invoice list). The WO window is cropped to
    * the work orders of those statements too (T3): its partitions are per work order service, so
    * each one still enters whole and rn / paid do not change.
@@ -134,8 +140,11 @@ const ROW_KEYS_SELECT = `s.id AS stmtId,
 
 export const ROW_KEY_COLUMNS = ['stmtId', 'rowKind', 'rowIdBilling', 'rowNroBilled'] as const
 
-/** Money columns of the rowMoney mode, in SELECT order. */
-export const ROW_MONEY_COLUMNS = ['rowSubtotal', 'rowTotal'] as const
+/**
+ * Money columns of the rowMoney mode, in SELECT order. rowTotalNoTax is rowTotal without the tax
+ * of a generic (discount only): Outstanding AR shows it in small, «No tax».
+ */
+export const ROW_MONEY_COLUMNS = ['rowSubtotal', 'rowTotal', 'rowTotalNoTax'] as const
 
 /**
  * Key of a row of the invoice list: which invoice and which of its three rows (balance,
@@ -202,10 +211,19 @@ function assertRowMoneyOpts(opts: BilledLinesOpts): void {
   }
 }
 
-function rowMoneySelectSql(subtotalExpr: string, totalExpr: string): string {
+function rowMoneySelectSql(subtotalExpr: string, totalExpr: string, totalNoTaxExpr: string): string {
   return `SELECT ${ROW_KEYS_SELECT},
       SUM(${subtotalExpr}) AS rowSubtotal,
-      SUM(${totalExpr}) AS rowTotal`
+      SUM(${totalExpr}) AS rowTotal,
+      SUM(${totalNoTaxExpr}) AS rowTotalNoTax`
+}
+
+/** invoicedReal / collectedReal (withRealSplit): the same lines as billed money, tax + discount. */
+function realSplitSql(opts: BilledLinesOpts, realAmt: string, paidExpr: string): string {
+  if (!opts.withRealSplit) return ''
+  return `,
+      ROUND(IFNULL(SUM(${realAmt}), 0), 2) AS invoicedReal,
+      ROUND(IFNULL(SUM(CASE WHEN ${paidExpr} THEN ${realAmt} END), 0), 2) AS collectedReal`
 }
 
 function bucketSelect(groupBy: BilledGroupBy | undefined, dateExpr: string): string {
@@ -275,6 +293,7 @@ function periodSplitSql(opts: BilledLinesOpts, lineAmt: string, productionAmt: s
 function billedValueColumns(opts: BilledLinesOpts): string[] {
   if (opts.groupBy === 'row') return opts.rowMoney ? [...ROW_MONEY_COLUMNS] : ['partialInvoiced']
   const cols = ['invoiced', 'collected']
+  if (opts.withRealSplit) cols.push('invoicedReal', 'collectedReal')
   if (opts.withPeriodSplit) {
     cols.push('invoicedInRange', 'collectedInRange')
     if (opts.withProductionSplit) {
@@ -424,11 +443,13 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
     selectSql = rowMoneySelectSql(
       `${production} * ${statementTaxFactorSql('s')}`,
       `${production} * ${factor}`,
+      `${production} * ${lineValuationFactorSql('production', 's')}`,
     )
   } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionAmt}), 2) AS partialInvoiced`
   } else {
+    const real = realSplitSql(opts, `${production} * ${factor}`, 'w.paid = 1')
     const split = periodSplitSql(opts, lineAmt, productionAmt, 'w.paid = 1')
     const lag = opts.withAvgDoneToInvoiced
       ? `,
@@ -440,7 +461,7 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
       : ''
     selectSql = `SELECT ${bucketSelect(groupBy, periodCol)}
       ROUND(IFNULL(SUM(${lineAmt}), 0), 2) AS invoiced,
-      ROUND(IFNULL(SUM(CASE WHEN w.paid = 1 THEN ${lineAmt} END), 0), 2) AS collected${split}${lag}${over60}`
+      ROUND(IFNULL(SUM(CASE WHEN w.paid = 1 THEN ${lineAmt} END), 0), 2) AS collected${real}${split}${lag}${over60}`
   }
 
   const sql = `${selectSql}
@@ -488,11 +509,16 @@ function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT s.id AS id'
   } else if (rowMode && opts.rowMoney) {
-    selectSql = rowMoneySelectSql(`isir.amount * ${statementTaxFactorSql('s')}`, `isir.amount * ${factor}`)
+    selectSql = rowMoneySelectSql(
+      `isir.amount * ${statementTaxFactorSql('s')}`,
+      `isir.amount * ${factor}`,
+      `isir.amount * ${lineValuationFactorSql('production', 's')}`,
+    )
   } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionAmt}), 2) AS partialInvoiced`
   } else {
+    const real = realSplitSql(opts, `isir.amount * ${factor}`, `(${PAID})`)
     const split = periodSplitSql(opts, lineAmt, productionAmt, `(${PAID})`)
     const over60 = opts.withOver60
       ? `,
@@ -500,7 +526,7 @@ function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType
       : ''
     selectSql = `SELECT ${bucketSelect(groupBy, 'tew.punch_in')}
       ROUND(IFNULL(SUM(${lineAmt}), 0), 2) AS invoiced,
-      ROUND(IFNULL(SUM(CASE WHEN ${PAID} THEN ${lineAmt} END), 0), 2) AS collected${split}${over60}`
+      ROUND(IFNULL(SUM(CASE WHEN ${PAID} THEN ${lineAmt} END), 0), 2) AS collected${real}${split}${over60}`
   }
 
   params.push(opts.idDealerProvider, ...billedJoinsParams(opts.idDealerProvider))
@@ -612,11 +638,13 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
     selectSql = rowMoneySelectSql(
       `${genericLineBaseSql('isir')} * ${statementTaxFactorSql('s')}`,
       genericLineAmountSql('isir', 's', 'net'),
+      genericLineAmountSql('isir', 's', 'production'),
     )
   } else if (rowMode) {
     selectSql = `SELECT ${ROW_KEYS_SELECT},
       ROUND(SUM(${productionExpr}), 2) AS partialInvoiced`
   } else {
+    const real = realSplitSql(opts, genericValueForOpts(opts, buckets, 'net'), `(${PAID})`)
     const split = periodSplitSql(opts, valueExpr, productionExpr, `(${PAID})`)
     const over60 = opts.withOver60
       ? `,
@@ -629,7 +657,7 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
         : ''
     selectSql = `SELECT ${bucketCol}
       ROUND(IFNULL(SUM(${valueExpr}), 0), 2) AS invoiced,
-      ROUND(IFNULL(SUM(CASE WHEN ${PAID} THEN ${valueExpr} END), 0), 2) AS collected${split}${over60}`
+      ROUND(IFNULL(SUM(CASE WHEN ${PAID} THEN ${valueExpr} END), 0), 2) AS collected${real}${split}${over60}`
   }
 
   if (buckets) {
