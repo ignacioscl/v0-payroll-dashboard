@@ -146,6 +146,9 @@ function sharedSelectSql(kind: UnionKind): string {
       ${poSql(kind)},
       ${roSql(kind)},
       s.discount, s.discount_type, s.discount_detail, ROUND(s.tax, 2) AS tax,
+      CASE WHEN IFNULL(s.discount, 0) = 0 THEN 0
+           WHEN IFNULL(s.discount_type, 0) = 2 THEN s.discount
+           ELSE ROUND(s.discount * 0.01 * GET_SUBTOTAL_BY_STATEMENT(s.id, NULL), 2) END AS discount_invoice,
       s.invoice_service_sel_rel, s.invoice_note, s.id_invoice_statement_schedule,
       d.nombre        AS department,
       inv_serv.nombre AS invoice_service,
@@ -594,6 +597,8 @@ export function mapInvoiceListRow(r: any): InvoiceRowDto {
     discountType: r.discount_type == null ? undefined : Number(r.discount_type),
     discountDetail: r.discount_detail ?? undefined,
     discountAmount: 0,
+    // El descuento de la invoice entera (fijo = el importe; porcentual = sobre el subtotal), para el tooltip (D1).
+    discountInvoiceAmount: Number(r.discount_invoice ?? 0),
     total: Number(r.total ?? r.sub_total ?? 0),
     tax: Number(r.tax ?? 0),
     po: r.po ?? undefined,

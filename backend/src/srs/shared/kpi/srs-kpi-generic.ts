@@ -78,13 +78,16 @@ export function payingBillingJoinsParams(idDealerProvider: number): number[] {
   return [idDealerProvider, idDealerProvider]
 }
 
-/** A free line of a generic at price: effective qty (empty or 0 = 1) × amount, no factor. */
+/**
+ * A free line of a generic at price: qty × amount, no factor. Empty qty = 1 and qty 0 = $0, the rule of
+ * migration 008 that the DB functions and both invoice lists use (D3).
+ */
 export function genericLineBaseSql(lineAlias = 'isir'): string {
-  return `IF(IFNULL(${lineAlias}.generic_qty, 0) > 0, ${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
+  return `IFNULL(${lineAlias}.generic_qty, 1) * ${lineAlias}.amount`
 }
 
 /**
- * Line amount for a generic: effective qty (empty or 0 = 1) × amount × the valuation factor.
+ * Line amount for a generic: qty (empty = 1, 0 = $0) × amount × the valuation factor.
  */
 export function genericLineAmountSql(
   lineAlias = 'isir',

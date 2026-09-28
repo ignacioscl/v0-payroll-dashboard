@@ -40,8 +40,9 @@ export function ttkAmountNonZeroSql(): string {
   return ' AND IFNULL(isir.amount, 0) <> 0'
 }
 
+/** Empty qty = 1 and qty 0 = $0 (migration 008, D3): a qty-0 line is a zero line. */
 export function genericLineNonZeroSql(): string {
-  return ' AND (IFNULL(isir.amount, 0) * IF(IFNULL(isir.generic_qty, 0) > 0, isir.generic_qty, 1)) <> 0'
+  return ' AND (IFNULL(isir.amount, 0) * IFNULL(isir.generic_qty, 1)) <> 0'
 }
 
 export function statementNetNonZeroSql(alias = 's'): string {

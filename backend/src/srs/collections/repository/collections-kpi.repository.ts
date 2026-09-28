@@ -152,9 +152,17 @@ export class CollectionsKpiRepository {
     // Drive from payments in range, then STRAIGHT_JOIN statements. MariaDB 10.3 otherwise
     // nested-loops CONTRATISTA → every invoice and runs IS_STATEMENT_BILLED /
     // GET_TOTAL_BY_STATEMENT (~90k rows) before applying the payment window.
+    //
+    // «Cobrada» es lo que dice el listado (plans/plan-invoices-salidas-legacy, 7.9): la invoice no
+    // tiene ninguna línea sin cobro —cobro entero o cobro propio de un BILLING activo del provider—,
+    // con las mismas líneas que cuentan los builders (srs-kpi-billed-lines): WO activa con su
+    // servicio, ponchada activa del provider, línea libre de generic; nunca only_timecard.
+    // IS_STATEMENT_BILLED no se toca (la usa la pestaña Unpaid): sólo mira líneas de WO, así que una
+    // TTK o una generic cobrada línea por línea quedaba afuera del DSO. Una invoice cobrada antes de
+    // facturarse cuenta 0 días, no días negativos (decidido por Ignacio el 22/09).
     const [dso, debt] = await Promise.all([
       this.srs.query(
-        `SELECT ROUND(AVG(DATEDIFF(pay.paid_at, s.fecha_create)), 1) AS dsoDays
+        `SELECT ROUND(AVG(GREATEST(DATEDIFF(pay.paid_at, s.fecha_create), 0)), 1) AS dsoDays
          FROM (
            SELECT link.id_statement, MAX(b.fecha) AS paid_at
            FROM (${BILLING_STATEMENT_LINK}) link
@@ -167,8 +175,32 @@ export class CollectionsKpiRepository {
          STRAIGHT_JOIN CONTRATISTA c ON c.id = s.id_dealer
          WHERE s.estado = 1 AND s.id_dealer_provider = ?
            ${stmt.and}
-           AND IS_STATEMENT_BILLED(s.id) = 1${stmtZero}`,
-        [idDealerProvider, fechaDesde, fechaHasta, idDealerProvider, ...stmt.params],
+           AND NOT EXISTS (
+             SELECT 1 FROM INVOICE_STATEMENT_INV_REL r
+               LEFT JOIN INVOICE i ON i.id = r.id_invoice AND i.estado = 1 AND i.id_dealer_provider = ?
+               LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id AND isr.id_service_invoice = r.id_invoice_service
+               LEFT JOIN TTK_EMPLOYEE_WORK tew ON tew.id = r.id_employee_work AND tew.estado = 1 AND tew.id_dealer_provider = ?
+              WHERE r.id_statement = s.id AND IFNULL(r.only_timecard, 0) = 0
+                AND ((s.statement_type IN (1,2,3,4) AND isr.id IS NOT NULL)
+                  OR (s.statement_type = 5 AND tew.id IS NOT NULL)
+                  OR (s.statement_type = 6 AND (r.id_employee_work IS NULL OR tew.id IS NOT NULL)))
+                AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bw JOIN BILLING b ON b.id = bw.id_billing
+                                  AND b.estado = 1 AND b.id_dealer_provider = ?
+                                 WHERE bw.id_statement = s.id)
+                AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bw JOIN BILLING b ON b.id = bw.id_billing
+                                  AND b.estado = 1 AND b.id_dealer_provider = ?
+                                 WHERE bw.id_statement_inv_rel = r.id))${stmtZero}`,
+        [
+          idDealerProvider,
+          fechaDesde,
+          fechaHasta,
+          idDealerProvider,
+          ...stmt.params,
+          idDealerProvider,
+          idDealerProvider,
+          idDealerProvider,
+          idDealerProvider,
+        ],
       ),
       this.getOutstanding(filter),
     ])

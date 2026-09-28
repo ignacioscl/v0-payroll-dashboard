@@ -230,6 +230,7 @@ export const es: Messages = {
     colDetail: 'Servicios',
     colSubtotal: 'Subtotal',
     colDiscount: 'Descuento',
+    discountShareTooltip: '{part} ({pct}% de {total})',
     colTotal: 'Total',
     colPartialInvoiced: 'Parcial facturado',
     colPaid: 'Pago',

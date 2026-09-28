@@ -222,6 +222,8 @@ export interface Messages {
     colDetail: string
     colSubtotal: string
     colDiscount: string
+    /** Tooltip de la celda Discount cuando la fila es parte de la invoice: parte, % y descuento de la invoice. */
+    discountShareTooltip: string
     colTotal: string
     colPartialInvoiced: string
     colPaid: string

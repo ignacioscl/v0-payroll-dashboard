@@ -38,7 +38,7 @@ import {
 } from '@/lib/billing/invoice-email-prefs'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { discountExportValue } from '@/lib/billing/invoice-discount'
-import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
+import { idsBillingOf, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 
 const TTK_TYPE = 5
@@ -112,6 +112,8 @@ export function InvoiceExportDialog({
   const baseServerPayload = () => ({
     exportType,
     idsInvoices: idsCsv,
+    // Las filas tildadas: el archivo trae las mismas filas que la grilla (pestaña y tildes).
+    idsBilling: idsBillingOf(rows),
     idDealer: filters?.idDealer,
     fechaDesde: filters?.fechaDesde,
     fechaHasta: filters?.fechaHasta,

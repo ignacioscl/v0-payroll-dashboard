@@ -38,12 +38,15 @@ export type InvoiceExportPayload = InvoiceExportFilters & {
   fileName?: string
   queuename?: string
   attachTimeCard?: boolean
+  /** Filas tildadas: "idStatement,idBilling|..." (idBilling -1 = fila del saldo). */
+  idsBilling?: string
 }
 
 type InvoiceExportBody = {
   export_type: number
   action: InvoiceExportAction
   ids_invoices: string
+  ids_billing: string
   id_dealer: string
   fecha_desde: string
   fecha_hasta: string
@@ -75,6 +78,7 @@ function toBody(payload: InvoiceExportPayload): InvoiceExportBody {
     export_type: payload.exportType,
     action: payload.action,
     ids_invoices: payload.idsInvoices,
+    ids_billing: payload.idsBilling ?? '',
     id_dealer: payload.idDealer ?? '',
     fecha_desde: payload.fechaDesde ?? '',
     fecha_hasta: payload.fechaHasta ?? '',

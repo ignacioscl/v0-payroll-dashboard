@@ -1132,16 +1132,35 @@ export function InvoiceListTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('invoices.colDiscount')} />
         ),
-        cell: ({ row }) => (
-          <span
-            className={cn(
-              'text-amber-600 dark:text-amber-400',
-              row.original.estado === 0 && 'text-muted-foreground line-through',
-            )}
-          >
-            {fmtDiscount(row.original.discountAmount)}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const part = row.original.discountAmount
+          const cell = (
+            <span
+              className={cn(
+                'text-amber-600 dark:text-amber-400',
+                row.original.estado === 0 && 'text-muted-foreground line-through',
+              )}
+            >
+              {fmtDiscount(part)}
+            </span>
+          )
+          // Fila que es parte de la invoice: la celda igual y, al pasar el mouse, la parte, su % y el
+          // descuento de la invoice entera (D1). Una fila con el descuento entero queda sin tooltip.
+          const whole = row.original.discountInvoiceAmount ?? 0
+          if (!part || !whole || Math.abs(part - whole) < 0.005) return cell
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>{cell}</TooltipTrigger>
+              <TooltipContent>
+                {t('invoices.discountShareTooltip', {
+                  part: fmtDiscount(part),
+                  pct: ((part / whole) * 100).toFixed(1),
+                  total: fmtMoney(whole),
+                })}
+              </TooltipContent>
+            </Tooltip>
+          )
+        },
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,

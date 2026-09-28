@@ -32,6 +32,8 @@ export interface InvoiceRow {
   discountDetail?: string
   /** Descuento de esta fila en plata: subtotal − total (su parte del de la invoice). */
   discountAmount: number
+  /** Descuento de la invoice entera en plata; opcional para respuestas viejas. */
+  discountInvoiceAmount?: number
   /** Plata neta de esta fila. La de saldo es el total de la invoice menos sus cobros. */
   total: number
   tax: number

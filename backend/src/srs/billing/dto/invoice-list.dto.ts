@@ -391,6 +391,12 @@ export class InvoiceRowDto {
   discountAmount!: number
   @ApiProperty({
     description:
+      'Discount of the whole invoice in money (fixed = the amount; percentage = over the invoice subtotal), ' +
+      'shown next to discountAmount when the row is only a share of it',
+  })
+  discountInvoiceAmount!: number
+  @ApiProperty({
+    description:
       'Net money of this row: its lines with tax and their share of the discount. Balance row: ' +
       'the invoice total minus its payment rows, so the rows of an invoice add up to its total.',
   })
