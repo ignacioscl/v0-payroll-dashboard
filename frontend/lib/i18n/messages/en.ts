@@ -1493,6 +1493,10 @@ export const en: Messages = {
       'These KPIs are in beta. Values should be verified against legacy SRS reports before making business decisions.',
     billingPeriodSummary: 'Invoiced vs collected (work in the period)',
     incomeTitle: 'Income',
+    incomeSummaryInvoiced: 'TTK + Generic + WO {amount}',
+    incomeSummaryNotInvoiced: 'WO not invoiced {amount}',
+    incomeSummaryTotal: 'Total {amount}',
+    incomeSummaryNoTax: 'Does not include tax.',
     collectionsSnapshotNote:
       'Open receivables snapshot — not limited to the header date range.',
     collectionsHistoryMonths: 'History',

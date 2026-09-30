@@ -1497,6 +1497,10 @@ export const es: Messages = {
       'Estos KPIs están en versión beta. Los valores deben corroborarse con los reportes legacy de SRS antes de tomar decisiones.',
     billingPeriodSummary: 'Facturado vs cobrado (trabajo del período)',
     incomeTitle: 'Ingresos',
+    incomeSummaryInvoiced: 'TTK + Genérico + WO {amount}',
+    incomeSummaryNotInvoiced: 'WO sin facturar {amount}',
+    incomeSummaryTotal: 'Total {amount}',
+    incomeSummaryNoTax: 'No incluye tax.',
     collectionsSnapshotNote:
       'Snapshot de CxC abierta — no limitado al rango de fechas del encabezado.',
     collectionsHistoryMonths: 'Historial',

@@ -263,6 +263,12 @@ export default function BusinessKpisPage() {
   const invoicedShown = b
     ? sumShown(b.woInvoicedValue, b.ttkInvoicedValue, b.genericInvoicedValue)
     : undefined
+  // Resumen al lado del título Income: la suma de lo que muestran las cuatro tarjetas.
+  const unbilledShown = b ? dollars(b.unbilledValue) : undefined
+  const incomeTotalShown =
+    invoicedShown !== undefined && unbilledShown !== undefined
+      ? invoicedShown + unbilledShown
+      : undefined
   const collectedShown = pc ? dollars(pc.incomeCollectedValue) : undefined
   const unpaidShown =
     invoicedShown !== undefined && collectedShown !== undefined
@@ -476,9 +482,23 @@ export default function BusinessKpisPage() {
           </div>
 
           <section className="space-y-3">
-            <h2 className="border-b border-border pb-2 text-lg font-semibold sm:text-xl tracking-tight text-foreground">
-              {t('businessKpis.incomeTitle')}
-            </h2>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border pb-2">
+              <h2 className="text-lg font-semibold sm:text-xl tracking-tight text-foreground">
+                {t('businessKpis.incomeTitle')}
+              </h2>
+              {invoicedShown !== undefined && unbilledShown !== undefined && incomeTotalShown !== undefined && (
+                <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs tabular-nums text-foreground">
+                  <span>{t('businessKpis.incomeSummaryInvoiced', { amount: fmtDollars(invoicedShown) })}</span>
+                  <span aria-hidden>·</span>
+                  <span>{t('businessKpis.incomeSummaryNotInvoiced', { amount: fmtDollars(unbilledShown) })}</span>
+                  <span aria-hidden>·</span>
+                  <span className="font-semibold">
+                    {t('businessKpis.incomeSummaryTotal', { amount: fmtDollars(incomeTotalShown) })}
+                  </span>
+                  <span className="text-muted-foreground">{t('businessKpis.incomeSummaryNoTax')}</span>
+                </p>
+              )}
+            </div>
             <div className={KPI_CARD_GRID}>
             <KPICard
               inline

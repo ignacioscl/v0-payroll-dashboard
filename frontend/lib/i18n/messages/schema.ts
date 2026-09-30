@@ -1462,6 +1462,10 @@ export interface Messages {
     betaDisclaimer: string
     billingPeriodSummary: string
     incomeTitle: string
+    incomeSummaryInvoiced: string
+    incomeSummaryNotInvoiced: string
+    incomeSummaryTotal: string
+    incomeSummaryNoTax: string
     collectionsSnapshotNote: string
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string
