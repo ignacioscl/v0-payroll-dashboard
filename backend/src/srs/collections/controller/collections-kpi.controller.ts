@@ -6,7 +6,12 @@ import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { CollectionsKpiService } from '../service/collections-kpi.service'
 import { CollectionsByMonthQueryDto, CollectionsByMonthRowDto } from '../dto/collections-by-month.dto'
-import { ArAgingBucketDto, CollectionsKpiDto } from '../dto/collections-kpi.dto'
+import {
+  ArAgingBucketDto,
+  CollectionsKpiDto,
+  OutstandingArDto,
+  OutstandingQueryDto,
+} from '../dto/collections-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/collections')
@@ -22,6 +27,15 @@ export class CollectionsKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<CollectionsKpiDto> {
     return this.service.getCollectionsKpis(request.srsContext, query)
+  }
+
+  @Get('/outstanding')
+  @ApiOkResponse({ type: OutstandingArDto })
+  async getOutstanding(
+    @Req() request: any,
+    @Query() query: OutstandingQueryDto,
+  ): Promise<OutstandingArDto> {
+    return this.service.getOutstanding(request.srsContext, query)
   }
 
   @Get('/ar-aging')

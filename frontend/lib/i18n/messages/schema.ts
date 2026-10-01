@@ -190,6 +190,7 @@ export interface Messages {
   invoices: {
     title: string
     subtitle: string
+    subtitleAllDates: string
     searchPlaceholder: string
     typesLabel: string
     typeWo: string
@@ -221,7 +222,12 @@ export interface Messages {
     colDetail: string
     colSubtotal: string
     colDiscount: string
+    /** Tooltip de la celda Discount cuando la fila es parte de la invoice: parte, % y descuento de la invoice. */
+    discountShareTooltip: string
     colTotal: string
+    colPartialInvoiced: string
+    /** Título de la columna en la tabla: el largo no entra. Columns y el export usan colPartialInvoiced. */
+    colPartialInvoicedShort: string
     colPaid: string
     colCheckNumber: string
     colCheckAmount: string
@@ -384,6 +390,7 @@ export interface Messages {
     summaryFilteredTotal: string
     totalsShowing: string
     totalsSubtotal: string
+    totalsPartialInvoiced: string
     totalsDiscount: string
     totalsTotal: string
     loadingMore: string
@@ -491,6 +498,25 @@ export interface Messages {
     filterIgnoreDatesTooltip: string
     filterIgnoreDatesForced: string
     filterIgnoreDatesChip: string
+    includePartialLabel: string
+    includePartialTooltip: string
+    includePartialChip: string
+    includePartialLocked: string
+    includePartialLegend: string
+    filterDateDoneLabel: string
+    filterDateDoneTooltip: string
+    filterDateDoneChip: string
+    filterDateDoneLocked: string
+    summaryPartialInvoiced: string
+    summaryOwedAllDates: string
+    summaryDeleted: string
+    summaryStatementsHelp: string
+    summaryFilteredTotalHelp: string
+    summarySubtotalHelp: string
+    summaryDiscountHelp: string
+    summaryPartialInvoicedHelp: string
+    summaryOwedAllDatesHelp: string
+    summaryDeletedHelp: string
     filterSearchLockHint: string
     summaryExcludesDeleted: string
     rowDeletedBadge: string
@@ -973,6 +999,8 @@ export interface Messages {
     lastMonth: string
     openFilters: string
     dateRange: string
+    ignoreDateRange: string
+    dateRangeIgnored: string
     allStatus: string
     pending: string
     reviewed: string
@@ -1257,6 +1285,7 @@ export interface Messages {
     chartProductionVsGoal: string
     chartInvoicedVsProduction: string
     chartInvoicedByWeek: string
+    chartNoTaxNote: string
     chartUnbilledAging: string
     unbilledLookbackNote: string
     chartUnbilledByDealer: string
@@ -1303,6 +1332,7 @@ export interface Messages {
     openStatements: string
     outstandingArSubtitle: string
     outstandingArOutsideChart: string
+    outstandingArNoTax: string
     unpaidInPeriod: string
     unpaidInPeriodStatements: string
     withTaxDiscount: string
@@ -1432,6 +1462,10 @@ export interface Messages {
     betaDisclaimer: string
     billingPeriodSummary: string
     incomeTitle: string
+    incomeSummaryInvoiced: string
+    incomeSummaryNotInvoiced: string
+    incomeSummaryTotal: string
+    incomeSummaryNoTax: string
     collectionsSnapshotNote: string
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string

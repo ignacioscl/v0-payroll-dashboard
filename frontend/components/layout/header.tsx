@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Menu, SlidersHorizontal } from 'lucide-react'
+import type { DateRange } from 'react-day-picker'
 import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
 import {
   Select,
@@ -13,10 +14,10 @@ import {
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
-import { DatePicker } from '@/components/filters/date-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
+import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -47,6 +48,9 @@ export function Header() {
     invoiceDateTo,
     setInvoiceDateFrom,
     setInvoiceDateTo,
+    invoiceIgnorePeriod,
+    setInvoiceIgnorePeriod,
+    invoiceIgnorePeriodLocked,
   } = useFilters()
   const dealerOptions = useMemo(() => {
     if (!dealerIdAllowList || dealerIdAllowList.length === 0) return allDealerOptions
@@ -67,6 +71,25 @@ export function Header() {
     })
   }, [dealerOptions, setSelectedDealers])
 
+  // Invoices guarda el período como dos fechas sueltas (fecha_desde / fecha_hasta del
+  // statement); el picker compartido habla en rangos. Se traduce acá y nadie más se entera.
+  const invoiceRange = useMemo<DateRange | undefined>(
+    () => (invoiceDateFrom ? { from: invoiceDateFrom, to: invoiceDateTo } : undefined),
+    [invoiceDateFrom, invoiceDateTo],
+  )
+  const setInvoiceRange = useCallback(
+    (next: DateRange | undefined) => {
+      // Sin fechas el listado no carga (el backend exige fechaDesde/fechaHasta aunque se
+      // ignore el período), así que «Clear» vuelve al rango por defecto, igual que
+      // `clearFilters()`. Si no, limpiar dejaría la pantalla en un cartel sin salida.
+      const range = next?.from ? next : getDefaultDateRange()
+      setInvoiceDateFrom(range.from)
+      // Un solo día elegido = desde y hasta el mismo día, no un "hasta" vacío.
+      setInvoiceDateTo(range.to ?? range.from)
+    },
+    [setInvoiceDateFrom, setInvoiceDateTo],
+  )
+
   const showStatusFilter = pathname === '/schedule'
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
@@ -81,12 +104,26 @@ export function Header() {
     (selectedDealers.length > 0 ? 1 : 0) +
     (showDateFilter
       ? isInvoicesPage
-        ? (invoiceDateFrom ? 1 : 0) + (invoiceDateTo ? 1 : 0)
+        ? invoiceIgnorePeriod || invoiceIgnorePeriodLocked || invoiceRange?.from
+          ? 1
+          : 0
         : dateRange?.from
           ? 1
           : 0
       : 0) +
     (showStatusFilter && selectedStatus && selectedStatus !== 'all' ? 1 : 0)
+
+  const invoiceRangeProps = {
+    value: invoiceRange,
+    onChange: setInvoiceRange,
+    ignorable: true,
+    ignored: invoiceIgnorePeriod,
+    onIgnoredChange: setInvoiceIgnorePeriod,
+    ignoreLocked: invoiceIgnorePeriodLocked,
+    ignoreHint: invoiceIgnorePeriodLocked
+      ? t('invoices.filterIgnoreDatesForced')
+      : t('invoices.filterIgnoreDatesTooltip'),
+  }
 
   return (
     <>
@@ -139,20 +176,7 @@ export function Header() {
 
           {showDateFilter ? (
             isInvoicesPage ? (
-              <div className="flex shrink-0 items-center gap-2">
-                <DatePicker
-                  value={invoiceDateFrom}
-                  onChange={setInvoiceDateFrom}
-                  placeholder={t('filters.dateFrom')}
-                  toDate={invoiceDateTo}
-                />
-                <DatePicker
-                  value={invoiceDateTo}
-                  onChange={setInvoiceDateTo}
-                  placeholder={t('filters.dateTo')}
-                  fromDate={invoiceDateFrom}
-                />
-              </div>
+              <DateRangePicker {...invoiceRangeProps} className="shrink-0" />
             ) : (
               <DateRangePicker
                 value={dateRange}
@@ -232,39 +256,18 @@ export function Header() {
 
             {/* Date range / invoice period — hidden on Roles */}
             {showDateFilter ? (
-              isInvoicesPage ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-muted-foreground">{t('filters.dateFrom')}</span>
-                    <DatePicker
-                      value={invoiceDateFrom}
-                      onChange={setInvoiceDateFrom}
-                      placeholder={t('filters.dateFrom')}
-                      toDate={invoiceDateTo}
-                      className="w-full min-w-0"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-muted-foreground">{t('filters.dateTo')}</span>
-                    <DatePicker
-                      value={invoiceDateTo}
-                      onChange={setInvoiceDateTo}
-                      placeholder={t('filters.dateTo')}
-                      fromDate={invoiceDateFrom}
-                      className="w-full min-w-0"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
+                {isInvoicesPage ? (
+                  <DateRangePicker {...invoiceRangeProps} className="w-full min-w-0" />
+                ) : (
                   <DateRangePicker
                     value={dateRange}
                     onChange={setDateRange}
                     maxRangeYears={isIssuesPage ? 1 : undefined}
                   />
-                </div>
-              )
+                )}
+              </div>
             ) : null}
 
 

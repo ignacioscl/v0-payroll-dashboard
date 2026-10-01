@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { Column, ColumnDef, Row, SortingState } from '@tanstack/react-table'
 import {
   AlertTriangle,
   ChevronDown,
@@ -57,11 +57,8 @@ import {
   type InvoiceRow,
   type InvoiceSummary,
 } from '@/lib/srs-invoices-api'
-import {
-  invoiceRowKey,
-  isInvoiceRemainder,
-  uniqueStatementIds,
-} from '@/lib/billing/invoice-nro-billed'
+import { discountExportValue } from '@/lib/billing/invoice-discount'
+import { invoiceRowKey, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -79,6 +76,12 @@ function fmtMoney(n: number | undefined | null): string {
     maximumFractionDigits: 2,
   })
   return n < 0 ? `-$${abs}` : `$${abs}`
+}
+
+/** A discount in money: −$40.00 when it lowers the total, +$10.00 when a credit's raises it. */
+function fmtDiscount(n: number | undefined | null): string {
+  if (n === undefined || n === null || n === 0) return '—'
+  return n > 0 ? `−${fmtMoney(n)}` : `+${fmtMoney(-n)}`
 }
 
 function fmtDate(value: string | undefined | null): string {
@@ -327,11 +330,15 @@ function InvoiceDetailBody({
     row.estado !== 0 &&
     row.isBilled !== 1
 
+  // La fila entera va en el pedido: el cheque, su nro_billed y si es cobro por línea o de la
+  // invoice entera. Así el detalle trae las mismas líneas que suman el Total de la fila (T8/T11).
   const detail = useQuery({
     queryKey: [
       'srs-invoice-detail',
       row.id,
       row.idBilling ?? 0,
+      row.nroBilled ?? null,
+      row.idBillingWoRel ?? null,
       row.isBilled,
       listInput?.idDepartment,
       listInput?.idInvoiceService,
@@ -341,6 +348,8 @@ function InvoiceDetailBody({
       fetchInvoiceDetail(row.id, {
         idBilling: row.idBilling ?? 0,
         payed: row.isBilled === 1 ? '1' : undefined,
+        nroBilled: row.nroBilled,
+        idBillingWoRel: row.idBillingWoRel,
         idDepartment: listInput?.idDepartment,
         idInvoiceService: listInput?.idInvoiceService,
         stock: listInput?.stock,
@@ -584,6 +593,7 @@ function TotalsBar({
   subtotal,
   discount,
   grandTotal,
+  partialInvoiced,
   showExcludesDeleted,
   isLoading,
 }: {
@@ -595,6 +605,8 @@ function TotalsBar({
   subtotal: number | null
   discount: number | null
   grandTotal: number | null
+  /** undefined = the partial switch is off, so the total is not shown. */
+  partialInvoiced?: number | null
 }) {
   const { t } = useTranslation()
   const money = (n: number | null) => (isLoading || n == null ? '—' : fmtMoney(n))
@@ -629,11 +641,21 @@ function TotalsBar({
           <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
             {isLoading || discount == null
               ? '—'
-              : discount > 0
-                ? `−${fmtMoney(discount)}`
-                : fmtMoney(0)}
+              : discount === 0
+                ? fmtMoney(0)
+                : fmtDiscount(discount)}
           </span>
         </div>
+        {partialInvoiced !== undefined ? (
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {t('invoices.totalsPartialInvoiced')}
+            </span>
+            <span className="text-xs font-medium text-sky-700 dark:text-sky-300">
+              {money(partialInvoiced)}
+            </span>
+          </div>
+        ) : null}
         <div className="flex items-baseline gap-2 border-l border-border/80 pl-4">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsTotal')}
@@ -668,9 +690,12 @@ export function InvoiceListTable({
   summary,
   summaryTotal,
   summaryLoading,
+  includePartial,
 }: {
   query: InvoiceListQuery
   input: InvoiceListInput | null
+  /** Switch de parciales: agrega la columna Partial Invoiced y pinta las filas parciales. */
+  includePartial?: boolean
   /** Computed once in the page and shared with the top summary strip. */
   showExcludesDeleted?: boolean
   summary?: InvoiceSummary
@@ -1096,8 +1121,10 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
+        // La parte del descuento de la invoice que le toca a esta fila, en plata (T9). Antes
+        // mostraba la configuración cruda y sólo en la fila de saldo: un 10 % salía «−$10,00».
         id: 'discount',
-        accessorFn: (row) => row.discount ?? 0,
+        accessorFn: (row) => row.discountAmount,
         size: 80,
         minSize: 68,
         maxSize: 84,
@@ -1106,17 +1133,39 @@ export function InvoiceListTable({
           <DataTableColumnHeader column={column} title={t('invoices.colDiscount')} />
         ),
         cell: ({ row }) => {
-          const d = isInvoiceRemainder(row.original) ? row.original.discount : null
-          return (
-            <span className="text-amber-600 dark:text-amber-400">
-              {d && d > 0 ? `−${fmtMoney(d)}` : '—'}
+          const part = row.original.discountAmount
+          const cell = (
+            <span
+              className={cn(
+                'text-amber-600 dark:text-amber-400',
+                row.original.estado === 0 && 'text-muted-foreground line-through',
+              )}
+            >
+              {fmtDiscount(part)}
             </span>
+          )
+          // Fila que es parte de la invoice: la celda igual y, al pasar el mouse, la parte, su % y el
+          // descuento de la invoice entera (D1). Una fila con el descuento entero queda sin tooltip.
+          const whole = row.original.discountInvoiceAmount ?? 0
+          if (!part || !whole || Math.abs(part - whole) < 0.005) return cell
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>{cell}</TooltipTrigger>
+              <TooltipContent>
+                {t('invoices.discountShareTooltip', {
+                  part: fmtDiscount(part),
+                  pct: ((part / whole) * 100).toFixed(1),
+                  total: fmtMoney(whole),
+                })}
+              </TooltipContent>
+            </Tooltip>
           )
         },
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,
-          exportValue: (r) => (isInvoiceRemainder(r) ? (r.discount ?? 0) : ''),
+          // Con el signo de la pantalla: −$2,421.06 en la grilla es −2421.06 en el Excel.
+          exportValue: (r) => discountExportValue(r.discountAmount),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1145,6 +1194,38 @@ export function InvoiceListTable({
           exportValue: (r) => r.total,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
+      ...(includePartial
+        ? [
+            {
+              id: 'partialInvoiced',
+              accessorFn: (row: InvoiceRow) => row.partialInvoiced ?? 0,
+              // 104 es lo mínimo en que entra entero «PARCIAL FACT.» (ES); «PARTIAL INV.» pide 90.
+              size: 112,
+              minSize: 104,
+              maxSize: 120,
+              enableSorting: false,
+              // Título corto: el largo no entra. Columns y el export siguen con meta.label.
+              header: ({ column }: { column: Column<InvoiceRow, unknown> }) => (
+                <DataTableColumnHeader column={column} title={t('invoices.colPartialInvoicedShort')} />
+              ),
+              cell: ({ row }: { row: Row<InvoiceRow> }) => (
+                <span
+                  className={cn(
+                    'font-semibold text-sky-700 dark:text-sky-300',
+                    row.original.estado === 0 && 'text-muted-foreground line-through',
+                  )}
+                >
+                  {fmtMoney(row.original.partialInvoiced ?? 0)}
+                </span>
+              ),
+              meta: {
+                label: t('invoices.colPartialInvoiced'),
+                numeric: true,
+                exportValue: (r: InvoiceRow) => r.partialInvoiced ?? 0,
+              } satisfies DataTableColumnMeta<InvoiceRow>,
+            } as ColumnDef<InvoiceRow>,
+          ]
+        : []),
       {
         id: 'paid',
         accessorFn: (row) => paidMeta(row, t).label,
@@ -1246,7 +1327,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input],
+    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input, includePartial],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
@@ -1378,6 +1459,26 @@ export function InvoiceListTable({
       </Button>
     ) : null
 
+  // La fila pintada no lleva etiqueta, así que el color se explica al lado del contador.
+  const partialLegend =
+    includePartial && rows.some((r) => r.outsideRange) ? (
+      <span className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span
+          aria-hidden
+          className="inline-block size-3 rounded-sm border border-border/60 bg-[var(--partial-row-bg)]"
+        />
+        {t('invoices.includePartialLegend')}
+      </span>
+    ) : null
+
+  const recordsNote =
+    deleteSelectedNote || partialLegend ? (
+      <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+        {deleteSelectedNote}
+        {partialLegend}
+      </span>
+    ) : null
+
   return (
     <>
       <DataTable<InvoiceRow>
@@ -1390,7 +1491,15 @@ export function InvoiceListTable({
         enableGlobalFilter={false}
         recordsCount={gateReady && summaryTotal != null ? summaryTotal : undefined}
         recordsCountLabel={t('nav.invoices')}
-        recordsCountNote={deleteSelectedNote}
+        recordsCountNote={recordsNote}
+        getRowClassName={
+          includePartial
+            ? (row) =>
+                row.outsideRange
+                  ? '[--dt-row-bg:var(--partial-row-bg)] bg-[var(--partial-row-bg)]'
+                  : undefined
+            : undefined
+        }
         pageSize={pageSize}
         onPageSizeChange={onPageSizeChange}
         showPageSizeInInfiniteScroll
@@ -1430,6 +1539,7 @@ export function InvoiceListTable({
               subtotal={summary?.subtotal ?? null}
               discount={summary?.discount ?? null}
               grandTotal={summary?.total ?? null}
+              partialInvoiced={includePartial ? (summary?.partialInvoiced ?? null) : undefined}
               showExcludesDeleted={showExcludesDeleted}
               isLoading={Boolean(summaryLoading && !summary)}
             />

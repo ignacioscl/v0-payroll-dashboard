@@ -39,8 +39,17 @@ export type InvoiceStatementNotesResponse = {
   statuses: InvoiceNoteStatusOption[]
 }
 
+/**
+ * Todo lo que cambia la plata de una invoice tiene que refrescar también los totales: las
+ * tarjetas de arriba y la barra de abajo salen de `srs-invoices-summary` y la tarjeta de deuda
+ * de `srs-invoices-outstanding`, que son claves aparte — invalidar `srs-invoices` no las toca,
+ * porque no es prefijo de ninguna de las dos. Sin esto, se guarda un descuento, la fila queda
+ * bien y los totales siguen mostrando el número viejo.
+ */
 function invalidateInvoiceQueries(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ['srs-invoices'] })
+  void queryClient.invalidateQueries({ queryKey: ['srs-invoices-summary'] })
+  void queryClient.invalidateQueries({ queryKey: ['srs-invoices-outstanding'] })
   void queryClient.invalidateQueries({ queryKey: ['srs-invoice-detail'] })
 }
 
@@ -109,8 +118,9 @@ export function useRemoveWoFromInvoice() {
       return assertSrsSuccess(raw, 'Failed to remove work order from invoice')
     },
     onSuccess: (_data, vars) => {
+      // Sacar una WO de la invoice cambia su plata: van también los totales.
       void queryClient.invalidateQueries({ queryKey: ['srs-invoice-detail', vars.id_statement] })
-      void queryClient.invalidateQueries({ queryKey: ['srs-invoices'] })
+      invalidateInvoiceQueries(queryClient)
     },
   })
 }

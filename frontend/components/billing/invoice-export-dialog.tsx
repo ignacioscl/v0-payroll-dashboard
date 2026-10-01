@@ -37,7 +37,8 @@ import {
   persistInvoiceEmailPrefsAfterSend,
 } from '@/lib/billing/invoice-email-prefs'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
+import { discountExportValue } from '@/lib/billing/invoice-discount'
+import { idsBillingOf, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import type { InvoiceRow } from '@/lib/srs-invoices-api'
 
 const TTK_TYPE = 5
@@ -111,6 +112,8 @@ export function InvoiceExportDialog({
   const baseServerPayload = () => ({
     exportType,
     idsInvoices: idsCsv,
+    // Las filas tildadas: el archivo trae las mismas filas que la grilla (pestaña y tildes).
+    idsBilling: idsBillingOf(rows),
     idDealer: filters?.idDealer,
     fechaDesde: filters?.fechaDesde,
     fechaHasta: filters?.fechaHasta,
@@ -140,7 +143,8 @@ export function InvoiceExportDialog({
         [t('invoices.colDetail')]:
           r.invoiceServiceSelRel || r.invoiceService || r.invoiceServicesByWo || '',
         [t('invoices.colSubtotal')]: r.subtotal,
-        [t('invoices.colDiscount')]: r.nroBilled == null ? (r.discount ?? '') : '',
+        // La parte del descuento de esta fila en plata, con el signo de la grilla (T9).
+        [t('invoices.colDiscount')]: discountExportValue(r.discountAmount),
         [t('invoices.colTotal')]: r.total,
         [t('invoices.colCheckAmount')]: r.amount ?? '',
         [t('invoices.colCheckNumber')]: r.checkNumber ?? '',

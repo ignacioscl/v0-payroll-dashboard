@@ -80,6 +80,15 @@ interface FilterContextType {
   invoiceDateTo: Date | undefined
   setInvoiceDateFrom: (value: Date | undefined) => void
   setInvoiceDateTo: (value: Date | undefined) => void
+  /**
+   * «Ignore date range» del listado de invoices. Vive acá y no en la pantalla porque el
+   * control que lo prende está en el header, que es hermano de la página, no hijo.
+   */
+  invoiceIgnorePeriod: boolean
+  setInvoiceIgnorePeriod: (value: boolean) => void
+  /** La pantalla lo publica cuando la búsqueda lo fuerza (invoice # o empleado). */
+  invoiceIgnorePeriodLocked: boolean
+  setInvoiceIgnorePeriodLocked: (value: boolean) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
   filtersHydrated: boolean
   clearFilters: () => void
@@ -121,6 +130,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
   const [invoiceDateFrom, setInvoiceDateFrom] = useState<Date | undefined>(undefined)
   const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
+  const [invoiceIgnorePeriod, setInvoiceIgnorePeriod] = useState(false)
+  const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const setDateRange = useCallback((value: DateRange | undefined) => {
@@ -216,6 +227,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDateRange(def)
     setInvoiceDateFrom(def.from)
     setInvoiceDateTo(def.to)
+    setInvoiceIgnorePeriod(false)
   }
 
   return (
@@ -252,6 +264,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       invoiceDateTo,
       setInvoiceDateFrom,
       setInvoiceDateTo,
+      invoiceIgnorePeriod,
+      setInvoiceIgnorePeriod,
+      invoiceIgnorePeriodLocked,
+      setInvoiceIgnorePeriodLocked,
       filtersHydrated,
       clearFilters
     }}>

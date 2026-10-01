@@ -412,6 +412,14 @@ export interface DataTableProps<TData, TValue = unknown> {
   // ---------- Interactivity ----------
   onRowClick?: (row: TData) => void
 
+  /**
+   * Extra classes per row, to mark a subset (e.g. the invoices that only partly fall in the
+   * period). The class goes AFTER the zebra background so it wins, and the row should set
+   * `--dt-row-bg` with an OPAQUE colour: the pinned cells paint their own background and would
+   * otherwise show the plain card colour over the tint.
+   */
+  getRowClassName?: (row: TData, index: number) => string | undefined
+
   // ---------- Row expansion (sub-table / drilldown) ----------
   /**
    * When provided, expandable rows render this content in a full-width row
@@ -537,6 +545,7 @@ export function DataTable<TData, TValue = unknown>({
   onRowSelectionChange,
   getRowId,
   onRowClick,
+  getRowClassName,
   renderSubComponent,
   getRowCanExpand,
   subComponentLayout = 'content',
@@ -791,6 +800,8 @@ export function DataTable<TData, TValue = unknown>({
   const topScrollRef = React.useRef<HTMLDivElement>(null)
   const cardRef = React.useRef<HTMLDivElement>(null)
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = React.useState(false)
+  /** Ancho del contenido de la barra de arriba; null hasta la primera medición. */
+  const [mirrorWidth, setMirrorWidth] = React.useState<number | null>(null)
   const [isTableFocused, setIsTableFocused] = React.useState(false)
   const [focusScrollHeight, setFocusScrollHeight] = React.useState<string | null>(null)
 
@@ -832,18 +843,40 @@ export function DataTable<TData, TValue = unknown>({
     return () => window.removeEventListener('resize', onResize)
   }, [computeFocusedScrollHeight, isTableFocused])
 
+  /** Última posición que el código le copió a cada barra; su `scroll` es el aviso de esa copia. */
+  const copiedLeftRef = React.useRef<{ top: number | null; main: number | null }>({
+    top: null,
+    main: null,
+  })
+
+  // El aviso de una copia llega un cuadro tarde, cuando el usuario ya movió la barra que arrastra:
+  // si se lo toma como un movimiento, le devuelve la posición vieja y la tabla va y vuelve. La copia
+  // guardada vence en cuanto esa barra se mueve de verdad (si no, al volver a un borde no se copia).
+  // Tolerancia de 1px: las medidas vienen redondeadas y el scroll puede ser fraccionario.
   const onTopScroll = React.useCallback(() => {
     const top = topScrollRef.current
     const main = mainScrollRef.current
     if (!top || !main) return
-    if (main.scrollLeft !== top.scrollLeft) main.scrollLeft = top.scrollLeft
+    const copied = copiedLeftRef.current.top
+    if (copied != null && Math.abs(top.scrollLeft - copied) < 1) return
+    copiedLeftRef.current.top = null
+    if (Math.abs(main.scrollLeft - top.scrollLeft) >= 1) {
+      main.scrollLeft = top.scrollLeft
+      copiedLeftRef.current.main = main.scrollLeft
+    }
   }, [])
 
   const onMainScroll = React.useCallback(() => {
     const top = topScrollRef.current
     const main = mainScrollRef.current
     if (!top || !main) return
-    if (top.scrollLeft !== main.scrollLeft) top.scrollLeft = main.scrollLeft
+    const copied = copiedLeftRef.current.main
+    if (copied != null && Math.abs(main.scrollLeft - copied) < 1) return
+    copiedLeftRef.current.main = null
+    if (Math.abs(top.scrollLeft - main.scrollLeft) >= 1) {
+      top.scrollLeft = main.scrollLeft
+      copiedLeftRef.current.top = top.scrollLeft
+    }
   }, [])
 
   React.useLayoutEffect(() => {
@@ -851,6 +884,9 @@ export function DataTable<TData, TValue = unknown>({
     if (!el) return
     const update = () => {
       setHasHorizontalOverflow(el.scrollWidth > el.clientWidth + 1)
+      // La barra de arriba no tiene barra vertical y la tabla sí: se le suma ese ancho para que
+      // las dos recorran lo mismo. Si no, la de arriba topea antes y tira de la tabla para atrás.
+      setMirrorWidth(el.scrollWidth + (el.offsetWidth - el.clientWidth))
     }
     update()
     const ro = new ResizeObserver(update)
@@ -978,6 +1014,7 @@ export function DataTable<TData, TValue = unknown>({
         className={cn(
           'border-b border-border/50 transition-colors',
           baseBg,
+          getRowClassName?.(row.original, index),
           isExpanded && 'bg-accent/30',
           onRowClick && 'cursor-pointer hover:bg-accent/40',
         )}
@@ -1003,8 +1040,9 @@ export function DataTable<TData, TValue = unknown>({
               style={{
                 ...cellPinStyles,
                 ...(sizingStyle ?? {}),
+                // Las celdas fijadas son opacas: si la fila está pintada, toman su color.
                 backgroundColor: pin
-                  ? 'var(--card)'
+                  ? 'var(--dt-row-bg, var(--card))'
                   : cellPinStyles.backgroundColor,
                 ...(isLastLeftPinned
                   ? { boxShadow: 'inset -4px 0 8px -4px rgba(0,0,0,0.14)' }
@@ -1109,7 +1147,13 @@ export function DataTable<TData, TValue = unknown>({
           hasHorizontalOverflow ? 'h-3.5' : 'h-0 border-b-0',
         )}
       >
-        <div style={{ ...tableWidthStyle, height: 1 }} />
+        <div
+          style={
+            mirrorWidth != null
+              ? { width: mirrorWidth, height: 1 }
+              : { ...tableWidthStyle, height: 1 }
+          }
+        />
       </div>
 
       <div

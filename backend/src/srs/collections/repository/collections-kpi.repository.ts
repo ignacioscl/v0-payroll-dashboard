@@ -25,7 +25,9 @@ import {
   statementTypesSqlIn,
 } from '../../billing/entity/invoice-statement.srsentity'
 import {
-  billedOpenCountSql,
+  billedBaseOpts,
+  billedOwingByStatementSql,
+  billedRowMoneySql,
   collectionRatePct,
   genericBilledLinesSql,
   roundMoney,
@@ -33,6 +35,23 @@ import {
   woBilledLinesSql,
   type BilledLinesOpts,
 } from '../../shared/kpi/srs-kpi-billed-lines'
+import {
+  balanceCents,
+  centsToMoney,
+  moneyToCents,
+  rowMoneyByKey,
+  rowMoneyIdsOrAll,
+  type RowMoneyCents,
+} from '../../shared/kpi/srs-kpi-row-money'
+
+/** What the Outstanding AR pass returns; arOver60Pct needs debtOver60 from the same run. */
+export interface OutstandingArResult {
+  outstandingAr: number
+  /** The same debt without the tax of the generics (discount only): the small line of the card. */
+  outstandingArNoTax: number
+  openStatements: number
+  debtOver60: number
+}
 
 /** BILLING_WO_REL → statement id without OR + correlated IN (full-table killer). */
 const BILLING_STATEMENT_LINK = `
@@ -60,6 +79,10 @@ function emptyCollectionsMonth(monthStart: string): CollectionsByMonthRowDto {
     collectedValue: 0,
     pendingCollectionValue: 0,
     collectionRatePct: 0,
+    woInvoicedRealValue: 0,
+    ttkInvoicedRealValue: 0,
+    genericInvoicedRealValue: 0,
+    collectedRealValue: 0,
   }
 }
 
@@ -71,55 +94,88 @@ function monthKey(value: unknown): string {
 export class CollectionsKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
+  /**
+   * Same options as the Billing KPIs, without the Filter Date Completed switch: Collections and
+   * Open AR count every invoice, whatever the workflow of its WOs, exactly like before.
+   */
   private billedBase(
     filter: SrsKpiFilter,
     range: { fechaDesde: string; fechaHasta: string } | null,
   ): { wo: BilledLinesOpts; ttk: BilledLinesOpts; gen: BilledLinesOpts } {
-    const { idDealerProvider, idUsuario, dealerIds, includeZero, skipDealerRestriction } = filter
-    const common = { idDealerProvider, includeZero, range }
-    return {
-      wo: {
-        ...common,
-        dealer: buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      ttk: {
-        ...common,
-        dealer: buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction),
-      },
-      gen: {
-        ...common,
-        dealer: buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction),
-      },
-    }
+    const { wo, ttk, gen } = billedBaseOpts({ ...filter, filterDateDone: false }, range)
+    return { wo, ttk, gen }
   }
 
-  async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
-    const {
-      idDealerProvider,
-      idUsuario,
-      dealerIds,
-      fechaDesde,
-      fechaHasta,
-      includeZero,
-      skipDealerRestriction,
-    } = filter
-    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
-    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+  /**
+   * What the dealers still owe, over the whole history (no period): the same pass feeds the
+   * Outstanding AR card, the open-invoice count and the over-60 share (arOver60Pct).
+   *
+   * T4 of plans/plan-invoices-totales-listado/PLAN.md: what an invoice owes is its total minus
+   * its payment rows, exactly like the balance row of the invoice list, so the Deuda total card
+   * and the Unpaid tab give the same number invoice by invoice. Two passes: the invoices that
+   * owe something (unpaid lines, as before), then the money of their rows.
+   */
+  async getOutstanding(filter: SrsKpiFilter): Promise<OutstandingArResult> {
     const { wo, ttk, gen } = this.billedBase(filter, null)
     const owingOpts = { debtOnly: true, groupBy: 'statement' as const, withOver60: true }
     const woOwing = woBilledLinesSql({ ...wo, ...owingOpts })
     const ttkOwing = ttkBilledLinesSql({ ...ttk, ...owingOpts })
     const genOwing = genericBilledLinesSql({ ...gen, ...owingOpts })
-    // One pass per invoice: total debt, over-60 debt and open invoices (net unpaid ≠ 0,
-    // with the toggle on or off).
-    const debtQ = billedOpenCountSql(woOwing, ttkOwing, genOwing, true)
+    const owingQ = billedOwingByStatementSql(woOwing, ttkOwing, genOwing)
+    const owing: any[] = await this.srs.query(owingQ.sql, owingQ.params)
+    const ids = owing.map((r) => Number(r.stmtId))
+    let rowMoney = new Map<string, RowMoneyCents>()
+    let rowMoneyNoTax = new Map<string, RowMoneyCents>()
+    if (ids.length) {
+      const moneyQ = billedRowMoneySql({ ...filter, filterDateDone: false }, rowMoneyIdsOrAll(ids))
+      const rows: any[] = await this.srs.query(moneyQ.sql, moneyQ.params)
+      rowMoney = rowMoneyByKey(rows)
+      // Same rows and the same subtraction, with the total without tax: the «No tax» line.
+      rowMoneyNoTax = rowMoneyByKey(rows.map((r) => ({ ...r, rowTotal: r.rowTotalNoTax })))
+    }
+    let debtCents = 0
+    let debtNoTaxCents = 0
+    let over60Cents = 0
+    let openStatements = 0
+    for (const r of owing) {
+      const before = moneyToCents(r.debt)
+      const beforeOver60 = moneyToCents(r.debtOver60)
+      const debt = balanceCents(rowMoney, Number(r.stmtId))
+      // The cent of rounding follows the debt into Over60 when the invoice owes work that old.
+      const over60 = beforeOver60 === 0 ? 0 : beforeOver60 + (debt - before)
+      debtCents += debt
+      debtNoTaxCents += balanceCents(rowMoneyNoTax, Number(r.stmtId))
+      over60Cents += over60
+      if (debt !== 0) openStatements += 1
+    }
+    return {
+      outstandingAr: centsToMoney(debtCents),
+      outstandingArNoTax: centsToMoney(debtNoTaxCents),
+      openStatements,
+      debtOver60: centsToMoney(over60Cents),
+    }
+  }
+
+  async getCollectionsKpis(filter: SrsKpiFilter): Promise<CollectionsKpiDto> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, skipDealerRestriction } =
+      filter
+    const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
+    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
 
     // Drive from payments in range, then STRAIGHT_JOIN statements. MariaDB 10.3 otherwise
     // nested-loops CONTRATISTA → every invoice and runs IS_STATEMENT_BILLED /
     // GET_TOTAL_BY_STATEMENT (~90k rows) before applying the payment window.
+    //
+    // «Cobrada» es lo que dice el listado (plans/plan-invoices-salidas-legacy, 7.9): la invoice no
+    // tiene ninguna línea sin cobro —cobro entero o cobro propio de un BILLING activo del provider—,
+    // con las mismas líneas que cuentan los builders (srs-kpi-billed-lines): WO activa con su
+    // servicio, ponchada activa del provider, línea libre de generic; nunca only_timecard.
+    // IS_STATEMENT_BILLED no se toca (la usa la pestaña Unpaid): sólo mira líneas de WO, así que una
+    // TTK o una generic cobrada línea por línea quedaba afuera del DSO. Una invoice cobrada antes de
+    // facturarse cuenta 0 días, no días negativos (decidido por Ignacio el 22/09).
     const [dso, debt] = await Promise.all([
       this.srs.query(
-        `SELECT ROUND(AVG(DATEDIFF(pay.paid_at, s.fecha_create)), 1) AS dsoDays
+        `SELECT ROUND(AVG(GREATEST(DATEDIFF(pay.paid_at, s.fecha_create), 0)), 1) AS dsoDays
          FROM (
            SELECT link.id_statement, MAX(b.fecha) AS paid_at
            FROM (${BILLING_STATEMENT_LINK}) link
@@ -132,20 +188,44 @@ export class CollectionsKpiRepository {
          STRAIGHT_JOIN CONTRATISTA c ON c.id = s.id_dealer
          WHERE s.estado = 1 AND s.id_dealer_provider = ?
            ${stmt.and}
-           AND IS_STATEMENT_BILLED(s.id) = 1${stmtZero}`,
-        [idDealerProvider, fechaDesde, fechaHasta, idDealerProvider, ...stmt.params],
+           AND NOT EXISTS (
+             SELECT 1 FROM INVOICE_STATEMENT_INV_REL r
+               LEFT JOIN INVOICE i ON i.id = r.id_invoice AND i.estado = 1 AND i.id_dealer_provider = ?
+               LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id AND isr.id_service_invoice = r.id_invoice_service
+               LEFT JOIN TTK_EMPLOYEE_WORK tew ON tew.id = r.id_employee_work AND tew.estado = 1 AND tew.id_dealer_provider = ?
+              WHERE r.id_statement = s.id AND IFNULL(r.only_timecard, 0) = 0
+                AND ((s.statement_type IN (1,2,3,4) AND isr.id IS NOT NULL)
+                  OR (s.statement_type = 5 AND tew.id IS NOT NULL)
+                  OR (s.statement_type = 6 AND (r.id_employee_work IS NULL OR tew.id IS NOT NULL)))
+                AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bw JOIN BILLING b ON b.id = bw.id_billing
+                                  AND b.estado = 1 AND b.id_dealer_provider = ?
+                                 WHERE bw.id_statement = s.id)
+                AND NOT EXISTS (SELECT 1 FROM BILLING_WO_REL bw JOIN BILLING b ON b.id = bw.id_billing
+                                  AND b.estado = 1 AND b.id_dealer_provider = ?
+                                 WHERE bw.id_statement_inv_rel = r.id))${stmtZero}`,
+        [
+          idDealerProvider,
+          fechaDesde,
+          fechaHasta,
+          idDealerProvider,
+          ...stmt.params,
+          idDealerProvider,
+          idDealerProvider,
+          idDealerProvider,
+          idDealerProvider,
+        ],
       ),
-      this.srs.query(debtQ.sql, debtQ.params),
+      this.getOutstanding(filter),
     ])
 
-    const outstandingAr = roundMoney(money(debt[0]?.debt))
-    const over60 = roundMoney(money(debt[0]?.debtOver60))
+    const { outstandingAr, outstandingArNoTax, openStatements, debtOver60 } = debt
 
     return {
       outstandingAr,
+      outstandingArNoTax,
       dsoDays: Number(dso[0]?.dsoDays ?? 0),
-      arOver60Pct: outstandingAr > 0 ? Math.round((over60 / outstandingAr) * 1000) / 10 : 0,
-      openStatements: Number(debt[0]?.unpaidStatements ?? 0),
+      arOver60Pct: outstandingAr > 0 ? Math.round((debtOver60 / outstandingAr) * 1000) / 10 : 0,
+      openStatements,
     }
   }
 
@@ -167,9 +247,13 @@ export class CollectionsKpiRepository {
       end: monthEndInclusive(ms, rangeEnd),
     }))
 
-    const woQ = woBilledLinesSql({ ...wo, groupBy: 'month' })
-    const ttkQ = ttkBilledLinesSql({ ...ttk, groupBy: 'month' })
-    const genQ = genericBilledLinesSql({ ...gen, groupBy: 'month', monthBuckets })
+    // The chart counts like the Billing cards (discount, no tax), so each month matches them. The
+    // same pass also returns the real money (tax + discount): the Outstanding AR subtitle subtracts
+    // it from the debt, which is real money.
+    const monthOpts = { groupBy: 'month' as const, productionValue: true, withRealSplit: true }
+    const woQ = woBilledLinesSql({ ...wo, ...monthOpts })
+    const ttkQ = ttkBilledLinesSql({ ...ttk, ...monthOpts })
+    const genQ = genericBilledLinesSql({ ...gen, ...monthOpts, monthBuckets })
 
     const [woRows, ttkRows, genRows, unbilledRows] = await Promise.all([
       this.srs.query(woQ.sql, woQ.params),
@@ -225,6 +309,12 @@ export class CollectionsKpiRepository {
         collectedValue,
         pendingCollectionValue,
         collectionRatePct: collectionRatePct(collectedValue, invoiced),
+        woInvoicedRealValue: money(woRow?.invoicedReal),
+        ttkInvoicedRealValue: money(ttkRow?.invoicedReal),
+        genericInvoicedRealValue: money(genRow?.invoicedReal),
+        collectedRealValue: roundMoney(
+          money(woRow?.collectedReal) + money(ttkRow?.collectedReal) + money(genRow?.collectedReal),
+        ),
       }
     })
 

@@ -31,4 +31,9 @@ export class CollectionsByMonthRowDto {
   @ApiProperty({ example: 697806.65 }) collectedValue!: number
   @ApiProperty({ example: 10000 }) pendingCollectionValue!: number
   @ApiProperty({ example: 80.8 }) collectionRatePct!: number
+  /** The same months as real money (tax + discount): only for the Outstanding AR subtitle. */
+  @ApiProperty({ example: 25781 }) woInvoicedRealValue!: number
+  @ApiProperty({ example: 46739.76 }) ttkInvoicedRealValue!: number
+  @ApiProperty({ example: 625300.12 }) genericInvoicedRealValue!: number
+  @ApiProperty({ example: 697820.88 }) collectedRealValue!: number
 }

@@ -18,6 +18,30 @@ export interface SrsKpiFilter {
   skipDealerRestriction: boolean
 }
 
+/**
+ * Filter for endpoints that look at the whole history, with no period (Outstanding AR of the
+ * invoice list). The dates stay empty on purpose: those queries run with range = null.
+ */
+export function buildSrsKpiFilterNoPeriod(
+  ctx: SrsContext,
+  query: { idDealer?: string; includeZero?: string | boolean },
+): SrsKpiFilter {
+  const dealerIds = parseDealerIds(query.idDealer)
+  if (dealerIds.length === 0) {
+    throw new BadRequestException('idDealer is required (select dealer(s) in header)')
+  }
+  return {
+    idDealerProvider: ctx.idDealerProvider,
+    idUsuario: ctx.idUsuario,
+    dealerIds,
+    fechaDesde: '',
+    fechaHasta: '',
+    filterDateDone: false,
+    includeZero: parseIncludeZero(query.includeZero),
+    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+  }
+}
+
 export function buildSrsKpiFilter(ctx: SrsContext, query: SrsKpiQueryDto): SrsKpiFilter {
   const dealerIds = parseDealerIds(query.idDealer)
   if (dealerIds.length === 0) {
