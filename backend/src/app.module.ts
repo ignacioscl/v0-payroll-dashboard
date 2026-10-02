@@ -35,6 +35,7 @@ import { AuditLogModule } from './features/audit-log/audit-log.module'
 
 // --- SRS Suite ---
 import { srsDataSourceOptions, SRS_CONNECTION } from './srs/srs.datasource'
+import { SrsPoolAcquireTimeout } from './srs/srs-pool-acquire-timeout'
 import { HealthModule } from './features/health/health.module'
 import { SrsProductionModule } from './srs/production/srs-production.module'
 import { SrsBillingModule } from './srs/billing/srs-billing.module'
@@ -103,6 +104,8 @@ HttpModule.registerAsync({
   ],
   controllers: [],
   providers: [
+    // Límite de espera de conexión del pool 'srs' (plans/plan-pool-v0-saturacion).
+    SrsPoolAcquireTimeout,
     {
       provide: APP_INTERCEPTOR,
       useClass: TrimResponseInterceptor,

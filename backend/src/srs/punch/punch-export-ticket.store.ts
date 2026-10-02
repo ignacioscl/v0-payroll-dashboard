@@ -55,6 +55,8 @@ export type PunchExportTicket = {
   filters: PunchExportStoredFilters | DealerRankingExportStoredFilters
   state: PunchExportTicketState
   errorMessage?: string
+  /** p.ej. DB_POOL_BUSY: el front lo traduce (plans/plan-pool-v0-saturacion §4.6). */
+  errorCode?: string
   createdAt: number
   pendingTimer: ReturnType<typeof setTimeout> | null
   terminalTimer: ReturnType<typeof setTimeout> | null
@@ -126,9 +128,9 @@ export class PunchExportTicketStore {
     id: string,
     idUsuario: number,
     kind: PunchExportTicketKind = 'punch-list',
-  ): { status: PunchExportTicketState; errorMessage?: string } {
+  ): { status: PunchExportTicketState; errorMessage?: string; errorCode?: string } {
     const ticket = this.requireOwned(id, idUsuario, kind)
-    return { status: ticket.state, errorMessage: ticket.errorMessage }
+    return { status: ticket.state, errorMessage: ticket.errorMessage, errorCode: ticket.errorCode }
   }
 
   markDone(id: string): void {
@@ -138,11 +140,12 @@ export class PunchExportTicketStore {
     this.scheduleDelete(ticket)
   }
 
-  markError(id: string, message: string): void {
+  markError(id: string, message: string, code?: string): void {
     const ticket = this.tickets.get(id)
     if (!ticket || ticket.state === 'done' || ticket.state === 'error') return
     ticket.state = 'error'
     ticket.errorMessage = message
+    ticket.errorCode = code
     this.scheduleDelete(ticket)
   }
 

@@ -72,6 +72,7 @@ import {
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
 import { dollars, fmtDollars, shownPending, sumShown } from '@/lib/kpi-money'
+import { isSrsBusyError } from '@/lib/srs-busy-error'
 
 const fmtMoney = (n: number | undefined) =>
   n === undefined ? '—' : fmtDollars(n)
@@ -635,7 +636,11 @@ export default function BusinessKpisPage() {
 function KpiErrorBanner({ q }: { q: { isLoading: boolean; isError: boolean; error: unknown } }) {
   const { t } = useTranslation()
   if (q.isLoading || !q.isError) return null
-  const msg = q.error instanceof Error ? q.error.message : t('common.failedToLoad')
+  const msg = isSrsBusyError(q.error)
+    ? t('common.serverBusy')
+    : q.error instanceof Error
+      ? q.error.message
+      : t('common.failedToLoad')
   return (
     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
       {msg}

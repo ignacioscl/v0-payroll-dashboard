@@ -59,6 +59,7 @@ import {
 } from '@/lib/srs-invoices-api'
 import { discountExportValue } from '@/lib/billing/invoice-discount'
 import { invoiceRowKey, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
+import { isSrsBusyError } from '@/lib/srs-busy-error'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -739,6 +740,7 @@ export function InvoiceListTable({
   const {
     data,
     isError,
+    error,
     isFetching,
     hasNextPage,
     isFetchingNextPage,
@@ -1357,7 +1359,7 @@ export function InvoiceListTable({
     <StateBlock
       icon={<AlertTriangle className="h-6 w-6" />}
       title={t('invoices.loadErrorTitle')}
-      hint={t('invoices.loadErrorHint')}
+      hint={isSrsBusyError(error) ? t('common.serverBusy') : t('invoices.loadErrorHint')}
       tone="danger"
     />
   ) : (

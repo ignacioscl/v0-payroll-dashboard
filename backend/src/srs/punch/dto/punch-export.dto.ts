@@ -115,4 +115,7 @@ export class PunchExportStatusDto {
 
   @ApiPropertyOptional()
   errorMessage?: string
+
+  @ApiPropertyOptional({ description: 'DB_POOL_BUSY cuando la base estaba saturada' })
+  errorCode?: string
 }

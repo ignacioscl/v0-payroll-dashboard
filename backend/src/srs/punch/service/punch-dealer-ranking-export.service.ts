@@ -31,6 +31,7 @@ import {
 import { buildDealerRankingWorkbook } from '../punch-dealer-ranking-xlsx'
 import { CORRECTIONS_LOG_START, correctionsCoverageNoticeApplies } from '../punch-corrections-log'
 import type { PunchExportMetaRow } from '../punch-export-xlsx'
+import { DB_POOL_BUSY, isPoolBusyError } from '../../srs-pool-acquire-timeout'
 
 /** Lo que mira el gate: sale del body en el `prepare` y del ticket en la descarga. */
 type DealerRankingGateFilters = Pick<DealerRankingExportStoredFilters, 'idDealer' | 'errorTypes'>
@@ -96,14 +97,14 @@ export class PunchDealerRankingExportService {
     const filters = ticket.filters as DealerRankingExportStoredFilters
 
     let released = false
-    const cleanup = (kind: 'ok' | 'err', message?: string) => {
+    const cleanup = (kind: 'ok' | 'err', message?: string, code?: string) => {
       if (released) return
       released = true
       this.semaphore.release()
       if (kind === 'ok') {
         this.tickets.markDone(ticketId)
       } else {
-        this.tickets.markError(ticketId, message ?? 'Export failed')
+        this.tickets.markError(ticketId, message ?? 'Export failed', code)
       }
     }
 
@@ -175,7 +176,7 @@ export class PunchDealerRankingExportService {
       cleanup('ok')
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Export failed'
-      cleanup('err', message)
+      cleanup('err', message, isPoolBusyError(e) ? DB_POOL_BUSY : undefined)
       if (!res.headersSent) {
         // Falló antes del primer byte: el error sale como JSON por el filtro de Nest.
         // Con estos headers puestos, el navegador lo bajaría como un .xlsx roto.

@@ -63,6 +63,7 @@ import {
 import { useFilters } from '@/lib/filter-context'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { isSrsBusyError } from '@/lib/srs-busy-error'
 import {
   isGenericInvoiceApiError,
   type GenericCatalogItem,
@@ -340,7 +341,9 @@ export function GenericInvoiceDialog({
     if (loaded.isError) {
       loadHandled.current = true
       const err = loaded.error
-      toast.error(getSrsErrorMessage(err, t('invoices.generic.loadError')))
+      toast.error(
+        isSrsBusyError(err) ? t('common.serverBusy') : getSrsErrorMessage(err, t('invoices.generic.loadError')),
+      )
       onOpenChange(false)
       void queryClient.invalidateQueries({ queryKey: ['srs-invoices'] })
       return
@@ -482,10 +485,12 @@ export function GenericInvoiceDialog({
 
   const handleConflict = async (err: unknown) => {
     if (!isGenericInvoiceApiError(err)) {
-      toast.error(getSrsErrorMessage(err, t('invoices.generic.createError')))
+      toast.error(
+        isSrsBusyError(err) ? t('common.serverBusy') : getSrsErrorMessage(err, t('invoices.generic.createError')),
+      )
       return
     }
-    toast.error(err.message)
+    toast.error(isSrsBusyError(err) ? t('common.serverBusy') : err.message)
     if (err.status === 404 || err.code === 'STATEMENT_PAID') {
       closeNow()
       void queryClient.invalidateQueries({ queryKey: ['srs-invoices'] })

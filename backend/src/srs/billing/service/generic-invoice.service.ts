@@ -29,6 +29,7 @@ import {
 } from '../dto/generic-invoice.dto'
 import { GenericInvoiceConflictError } from '../generic-invoice-conflict.error'
 import { conflictFromMysql, isDupEntry } from '../generic-invoice-write-errors'
+import { DB_POOL_BUSY, isPoolBusyError } from '../../srs-pool-acquire-timeout'
 import {
   PersistLine,
   GenericInvoiceRepository,
@@ -178,19 +179,25 @@ export class GenericInvoiceService {
       throw new BadRequestException('The billing has been blocked')
     }
 
-    const cambios = await this.upsertCatalogBestEffort(ctx, dto.idDealer, dto.items, dto.headerNote)
-
     const persistItems = this.toPersistLines(dto.items, punchesByEmployee)
+    let created: Awaited<ReturnType<GenericInvoiceService['persistStatement']>>
     try {
-      const created = await this.persistStatement(ctx, dto, selRel, persistItems)
-      await this.logCatalogChangesBestEffort(created.id, ctx.idUsuario, cambios)
-      return created
+      created = await this.persistStatement(ctx, dto, selRel, persistItems)
     } catch (err) {
       if (!isDupEntry(err)) throw err
-      const created = await this.persistStatement(ctx, dto, selRel, persistItems)
-      await this.logCatalogChangesBestEffort(created.id, ctx.idUsuario, cambios)
-      return created
+      created = await this.persistStatement(ctx, dto, selRel, persistItems)
     }
+    // El catálogo se actualiza DESPUÉS de guardar (igual que update()): si la base está
+    // saturada antes de guardar, no queda nada escrito. plans/plan-pool-v0-saturacion §3.
+    const cambios = await this.upsertCatalogBestEffort(
+      ctx,
+      dto.idDealer,
+      dto.items,
+      dto.headerNote,
+      created.id,
+    )
+    await this.logCatalogChangesBestEffort(created.id, ctx.idUsuario, cambios)
+    return created
   }
 
   async update(
@@ -460,7 +467,8 @@ export class GenericInvoiceService {
     ctx: SrsContext,
     idDealer: number,
     items: Array<GenericFreeItemDto | GenericTtkItemDto>,
-    headerNote?: string,
+    headerNote: string | undefined,
+    idStatement: number,
   ): Promise<Array<{ name: string; idDealer: number; priceOld: number | null; priceNew: number }>> {
     const cambios: Array<{
       name: string
@@ -480,7 +488,7 @@ export class GenericInvoiceService {
         )
         if (change) cambios.push(change)
       } catch (err) {
-        this.logCatalogUpsertError(`item "${item.description}"`, err)
+        this.logCatalogUpsertError(`item "${item.description}"`, err, idStatement)
       }
     }
     const header = headerNote?.trim() ?? ''
@@ -493,7 +501,7 @@ export class GenericInvoiceService {
           header,
         )
       } catch (err) {
-        this.logCatalogUpsertError('header note', err)
+        this.logCatalogUpsertError('header note', err, idStatement)
       }
     }
     return cambios
@@ -523,7 +531,7 @@ export class GenericInvoiceService {
         )
         if (change) cambios.push(change)
       } catch (err) {
-        this.logCatalogUpsertError(`item "${item.name}"`, err)
+        this.logCatalogUpsertError(`item "${item.name}"`, err, idStatement)
       }
     }
     const header = headerNote?.trim() ?? ''
@@ -536,7 +544,7 @@ export class GenericInvoiceService {
           header,
         )
       } catch (err) {
-        this.logCatalogUpsertError('header note', err)
+        this.logCatalogUpsertError('header note', err, idStatement)
       }
     }
     await this.logCatalogChangesBestEffort(idStatement, ctx.idUsuario, cambios)
@@ -551,13 +559,15 @@ export class GenericInvoiceService {
     try {
       await this.repository.logCatalogPriceChanges(idStatement, idUsuario, cambios)
     } catch (err) {
-      this.logCatalogUpsertError('catalog price log', err)
+      this.logCatalogUpsertError('catalog price log', err, idStatement)
     }
   }
 
-  private logCatalogUpsertError(what: string, err: unknown): void {
+  /** Best effort después de guardar (D4 de plans/plan-pool-v0-saturacion): se loguea y se sigue. */
+  private logCatalogUpsertError(what: string, err: unknown, idStatement: number): void {
+    const busy = isPoolBusyError(err) ? ` [${DB_POOL_BUSY}]` : ''
     this.logger.error(
-      `Generic invoice catalog upsert failed (${what}); continuing with statement create`,
+      `Generic invoice catalog step skipped (${what}) for statement ${idStatement}${busy}; the statement is already saved`,
       err instanceof Error ? err.stack : String(err),
     )
   }

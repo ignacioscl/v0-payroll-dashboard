@@ -73,6 +73,7 @@ import {
   type PaymentTypeFilterValue,
 } from '@/lib/ttk/payment-type-filter'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { isSrsBusyError } from '@/lib/srs-busy-error'
 import { toast } from 'sonner'
 import { PunchDeleteConfirmDialog } from '@/components/ttk/punch-delete-confirm-dialog'
 import { useMinWidth } from '@/hooks/use-mobile'
@@ -931,8 +932,9 @@ export function IssuesDataTable({
   const rows = emptyByErrorTypes ? EMPTY_ROWS : listQuery.rows
   const total = emptyByErrorTypes ? 0 : listQuery.total
   const isFetching = emptyByErrorTypes ? false : listQuery.isFetching
-  const error =
-    listQuery.error instanceof Error
+  const error = isSrsBusyError(listQuery.error)
+    ? t('common.serverBusy')
+    : listQuery.error instanceof Error
       ? listQuery.error.message
       : listQuery.error
         ? String(listQuery.error)

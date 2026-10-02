@@ -28,6 +28,7 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
 import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
 import { useInvoiceOutstanding } from '@/hooks/use-invoice-outstanding'
+import { isSrsBusyError } from '@/lib/srs-busy-error'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
 
@@ -335,6 +336,7 @@ export default function InvoicesPage() {
           owedAllDates={showOwedAllDates ? outstandingQuery.data?.outstandingAr : undefined}
           owedAllDatesLoading={showOwedAllDates && outstandingQuery.isFetching}
           showDeleted={deleted !== 'hide'}
+          busy={summaryQuery.isError && isSrsBusyError(summaryQuery.error)}
         />
       ) : null}
 

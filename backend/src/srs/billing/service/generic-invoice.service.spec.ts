@@ -5,6 +5,7 @@ import { CreateGenericInvoiceDto, UpdateGenericInvoiceDto } from '../dto/generic
 import { GenericInvoiceService } from './generic-invoice.service'
 import { GenericInvoiceConflictError } from '../generic-invoice-conflict.error'
 import { assertRelWriteAffected, conflictFromMysql } from '../generic-invoice-write-errors'
+import { DB_POOL_BUSY, poolBusyError } from '../../srs-pool-acquire-timeout'
 
 const ctx = {
   idUsuario: 10,
@@ -154,6 +155,44 @@ describe('GenericInvoiceService.create', () => {
     const out = await service.create(ctx as any, happyDto as any)
     expect(out.id).toBe(1)
     expect(repository.createStatement).toHaveBeenCalled()
+  })
+
+  // plans/plan-pool-v0-saturacion §3: el catálogo se toca recién con la invoice guardada.
+  it('updates the catalog only after the statement is saved', async () => {
+    const order: string[] = []
+    const { service, repository } = buildService({
+      create: async () => {
+        order.push('statement')
+        return { id: 7, invoiceNro: 12, fullNro: 'AW12' }
+      },
+    })
+    repository.upsertCatalogItem.mockImplementation(async () => {
+      order.push('catalog')
+      return null
+    })
+    await service.create(ctx as any, happyDto as any)
+    expect(order).toEqual(['statement', 'catalog', 'catalog'])
+  })
+
+  it('pool busy before saving ⇒ 503 and the catalog is not touched', async () => {
+    const { service, repository } = buildService({
+      create: async () => {
+        throw poolBusyError()
+      },
+    })
+    await expect(service.create(ctx as any, happyDto as any)).rejects.toMatchObject({
+      httpStatus: 503,
+      code: DB_POOL_BUSY,
+    })
+    expect(repository.upsertCatalogItem).not.toHaveBeenCalled()
+    expect(repository.upsertCatalogHeaderNote).not.toHaveBeenCalled()
+  })
+
+  it('pool busy on the catalog after saving ⇒ the statement is still returned', async () => {
+    const { service, repository } = buildService()
+    repository.upsertCatalogItem.mockRejectedValue(poolBusyError())
+    const out = await service.create(ctx as any, happyDto as any)
+    expect(out.id).toBe(1)
   })
 })
 

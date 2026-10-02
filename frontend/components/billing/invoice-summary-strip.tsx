@@ -95,9 +95,12 @@ export function InvoiceSummaryStrip({
   owedAllDates,
   owedAllDatesLoading,
   showDeleted,
+  busy,
 }: {
   summary: InvoiceSummary | undefined
   isLoading?: boolean
+  /** The totals request failed because the system is busy (503 DB_POOL_BUSY). */
+  busy?: boolean
   showExcludesDeleted?: boolean
   /** Outstanding AR with no date filter; undefined = the card is not shown. */
   owedAllDates?: number
@@ -127,7 +130,14 @@ export function InvoiceSummaryStrip({
     )
   }
 
-  if (!summary) return null
+  if (!summary) {
+    if (!busy) return null
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {t('common.serverBusy')}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-1.5">

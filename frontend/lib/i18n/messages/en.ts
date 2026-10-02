@@ -688,6 +688,7 @@ export const en: Messages = {
     corrected: 'Corrected',
     failedToLoad: 'Failed to load',
     exportFailed: 'Export failed. Please try again.',
+    serverBusy: 'The system is busy right now. Please try again in a minute.',
     exportSuccess: 'Exported {count} row(s)',
     exportInProgress: 'Export in progress',
     clearSearch: 'Clear search',

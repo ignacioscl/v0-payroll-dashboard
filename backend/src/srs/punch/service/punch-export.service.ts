@@ -32,6 +32,7 @@ import { parsePaymentTypeIds } from '../repository/punch-payment-types'
 import { assertPaymentTypesInCatalog } from '../repository/punch-payment-type-catalog'
 import { isCompleteEffectiveList, parseErrorTypes } from '../repository/punch-error-types'
 import type { PunchListRowDto } from '../dto/punch-list.dto'
+import { DB_POOL_BUSY, isPoolBusyError } from '../../srs-pool-acquire-timeout'
 
 function metaAll(labels: PunchExportLabels, value?: string | null): string {
   const v = value?.trim()
@@ -88,7 +89,7 @@ export class PunchExportService {
     let mysqlCleanup: (() => Promise<void>) | null = null
     let released = false
 
-    const cleanup = async (kind: 'ok' | 'err', message?: string) => {
+    const cleanup = async (kind: 'ok' | 'err', message?: string, code?: string) => {
       if (released) return
       released = true
       try {
@@ -100,7 +101,7 @@ export class PunchExportService {
       if (kind === 'ok') {
         this.tickets.markDone(ticketId)
       } else {
-        this.tickets.markError(ticketId, message ?? 'Export failed')
+        this.tickets.markError(ticketId, message ?? 'Export failed', code)
       }
     }
 
@@ -178,11 +179,12 @@ export class PunchExportService {
       await cleanup('ok')
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Export failed'
+      const code = isPoolBusyError(e) ? DB_POOL_BUSY : undefined
       if (!headersSent) {
-        await cleanup('err', message)
+        await cleanup('err', message, code)
         throw e
       }
-      await cleanup('err', message)
+      await cleanup('err', message, code)
       if (!res.destroyed) {
         res.destroy(e instanceof Error ? e : undefined)
       }

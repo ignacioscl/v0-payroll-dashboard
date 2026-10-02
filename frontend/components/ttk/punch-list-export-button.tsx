@@ -12,6 +12,7 @@ import {
 } from '@/lib/ttk/punch-list-filters'
 import { fetchPunchExportPrepare, fetchPunchExportStatus } from '@/lib/srs-kpis-api'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { DB_POOL_BUSY, isSrsBusyError } from '@/lib/srs-busy-error'
 import { startTicketDownload } from '@/lib/ttk/ticket-download'
 
 type PunchListExportButtonProps = {
@@ -59,16 +60,19 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
             } else if (status.status === 'error') {
               stopPoll()
               setGenerating(false)
-              toast.error(status.errorMessage || t('common.exportFailed'), {
-                duration: TOAST_DURATION_MS,
-              })
+              toast.error(
+                status.errorCode === DB_POOL_BUSY
+                  ? t('common.serverBusy')
+                  : status.errorMessage || t('common.exportFailed'),
+                { duration: TOAST_DURATION_MS },
+              )
             }
           })
           .catch((e) => {
             if (e instanceof TypeError) return
             stopPoll()
             setGenerating(false)
-            toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {
+            toast.error(isSrsBusyError(e) ? t('common.serverBusy') : getSrsErrorMessage(e, t('common.exportFailed')), {
               duration: TOAST_DURATION_MS,
             })
           })
@@ -79,7 +83,7 @@ export function PunchListExportButton({ params, enabled }: PunchListExportButton
       startTicketDownload('/api/srs-kpis/punch/list/export', prepared.ticket)
     } catch (e) {
       setGenerating(false)
-      toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {
+      toast.error(isSrsBusyError(e) ? t('common.serverBusy') : getSrsErrorMessage(e, t('common.exportFailed')), {
         duration: TOAST_DURATION_MS,
       })
     }

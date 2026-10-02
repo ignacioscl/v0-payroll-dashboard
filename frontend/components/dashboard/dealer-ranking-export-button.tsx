@@ -11,6 +11,7 @@ import {
   fetchDealerRankingExportStatus,
 } from '@/lib/srs-kpis-api'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { DB_POOL_BUSY, isSrsBusyError } from '@/lib/srs-busy-error'
 import { startTicketDownload } from '@/lib/ttk/ticket-download'
 import type { DealerRankingQueryParams } from '@/lib/ttk/dealer-ranking-types'
 import type { ErrorStatus } from '@/lib/ttk/error-status'
@@ -75,16 +76,19 @@ export function DealerRankingExportButton({
             } else if (res.status === 'error') {
               stopPoll()
               setGenerating(false)
-              toast.error(res.errorMessage || t('common.exportFailed'), {
-                duration: TOAST_DURATION_MS,
-              })
+              toast.error(
+                res.errorCode === DB_POOL_BUSY
+                  ? t('common.serverBusy')
+                  : res.errorMessage || t('common.exportFailed'),
+                { duration: TOAST_DURATION_MS },
+              )
             }
           })
           .catch((e) => {
             if (e instanceof TypeError) return
             stopPoll()
             setGenerating(false)
-            toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {
+            toast.error(isSrsBusyError(e) ? t('common.serverBusy') : getSrsErrorMessage(e, t('common.exportFailed')), {
               duration: TOAST_DURATION_MS,
             })
           })
@@ -95,7 +99,7 @@ export function DealerRankingExportButton({
       startTicketDownload(DEALER_RANKING_EXPORT_PATH, prepared.ticket)
     } catch (e) {
       setGenerating(false)
-      toast.error(getSrsErrorMessage(e, t('common.exportFailed')), {
+      toast.error(isSrsBusyError(e) ? t('common.serverBusy') : getSrsErrorMessage(e, t('common.exportFailed')), {
         duration: TOAST_DURATION_MS,
       })
     }

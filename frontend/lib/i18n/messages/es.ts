@@ -688,6 +688,7 @@ export const es: Messages = {
     corrected: 'Corregido',
     failedToLoad: 'Error al cargar',
     exportFailed: 'Error al exportar. Inténtelo de nuevo.',
+    serverBusy: 'El sistema está ocupado en este momento. Intentá de nuevo en un minuto.',
     exportSuccess: 'Exportados {count} registro(s)',
     exportInProgress: 'Exportación en curso',
     clearSearch: 'Limpiar búsqueda',

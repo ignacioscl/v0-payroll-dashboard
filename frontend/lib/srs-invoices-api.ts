@@ -1,5 +1,7 @@
 // Tipos = DTOs del backend NestJS (src/srs/billing/dto/invoice-*.dto). Datos REALES.
 
+import { isSrsBusy, SrsBusyError } from '@/lib/srs-busy-error'
+
 export type InvoiceStatementTypeToken = 'wo' | 'ttk' | 'generic'
 
 export interface InvoiceRow {
@@ -226,6 +228,7 @@ export async function fetchInvoiceList(params: InvoiceListParams): Promise<Invoi
   const res = await fetch(`/api/srs-kpis/billing/invoices${buildInvoiceQuery(params)}`, {
     cache: 'no-store',
   })
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) {
     throw new Error(`Invoices (${res.status})`)
   }
@@ -243,6 +246,7 @@ export async function fetchInvoiceSummary(
     })}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) {
     throw new Error(`Invoice summary (${res.status})`)
   }
@@ -264,6 +268,7 @@ export async function fetchInvoiceOutstanding(params: {
   const res = await fetch(`/api/srs-kpis/kpis/collections/outstanding?${qs.toString()}`, {
     cache: 'no-store',
   })
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) {
     throw new Error(`Outstanding AR (${res.status})`)
   }
@@ -299,6 +304,7 @@ export async function fetchInvoiceDetail(
     `/api/srs-kpis/billing/invoices/${id}/detail${q ? `?${q}` : ''}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) {
     throw new Error(`Invoice detail (${res.status})`)
   }
@@ -327,6 +333,7 @@ export async function fetchInvoiceDepartments(params: {
     `/api/srs-kpis/billing/invoices/lookups/departments${buildLookupQuery(params)}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice departments (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
@@ -342,6 +349,7 @@ export async function fetchInvoiceServices(params: {
     `/api/srs-kpis/billing/invoices/lookups/services${buildLookupQuery(params)}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice services (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
@@ -356,6 +364,7 @@ export async function fetchInvoiceAuthors(params: {
     `/api/srs-kpis/billing/invoices/lookups/authors${buildLookupQuery(params)}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice authors (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
@@ -370,6 +379,7 @@ export async function fetchInvoiceWorkers(params: {
     `/api/srs-kpis/billing/invoices/lookups/workers${buildLookupQuery(params)}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice workers (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
   return data.results ?? []
@@ -389,6 +399,7 @@ export async function fetchInvoiceDistricts(params: {
     `/api/srs-kpis/billing/invoices/lookups/districts${q ? `?${q}` : ''}`,
     { cache: 'no-store' },
   )
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice districts (${res.status})`)
   const data = (await res.json()) as { results?: InvoiceDistrictOption[] }
   return data.results ?? []

@@ -1,6 +1,7 @@
 // Tipos = DTOs del backend NestJS (src/srs/*/dto). Datos REALES (no mock).
 
 import type { PunchGroupedResponse } from '@/lib/ttk/punch-grouped-types'
+import { isSrsBusy, SrsBusyError } from '@/lib/srs-busy-error'
 import {
   punchGroupedParamsToSearchParams,
   type PunchGroupedQueryParams,
@@ -187,6 +188,7 @@ function buildKpiQuery(params: KpiQueryParams): string {
 
 async function getKpi<T>(vertical: string, params: KpiQueryParams): Promise<T> {
   const res = await fetch(`/api/srs-kpis/kpis/${vertical}${buildKpiQuery(params)}`, { cache: 'no-store' })
+  if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) {
     throw new Error(`KPI ${vertical} (${res.status})`)
   }
@@ -218,6 +220,7 @@ export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch
 export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)
 
 async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
+  if (isSrsBusy(res)) throw new SrsBusyError()
   const text = await res.text()
   let parsed: unknown = null
   if (text) {
@@ -302,7 +305,7 @@ export async function fetchPunchExportPrepare(
 
 export async function fetchPunchExportStatus(
   ticket: string,
-): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string }> {
+): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string; errorCode?: string }> {
   const qs = new URLSearchParams({ ticket })
   const res = await fetch(`/api/srs-kpis/punch/list/export/status?${qs.toString()}`, {
     cache: 'no-store',
@@ -310,6 +313,7 @@ export async function fetchPunchExportStatus(
   return readNestJson<{
     status: 'pending' | 'running' | 'done' | 'error'
     errorMessage?: string
+    errorCode?: string
   }>(res, `punch/list/export/status (${res.status})`)
 }
 
@@ -351,7 +355,7 @@ export async function fetchDealerRankingExportPrepare(
 
 export async function fetchDealerRankingExportStatus(
   ticket: string,
-): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string }> {
+): Promise<{ status: 'pending' | 'running' | 'done' | 'error'; errorMessage?: string; errorCode?: string }> {
   const qs = new URLSearchParams({ ticket })
   const res = await fetch(`/api/srs-kpis/punch/dealer-ranking/export/status?${qs.toString()}`, {
     cache: 'no-store',
@@ -359,5 +363,6 @@ export async function fetchDealerRankingExportStatus(
   return readNestJson<{
     status: 'pending' | 'running' | 'done' | 'error'
     errorMessage?: string
+    errorCode?: string
   }>(res, `punch/dealer-ranking/export/status (${res.status})`)
 }
