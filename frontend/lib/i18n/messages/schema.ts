@@ -1439,6 +1439,7 @@ export interface Messages {
     outstandingAr: string
     unpaidInPeriod: string
     dso: string
+    income: string
     collected: string
     collectionRate: string
     arOver60: string

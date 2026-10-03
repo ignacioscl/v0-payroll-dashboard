@@ -102,6 +102,10 @@ export interface BillingPeriodCollectionKpi {
    */
   incomeInvoicedValue: number
   incomeCollectedValue: number
+  /** incomeCollectedValue por tipo: se redondea cada uno como su tarjeta facturada (Unpaid sin −$1). */
+  incomeCollectedWoValue: number
+  incomeCollectedTtkValue: number
+  incomeCollectedGenericValue: number
   /** Las mismas líneas, con tax y descuento (plata real): los subtítulos de Collected y Unpaid. */
   incomeInvoicedRealValue: number
   incomeCollectedRealValue: number
@@ -125,6 +129,10 @@ export interface CollectionsByMonthPoint {
   woUnbilledValue: number
   producedValue: number
   collectedValue: number
+  /** collectedValue by type: rounded like the invoiced series so the pending never shows −$1. */
+  woCollectedValue: number
+  ttkCollectedValue: number
+  genericCollectedValue: number
   pendingCollectionValue: number
   collectionRatePct: number
   /** The same month as real money (tax + discount): only for the Outstanding AR subtitle. */
@@ -132,6 +140,9 @@ export interface CollectionsByMonthPoint {
   ttkInvoicedRealValue: number
   genericInvoicedRealValue: number
   collectedRealValue: number
+  woCollectedRealValue: number
+  ttkCollectedRealValue: number
+  genericCollectedRealValue: number
 }
 
 export const COLLECTIONS_HISTORY_MONTHS = [4, 6, 8, 10, 12] as const

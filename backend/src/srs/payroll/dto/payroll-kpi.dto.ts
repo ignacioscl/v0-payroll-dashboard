@@ -25,6 +25,6 @@ export class PayrollKpiDto {
 
 /** Payroll por tipo de pago (torta). */
 export class PayrollByTypeRowDto {
-  @ApiProperty({ example: 'hourly' }) type!: string
+  @ApiProperty({ example: 'Hourly' }) type!: string
   @ApiProperty({ example: 30960 }) value!: number
 }

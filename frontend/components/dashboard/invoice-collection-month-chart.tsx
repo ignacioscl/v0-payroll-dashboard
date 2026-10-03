@@ -64,6 +64,8 @@ function CollectionMonthTooltip({
     row.woUnbilledValue,
   )
   const pending = shownPending(row)
+  // Same rounding as the pending line: by type, so produced − collected = pending on screen.
+  const collected = sumShown(row.woCollectedValue, row.ttkCollectedValue, row.genericCollectedValue)
 
   return (
     <div className="rounded-lg border border-border/80 bg-popover px-3 py-2 text-sm shadow-md">
@@ -84,7 +86,7 @@ function CollectionMonthTooltip({
         {labels.woUnbilled}: {fmtDollars(row.woUnbilledValue)}
       </p>
       <p>
-        {labels.collected}: {fmtDollars(row.collectedValue)}
+        {labels.collected}: {fmtDollars(collected)}
       </p>
       <p>
         {labels.pending}: {fmtDollars(pending)}

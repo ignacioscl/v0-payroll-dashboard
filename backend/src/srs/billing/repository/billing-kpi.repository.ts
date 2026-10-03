@@ -285,6 +285,11 @@ export class BillingKpiRepository {
     const incomeInvoicedValue = roundMoney(
       money(w.invoicedProduction) + money(tk.invoicedProduction) + money(g.invoicedProduction),
     )
+    // Collected by type: the screen rounds each invoiced card on its own, so it has to round the
+    // collected money the same way or Unpaid shows −$1 with everything collected.
+    const incomeCollectedWoValue = roundMoney(money(w.collectedProduction))
+    const incomeCollectedTtkValue = roundMoney(money(tk.collectedProduction))
+    const incomeCollectedGenericValue = roundMoney(money(g.collectedProduction))
     const incomeCollectedValue = roundMoney(
       money(w.collectedProduction) + money(tk.collectedProduction) + money(g.collectedProduction),
     )
@@ -299,6 +304,9 @@ export class BillingKpiRepository {
     return {
       incomeInvoicedValue,
       incomeCollectedValue,
+      incomeCollectedWoValue,
+      incomeCollectedTtkValue,
+      incomeCollectedGenericValue,
       incomeInvoicedRealValue,
       incomeCollectedRealValue,
       incomeCollectionRatePct: collectionRatePct(incomeCollectedValue, incomeInvoicedValue),

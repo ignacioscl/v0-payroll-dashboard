@@ -5,7 +5,8 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
  *  - id_author          = empleado dueño de la ponchada (FK a usuarios)
  *  - id_dealer          = empresa donde trabaja (FK a CONTRATISTA)
  *  - id_dealer_provider = provider que gestiona el payroll (tenant, filtro de seguridad)
- *  - type_payment: hourly=1, piecework=2, salary=3, flat rate=4, daily=5, holiday=6, sick=7
+ *  - id_payment_type    = tipo de pago real (FK a GENERIC_DATA, categoría 30). La copia vieja
+ *                         type_payment no se mapea (regla ttk-payment-type-column).
  */
 @Entity({ name: 'TTK_EMPLOYEE_WORK', synchronize: false })
 export class TtkEmployeeWork {
@@ -47,20 +48,9 @@ export class TtkEmployeeWork {
   @Column({ name: 'fixed_at', type: 'datetime', nullable: true })
   fixedAt?: string
 
-  @Column({ name: 'type_payment', type: 'tinyint', nullable: true })
-  typePayment?: number
+  @Column({ name: 'id_payment_type', type: 'int', nullable: true })
+  idPaymentType?: number
 
   @Column({ name: 'hourly_rate', type: 'decimal', precision: 12, scale: 2, nullable: true })
   hourlyRate?: number
-}
-
-/** type_payment legacy. */
-export enum PaymentType {
-  HOURLY = 1,
-  PIECEWORK = 2,
-  SALARY = 3,
-  FLAT_RATE = 4,
-  DAILY_PAY = 5,
-  HOLIDAY = 6,
-  SICK_DAY = 7,
 }

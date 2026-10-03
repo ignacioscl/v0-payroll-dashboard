@@ -29,6 +29,10 @@ export class CollectionsByMonthRowDto {
   @ApiProperty({ example: 50996 }) woUnbilledValue!: number
   @ApiProperty({ example: 758802.65 }) producedValue!: number
   @ApiProperty({ example: 697806.65 }) collectedValue!: number
+  /** `collectedValue` by type: the screen rounds each one like the invoiced series (no −$1 pending). */
+  @ApiProperty({ example: 25781 }) woCollectedValue!: number
+  @ApiProperty({ example: 46739.76 }) ttkCollectedValue!: number
+  @ApiProperty({ example: 625285.89 }) genericCollectedValue!: number
   @ApiProperty({ example: 10000 }) pendingCollectionValue!: number
   @ApiProperty({ example: 80.8 }) collectionRatePct!: number
   /** The same months as real money (tax + discount): only for the Outstanding AR subtitle. */
@@ -36,4 +40,8 @@ export class CollectionsByMonthRowDto {
   @ApiProperty({ example: 46739.76 }) ttkInvoicedRealValue!: number
   @ApiProperty({ example: 625300.12 }) genericInvoicedRealValue!: number
   @ApiProperty({ example: 697820.88 }) collectedRealValue!: number
+  /** `collectedRealValue` by type, for the same rounding as the real invoiced series. */
+  @ApiProperty({ example: 25781 }) woCollectedRealValue!: number
+  @ApiProperty({ example: 46739.76 }) ttkCollectedRealValue!: number
+  @ApiProperty({ example: 625300.12 }) genericCollectedRealValue!: number
 }

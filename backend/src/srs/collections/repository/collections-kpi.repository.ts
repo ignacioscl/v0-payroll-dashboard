@@ -77,12 +77,18 @@ function emptyCollectionsMonth(monthStart: string): CollectionsByMonthRowDto {
     woUnbilledValue: 0,
     producedValue: 0,
     collectedValue: 0,
+    woCollectedValue: 0,
+    ttkCollectedValue: 0,
+    genericCollectedValue: 0,
     pendingCollectionValue: 0,
     collectionRatePct: 0,
     woInvoicedRealValue: 0,
     ttkInvoicedRealValue: 0,
     genericInvoicedRealValue: 0,
     collectedRealValue: 0,
+    woCollectedRealValue: 0,
+    ttkCollectedRealValue: 0,
+    genericCollectedRealValue: 0,
   }
 }
 
@@ -307,6 +313,9 @@ export class CollectionsKpiRepository {
         woUnbilledValue,
         producedValue,
         collectedValue,
+        woCollectedValue: money(woRow?.collected),
+        ttkCollectedValue: money(ttkRow?.collected),
+        genericCollectedValue: money(genRow?.collected),
         pendingCollectionValue,
         collectionRatePct: collectionRatePct(collectedValue, invoiced),
         woInvoicedRealValue: money(woRow?.invoicedReal),
@@ -315,6 +324,9 @@ export class CollectionsKpiRepository {
         collectedRealValue: roundMoney(
           money(woRow?.collectedReal) + money(ttkRow?.collectedReal) + money(genRow?.collectedReal),
         ),
+        woCollectedRealValue: money(woRow?.collectedReal),
+        ttkCollectedRealValue: money(ttkRow?.collectedReal),
+        genericCollectedRealValue: money(genRow?.collectedReal),
       }
     })
 

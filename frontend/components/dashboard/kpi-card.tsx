@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { Check, HelpCircle, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, HelpCircle, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
@@ -70,6 +70,11 @@ interface KPICardProps {
    * alto; se usa en el Dashboard y en Punch Report.
    */
   inline?: boolean
+  /**
+   * Tarjeta `inline` que abre y cierra su detalle con el click: muestra una flecha a la
+   * derecha (girada cuando está abierta). Quien la usa decide qué subtítulo pasa en cada estado.
+   */
+  expanded?: boolean
   className?: string
 }
 
@@ -93,6 +98,7 @@ export function KPICard({
   hint,
   hintKey,
   inline = false,
+  expanded,
   className,
 }: KPICardProps) {
   const { t } = useTranslation()
@@ -250,6 +256,15 @@ export function KPICard({
           <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground sm:text-[11px]">{subtitle}</div>
         ) : null}
       </div>
+      {expanded !== undefined ? (
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform duration-200',
+            expanded && 'rotate-180',
+          )}
+          aria-hidden
+        />
+      ) : null}
     </div>
   )
 
@@ -271,7 +286,8 @@ export function KPICard({
       }
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
-      aria-pressed={isInteractive ? active : undefined}
+      aria-pressed={isInteractive && expanded === undefined ? active : undefined}
+      aria-expanded={isInteractive ? expanded : undefined}
       className={cn(
         'group relative overflow-hidden border transition-all duration-300',
         inline

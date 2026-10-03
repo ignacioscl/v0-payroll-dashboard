@@ -132,6 +132,9 @@ export default function BusinessKpisPage() {
   const [payrollWeek, setPayrollWeek] = useState(PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1].value)
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [includeZero, setIncludeZero] = useState(false)
+  // Las tres tarjetas del resumen muestran solo título y total; un click en cualquiera abre el detalle de las tres.
+  const [summaryDetailOpen, setSummaryDetailOpen] = useState(false)
+  const toggleSummaryDetail = () => setSummaryDetailOpen((open) => !open)
   const [collectionsHistoryMonths, setCollectionsHistoryMonths] = useState<CollectionsHistoryMonths>(4)
   // WO Production está oculta (sin botón): la pestaña y sus consultas siguen en el
   // código para volver a mostrarla, pero no se pide nada mientras no se elija.
@@ -270,7 +273,15 @@ export default function BusinessKpisPage() {
     invoicedShown !== undefined && unbilledShown !== undefined
       ? invoicedShown + unbilledShown
       : undefined
-  const collectedShown = pc ? dollars(pc.incomeCollectedValue) : undefined
+  // Collected se redondea igual que lo facturado: por tipo y después se suma. Redondeado una
+  // sola vez sobre el total, Unpaid daba −$1 con todo cobrado.
+  const collectedShown = pc
+    ? sumShown(
+        pc.incomeCollectedWoValue,
+        pc.incomeCollectedTtkValue,
+        pc.incomeCollectedGenericValue,
+      )
+    : undefined
   const unpaidShown =
     invoicedShown !== undefined && collectedShown !== undefined
       ? invoicedShown - collectedShown
@@ -291,7 +302,9 @@ export default function BusinessKpisPage() {
               woInvoicedValue: point.woInvoicedRealValue,
               ttkInvoicedValue: point.ttkInvoicedRealValue,
               genericInvoicedValue: point.genericInvoicedRealValue,
-              collectedValue: point.collectedRealValue,
+              woCollectedValue: point.woCollectedRealValue,
+              ttkCollectedValue: point.ttkCollectedRealValue,
+              genericCollectedValue: point.genericCollectedRealValue,
             }),
           0,
         )
@@ -428,14 +441,38 @@ export default function BusinessKpisPage() {
             <div className={KPI_CARD_GRID}>
               <KPICard
                 inline
+                onClick={toggleSummaryDetail}
+                expanded={summaryDetailOpen}
+                help={t('businessKpisHelp.income')}
+                loading={bill.isLoading}
+                title={t('businessKpis.incomeTitle')}
+                value={incomeTotalShown === undefined ? '—' : fmtDollars(incomeTotalShown)}
+                icon={<Landmark className="h-5 w-5" />}
+                variant="success"
+                subtitle={
+                  summaryDetailOpen && invoicedShown !== undefined && unbilledShown !== undefined ? (
+                    <>
+                      <p>{t('businessKpis.incomeSummaryInvoiced', { amount: fmtDollars(invoicedShown) })}</p>
+                      <p>{t('businessKpis.incomeSummaryNotInvoiced', { amount: fmtDollars(unbilledShown) })}</p>
+                      <p className="text-muted-foreground">{t('businessKpis.incomeSummaryNoTax')}</p>
+                    </>
+                  ) : (
+                    ''
+                  )
+                }
+              />
+              <KPICard
+                inline
+                onClick={toggleSummaryDetail}
+                expanded={summaryDetailOpen}
                 help={t('businessKpisHelp.collected')}
                 loading={periodColl.isLoading}
                 title={t('mockKpis.collected')}
-                value={pc ? fmtDollars(pc.incomeCollectedValue) : '—'}
+                value={collectedShown === undefined ? '—' : fmtDollars(collectedShown)}
                 icon={<DollarSign className="h-5 w-5" />}
                 variant="info"
                 subtitle={
-                  pc ? (
+                  summaryDetailOpen && pc ? (
                     <>
                       <p>{t('mockKpis.withTaxDiscount', { amount: fmtDollars(pc.incomeCollectedRealValue) })}</p>
                       <p>{t('mockKpis.collectionRate') + ': ' + pc.incomeCollectionRatePct + '%'}</p>
@@ -447,6 +484,8 @@ export default function BusinessKpisPage() {
               />
               <KPICard
                 inline
+                onClick={toggleSummaryDetail}
+                expanded={summaryDetailOpen}
                 help={t('businessKpisHelp.unpaidInPeriod')}
                 loading={bill.isLoading || periodColl.isLoading}
                 title={t('mockKpis.unpaidInPeriod')}
@@ -454,7 +493,7 @@ export default function BusinessKpisPage() {
                 icon={<Banknote className="h-5 w-5" />}
                 variant="danger"
                 subtitle={
-                  pc && unpaidRealShown !== undefined ? (
+                  summaryDetailOpen && pc && unpaidRealShown !== undefined ? (
                     <>
                       <p>
                         {t('mockKpis.withTaxDiscount', { amount: fmtDollars(unpaidRealShown) })}
@@ -487,18 +526,6 @@ export default function BusinessKpisPage() {
               <h2 className="text-lg font-semibold sm:text-xl tracking-tight text-foreground">
                 {t('businessKpis.incomeTitle')}
               </h2>
-              {invoicedShown !== undefined && unbilledShown !== undefined && incomeTotalShown !== undefined && (
-                <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs tabular-nums text-foreground">
-                  <span>{t('businessKpis.incomeSummaryInvoiced', { amount: fmtDollars(invoicedShown) })}</span>
-                  <span aria-hidden>·</span>
-                  <span>{t('businessKpis.incomeSummaryNotInvoiced', { amount: fmtDollars(unbilledShown) })}</span>
-                  <span aria-hidden>·</span>
-                  <span className="font-semibold">
-                    {t('businessKpis.incomeSummaryTotal', { amount: fmtDollars(incomeTotalShown) })}
-                  </span>
-                  <span className="text-muted-foreground">{t('businessKpis.incomeSummaryNoTax')}</span>
-                </p>
-              )}
             </div>
             <div className={KPI_CARD_GRID}>
             <KPICard

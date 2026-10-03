@@ -85,6 +85,14 @@ export class BillingPeriodCollectionKpiDto {
    */
   @ApiProperty({ example: 228000 }) incomeInvoicedValue!: number
   @ApiProperty({ example: 178500 }) incomeCollectedValue!: number
+  /**
+   * `incomeCollectedValue` abierto por tipo, sin redondear a dólares. La pantalla redondea cada
+   * tarjeta facturada por separado; lo cobrado se redondea igual (por tipo) para que Unpaid no dé
+   * −$1 cuando todo está cobrado.
+   */
+  @ApiProperty({ example: 90000 }) incomeCollectedWoValue!: number
+  @ApiProperty({ example: 60000 }) incomeCollectedTtkValue!: number
+  @ApiProperty({ example: 28500 }) incomeCollectedGenericValue!: number
   /** Las mismas líneas, con tax y descuento (plata real): los subtítulos de Collected y Unpaid. */
   @ApiProperty({ example: 230000 }) incomeInvoicedRealValue!: number
   @ApiProperty({ example: 180000 }) incomeCollectedRealValue!: number

@@ -169,6 +169,12 @@ describe('punch-list SQL compartido', () => {
     expect(without.fromWhere).toBe(withAmounts.fromWhere)
   })
 
+  it('con permiso de importes el tipo sale de tew.id_payment_type, nunca de tew.type_payment', () => {
+    const withAmounts = buildPunchListExportSql(filter, { ...opts, includeAmounts: true })
+    expect(withAmounts.sql).not.toContain('tew.type_payment')
+    expect(withAmounts.sql).toMatch(/tew\.id_payment_type\s+AS type_payment/)
+  })
+
   it('si no se pasa includeAmounts, no selecciona tew.hourly_rate', () => {
     const omitted = buildPunchListExportSql(filter, { issueType: 'all' })
     expect(omitted.sql).not.toContain('tew.hourly_rate')

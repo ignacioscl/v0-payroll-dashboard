@@ -1466,6 +1466,8 @@ export const es: Messages = {
     unpaidInPeriod:
       'WO Invoiced + TTK Invoiced + Generic Invoiced, menos Cobrado: los mismos números que muestran esas cards, con el descuento de cada factura y sin impuesto. Subtítulo: lo mismo con impuesto y descuento, cuántas facturas tienen al menos una línea del período sin cobrar, y el valor de OT todavía sin facturar (WO sin facturar).',
     dso: 'Días promedio desde la emisión de la factura hasta recibir el pago.',
+    income:
+      'Ingresos totales del período: TTK, Generic y WO facturados más las WO terminadas sin facturar. No incluye impuestos.',
     collected:
       'Monto cobrado de exactamente las líneas de WO Invoiced, TTK Invoiced y Generic Invoiced, valorado como esas cards (el trabajo facturado con el descuento de su factura, sin impuesto). El subtítulo es la plata real, con impuesto y descuento. Una línea está cobrada si tiene su propio pago activo o su factura está paga entera. Un pago de trabajo de otro mes no cuenta acá.',
     collectionRate: 'Porcentaje del total facturado en el período que ya se cobró.',

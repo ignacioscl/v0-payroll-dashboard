@@ -8,15 +8,23 @@ export function sumShown(...ns: number[]): number {
   return ns.reduce((acc, n) => acc + dollars(n), 0)
 }
 
+/**
+ * Invoiced − collected with the numbers on screen. Both sides are rounded the same way, type by
+ * type (WO, TTK, Generic): rounding the collected money once over its total gave −$1 with
+ * everything collected. No clamp to 0: by type the collected money never exceeds the invoiced
+ * money, so a negative result would be a data problem to look at, not to hide.
+ */
 export function shownPending(point: {
   woInvoicedValue: number
   ttkInvoicedValue: number
   genericInvoicedValue: number
-  collectedValue: number
+  woCollectedValue: number
+  ttkCollectedValue: number
+  genericCollectedValue: number
 }): number {
   return (
     sumShown(point.woInvoicedValue, point.ttkInvoicedValue, point.genericInvoicedValue) -
-    dollars(point.collectedValue)
+    sumShown(point.woCollectedValue, point.ttkCollectedValue, point.genericCollectedValue)
   )
 }
 

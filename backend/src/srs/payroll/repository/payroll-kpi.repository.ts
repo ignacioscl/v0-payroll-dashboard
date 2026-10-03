@@ -4,20 +4,9 @@ import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { WorkflowStatus } from '../../production/entity/workflow.srsentity'
-import { PaymentType } from '../entity/ttk-employee-work.srsentity'
 import { PayrollKpiDto } from '../dto/payroll-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { buildDealerFilterSql } from '../../shared/kpi/srs-kpi-dealer-filter'
-
-const PAYMENT_TYPE_LABEL: Record<number, string> = {
-  [PaymentType.HOURLY]: 'hourly',
-  [PaymentType.PIECEWORK]: 'piecework',
-  [PaymentType.SALARY]: 'salary',
-  [PaymentType.FLAT_RATE]: 'flatRate',
-  [PaymentType.DAILY_PAY]: 'dailyPay',
-  [PaymentType.HOLIDAY]: 'holiday',
-  [PaymentType.SICK_DAY]: 'sickDay',
-}
 
 @Injectable()
 export class PayrollKpiRepository {
@@ -76,15 +65,19 @@ export class PayrollKpiRepository {
 
   async getPayrollByType(filter: SrsKpiFilter): Promise<{ type: string; value: number }[]> {
     const ttk = buildDealerFilterSql('ttk', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    // Tipo de pago real (id_payment_type) con su nombre de GENERIC_DATA; nunca la copia
+    // vieja type_payment (regla ttk-payment-type-column).
     const rows = await this.srs.query(
-      `SELECT tew.type_payment                                  AS typePayment,
+      `SELECT tew.id_payment_type                               AS idPaymentType,
+              gd.name                                           AS name,
               IFNULL(SUM(TTK_CALCULATE_PAYMENT_JSON(tew.id, NULL)), 0) AS value
        FROM TTK_EMPLOYEE_WORK tew
        ${ttk.join}
+       LEFT JOIN GENERIC_DATA gd ON gd.id = tew.id_payment_type
        WHERE tew.estado = 1 AND tew.id_dealer_provider = ?
          ${ttk.and}
          AND tew.fecha BETWEEN ? AND ?
-       GROUP BY tew.type_payment`,
+       GROUP BY tew.id_payment_type, gd.name`,
       [
         filter.idDealerProvider,
         ...ttk.params,
@@ -93,7 +86,7 @@ export class PayrollKpiRepository {
       ],
     )
     return rows.map((r: any) => ({
-      type: PAYMENT_TYPE_LABEL[Number(r.typePayment)] ?? `type_${r.typePayment}`,
+      type: r.name ?? '(without)',
       value: Number(r.value),
     }))
   }

@@ -131,9 +131,12 @@ export function buildPunchListSelectFields(
     opts.includeErrorType === true
       ? `TTK_PUNCH_WITH_ERROR_V2(tew.id,'')       AS error_type,`
       : ''
+  // typePayment = id_payment_type, igual que ttk-list.php:180 y el alias de
+  // TTKEmployeeReportDao::getFrom; nunca la copia vieja type_payment (regla
+  // ttk-payment-type-column). El alias se mantiene por el contrato del DTO.
   const amountFields = includeAmounts
     ? `tew.hourly_rate                          AS hourly_rate,
-  tew.type_payment                         AS type_payment,`
+  tew.id_payment_type                      AS type_payment,`
     : `NULL                                     AS hourly_rate,
   NULL                                     AS type_payment,`
   const paymentTypeFields = includePaymentTypeName

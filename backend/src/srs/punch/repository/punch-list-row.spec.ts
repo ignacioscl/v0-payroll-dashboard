@@ -37,4 +37,13 @@ describe('mapPunchListRow', () => {
     expect(row.hourlyRate).toBe(25)
     expect(row.typePayment).toBe(4)
   })
+
+  it('ponchada sin tipo de pago (ej. 818201): typePayment y objPaymentType en null', () => {
+    const row = mapPunchListRow(
+      { ...raw, hourly_rate: null, type_payment: null, id_payment_type: null, payment_type_name: null },
+      { includeAmounts: true, includePaymentTypeName: true },
+    )
+    expect(row.typePayment).toBeNull()
+    expect(row.objPaymentType).toBeNull()
+  })
 })

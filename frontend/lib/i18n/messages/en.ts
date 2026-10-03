@@ -1462,6 +1462,8 @@ export const en: Messages = {
     unpaidInPeriod:
       'WO Invoiced + TTK Invoiced + Generic Invoiced, minus Collected: the same numbers shown on those cards, with the discount of each invoice and no tax. Subtitle: the same with tax and discount, how many invoices have at least one uncollected line in the period, and the WO value not invoiced yet (WO Not Invoiced).',
     dso: 'Average days from issuing an invoice to receiving payment.',
+    income:
+      'Total income for the period: invoiced TTK, Generic and WO plus WO done but not invoiced. Does not include tax.',
     collected:
       'Amount collected on exactly the lines of WO Invoiced, TTK Invoiced and Generic Invoiced, valued like those cards (the work billed with the discount of its invoice, no tax). Subtitle is the actual money, with tax and discount. A line is collected if it has its own active payment or its invoice was paid in full. Payments on work from other months do not count here.',
     collectionRate: 'Share of the period invoice total that has been collected.',
