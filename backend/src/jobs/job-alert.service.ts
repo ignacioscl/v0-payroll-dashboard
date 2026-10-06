@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 
-import { EmailService } from '../commons/email/service/email.service'
+import { EmailService } from '../commons/email/email.service'
 import { JobRun } from '../features/job-run/entity/job-run.jobsentity'
 import { JobRunService, utcNow } from '../features/job-run/service/job-run.service'
 import { JobRunLogService } from '../features/job-run-log/service/job-run-log.service'
@@ -9,8 +9,13 @@ import { areJobAlertsEnabled } from './jobs-env'
 const ONE_HOUR_MS = 3_600_000
 
 /**
- * Alertas por email de los jobs. Asunto y cuerpo son internos (los lee Ignacio), nunca van a un
- * cliente. Fuera de producción no sale nada: la alerta queda como línea `warn` en el log.
+ * Alertas por email de los jobs, en texto plano por el módulo de email (plans/plan-nest-email §9).
+ * Asunto y cuerpo son internos (los lee Juan / Ignacio), nunca van a un cliente.
+ *
+ * Dos compuertas: los jobs deciden si *piden* la alerta (`areJobAlertsEnabled()`: en dev solo con
+ * `JOBS_DEV_FORCE=true`; si no, queda «alert suppressed in development» en el log) y el módulo de
+ * email decide si *sale* (en dev solo con `EMAIL_DEV_REDIRECT_TO`, y a esa casilla). `alert_sent_at`
+ * se marca solo si salió de verdad (`status: 'sent'`).
  */
 @Injectable()
 export class JobAlertService {
@@ -68,18 +73,21 @@ export class JobAlertService {
       await this.logs.append(runId, 'warn', 'alerta no enviada: falta JOBS_ALERT_EMAIL')
       return false
     }
-    const ok = await this.email.sendEmail({ to, subject, text, html: `<pre>${escapeHtml(text)}</pre>` })
-    await this.logs.append(runId, ok ? 'info' : 'warn', ok ? `alerta enviada a ${to}` : 'no se pudo enviar la alerta')
-    if (!ok) this.logger.warn(`[run ${runId}] no se pudo enviar la alerta a ${to}`)
-    return ok
+    const result = await this.email.send({ purpose: 'job-alert', audience: 'internal', to, subject, text })
+    const sent = result.status === 'sent'
+    const detail =
+      result.status === 'sent'
+        ? `alerta enviada a ${to}${result.mode === 'redirect' ? ` (redirigida a ${result.to.join(', ')})` : ''}`
+        : result.status === 'suppressed'
+        ? `alerta suprimida (email ${result.mode}: ${result.reason})`
+        : `no se pudo enviar la alerta: ${result.error}`
+    await this.logs.append(runId, sent ? 'info' : 'warn', detail)
+    if (!sent) this.logger.warn(`[run ${runId}] ${detail}`)
+    return sent
   }
 
   private runsLink(jobName: string): string {
     const base = (process.env.API_ENDPOINT ?? '').replace(/\/+$/, '')
     return `${base}/api/jobs/runs?name=${encodeURIComponent(jobName)}`
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

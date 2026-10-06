@@ -1,0 +1,7 @@
+{{!-- Smoke test del CLI (email.cli.js send): prueba el layout y que las plantillas llegaron a dist. Interno. --}}
+{{#> layout title=subject}}
+  <p style="margin:0 0 16px;font-size:20px;font-weight:bold;">{{subject}}</p>
+  <p style="margin:0 0 12px;">This is a test email from the SRS Suite backend.</p>
+  <p style="margin:0 0 12px;">Host: {{hostname}}<br>Mode: {{mode}}<br>Sent at (UTC): {{sentAt}}</p>
+  <p style="margin:0;">If you received it, the backend email configuration works.</p>
+{{/layout}}

@@ -1,4 +1,7 @@
 {
   "collection": "@nestjs/schematics",
-  "sourceRoot": "src/features"
+  "sourceRoot": "src/features",
+  "compilerOptions": {
+    "assets": [{ "include": "../commons/email/templates/**/*.hbs", "outDir": "dist/commons" }]
+  }
 }

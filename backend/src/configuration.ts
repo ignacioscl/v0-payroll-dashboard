@@ -8,11 +8,4 @@ export default () => ({
   initAdmin: process.env.INIT_ADMIN,
   initAdminPassword: process.env.INIT_ADMIN_PASSWORD,
   apiEndpoint: process.env.API_ENDPOINT,
-  emailHost: process.env.EMAIL_HOST,
-  emailPort: process.env.EMAIL_PORT,
-  emailSecure: process.env.EMAIL_SECURE,
-  emailUser: process.env.EMAIL_USER,
-  emailPass: process.env.EMAIL_PASS,
-  emailFrom: process.env.EMAIL_FROM,
-  frontendUrl: process.env.FRONTEND_URL,
 })

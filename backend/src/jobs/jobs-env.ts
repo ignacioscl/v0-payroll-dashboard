@@ -9,7 +9,8 @@
  * | Corrida manual         | anda                               | anda (escribe en la base local)  |
  *
  * `JOBS_DEV_FORCE=true` hace que dev se comporte como producción para probar cron y alertas en
- * local. Nunca va a prod ni a `.env.template`.
+ * local. Nunca va a prod ni a `.env.template`. Con eso los jobs *piden* la alerta; el módulo de email
+ * la deja salir solo con `EMAIL_DEV_REDIRECT_TO`, y a esa casilla (plans/plan-nest-email §8.4).
  */
 
 /** NODE_ENV=production (el mismo valor que `configuration.ts` expone como `nodeEnv`). */

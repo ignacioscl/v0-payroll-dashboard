@@ -9,7 +9,7 @@
     "prebuild": "rimraf dist",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "npm run copy-public && nest start --watch --entryFile main",
+    "start": "npm run copy-public && nest start --watch --watchAssets --entryFile main",
     "copy-public": "mkdirp dist/public && ncp public dist/public",
     "debug": "nest start --debug --watch --entryFile main",
     "start:prod": "node dist/main",
@@ -30,7 +30,6 @@
   },
   "dependencies": {
     "@json2csv/node": "^7.0.6",
-    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/axios": "^3.0.2",
     "@nestjs/common": "^10.2.6",
     "@nestjs/config": "^3.1.1",

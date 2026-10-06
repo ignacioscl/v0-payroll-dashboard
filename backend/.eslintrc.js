@@ -56,12 +56,30 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-non-null-assertion': 0,
     '@typescript-eslint/explicit-module-boundary-types': 0,
+    // Una sola puerta para el email (regla nest-email-module.mdc): nodemailer, handlebars y
+    // @nestjs-modules/mailer solo dentro de src/commons/email (override de abajo). Con el lint
+    // apagado (.eslintignore) lo controla src/commons/email/email.boundary.spec.ts.
     'no-restricted-imports': [
       'error',
       {
-        paths: ['src', 'build'],
-        patterns: ['src/*', 'build/*'],
+        paths: [
+          'src',
+          'build',
+          { name: 'nodemailer', message: 'Todo mail del Nest sale por EmailService (src/commons/email).' },
+          { name: 'handlebars', message: 'Las plantillas de email viven en src/commons/email.' },
+          { name: '@nestjs-modules/mailer', message: 'Todo mail del Nest sale por EmailService (src/commons/email).' },
+        ],
+        patterns: ['src/*', 'build/*', 'nodemailer/*', 'handlebars/*', '@nestjs-modules/mailer/*'],
       },
     ],
   },
+  overrides: [
+    {
+      // En un override la regla reemplaza a la de arriba (no se mezcla): se repite sin los del email.
+      files: ['src/commons/email/**/*.ts'],
+      rules: {
+        'no-restricted-imports': ['error', { paths: ['src', 'build'], patterns: ['src/*', 'build/*'] }],
+      },
+    },
+  ],
 }
