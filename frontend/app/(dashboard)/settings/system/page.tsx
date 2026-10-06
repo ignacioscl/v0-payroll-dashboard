@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 import { VisualSettingsForm } from '@/components/settings/visual-settings-form'
+import { JobsMonitor } from '@/components/settings/jobs-monitor'
+import { useQuery } from '@tanstack/react-query'
+import { fetchJobRuns } from '@/lib/jobs-api'
 import { getAppTitle } from '@/lib/branding'
 import {
   useInvoiceNoteStatuses,
@@ -26,6 +29,16 @@ export default function SystemConfigPage() {
   const canAccess = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const { data, isLoading, error } = useInvoiceNoteStatuses(canAccess)
   const updateLabel = useUpdateInvoiceNoteStatusLabel()
+  // Tab Jobs: únicamente el Admin General. El front no distingue al Admin General del Admin Company
+  // (`isSystemAdmin` incluye a los dos): se muestra solo si el backend responde 200 (al resto, 403).
+  const jobsProbe = useQuery({
+    queryKey: ['jobs', 'probe'],
+    queryFn: () => fetchJobRuns('', 1),
+    enabled: canAccess,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+  const canSeeJobs = jobsProbe.isSuccess
   const [drafts, setDrafts] = useState<Record<number, string>>({})
 
   useEffect(() => {
@@ -83,6 +96,11 @@ export default function SystemConfigPage() {
           <TabsTrigger value="visual" className="cursor-pointer">
             {t('visualSettings.title')}
           </TabsTrigger>
+          {canSeeJobs ? (
+            <TabsTrigger value="jobs" className="cursor-pointer">
+              {t('systemConfig.jobsTab')}
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -133,6 +151,12 @@ export default function SystemConfigPage() {
         <TabsContent value="visual">
           <VisualSettingsForm companyName={getAppTitle(user)} />
         </TabsContent>
+
+        {canSeeJobs ? (
+          <TabsContent value="jobs">
+            <JobsMonitor />
+          </TabsContent>
+        ) : null}
       </Tabs>
 
       <Link href="/" className="text-sm text-primary hover:underline">

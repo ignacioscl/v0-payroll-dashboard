@@ -46,7 +46,11 @@ import {
 } from '@/components/ui/sheet'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
-import { canAccessBusinessKpis, canAccessBillingInvoices } from '@/lib/auth/payroll-access'
+import {
+  canAccessBusinessKpis,
+  canAccessBillingInvoices,
+  canAccessProductionReport,
+} from '@/lib/auth/payroll-access'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 import { getAppTitle } from '@/lib/branding'
@@ -107,6 +111,7 @@ function SidebarInner({
     isDev: isDevEnvironment(),
     canAccessTtk,
     canAccessProdKpis: canAccessBusinessKpis(user, hasPermission),
+    canAccessProductionGoal: canAccessProductionReport(user, hasPermission),
     canAccessBillingInvoices: canAccessBillingInvoices(user, hasPermission),
     canViewRoles: canViewRoles(hasPermission, user?.isSystemAdmin),
     canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),

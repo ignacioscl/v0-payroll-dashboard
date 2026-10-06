@@ -7,6 +7,7 @@ import {
   canAccessBillingInvoices,
   canAccessBusinessKpis,
   canAccessPayrollDashboard,
+  canAccessProductionReport,
 } from '@/lib/auth/payroll-access'
 import { canAccessDailyPunch, canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
@@ -23,6 +24,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
   const canAccessDashboard = canAccessPayrollDashboard(user)
   const canAccessTtk = canAccessDailyPunch(hasPermission, user?.isSystemAdmin)
   const canAccessProdKpis = canAccessBusinessKpis(user, hasPermission)
+  const canAccessProductionGoal = canAccessProductionReport(user, hasPermission)
   const canAccessBilling = canAccessBillingInvoices(user, hasPermission)
   const canAccessRoles = canViewRoles(hasPermission, user?.isSystemAdmin)
   const canAccessRoleTemplates = canManageRoleTemplates(hasPermission, user?.isSystemAdmin)
@@ -56,6 +58,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
         canAccessRoles,
         canAccessRoleTemplates,
         canAccessSettings,
+        canAccessProductionGoal,
       )
     ) {
       router.replace(homeFallback)
@@ -66,6 +69,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     canAccessDashboard,
     hasAnyModule,
     canAccessProdKpis,
+    canAccessProductionGoal,
     canAccessBilling,
     canAccessRoles,
     canAccessRoleTemplates,

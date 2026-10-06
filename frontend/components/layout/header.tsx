@@ -18,6 +18,7 @@ import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
+import { resolveOpenRange, type InvoiceDateMode } from '@/lib/filters/date-range-open-ends'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -48,6 +49,8 @@ export function Header() {
     invoiceDateTo,
     setInvoiceDateFrom,
     setInvoiceDateTo,
+    invoiceDateMode,
+    setInvoiceDateMode,
     invoiceIgnorePeriod,
     setInvoiceIgnorePeriod,
     invoiceIgnorePeriodLocked,
@@ -78,7 +81,16 @@ export function Header() {
     [invoiceDateFrom, invoiceDateTo],
   )
   const setInvoiceRange = useCallback(
-    (next: DateRange | undefined) => {
+    (next: DateRange | undefined, mode: InvoiceDateMode = 'range') => {
+      // «From» / «Until»: el extremo abierto se convierte acá en una fecha concreta (hoy o
+      // 01/01/2015) y modo y fechas se escriben juntos, así nunca quedan desparejos.
+      if (mode !== 'range' && next?.from) {
+        const resolved = resolveOpenRange(mode, next.from)
+        setInvoiceDateFrom(resolved.from)
+        setInvoiceDateTo(resolved.to)
+        setInvoiceDateMode(mode)
+        return
+      }
       // Sin fechas el listado no carga (el backend exige fechaDesde/fechaHasta aunque se
       // ignore el período), así que «Clear» vuelve al rango por defecto, igual que
       // `clearFilters()`. Si no, limpiar dejaría la pantalla en un cartel sin salida.
@@ -86,8 +98,9 @@ export function Header() {
       setInvoiceDateFrom(range.from)
       // Un solo día elegido = desde y hasta el mismo día, no un "hasta" vacío.
       setInvoiceDateTo(range.to ?? range.from)
+      setInvoiceDateMode('range')
     },
-    [setInvoiceDateFrom, setInvoiceDateTo],
+    [setInvoiceDateFrom, setInvoiceDateTo, setInvoiceDateMode],
   )
 
   const showStatusFilter = pathname === '/schedule'
@@ -116,6 +129,9 @@ export function Header() {
   const invoiceRangeProps = {
     value: invoiceRange,
     onChange: setInvoiceRange,
+    // Range / From / Until: solo Invoices (plans/plan-payroll-spend §1 bis).
+    openEnds: true,
+    mode: invoiceDateMode,
     ignorable: true,
     ignored: invoiceIgnorePeriod,
     onIgnoredChange: setInvoiceIgnorePeriod,

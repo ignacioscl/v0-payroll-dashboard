@@ -188,11 +188,9 @@ export function KPICard({
 
   const isInteractive = typeof onClick === 'function'
 
-  const valueNode = loading ? (
-    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-  ) : (
+  const inlineValueSpan = (
     <motion.span
-      key={String(value)}
+      key={String(displayedValue)}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
@@ -200,8 +198,27 @@ export function KPICard({
         excluded && !inactive ? 'text-muted-foreground line-through' : 'text-foreground',
       )}
     >
-      {value}
+      {displayedValue}
     </motion.span>
+  )
+  // Con `valueFull` el número abreviado ($745.9k) se abre al monto completo con un click, igual que
+  // en la tarjeta grande.
+  const valueNode = loading ? (
+    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+  ) : canExpandValue ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        setValueExpanded((prev) => !prev)
+      }}
+      aria-expanded={valueExpanded}
+      className="cursor-pointer rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      {inlineValueSpan}
+    </button>
+  ) : (
+    inlineValueSpan
   )
 
   // Una sola fila: ícono, número y al lado el título con el subtítulo. El número va

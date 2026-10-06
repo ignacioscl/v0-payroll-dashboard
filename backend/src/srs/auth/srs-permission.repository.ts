@@ -17,6 +17,12 @@ export const ROL_ACCION_BILLING_DISTRICT = 69
 /** Invoices > Delete Generic Service — catalog soft-delete from the generic invoice modal. */
 export const ROL_ACCION_GENERIC_SERVICE_DELETE = 145
 
+/**
+ * Time Tracking > Payroll (legacy `show-rol-action-93`, menú Payroll Excel Report). Montos de
+ * payroll: tab Payroll Spend y endpoints `/srs/kpis/payroll` (plans/plan-payroll-spend, decisión C).
+ */
+export const ROL_ACCION_TTK_PAYROLL = 93
+
 /** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 

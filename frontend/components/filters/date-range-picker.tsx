@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { Calendar, CalendarOff, Check, Lock, X } from 'lucide-react'
-import type { DateRange } from 'react-day-picker'
+import {
+  ArrowLeftToLine,
+  ArrowRightFromLine,
+  Calendar,
+  CalendarOff,
+  Check,
+  Lock,
+  MoveHorizontal,
+  X,
+} from 'lucide-react'
+import type { DateRange, Matcher } from 'react-day-picker'
 import { enUS as enUSDayPicker, es as esDayPicker } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
@@ -15,7 +24,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
+import {
+  isInvoiceDateMode,
+  openRangeDay,
+  type InvoiceDateMode,
+} from '@/lib/filters/date-range-open-ends'
 import {
   matchPreset,
   resolvePresetRange,
@@ -33,9 +48,29 @@ export function maxInclusiveHastaFromDesde(from: Date): Date {
   return max
 }
 
+/** Días que abarca «From» (después del elegido, hasta hoy) o «Until» (antes del elegido). */
+function openRangeMatcher(mode: InvoiceDateMode, day: Date | undefined): Matcher | Matcher[] {
+  if (!day || mode === 'range') return []
+  if (mode === 'until') return { before: day }
+  const now = new Date()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return { after: day, before: tomorrow }
+}
+
 interface DateRangePickerProps {
   value?: DateRange
-  onChange?: (range: DateRange | undefined) => void
+  /**
+   * Con `openEnds`, el segundo argumento dice cómo se eligió: en «From» / «Until» `range.from` es
+   * el día elegido y quien llama resuelve el extremo abierto. Sin `openEnds`, siempre `range`.
+   */
+  onChange?: (range: DateRange | undefined, mode?: InvoiceDateMode) => void
+  /**
+   * Opt-in (solo Invoices): fila «Range · From · Until» arriba del switch de ignorar. Sin esta prop
+   * el componente se ve y funciona exactamente como antes.
+   */
+  openEnds?: boolean
+  /** Modo actual (con `openEnds`): define el texto del botón y el día que abre el calendario. */
+  mode?: InvoiceDateMode
   placeholder?: string
   className?: string
   numberOfMonths?: number
@@ -73,6 +108,8 @@ export function DateRangePicker({
   onIgnoredChange,
   ignoreLocked,
   ignoreHint,
+  openEnds,
+  mode,
 }: DateRangePickerProps) {
   const { t, locale } = useTranslation()
   const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
@@ -83,9 +120,22 @@ export function DateRangePicker({
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<DateRange | undefined>(value)
   const [draftIgnored, setDraftIgnored] = useState(Boolean(ignored))
+  const currentMode: InvoiceDateMode = openEnds && mode ? mode : 'range'
+  const [draftMode, setDraftMode] = useState<InvoiceDateMode>(currentMode)
+  const [draftDay, setDraftDay] = useState<Date | undefined>(openRangeDay(currentMode, value))
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Celular (por debajo de sm, 640 px): el calendario muestra un solo mes.
+  const [isPhone, setIsPhone] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsPhone(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
   }, [])
 
   // Forzado desde afuera: el botón muestra el candado y el popover no abre.
@@ -97,27 +147,42 @@ export function DateRangePicker({
     if (nextOpen) {
       setDraft(value)
       setDraftIgnored(Boolean(ignored))
+      setDraftMode(currentMode)
+      setDraftDay(openRangeDay(currentMode, value))
     }
     setOpen(nextOpen)
   }
 
-  const activePresetKey = mounted ? matchPreset(value) : null
+  // Al pasar a «From» / «Until» se arranca del extremo que corresponde del rango que había.
+  const handleModeChange = (next: string) => {
+    if (!isInvoiceDateMode(next)) return
+    if (next !== 'range' && draftMode === 'range') setDraftDay(openRangeDay(next, draft))
+    if (next === 'range' && draftMode !== 'range' && draftDay) setDraft({ from: draftDay, to: draftDay })
+    setDraftMode(next)
+  }
+  const singleDay = draftMode !== 'range'
+
+  const activePresetKey = mounted && currentMode === 'range' ? matchPreset(value) : null
   const showPresets = resolvedPresets.length > 0
 
   const handlePreset = (preset: DateRangePreset) => {
     const range = resolvePresetRange(preset)
-    onChange?.(range)
+    onChange?.(range, 'range')
     setOpen(false)
   }
 
   const handleApply = () => {
-    onChange?.(draft)
+    if (singleDay) {
+      onChange?.(draftDay ? { from: draftDay, to: draftDay } : undefined, draftMode)
+    } else {
+      onChange?.(draft, 'range')
+    }
     if (ignorable) onIgnoredChange?.(draftIgnored)
     setOpen(false)
   }
 
   const handleClear = () => {
-    onChange?.(undefined)
+    onChange?.(undefined, 'range')
     setDraft(undefined)
     if (ignorable) {
       onIgnoredChange?.(false)
@@ -151,7 +216,13 @@ export function DateRangePicker({
       ) : (
         <>
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          {mounted && value?.from ? (
+          {mounted && currentMode !== 'range' && openRangeDay(currentMode, value) ? (
+            <span className="text-foreground tabular-nums">
+              {t(currentMode === 'from' ? 'filters.dateModeFromButton' : 'filters.dateModeUntilButton', {
+                date: format(openRangeDay(currentMode, value)!, 'MM/dd/yyyy'),
+              })}
+            </span>
+          ) : mounted && value?.from ? (
             value.to ? (
               <span className="text-foreground tabular-nums">
                 {format(value.from, 'MM/dd/yyyy')} – {format(value.to, 'MM/dd/yyyy')}
@@ -186,12 +257,19 @@ export function DateRangePicker({
       ) : (
         triggerNode
       )}
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        // En todos los tamaños: nunca más alto que lo visible, con scroll vertical adentro y la fila
+        // Clear / Apply pegada abajo (en una ventana baja se abría hacia arriba y tapaba el mes y las
+        // flechas). Celular (< sm): además, nunca más ancho que la pantalla.
+        className="w-auto max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden p-0 max-sm:w-[calc(100vw-1rem)]"
+        align="start"
+        collisionPadding={8}
+      >
         <div className="flex flex-col sm:flex-row">
           {showPresets && (
             <div
               className={cn(
-                'flex shrink-0 flex-row gap-1 border-b border-border p-2 sm:flex-col sm:border-b-0 sm:border-r sm:p-3',
+                'flex shrink-0 flex-row flex-wrap gap-1 border-b border-border p-2 sm:flex-col sm:flex-nowrap sm:border-b-0 sm:border-r sm:p-3',
                 datesMuted && 'pointer-events-none opacity-40',
               )}
             >
@@ -216,29 +294,90 @@ export function DateRangePicker({
             </div>
           )}
 
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-col">
             <div className={cn(datesMuted && 'pointer-events-none opacity-40')}>
-              <CalendarComponent
-                mode="range"
-                selected={draft}
-                onSelect={setDraft}
-                defaultMonth={draft?.from}
-                numberOfMonths={numberOfMonths}
-                locale={dayPickerLocale}
-                disabled={
-                  datesMuted
-                    ? true
-                    : maxRangeYears === 1 && draft?.from
-                      ? { after: maxInclusiveHastaFromDesde(draft.from) }
-                      : undefined
-                }
-              />
+              {singleDay ? (
+                <CalendarComponent
+                  mode="single"
+                  selected={draftDay}
+                  onSelect={setDraftDay}
+                  defaultMonth={draftDay}
+                  numberOfMonths={isPhone ? 1 : numberOfMonths}
+                  // Celular: días un poco más chicos para que el mes entre entero en pantallas angostas.
+                  className="max-sm:p-2 max-sm:[--cell-size:--spacing(7)]"
+                  locale={dayPickerLocale}
+                  disabled={datesMuted ? true : undefined}
+                  // Los días que entran se pintan como el medio de un rango (MAQUETA-selector-fechas):
+                  // «From» del día siguiente hasta hoy; «Until» todos los anteriores al elegido.
+                  modifiers={{ openRange: openRangeMatcher(draftMode, draftDay) }}
+                  modifiersClassNames={{
+                    openRange:
+                      'rounded-none [&>button]:rounded-none [&>button]:bg-accent [&>button]:text-accent-foreground',
+                  }}
+                />
+              ) : (
+                <CalendarComponent
+                  mode="range"
+                  selected={draft}
+                  onSelect={setDraft}
+                  defaultMonth={draft?.from}
+                  numberOfMonths={isPhone ? 1 : numberOfMonths}
+                  // Celular: días un poco más chicos para que el mes entre entero en pantallas angostas.
+                  className="max-sm:p-2 max-sm:[--cell-size:--spacing(7)]"
+                  locale={dayPickerLocale}
+                  disabled={
+                    datesMuted
+                      ? true
+                      : maxRangeYears === 1 && draft?.from
+                        ? { after: maxInclusiveHastaFromDesde(draft.from) }
+                        : undefined
+                  }
+                />
+              )}
             </div>
+
+            {openEnds && (
+              <div
+                className={cn(
+                  'flex flex-col items-stretch gap-1.5 border-t border-border px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3',
+                  datesMuted && 'pointer-events-none opacity-40',
+                )}
+              >
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={draftMode}
+                  onValueChange={handleModeChange}
+                  disabled={datesMuted}
+                  className="w-full shrink-0 sm:w-fit"
+                  aria-label={t('filters.dateRange')}
+                >
+                  <ToggleGroupItem value="range" className="cursor-pointer gap-1.5 px-3">
+                    <MoveHorizontal className="h-3.5 w-3.5" aria-hidden />
+                    {t('filters.dateModeRange')}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="from" className="cursor-pointer gap-1.5 px-3">
+                    <ArrowRightFromLine className="h-3.5 w-3.5" aria-hidden />
+                    {t('filters.dateModeFrom')}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="until" className="cursor-pointer gap-1.5 px-3">
+                    <ArrowLeftToLine className="h-3.5 w-3.5" aria-hidden />
+                    {t('filters.dateModeUntil')}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                {singleDay ? (
+                  <span className="text-left text-[11px] leading-tight text-muted-foreground sm:max-w-[26ch] sm:text-right">
+                    {t(draftMode === 'from' ? 'filters.dateModeFromHelp' : 'filters.dateModeUntilHelp')}
+                  </span>
+                ) : null}
+              </div>
+            )}
 
             {ignorable && (
               <div
                 className={cn(
-                  'flex items-center justify-between gap-3 border-t border-border px-3 py-2',
+                  'flex flex-col items-start gap-1.5 border-t border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3',
                   draftIgnored && 'bg-amber-500/10',
                 )}
               >
@@ -256,14 +395,14 @@ export function DateRangePicker({
                   </Label>
                 </div>
                 {ignoreHint ? (
-                  <span className="max-w-[26ch] text-right text-[11px] leading-tight text-muted-foreground">
+                  <span className="text-left text-[11px] leading-tight text-muted-foreground sm:max-w-[26ch] sm:text-right">
                     {ignoreHint}
                   </span>
                 ) : null}
               </div>
             )}
 
-            <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">
+            <div className="sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t border-border bg-popover px-3 py-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -276,7 +415,7 @@ export function DateRangePicker({
               <Button
                 size="sm"
                 onClick={handleApply}
-                disabled={!draft?.from && !draftIgnored}
+                disabled={(singleDay ? !draftDay : !draft?.from) && !draftIgnored}
               >
                 <Check />
                 {t('common.apply')}

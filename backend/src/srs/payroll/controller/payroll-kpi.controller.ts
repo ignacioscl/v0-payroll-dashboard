@@ -5,7 +5,7 @@ import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { PayrollKpiService } from '../service/payroll-kpi.service'
-import { PayrollByTypeRowDto, PayrollKpiDto } from '../dto/payroll-kpi.dto'
+import { PayrollByTypeRowDto, PayrollKpiDto, PayrollSpendDto } from '../dto/payroll-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/payroll')
@@ -21,6 +21,16 @@ export class PayrollKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<PayrollKpiDto> {
     return this.service.getPayrollKpis(request.srsContext, query)
+  }
+
+  /** Tab Payroll Spend: snapshot diario con las fechas y los dealers del header. */
+  @Get('/spend')
+  @ApiOkResponse({ type: PayrollSpendDto })
+  async getPayrollSpend(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<PayrollSpendDto> {
+    return this.service.getSpend(request.srsContext, query)
   }
 
   @Get('/by-type')

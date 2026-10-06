@@ -19,6 +19,9 @@ export interface EmailOptions {
   }>
 }
 
+/** El email de bienvenida de usuarios Suite queda apagado (ver sendWelcomeEmail). */
+const WELCOME_EMAIL_ENABLED = false
+
 export interface EmailTemplate {
   subject: string
   template: string
@@ -32,10 +35,15 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {
     this.loadTemplates()
-    // Inicializar el transporter de forma asíncrona
-    /*this.initializeTransporter().catch(error => {
-      this.logger.error('Error inicializando el transporter de email:', error)
-    })*/
+    // Transporter solo si hay EMAIL_HOST (alertas de los jobs, plans/plan-payroll-spend §6.5). Sin
+    // host queda apagado como antes y sendEmail devuelve false.
+    if (this.configService.get<string>('emailHost')) {
+      this.initializeTransporter().catch((error) => {
+        this.logger.error('Error inicializando el transporter de email:', error)
+      })
+    } else {
+      this.logger.warn('Email apagado: falta EMAIL_HOST')
+    }
 
     // Envío de prueba hardcodeado
     setTimeout(() => {
@@ -325,6 +333,13 @@ export class EmailService {
     to: string,
     userData: { firstName: string; lastName: string; email: string },
   ): Promise<boolean> {
+    // Apagado a propósito: hasta el 03/10/2026 nunca salió (transporter apagado) y el texto es de
+    // otro proyecto («Bienvenido a Óptica»). Prender el email para las alertas de los jobs no lo
+    // enciende (plans/plan-payroll-spend §6.5).
+    if (!WELCOME_EMAIL_ENABLED) {
+      this.logger.log(`Email de bienvenida no enviado (apagado): ${userData.email}`)
+      return false
+    }
     return this.sendEmail({
       to,
       subject: `Bienvenido a ${this.configService.get<string>('COMPANY_NAME', 'Óptica')}`,

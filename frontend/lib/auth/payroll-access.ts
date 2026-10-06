@@ -2,6 +2,7 @@ import type { SrsMeUser } from './types'
 import {
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   ROL_ACCION_PRODUCTION_REPORT,
+  ROL_ACCION_TTK_PAYROLL,
 } from './ttk-permissions'
 
 /** Same rule as Legacy `show-payroll-dashboard-sso` (admin or System v2 role). */
@@ -12,8 +13,9 @@ export function canAccessPayrollDashboard(user: SrsMeUser | null | undefined): b
 }
 
 /**
- * Production Business KPIs (`/reports/business-kpis`).
- * Legacy: Admin General, Admin Company (me.php isSystemAdmin), or ROL_ACCION production report (47).
+ * Business KPIs (`/reports/business-kpis`): ruta y menú. Admin General, Admin Company (me.php
+ * isSystemAdmin), «Reports > Production Report» (47) o «Time Tracking > Payroll» (93). Adentro cada
+ * tab pide lo suyo (plans/plan-payroll-spend, decisión C).
  */
 export function canAccessBusinessKpis(
   user: SrsMeUser | null | undefined,
@@ -21,7 +23,30 @@ export function canAccessBusinessKpis(
 ): boolean {
   if (!user) return false
   if (user.isSystemAdmin) return true
+  return hasPermission(ROL_ACCION_PRODUCTION_REPORT) || hasPermission(ROL_ACCION_TTK_PAYROLL)
+}
+
+/**
+ * Production Report (47): `/reports/production-vs-goal` y las tabs Billing, Collections, Punch y
+ * Production de Business KPIs.
+ */
+export function canAccessProductionReport(
+  user: SrsMeUser | null | undefined,
+  hasPermission: (id: number) => boolean,
+): boolean {
+  if (!user) return false
+  if (user.isSystemAdmin) return true
   return hasPermission(ROL_ACCION_PRODUCTION_REPORT)
+}
+
+/** Tab Payroll Spend: montos de payroll, mismo permiso que el Payroll Excel Report de legacy (93). */
+export function canViewPayrollSpend(
+  user: SrsMeUser | null | undefined,
+  hasPermission: (id: number) => boolean,
+): boolean {
+  if (!user) return false
+  if (user.isSystemAdmin) return true
+  return hasPermission(ROL_ACCION_TTK_PAYROLL)
 }
 
 /**

@@ -54,4 +54,20 @@ export class ContratistaRepository extends BaseRepository<Contratista, Contratis
       )
       .getMany()
   }
+
+  /**
+   * Empresas proveedoras con al menos un dealer activo (DEALER_REL vigente). Sin tenant: solo lo usa
+   * el monitor de jobs, que exige Admin General (plans/plan-payroll-spend §1 ter).
+   */
+  findProvidersWithActiveDealers(): Promise<Contratista[]> {
+    return this.createQueryBuilder('c')
+      .where(
+        `EXISTS (
+          SELECT 1 FROM DEALER_REL dr
+          WHERE dr.id_dealer_provider = c.id AND dr.estado = 1 AND dr.fecha_end IS NULL
+        )`,
+      )
+      .orderBy('c.razonSocial', 'ASC')
+      .getMany()
+  }
 }
