@@ -195,25 +195,15 @@ chmod 600 /home/srssui5/srs-backend.env
 nano /home/srssui5/srs-backend.env
 ```
 
-Contenido:
+Contenido: el de `backend/srs-backend.env.example` (la plantilla manda; no se repite acá para que no
+quede atrasada). Completar cada `PEGAR_*`:
 
-```env
-NODE_ENV=production
-PORT=3020
-
-DB_CONNECTION=mysql
-DB_HOST=host.docker.internal
-DB_PORT=3306
-DB_USERNAME=srssui5_srs
-DB_PASSWORD=PEGAR_DESDE_config.php
-DB_DATABASE=srssui5_srs
-DB_POOL=5
-DB_LOGGING=false
-DEBUG_QUERIES=false
-
-# Mismo valor que JWT_AUTH en config.php de PHP
-JWT_SECRET=PEGAR_DESDE_config.php_JWT_AUTH
-```
+- `DB_PASSWORD` — de `config.php`.
+- `JWT_SECRET` — mismo valor que `JWT_AUTH` de `config.php`.
+- `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — los `email_*_2go`,
+  `email_from` y `nombre_sitio` del `config.ini` de PROD (misma cuenta SMTP2GO que el PHP;
+  `plans/plan-nest-email`). Si un valor tiene `$`, `#` o espacios, entre comillas simples.
+- `EMAIL_DEV_REDIRECT_TO` **no** va en producción.
 
 > **No confundir** con `backend-apis/.env.template` del repo raíz — ese es otro proyecto. Este backend vive en `v0-payroll-dashboard/backend/`.
 
@@ -367,11 +357,12 @@ git pull
 docker compose up -d --build
 ```
 
-Solo cambiaste variables (sin código):
+Solo cambiaste variables (sin código): hay que **recrear** el contenedor; un `restart` no relee el
+`env_file` (las variables de un contenedor se fijan al crearlo).
 
 ```bash
-docker compose restart payroll-dashboard   # Archivo A
-docker compose restart srs-backend       # Archivo B
+docker compose up -d --force-recreate --no-deps payroll-dashboard   # Archivo A
+docker compose up -d --force-recreate --no-deps srs-backend         # Archivo B
 ```
 
 ---

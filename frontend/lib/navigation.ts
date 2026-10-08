@@ -73,8 +73,11 @@ export const PROD_NAV_HREFS = ['/', '/issues'] as const
 /** Externals (isCompanyTypeCompany): Punch Report only — no Dashboard home. */
 export const PROD_NAV_HREFS_EXTERNAL = ['/issues'] as const
 
-/** Real KPI report routes in production (Admin General/Company or production report perm; not /kpis mock). */
-export const PROD_KPI_HREFS = ['/reports/business-kpis', '/reports/production-vs-goal'] as const
+/** Business KPIs: Admin General/Company, Production Report (47) or Time Tracking > Payroll (93). */
+export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
+
+/** Production vs Goal: Admin General/Company or Production Report (47) only. */
+export const PROD_GOAL_HREFS = ['/reports/production-vs-goal'] as const
 
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
@@ -100,12 +103,14 @@ export function isProdAllowedPath(
   canViewRoles = false,
   canManageRoleTemplates = false,
   canAccessSystemConfig = false,
+  canAccessProductionGoal = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
   const matches = (hrefs: readonly string[]) =>
     hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
+  if (canAccessProductionGoal && matches(PROD_GOAL_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
   if (canManageRoleTemplates && matches(ROLE_TEMPLATES_NAV_HREFS)) return true
   if (canAccessSystemConfig && matches(SETTINGS_NAV_HREFS)) return true
@@ -131,6 +136,8 @@ export function getVisibleNavigation(options: {
   isDev: boolean
   canAccessTtk: boolean
   canAccessProdKpis?: boolean
+  /** Production vs Goal (Production Report, 47). */
+  canAccessProductionGoal?: boolean
   canAccessBillingInvoices?: boolean
   canViewRoles?: boolean
   /** Shows the Role Templates child item, independent of `canViewRoles`. */
@@ -143,6 +150,7 @@ export function getVisibleNavigation(options: {
     isDev,
     canAccessTtk,
     canAccessProdKpis = false,
+    canAccessProductionGoal = false,
     canAccessBillingInvoices = false,
     canViewRoles = false,
     canManageRoleTemplates = false,
@@ -157,7 +165,13 @@ export function getVisibleNavigation(options: {
     return withoutDashboard(ALL_NAVIGATION.map((item) => localizeNavItem(item, t)))
   }
 
-  if (!canAccessTtk && !canAccessBillingInvoices && !canViewRoles && !canManageRoleTemplates) {
+  if (
+    !canAccessTtk &&
+    !canAccessProdKpis &&
+    !canAccessBillingInvoices &&
+    !canViewRoles &&
+    !canManageRoleTemplates
+  ) {
     return []
   }
 
@@ -165,6 +179,7 @@ export function getVisibleNavigation(options: {
   const allowedHrefs: readonly string[] = [
     ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
+    ...(canAccessProductionGoal ? PROD_GOAL_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
     ...(canViewRoles ? ['/roles'] : []),
     ...(canManageRoleTemplates ? ROLE_TEMPLATES_NAV_HREFS : []),

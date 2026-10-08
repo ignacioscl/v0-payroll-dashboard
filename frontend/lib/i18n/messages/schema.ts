@@ -1002,6 +1002,13 @@ export interface Messages {
     dateRange: string
     ignoreDateRange: string
     dateRangeIgnored: string
+    dateModeRange: string
+    dateModeFrom: string
+    dateModeUntil: string
+    dateModeFromHelp: string
+    dateModeUntilHelp: string
+    dateModeFromButton: string
+    dateModeUntilButton: string
     allStatus: string
     pending: string
     reviewed: string
@@ -1366,6 +1373,14 @@ export interface Messages {
     costPerWo: string
     revenuePerEmployee: string
     pctOfPayroll: string
+    overtimePayment: string
+    overtimeHours: string
+    hoursOver40: string
+    hoursOver40One: string
+    totalPayrollWithoutDealer: string
+    totalPayrollWithoutDealerOne: string
+    activeEmployeesHourlyRate: string
+    piecework: string
     payrollOverProduction: string
     payrollOverCompletedWos: string
     avgRatePerHour: string
@@ -1451,6 +1466,8 @@ export interface Messages {
     deleted: string
     totalPayroll: string
     overtime: string
+    overtimeHours: string
+    piecework: string
     laborCost: string
     costPerWo: string
     activeEmployees: string
@@ -1468,6 +1485,27 @@ export interface Messages {
     incomeSummaryNotInvoiced: string
     incomeSummaryTotal: string
     incomeSummaryNoTax: string
+    payrollLastUpdated: string
+    payrollNotCalculated: string
+    payrollNoDataBefore: string
+    payrollNoPeriod: string
+    payrollChartTitle: string
+    payrollChartSubtitle: string
+    payrollColType: string
+    payrollColQty: string
+    payrollColAmount: string
+    payrollTypeOvertimeAuto: string
+    payrollTypeOvertimeManual: string
+    payrollTaxesRow: string
+    payrollTotalRow: string
+    payrollNote1: string
+    payrollNote2: string
+    payrollNote3: string
+    payrollNote4: string
+    payrollNote5: string
+    payrollNote6: string
+    payrollWithoutDealer: string
+    payrollDealerRestricted: string
     collectionsSnapshotNote: string
     collectionsHistoryMonths: string
     collectionsHistoryMonthsOption: string
@@ -1570,6 +1608,54 @@ export interface Messages {
     billingNoteHint: string
     backToDashboard: string
     tabGeneral: string
+    jobsTab: string
+    jobsRunsTitle: string
+    jobsRefresh: string
+    jobsRunJob: string
+    jobsAllJobs: string
+    jobsColJob: string
+    jobsColStarted: string
+    jobsColFinished: string
+    jobsColDuration: string
+    jobsColTrigger: string
+    jobsColStatus: string
+    jobsColChanged: string
+    jobsColSkipped: string
+    jobsColFailed: string
+    jobsColTotal: string
+    jobsLogTime: string
+    jobsLogLevel: string
+    jobsLogMessage: string
+    jobsRunLabel: string
+    jobsKeyJob: string
+    jobsKeyPayload: string
+    jobsKeyHost: string
+    jobsKeyError: string
+    jobsKeyWhen: string
+    jobsRunTitle: string
+    jobsRunSubtitle: string
+    jobsFieldJob: string
+    jobsSelectDate: string
+    jobsFieldCompany: string
+    jobsAllCompanies: string
+    jobsFieldFrom: string
+    jobsFieldTo: string
+    jobsDatesHint: string
+    jobsForce: string
+    jobsForceHint: string
+    jobsRunButton: string
+    jobsDailyOk: string
+    jobsDailyOkMeta: string
+    jobsDailyFailed: string
+    jobsDailyFailedMeta: string
+    jobsDailyMissing: string
+    jobsDailyMissingMeta: string
+    jobsDailyDisabled: string
+    jobsDailyDisabledMeta: string
+    jobsStatusOk: string
+    jobsStatusFailed: string
+    jobsStatusSkipped: string
+    jobsStatusRunning: string
   }
   visualSettings: {
     title: string

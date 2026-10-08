@@ -230,6 +230,48 @@ export const fetchCollectionsByMonth = (params: KpiQueryParams) =>
 export const fetchPunchKpi = (params: KpiQueryParams) => getKpi<PunchKpi>('punch', params)
 export const fetchPayrollKpi = (params: KpiQueryParams) => getKpi<PayrollKpi>('payroll', params)
 
+/** Una fila del desglose de Total Payroll (`GET kpis/payroll/spend`). */
+export interface PayrollSpendTypeRow {
+  /** GENERIC_DATA.id del tipo de pago (en `overtime`, el tipo Hourly). */
+  id: number
+  /** Nombre del tipo de pago tal cual está en el sistema. */
+  name: string
+  concepto: 'ponchada' | 'prorrateo' | 'overtime'
+  amount: number
+  /** Ponchadas (montos fijos) o empleados (salario / comisión). */
+  qty: number
+  hours: number
+  /** Qué va en «Qty / Hours»: horas, ponchadas, empleados o nada (piecework). */
+  measure: 'hours' | 'count' | 'employees' | 'none'
+  /** Overtime automático (> 40 h), tipo manual «Overtime» u otro. */
+  kind: 'overtime_auto' | 'overtime_manual' | 'hourly' | 'other'
+}
+
+/** Tab Payroll Spend: snapshot diario de payroll con las fechas y los dealers del header. */
+export interface PayrollSpendKpi {
+  /** 1 semanal, 2 quincenal, 3 mensual; null = sin período de pago configurado. */
+  paymentMethod: number | null
+  periodo: { desde: string; hasta: string }
+  /** Primer día con datos (yyyy-MM-dd). */
+  dataFrom: string
+  totalPayroll: number
+  payrollTaxes: number
+  overtime: { amount: number; hours: number; employeesOver40: number }
+  piecework: number
+  byType: PayrollSpendTypeRow[]
+  employees: number
+  /** Salarios sin dealer; null para usuarios restringidos a dealers. */
+  withoutDealer: { amount: number; employees: number; byType: PayrollSpendTypeRow[] } | null
+  /** Todos los dealers activos pedidos: lo sin dealer ya está sumado en el total. */
+  allDealers: boolean
+  dealerRestricted: boolean
+  /** UTC `yyyy-MM-dd HH:mm:ss` de la última corrida; null si todavía no se calculó. */
+  calculatedAt: string | null
+}
+
+export const fetchPayrollSpend = (params: KpiQueryParams) =>
+  getKpi<PayrollSpendKpi>('payroll/spend', params)
+
 async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
   if (isSrsBusy(res)) throw new SrsBusyError()
   const text = await res.text()

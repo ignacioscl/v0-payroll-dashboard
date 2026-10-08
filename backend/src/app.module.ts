@@ -44,6 +44,9 @@ import { SrsPunchModule } from './srs/punch/srs-punch.module'
 import { SrsPayrollModule } from './srs/payroll/srs-payroll.module'
 import { RolTemplateModule } from './features/rol-template/rol-template.module'
 import { SrsContratistaModule } from './features/srs-contratista/srs-contratista.module'
+// --- Jobs (worker) ---
+import { jobsDataSourceOptions, JOBS_CONNECTION } from './jobs/jobs.datasource'
+import { JobsModule } from './jobs/jobs.module'
 //ImportTemplateModule
 //NO BORRAR LA LINEA DE ARRIBA
 HttpModule.registerAsync({
@@ -75,6 +78,13 @@ HttpModule.registerAsync({
         return srsDataSourceOptions
       },
     }),
+    // Conexión nombrada a la base de los jobs (srssui5_srs_jobs): corridas, log y estado.
+    TypeOrmModule.forRootAsync({
+      name: JOBS_CONNECTION,
+      useFactory() {
+        return jobsDataSourceOptions
+      },
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
     }),
@@ -99,6 +109,7 @@ HttpModule.registerAsync({
     SrsPayrollModule,
     RolTemplateModule,
     SrsContratistaModule,
+    JobsModule,
     //TemplateModule
     //NO BORRAR LA LINEA DE ARRIBA
   ],

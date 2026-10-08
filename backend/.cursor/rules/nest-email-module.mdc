@@ -1,0 +1,116 @@
+---
+description: Uso del módulo de email del Nest — todo mail sale por EmailService.send() de src/commons/email; cómo pedir un mail, qué devuelve, plantillas (.hbs + .txt.hbs), remitentes, configuración en un solo lugar, pruebas sin red y el CLI
+globs: v0-payroll-dashboard/backend/src/**/*.ts,v0-payroll-dashboard/backend/src/commons/email/templates/**/*.hbs
+alwaysApply: false
+---
+
+# Nest — módulo de email: una sola puerta
+
+> La política de envío (entornos, destinatarios, secretos, contenido) está en `nest-email-sending.mdc`;
+> las dos van juntas. Plan: `plans/plan-nest-email/PLAN.md`.
+
+## La regla
+
+**Todo mail que sale del Nest pasa por `EmailService.send()` de `src/commons/email/`.** Nadie fuera de
+esa carpeta importa `nodemailer`, `handlebars` ni `@nestjs-modules/mailer` (desinstalado), ni crea un
+transporte. Lo controlan `no-restricted-imports` en `.eslintrc.js` y el test
+`src/commons/email/email.boundary.spec.ts`, que falla si cualquier otro archivo de `src/` los importa.
+
+Quien manda mails importa `EmailModule` (no es global a propósito: el `imports: [EmailModule]` es la
+lista de quién manda). `EmailModule` es hoja: no importa nada de `features/` ni de `srs/`.
+
+## Cómo se pide un mail
+
+```ts
+const result = await this.email.send({
+  purpose: 'job-alert',          // obligatorio: ^[a-z][a-z0-9-]{1,39}$ — etiqueta del log y cabecera X-SRS-Purpose
+  audience: 'internal',          // obligatorio: 'internal' | 'client' ('client' se rechaza mientras no exista la lista negra)
+  to,                            // string | { address, name } | lista; nunca escrito en el código (viene de env o de datos)
+  subject: '[SRS jobs] payroll-snapshot failed',
+  text,                          // texto plano; con `html` directo es obligatorio
+})
+
+// con plantilla: templates/<nombre>.hbs + templates/<nombre>.txt.hbs
+await this.email.send({ purpose: 'email-smoke-test', audience: 'internal', to, subject, template: { name: 'test', context: { hostname, mode } } })
+```
+
+`template` **o** `html`+`text`, nunca los dos. `sender` es opcional (default `'srs'`). Adjuntos:
+`{ filename, content: Buffer | string, contentType }`, 10 MB sumados como tope; nada de `path` ni URLs.
+
+## Qué devuelve y cómo se trata
+
+`send()` resuelve siempre con un `SendEmailResult`:
+
+| `status` | Qué pasó | Qué hace el consumidor |
+|---|---|---|
+| `sent` | salió por SMTP (`messageId`); en modo `redirect`, a la casilla de dev (`redirectedFrom` trae los originales) | marcar «enviado» **solo acá** (p. ej. `alert_sent_at`) |
+| `suppressed` | dev sin redirect: no salió nada (`reason`) | dejar constancia («suprimido»), no marcar como enviado |
+| `failed` | el transporte falló o el módulo está `disabled` en PROD (`error`, sin stack ni clave) | dejar constancia con el motivo; no reintentar en loop |
+
+- **Un fallo de transporte nunca tira.** `send()` tira `EmailRequestError` solo por errores de
+  programación: sin destinatario válido, `template` y `html` juntos, `html` sin `text`, plantilla
+  inexistente o sin `.txt.hbs`, `sender` desconocido, `purpose`/`audience` inválidos, `audience: 'client'`
+  mientras no exista la lista negra, adjuntos sobre el tope. Eso se ve en dev; no se atrapa para taparlo.
+- **Dentro de `@Transactional()`**: el mail se manda **después del commit**, con `runOnTransactionCommit`
+  de `typeorm-transactional`. Si no, sale aunque la transacción se revierta.
+- **Desde un job**: el hecho va a `JOB_RUN_LOG` («alerta enviada a X», «alerta enviada a X (redirigida a
+  Y)», «alerta suprimida (email …)», «no se pudo enviar la alerta: …»). La compuerta de los jobs
+  (`areJobAlertsEnabled()`) decide si se *pide* el mail; el módulo decide si *sale*. Son dos y las dos
+  quedan.
+- Nadie loguea el cuerpo del mail ni la configuración: el módulo ya escribe una línea por envío.
+
+## Plantillas
+
+- Viven en `src/commons/email/templates/`. **Cada plantilla es una pareja** `nombre.hbs` + `nombre.txt.hbs`
+  (texto plano real); `email.templates.spec.ts` falla si falta la hermana. El nombre es la ruta relativa
+  sin extensión (`test`, `jobs/alert`).
+- Toda plantilla HTML se envuelve en el layout: `{{#> layout title=subject}} … {{/layout}}`
+  (`templates/partials/layout.hbs`: marca SRS, Oswald con fallback Arial, `#35404f`, pie «This email
+  was sent automatically, please do not reply»). Nada de HTML armado en TypeScript.
+- Estilos **inline** en las etiquetas (no hay inliner de CSS). `{{x}}` escapa; `{{{x}}}` solo para HTML ya
+  seguro.
+- Las `.hbs` se copian a `dist/` por `compilerOptions.assets` de `nest-cli.json`; en dev el renderer
+  recarga al editar (con `--watchAssets` en el script `start`). En PROD una plantilla cambia solo con
+  redeploy.
+- Las alertas internas de jobs van en **texto plano sin plantilla**.
+- Texto visible para un cliente: en inglés, aprobado por Ignacio palabra por palabra en el plan del
+  consumidor (`nest-email-sending.mdc`).
+
+## Remitentes
+
+Registro tipado en `src/commons/email/email.senders.ts` (`EMAIL_SENDER_KEYS`, hoy solo `'srs'` ←
+`EMAIL_FROM` + `EMAIL_FROM_NAME`). Agregar uno: la clave y su fila (TypeScript obliga a completar el
+`Record`), sus variables en `.env.template` y `srs-backend.env.example` (y en PROD las carga Ignacio),
+un caso en `email.config.spec.ts`. El consumidor solo pasa `sender: 'x'`. Nunca se manda «desde» la
+casilla de un usuario (rompe SPF/DKIM).
+
+## Configuración
+
+Solo `src/commons/email/email.config.ts` lee las variables `EMAIL_*` (`loadEmailConfig(env, dir)`,
+función pura, sin tirar). Ningún otro archivo lee `EMAIL_*`, ni por `ConfigService` ni por `process.env`;
+`configuration.ts` no tiene claves de email. El módulo nunca tira en el boot: sin configuración en PROD
+queda `disabled` con `error` en el log y `/api/health/jobs` en 503 (`/api/health` no cambia).
+
+## Pruebas
+
+- Unitarias sin red: `EmailService` recibe el transporte por token (`EMAIL_TRANSPORTER`); en un spec
+  se inyecta `{ sendMail: jest.fn(), verify: jest.fn() }` y la configuración se arma a mano. Ningún spec
+  importa `EmailModule` ni abre SMTP (`NODE_ENV=test` → `suppressed` siempre).
+- Para verificar configuración o mandar un mail de prueba: el CLI, que pasa por la misma política.
+
+```bash
+node dist/commons/email/email.cli.js verify
+node dist/commons/email/email.cli.js send <destinatario>
+```
+
+En PROD: `docker exec srs-suite-backend node dist/commons/email/email.cli.js verify`.
+
+## Prohibido
+
+- `nodemailer`, `handlebars`, `@nestjs-modules/mailer`, `createTransport`, `MailerService` fuera de `src/commons/email/`.
+- Un destinatario, una casilla de prueba o un host escritos en el código (vienen de variables de entorno o de datos).
+- `console.log` del mail o de la configuración; la clave en cualquier log o error.
+- Funciones «de prueba» que mandan a una casilla fija (`sendTestEmail`): para eso está el CLI.
+- `sendBulk*`, loops de envío o reintentos dentro del módulo o del consumidor.
+- Leer `EMAIL_*` fuera de `email.config.ts`; mirar `NODE_ENV` para decidir si mandar fuera del módulo.
+- Volver `EmailModule` global o dinámico (`forRoot()`): crearía más de un transporte.

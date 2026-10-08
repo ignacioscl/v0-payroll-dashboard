@@ -26,6 +26,11 @@ export class ContratistaService extends GlobalBaseService<Contratista, Contratis
     return this.repository.findByIds(ids)
   }
 
+  /** Empresas para el campo «Company» del monitor de jobs (solo Admin General, lo exige el controller). */
+  findProvidersWithActiveDealers() {
+    return this.repository.findProvidersWithActiveDealers()
+  }
+
   /** Dealers valid for this provider (DEALER_REL / id_empresa / self). */
   findScopedByIds(ids: number[], idProvider: number) {
     return this.repository.findScopedByIds(ids, idProvider)

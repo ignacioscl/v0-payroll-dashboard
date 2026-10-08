@@ -1,0 +1,72 @@
+---
+description: Jobs y worker de Nest — dónde va cada cosa, idempotencia, lock, log de corridas, qué base usa cada tabla, cómo se agrega un job y cómo se monitorea
+globs: v0-payroll-dashboard/backend/src/jobs/**/*.ts,v0-payroll-dashboard/backend/src/features/job-*/**/*.ts,v0-payroll-dashboard/backend/src/features/payroll-period-state/**/*.ts,v0-payroll-dashboard/backend/src/srs/**/*.job.ts
+alwaysApply: false
+---
+
+# Worker y jobs
+
+Los jobs corren dentro del backend Nest con `@nestjs/schedule`. **No hay cola ni Redis**: el cron, el
+endpoint `POST /api/jobs/:name/run` y el CLI llaman al runner directo, protegido con `GET_LOCK`. La cola
+(`JobQueuePort` sobre MySQL, tabla `JOB_QUEUE`) se agrega el día que exista el primer job por evento
+(emails); Redis, detrás de la misma interfaz, cuando haya réplicas. Los jobs no cambian por eso.
+
+## Dónde va cada cosa (convive con `nest-feature-one-resource` y `typeorm-crud-no-raw-sql`)
+
+| Qué | Dónde | Conexión |
+|---|---|---|
+| Cada tabla de `srssui5_srs_jobs` (`JOB_RUN`, `JOB_RUN_LOG`, `PAYROLL_PERIOD_STATE`) | `src/features/<kebab>/` con entity `*.jobsentity.ts` `extends EntityBase` | `JOBS_CONNECTION` (`src/jobs/jobs.datasource.ts`); repos con `@InjectRepository(E, JOBS_CONNECTION)` |
+| Tablas de resultado que leen PHP o v0 (`PAYROLL_SNAPSHOT_DAY`) | `src/features/<kebab>/` con entity `*.entity.ts` `extends EntityBase` | default (`srssui5_srs`) |
+| Runner, registry, crons, health indicator, CLI, job `noop` | `src/jobs/` (no es un recurso, como `src/commons/email`) | — |
+| El job de un dominio (`*.job.ts`, calculator, repositorio fuente, writer) | la carpeta del dominio (`src/srs/payroll/snapshot/`) | fuente: `SRS_CONNECTION` (SQL crudo, reporte complejo); escritura: default vía QueryBuilder |
+
+Las entities de jobs se llaman `*.jobsentity.ts` porque el glob de la conexión default (`*.entity.ts`,
+`src/typeorm.config.ts`) las levantaría. Nunca una tabla interna del worker en `srssui5_srs`, nunca plata en
+`srssui5_srs_jobs`. Las columnas que apuntan a la otra base (`PAYROLL_PERIOD_STATE.id_contratista`) van
+**sin FK** (las copias locales de PROD tienen otro nombre) y con una consulta de huérfanos en el plan.
+
+## Cómo se agrega un job
+
+1. Clase `@Injectable()` que implementa `JobHandler<TPayload>`: `name` único, `run(payload, ctx)`.
+2. Se registra en el `inject` del provider `JOB_HANDLERS` de `src/jobs/jobs.module.ts` (y su módulo va en
+   `imports`); el registry falla al boot si el nombre se repite.
+3. Payload JSON plano, sin `Date` (strings `YYYY-MM-DD`). Todo job acepta `dryRun` y, si escribe por unidades, `force`.
+4. El cron va en `src/jobs/jobs.cron.ts` con `timeZone: 'America/New_York'` y se apaga con `JOBS_CRON_ENABLED=false`
+   (el CLI siempre lo apaga).
+5. **Dev no es producción:** fuera de `NODE_ENV=production` el cron no se registra y las alertas por email no se
+   mandan (quedan en el log), pase lo que pase con las otras variables. Todo pasa por `isJobsProd()` de
+   `src/jobs/jobs-env.ts`; ningún job pregunta `NODE_ENV` por su cuenta. La corrida manual (endpoint, CLI) sí anda en
+   dev. Para probar cron y alertas en local: `JOBS_DEV_FORCE=true`, que nunca va a prod ni a `.env.template`.
+   Un job que mande mails a clientes (el futuro de emails) usa la misma regla: en dev no sale nada.
+
+## Idempotencia (obligatoria)
+
+- Correr dos veces el mismo job con el mismo payload deja el mismo resultado.
+- Unidad de escritura = unidad de reescritura (p. ej. empresa + período): `DELETE` + `INSERT` en una
+  transacción por unidad. Nunca una transacción por corrida entera.
+- Cambió una función almacenada o una regla → sube `CALC_VERSION` y todo se recalcula.
+
+## Lock, reintentos y reinicios
+
+- `GET_LOCK('srs_jobs:<name>', 0)` en un `QueryRunner` dedicado, `RELEASE_LOCK` en `finally`. Lock ocupado
+  → la corrida se registra `skipped`. El lock se libera solo si cae la conexión.
+- Un solo reintento inmediato, solo para errores de conexión o deadlock. Un error de datos no se reintenta:
+  la unidad queda `failed` en su tabla de estado, se loguea, y el job sigue con las demás.
+- Al boot, las `JOB_RUN` `running` de este host cuyo lock (`IS_FREE_LOCK`) está libre pasan a `failed` («interrumpida por reinicio»). Sin umbral de tiempo: un reinicio rápido dejaba la corrida `running` para siempre.
+
+## Log de corridas y monitoreo
+
+- Cada ejecución crea una fila en `JOB_RUN` (inicio, fin, estado, contadores, resumen JSON, host, pid) y líneas
+  en `JOB_RUN_LOG` por unidad recalculada o fallida. Sin `JOB_RUN` no hay corrida.
+- Tiempos en UTC; la zona de negocio es del cron, no del log.
+- `GET /api/health/jobs` (Terminus) da 503 si un job crítico falló o no corrió en su ventana. **No se toca**
+  `/api/health`: es el healthcheck del contenedor.
+- Alerta por email (`EmailService`, `JOBS_ALERT_EMAIL`) al fallar, como máximo una por hora por job, y desde el
+  watchdog diario.
+
+## Prohibido
+
+- Estado en memoria entre corridas; `setInterval` suelto fuera del runner; `synchronize`/migraciones de TypeORM;
+  `SET time_zone` en la conexión; escribir tablas fuente de legacy desde un job; ids de `GENERIC_DATA` escritos
+  en SQL (van bindeados desde `payment-type-ids.ts`).
+- Cron PHP o `node-cron` en `srs-node-apis` para algo que puede ser un job Nest.

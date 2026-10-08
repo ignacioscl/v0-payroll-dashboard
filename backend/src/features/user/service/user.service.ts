@@ -18,7 +18,6 @@ import { UserRepository } from '../repository/user.repository'
 import { RoleEnum } from 'src/commons/enum/role.enum'
 import { GlobalBaseService } from 'src/commons/service/global.base.service'
 import { Transactional } from 'typeorm-transactional'
-import { EmailService } from '../../../commons/email/service/email.service'
 import { I18nError } from 'src/commons/errors/i18n.error'
 import { Company } from 'src/features/company/entity/company.entity'
 import { UserCompanyRelService } from 'src/features/user.company.rel/service/user.company.rel.service'
@@ -30,7 +29,6 @@ export class UserService extends GlobalBaseService<User, UserQueryDto> {
     @Inject(UserRepository) private readonly repository: UserRepository,
     @InjectRepository(UserExtended) private readonly userExtendedRepository: Repository<UserExtended>,
     @Inject(UserCompanyRelService) private readonly userCompanyRelService: UserCompanyRelService,
-    private readonly emailService: EmailService,
   ) {
     super()
   }
@@ -82,18 +80,6 @@ export class UserService extends GlobalBaseService<User, UserQueryDto> {
         // Log del error pero no fallar la creación del usuario
         console.error('Error guardando foto del empleado:', error)
       }
-    }
-
-    // Enviar email de bienvenida
-    try {
-      await this.emailService.sendWelcomeEmail(user.email, {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-      })
-    } catch (error) {
-      // Log del error pero no fallar la creación del usuario
-      console.error('Error enviando email de bienvenida:', error)
     }
 
     return await this.getById(createdUser.id!)

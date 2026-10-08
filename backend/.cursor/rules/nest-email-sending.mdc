@@ -1,0 +1,120 @@
+---
+description: Política de envío de email del Nest — en qué entorno sale un mail y a quién (dev nunca a un destinatario real), destinatarios, secretos, transporte, contenido para clientes, un envío por llamada, registro y qué falta antes del primer mail a un cliente
+globs: v0-payroll-dashboard/backend/src/**/*.ts,v0-payroll-dashboard/backend/src/commons/email/templates/**/*.hbs,v0-payroll-dashboard/backend/.env.template,v0-payroll-dashboard/backend/srs-backend.env.example
+alwaysApply: false
+---
+
+# Nest — política de envío de email
+
+> Cómo se usa el módulo está en `nest-email-module.mdc`; esta regla dice **cuándo sale un mail, a quién
+> y con qué**. Vale para todo consumidor del `EmailService` y para quien edite las plantillas o los
+> templates de variables. Plan: `plans/plan-nest-email/PLAN.md`.
+
+## 1. Dev no manda nada a nadie real
+
+Un mail llega a un destinatario real **solo** con `NODE_ENV=production` exacto, SMTP completo
+(`EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`) y `EMAIL_DEV_REDIRECT_TO` vacío. El módulo lo
+decide solo (`email.config.ts`); ningún consumidor mira `NODE_ENV` para esto.
+
+| Entorno | Modo | Qué pasa |
+|---|---|---|
+| PROD, SMTP completo, sin redirect | `live` | sale a los destinatarios reales |
+| PROD con `EMAIL_DEV_REDIRECT_TO` | `redirect` | **todo** va a esa casilla; `error` en el log al arrancar y por envío; `/api/health/jobs` en 503. Se arregla sacando la variable y recreando el contenedor |
+| PROD sin SMTP o inválido | `disabled` | nada sale; `error` al arrancar; cada `send` → `failed`; `/api/health/jobs` en 503. **El boot no se cae** |
+| `NODE_ENV=test` | `suppressed` | los tests nunca abren SMTP |
+| dev con SMTP y `EMAIL_DEV_REDIRECT_TO=<casilla propia>` | `redirect` | sale por SMTP2GO, pero to/cc/bcc se reemplazan por esa casilla; asunto `[DEV → originales] …`; cabecera `X-SRS-Original-To` |
+| dev en cualquier otro caso | `suppressed` | nada sale; `status: 'suppressed'` con motivo |
+
+- `EMAIL_DEV_REDIRECT_TO` va **vacía** en `.env.template` (es la forma documentada de probar) y **nunca**
+  en `srs-backend.env.example`. `JOBS_DEV_FORCE` sigue sin ir a ningún template (`worker-jobs.mdc`).
+- **Alertas de jobs en dev: suprimidas por defecto, habilitadas por parámetro** (Ignacio, 06/10/2026).
+  Hacen falta las tres cosas: `JOBS_DEV_FORCE=true` (los jobs piden el mail), SMTP completo y
+  `EMAIL_DEV_REDIRECT_TO=<casilla>` (el módulo lo deja salir, a esa casilla). Con la casilla de Juan le
+  llegan a Juan desde dev; con la propia, al que prueba. Con una sola de las tres no sale nada, y eso es
+  correcto.
+- **Nunca copiar el `srs-backend.env` de PROD entero a un `.env` local** (`NODE_ENV=production` + la clave
+  = modo `live` desde una máquina de dev). Las `EMAIL_*` locales se cargan a mano, siempre con redirect, y
+  se sacan al terminar la prueba.
+- En dev, el `.env` de trabajo normal **no tiene** `EMAIL_USER`/`EMAIL_PASS`.
+
+## 2. Destinatarios
+
+- Ningún destinatario escrito en el código. Vienen de variables de entorno (`JOBS_ALERT_EMAIL`), de la base
+  o del pedido. Un host o una casilla «de prueba» en un `.ts` es un hallazgo que se saca en el mismo cambio.
+- `purpose` y `audience` son obligatorios en cada envío. `audience: 'client'` = lo lee alguien de un dealer
+  o un cliente de SRS; `internal` = lo lee gente de SRS (Ignacio, Juan).
+- Destinatarios normalizados (trim, sin duplicados, una regex mínima); una lista vacía tira.
+- El remitente es siempre uno registrado en el módulo (hoy `srs`, el mismo `email_from` del PHP, verificado
+  en SMTP2GO). Nunca la casilla de un usuario como `from`; si alguien tiene que poder contestar, `replyTo`.
+
+## 3. Secretos y transporte
+
+- La clave vive solo en `EMAIL_PASS` y solo la lee `email.config.ts`. No aparece en logs, errores,
+  respuestas HTTP, Sentry ni en el objeto de configuración serializado (`pass` no enumerable). Los mensajes
+  de error del transporte pasan por `redact()`.
+- Una sola cuenta: SMTP2GO, la del PHP (`email_*_2go` del `config.ini` de PROD). InMotion y SendGrid no
+  existen para el Nest.
+- Puerto 587 con **STARTTLS obligatorio** (`requireTLS: true`) y verificación de certificado normal: nunca
+  `rejectUnauthorized: false`, nunca `name: 'localhost'`. Timeouts cortos (10 s conexión y saludo, 30 s
+  socket): el runner de jobs espera la alerta y un SMTP colgado no puede trabar una corrida.
+- Una sola instancia de transporte, creada por el módulo. Nada de `createTransport` en consumidores ni «un
+  transporte por envío».
+- Los valores de PROD los carga **solo Ignacio** en `/home/srssui5/srs-backend.env`
+  (`prod-config-files-only-ignacio`); el agente pasa las líneas. Después de cambiar variables el contenedor
+  se **recrea** (`docker compose up -d --force-recreate --no-deps srs-backend`); un `restart` no relee el
+  `env_file`.
+
+## 4. Contenido
+
+- **Texto plano siempre**: `text` con `html` directo, `.txt.hbs` con plantilla. Nunca un «AltBody» fijo.
+- **Mails a clientes** (`audience: 'client'`): en inglés; el texto completo (asunto y cuerpo) aprobado por
+  Ignacio palabra por palabra y pegado en el plan del consumidor antes de implementar; sin información
+  interna (ids de corrida, stack traces, nombres de tablas, rutas, links a `/api/...`); layout SRS con el
+  pie «This email was sent automatically, please do not reply».
+- **Mails internos**: asunto con prefijo `[SRS jobs]` (filtros en la casilla de Juan); en inglés como las
+  alertas de hoy; texto plano.
+- Cabecera `X-SRS-Purpose: <purpose>` en todo mail. `Message-ID`, `Date` y `charset` los pone nodemailer.
+
+## 5. Un envío por llamada
+
+- `send()` manda **un** mail. No hay `sendBulk*` ni loops de envío. Un plan que necesite N mails lo dice,
+  pone pausa y tope por corrida, y es un job (la cola `JOB_QUEUE` llega con el primer job por evento,
+  `worker-jobs.mdc`).
+- **Sin reintentos** dentro del módulo ni en el consumidor: un intento; `failed` queda registrado y el
+  consumidor decide. Reintentos ciegos duplican mails o bloquean la cuenta.
+- La idempotencia es del consumidor: quien manda por evento registra que mandó (como `JOB_RUN.alert_sent_at`)
+  y pregunta antes de volver a mandar (una alerta por hora por job). El módulo no deduplica.
+- Adjuntos: `Buffer` con `contentType`, 10 MB sumados como tope (el módulo rechaza antes de conectar);
+  para algo más grande, un link.
+
+## 6. Registro
+
+- El módulo escribe **una línea** por envío: `purpose`, `audience`, `status`, `mode`, `sender`, `to`,
+  `subject`, `messageId`, duración. Nunca el cuerpo ni los adjuntos, en ningún nivel de log.
+- Los jobs además dejan el hecho en `JOB_RUN_LOG` y marcan `alert_sent_at` **solo con `status: 'sent'`**.
+- Sin tabla de envíos por ahora. El `messageId` del log se cruza con el panel de SMTP2GO, que es el registro
+  de entrega real (también para el PHP).
+
+## 7. Antes del primer mail a un cliente desde el Nest
+
+Mientras falte cualquiera de estas tres cosas, `audience: 'client'` se rechaza en el módulo:
+
+1. **Lista negra de emails** con la misma regla que el PHP (`SendmailService.php` → tabla `datos_parametricos`,
+   categoría 27, `estado = 1`, `id_dealer IS NULL`, comparación en mayúsculas), aplicada a **todos** los
+   destinatarios (to, cc, bcc) con log del bloqueo. Las alertas internas **no** pasan por ella: si la base
+   está caída es cuando más hace falta el mail.
+2. **Registro en `EMAIL_SENDED`** como lo hace el PHP para invoices y WO, para que las pantallas legacy de
+   log de emails y la marca de lectura (`download.php`) sigan funcionando.
+3. Texto aprobado por Ignacio (sección 4).
+
+Es un plan propio, con su review. No se «prueba» un mail a un cliente desde dev: para eso está el redirect.
+
+## Prohibido
+
+- Mandar a un destinatario real desde cualquier cosa que no sea PROD en modo `live`.
+- `EMAIL_DEV_REDIRECT_TO` en `srs-backend.env`; `JOBS_DEV_FORCE` en cualquier template.
+- Casillas, hosts o claves en el código o en el repo (`.env` está en `.gitignore`; sigue así).
+- `rejectUnauthorized: false`, `verify_peer` apagado, `EHLO localhost`.
+- Loguear el cuerpo de un mail, la configuración del transporte o la clave; `console.log` en el módulo.
+- Reintentos en loop, envíos masivos, `preview-email` o cualquier cosa que abra el navegador desde el backend.
+- Un mail a cliente con texto que Ignacio no aprobó, o con información interna.

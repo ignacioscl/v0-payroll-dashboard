@@ -15,6 +15,7 @@ import {
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewFakeGps } from '@/lib/auth/ttk-permissions'
 import { getDefaultDateRange, isTodayOnlyDateRange } from '@/lib/filters/date-range-presets'
+import type { InvoiceDateMode } from '@/lib/filters/date-range-open-ends'
 import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
@@ -81,6 +82,13 @@ interface FilterContextType {
   setInvoiceDateFrom: (value: Date | undefined) => void
   setInvoiceDateTo: (value: Date | undefined) => void
   /**
+   * Cómo se eligió el período de Invoices: rango, «From» (de un día hasta hoy) o «Until» (hasta un
+   * día, desde 01/01/2015). Las fechas de arriba ya vienen resueltas; esto solo dice qué mostrar en
+   * el botón. En memoria, como las fechas: al recargar vuelve a `range` (plans/plan-payroll-spend §1 bis).
+   */
+  invoiceDateMode: InvoiceDateMode
+  setInvoiceDateMode: (value: InvoiceDateMode) => void
+  /**
    * «Ignore date range» del listado de invoices. Vive acá y no en la pantalla porque el
    * control que lo prende está en el header, que es hermano de la página, no hijo.
    */
@@ -130,6 +138,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
   const [invoiceDateFrom, setInvoiceDateFrom] = useState<Date | undefined>(undefined)
   const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
+  const [invoiceDateMode, setInvoiceDateMode] = useState<InvoiceDateMode>('range')
   const [invoiceIgnorePeriod, setInvoiceIgnorePeriod] = useState(false)
   const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
@@ -209,6 +218,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDateRange(def)
     setInvoiceDateFrom(def.from)
     setInvoiceDateTo(def.to)
+    setInvoiceDateMode('range')
   }, [setDateRange])
 
   const clearFilters = () => {
@@ -227,6 +237,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDateRange(def)
     setInvoiceDateFrom(def.from)
     setInvoiceDateTo(def.to)
+    setInvoiceDateMode('range')
     setInvoiceIgnorePeriod(false)
   }
 
@@ -264,6 +275,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       invoiceDateTo,
       setInvoiceDateFrom,
       setInvoiceDateTo,
+      invoiceDateMode,
+      setInvoiceDateMode,
       invoiceIgnorePeriod,
       setInvoiceIgnorePeriod,
       invoiceIgnorePeriodLocked,

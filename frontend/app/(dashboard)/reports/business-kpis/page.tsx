@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import {
@@ -18,13 +18,16 @@ import {
   Hourglass,
   Info,
   Landmark,
+  Package,
   Pencil,
   Percent,
   Receipt,
+  RefreshCw,
   Send,
   Target,
   Timer,
   Trash2,
+  TriangleAlert,
   TrendingUp,
   Users,
   Wrench,
@@ -36,6 +39,7 @@ import { ProductionWeekChart } from '@/components/dashboard/production-week-char
 import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
 import { InvoiceCollectionMonthChart } from '@/components/dashboard/invoice-collection-month-chart'
 import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
+import { PayrollByTypeChart } from '@/components/dashboard/payroll-by-type-chart'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
 import {
@@ -52,7 +56,9 @@ import { Label } from '@/components/ui/label'
 import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
-import { PAYROLL_WEEKS } from '@/lib/payroll-report-mock-data'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { canAccessProductionReport, canViewPayrollSpend } from '@/lib/auth/payroll-access'
+import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { cn } from '@/lib/utils'
 import {
   fetchBillingKpi,
@@ -61,6 +67,7 @@ import {
   fetchCollectionsKpi,
   fetchCollectionsByMonth,
   fetchPayrollKpi,
+  fetchPayrollSpend,
   fetchProductionKpi,
   fetchProductionByWeek,
   fetchPunchKpi,
@@ -104,6 +111,27 @@ function billingSplitSubtitle(
   })
 }
 
+/** Hora de la última corrida del snapshot (UTC `yyyy-MM-dd HH:mm:ss`) en New York, formato US. */
+const PAYROLL_TIME_ZONE = 'America/New_York'
+function formatSnapshotStamp(utc: string): { date: string; time: string } | null {
+  const d = new Date(`${utc.replace(' ', 'T')}Z`)
+  if (Number.isNaN(d.getTime())) return null
+  return {
+    date: d.toLocaleDateString('en-US', { timeZone: PAYROLL_TIME_ZONE, month: '2-digit', day: '2-digit', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { timeZone: PAYROLL_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: true }),
+  }
+}
+
+const fmtCents = (n: number) =>
+  n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** Montos de Payroll: abreviado en la tarjeta ($745.9k); con un click, completo con centavos ($745,921.78). */
+function kpiCentsProps(n: number | undefined): { value: string; valueFull?: string } {
+  if (n === undefined) return { value: '—' }
+  if (n >= 1000) return { value: fmtMoneyK(n), valueFull: fmtCents(n) }
+  return { value: fmtCents(n) }
+}
+
 function formatUsDate(date: Date): string {
   return format(date, 'MM/dd/yyyy')
 }
@@ -129,7 +157,11 @@ const KPI_CARD_GRID = 'grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,20r
 export default function BusinessKpisPage() {
   const { t } = useTranslation()
   const { dateRange, selectedDealers, filtersHydrated } = useFilters()
-  const [payrollWeek, setPayrollWeek] = useState(PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1].value)
+  const { user, loading: meLoading, hasPermission } = useSrsMe()
+  // Cada tab pide lo suyo (decisión C): Production Report (47) las de producción y facturación,
+  // Time Tracking > Payroll (93) la de payroll.
+  const canSeeProductionTabs = canAccessProductionReport(user, hasPermission)
+  const canSeePayroll = canViewPayrollSpend(user, hasPermission)
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [includeZero, setIncludeZero] = useState(false)
   // Las tres tarjetas del resumen muestran solo título y total; un click en cualquiera abre el detalle de las tres.
@@ -139,6 +171,10 @@ export default function BusinessKpisPage() {
   // WO Production está oculta (sin botón): la pestaña y sus consultas siguen en el
   // código para volver a mostrarla, pero no se pide nada mientras no se elija.
   const [activeTab, setActiveTab] = useState('billing')
+  // Quien solo tiene «Time Tracking > Payroll» entra directo en Payroll Spend.
+  useEffect(() => {
+    if (!meLoading && !canSeeProductionTabs && canSeePayroll) setActiveTab('payroll')
+  }, [meLoading, canSeeProductionTabs, canSeePayroll])
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -151,11 +187,6 @@ export default function BusinessKpisPage() {
   const headerRangeLabel = useMemo(
     () => formatUsDateRange(dateRange?.from, dateRange?.to),
     [dateRange],
-  )
-
-  const payrollWeekMeta = useMemo(
-    () => PAYROLL_WEEKS.find((w) => w.value === payrollWeek) ?? PAYROLL_WEEKS[PAYROLL_WEEKS.length - 1],
-    [payrollWeek],
   )
 
   const rangeReady =
@@ -183,14 +214,15 @@ export default function BusinessKpisPage() {
     return { ...headerKpiParams, filterDateDone }
   }, [headerKpiParams, filterDateDone])
 
+  // Payroll usa las fechas y los dealers del header, como las demás tabs (plan v9: sin combos).
   const payrollKpiParams = useMemo((): KpiQueryParams | null => {
     if (!rangeReady) return null
     return {
-      fechaDesde: payrollWeekMeta.start,
-      fechaHasta: payrollWeekMeta.end,
+      fechaDesde: headerRange.fechaDesde,
+      fechaHasta: headerRange.fechaHasta,
       idDealer,
     }
-  }, [rangeReady, payrollWeekMeta, idDealer])
+  }, [rangeReady, headerRange, idDealer])
 
   const prod = useQuery({
     queryKey: ['srs-kpi', 'production', productionKpiParams],
@@ -206,7 +238,8 @@ export default function BusinessKpisPage() {
   const bill = useQuery({
     queryKey: ['srs-kpi', 'billing', billingKpiParams],
     queryFn: () => fetchBillingKpi(billingKpiParams!),
-    enabled: Boolean(billingKpiParams) && activeTab === 'billing',
+    // Payroll lo usa para Labor Cost / Revenue (Total Payroll ÷ Income).
+    enabled: Boolean(billingKpiParams) && (activeTab === 'billing' || activeTab === 'payroll'),
   })
   const billWeek = useQuery({
     queryKey: ['srs-kpi', 'billing-by-week', billingKpiParams],
@@ -251,7 +284,12 @@ export default function BusinessKpisPage() {
   const pay = useQuery({
     queryKey: ['srs-kpi', 'payroll', payrollKpiParams],
     queryFn: () => fetchPayrollKpi(payrollKpiParams!),
-    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll',
+    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeePayroll,
+  })
+  const spend = useQuery({
+    queryKey: ['srs-kpi', 'payroll-spend', payrollKpiParams],
+    queryFn: () => fetchPayrollSpend(payrollKpiParams!),
+    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeePayroll,
   })
 
   const p = prod.data
@@ -260,6 +298,15 @@ export default function BusinessKpisPage() {
   const c = coll.data
   const k = punch.data
   const y = pay.data
+  const s = spend.data
+  const spendStamp = s?.calculatedAt ? formatSnapshotStamp(s.calculatedAt) : null
+  // Active Employees: monto ÷ horas de la barra Hourly del gráfico (los números que ya se ven).
+  const hourlyRow = s?.byType.find((r) => r.kind === 'hourly')
+  const activeEmployeesSubtitle =
+    hourlyRow && hourlyRow.hours > 0
+      ? t('mockKpis.activeEmployeesHourlyRate', { rate: fmtCents(hourlyRow.amount / hourlyRow.hours) })
+      : ''
+  const spendBeforeData = Boolean(s && headerRange.fechaDesde && headerRange.fechaDesde < s.dataFrom)
   // Unpaid = WO Invoiced + TTK Invoiced + Generic Invoiced − Collected, con los números
   // grandes que se ven: Collected mira exactamente las líneas de esas tres cards (WO: todo
   // el trabajo del rango; TTK y Generic: invoices enteras) con la misma valoración. WO Not
@@ -361,30 +408,36 @@ export default function BusinessKpisPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-5">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border/60 bg-muted/25 p-1.5 shadow-sm sm:grid-cols-4">
-          <KpiTabTrigger
-            value="billing"
-            icon={Receipt}
-            label={t('mockKpis.tabBilling')}
-            accent="sky"
-          />
-          <KpiTabTrigger
-            value="collections"
-            icon={Landmark}
-            label={t('mockKpis.tabCollections')}
-            accent="amber"
-          />
-          <KpiTabTrigger
-            value="punch"
-            icon={Fingerprint}
-            label={t('mockKpis.tabPunch')}
-            accent="violet"
-          />
-          <KpiTabTrigger
-            value="payroll"
-            icon={HandCoins}
-            label={t('mockKpis.tabPayroll')}
-            accent="rose"
-          />
+          {canSeeProductionTabs ? (
+            <>
+              <KpiTabTrigger
+                value="billing"
+                icon={Receipt}
+                label={t('mockKpis.tabBilling')}
+                accent="sky"
+              />
+              <KpiTabTrigger
+                value="collections"
+                icon={Landmark}
+                label={t('mockKpis.tabCollections')}
+                accent="amber"
+              />
+              <KpiTabTrigger
+                value="punch"
+                icon={Fingerprint}
+                label={t('mockKpis.tabPunch')}
+                accent="violet"
+              />
+            </>
+          ) : null}
+          {canSeePayroll ? (
+            <KpiTabTrigger
+              value="payroll"
+              icon={HandCoins}
+              label={t('mockKpis.tabPayroll')}
+              accent="rose"
+            />
+          ) : null}
         </TabsList>
 
         <TabsContent value="production" className="space-y-6">
@@ -628,32 +681,121 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground tabular-nums">
-              {formatUsDateRange(new Date(`${payrollWeekMeta.start}T12:00:00`), new Date(`${payrollWeekMeta.end}T12:00:00`))}
-            </p>
-            <Select value={payrollWeek} onValueChange={setPayrollWeek}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYROLL_WEEKS.map((w) => (
-                  <SelectItem key={w.value} value={w.value}>
-                    {w.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {s && s.paymentMethod === null ? (
+            <p className="text-sm text-muted-foreground">{t('businessKpis.payrollNoPeriod')}</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+                  <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="tabular-nums">
+                    {spend.isLoading
+                      ? '…'
+                      : spendStamp
+                        ? t('businessKpis.payrollLastUpdated', spendStamp)
+                        : t('businessKpis.payrollNotCalculated')}
+                  </span>
+                </p>
+                {spendBeforeData && s ? (
+                  <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+                    <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>{t('businessKpis.payrollNoDataBefore', { date: formatUsCalendarDate(s.dataFrom) })}</span>
+                  </p>
+                ) : null}
+              </div>
+              <KpiErrorBanner q={spend} />
+              <div className={KPI_CARD_GRID}>
+                <KPICard
+                  inline
+                  help={t('businessKpisHelp.totalPayroll')}
+                  loading={spend.isLoading}
+                  title={t('mockKpis.totalPayroll')}
+                  {...kpiCentsProps(s?.totalPayroll)}
+                  icon={<HandCoins className="h-5 w-5" />}
+                  variant="success"
+                  // Con todos los dealers el total incluye los salarios sin dealer: se dice cuánto y de cuántos.
+                  subtitle={
+                    s?.allDealers && s.withoutDealer && s.withoutDealer.amount !== 0
+                      ? t(
+                          s.withoutDealer.employees === 1
+                            ? 'mockKpis.totalPayrollWithoutDealerOne'
+                            : 'mockKpis.totalPayrollWithoutDealer',
+                          { amount: fmtCents(s.withoutDealer.amount), employees: s.withoutDealer.employees },
+                        )
+                      : ''
+                  }
+                />
+                <KPICard
+                  inline
+                  help={t('businessKpisHelp.overtime')}
+                  loading={spend.isLoading}
+                  title={t('mockKpis.overtimePayment')}
+                  {...kpiCentsProps(s?.overtime.amount)}
+                  icon={<Timer className="h-5 w-5" />}
+                  variant="warning"
+                />
+                <KPICard
+                  inline
+                  help={t('businessKpisHelp.overtimeHours')}
+                  loading={spend.isLoading}
+                  title={t('mockKpis.overtimeHours')}
+                  value={s ? `${s.overtime.hours.toLocaleString('en-US', { maximumFractionDigits: 2 })} h` : '—'}
+                  icon={<Clock className="h-5 w-5" />}
+                  variant="warning"
+                  subtitle={
+                    s
+                      ? s.overtime.employeesOver40 === 1
+                        ? t('mockKpis.hoursOver40One')
+                        : t('mockKpis.hoursOver40', { employees: s.overtime.employeesOver40 })
+                      : ''
+                  }
+                />
+                <KPICard
+                  inline
+                  help={t('businessKpisHelp.piecework')}
+                  loading={spend.isLoading}
+                  title={t('mockKpis.piecework')}
+                  {...kpiCentsProps(s?.piecework)}
+                  icon={<Package className="h-5 w-5" />}
+                  variant="info"
+                />
+              </div>
+            </>
+          )}
           <KpiErrorBanner q={pay} />
           <div className={KPI_CARD_GRID}>
-            <KPICard inline help={t('businessKpisHelp.totalPayroll')} loading={pay.isLoading} title={t('mockKpis.totalPayroll')} {...kpiMoneyProps(y?.totalPayroll)} icon={<HandCoins className="h-5 w-5" />} variant="success" />
-            <KPICard inline help={t('businessKpisHelp.overtime')} loading={pay.isLoading} title={t('mockKpis.overtimeCost')} {...kpiMoneyProps(y?.overtimeCost)} icon={<Timer className="h-5 w-5" />} variant="warning" subtitle={y ? t('mockKpis.pctOfPayroll', { pct: y.overtimePct }) : ''} />
-            <KPICard inline help={t('businessKpisHelp.laborCost')} loading={pay.isLoading} title={t('mockKpis.laborCostRevenue')} value={y ? `${y.laborCostPct}%` : '—'} icon={<Percent className="h-5 w-5" />} variant="violet" />
-            <KPICard inline help={t('businessKpisHelp.costPerWo')} loading={pay.isLoading} title={t('mockKpis.costPerWo')} value={y ? `$${y.avgCostPerWo.toFixed(2)}` : '—'} icon={<Wrench className="h-5 w-5" />} variant="info" />
-            <KPICard inline help={t('businessKpisHelp.activeEmployees')} loading={pay.isLoading} title={t('mockCosts.activeEmployees')} value={y ? y.activeEmployees : '—'} icon={<Users className="h-5 w-5" />} variant="default" subtitle={y ? t('mockKpis.avgRatePerHour', { rate: y.avgHourlyRate }) : ''} />
-            <KPICard inline help={t('businessKpisHelp.revenuePerEmployee')} loading={pay.isLoading} title={t('mockKpis.revenuePerEmployee')} {...kpiMoneyProps(y && p ? Math.round(p.productionValue / Math.max(1, y.activeEmployees)) : undefined)} icon={<TrendingUp className="h-5 w-5" />} variant="success" />
+            {/* Total Payroll (primera tarjeta) ÷ Income (tab Billing), con los mismos números que se ven. */}
+            <KPICard inline help={t('businessKpisHelp.laborCost')} loading={spend.isLoading || bill.isLoading} title={t('mockKpis.laborCostRevenue')} value={s && incomeTotalShown ? `${Math.round((s.totalPayroll / incomeTotalShown) * 1000) / 10}%` : '—'} icon={<Percent className="h-5 w-5" />} variant="violet" />
+            {/* Total Payroll (con piecework) ÷ WOs Completed de la tab Production. */}
+            <KPICard inline help={t('businessKpisHelp.costPerWo')} loading={spend.isLoading || prod.isLoading} title={t('mockKpis.costPerWo')} value={s && p && p.woCompleted > 0 ? fmtCents(s.totalPayroll / p.woCompleted) : '—'} icon={<Wrench className="h-5 w-5" />} variant="info" />
+            <KPICard inline help={t('businessKpisHelp.activeEmployees')} loading={pay.isLoading} title={t('mockCosts.activeEmployees')} value={y ? y.activeEmployees : '—'} icon={<Users className="h-5 w-5" />} variant="default" subtitle={activeEmployeesSubtitle} />
+            {/* Income (tab Billing) ÷ Active Employees (la tarjeta de al lado). */}
+            <KPICard inline help={t('businessKpisHelp.revenuePerEmployee')} loading={pay.isLoading || bill.isLoading} title={t('mockKpis.revenuePerEmployee')} {...kpiCentsProps(y && y.activeEmployees > 0 && incomeTotalShown !== undefined ? incomeTotalShown / y.activeEmployees : undefined)} icon={<TrendingUp className="h-5 w-5" />} variant="success" />
           </div>
+          {s && s.paymentMethod !== null ? (
+            <>
+              <PayrollByTypeChart
+                data={s}
+                loading={spend.isLoading}
+                rangeLabel={headerRangeLabel}
+                dealerCount={selectedDealers.length}
+              />
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>{t('businessKpis.payrollNote1')}</p>
+                <p>{t('businessKpis.payrollNote2')}</p>
+                <p>{t('businessKpis.payrollNote3')}</p>
+                <p>{t('businessKpis.payrollNote4')}</p>
+                <p>{t('businessKpis.payrollNote5')}</p>
+                <p>{t('businessKpis.payrollNote6')}</p>
+                {s.withoutDealer && !s.allDealers && s.withoutDealer.amount !== 0 ? (
+                  <p>{t('businessKpis.payrollWithoutDealer', { amount: fmtDollars(s.withoutDealer.amount) })}</p>
+                ) : null}
+                {s.dealerRestricted ? <p>{t('businessKpis.payrollDealerRestricted')}</p> : null}
+              </div>
+            </>
+          ) : spend.isLoading ? (
+            <PayrollByTypeChart loading rangeLabel={headerRangeLabel} dealerCount={selectedDealers.length} />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>

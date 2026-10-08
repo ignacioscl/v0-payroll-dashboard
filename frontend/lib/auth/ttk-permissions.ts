@@ -3,6 +3,8 @@
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
 /** Same gate as legacy production.php / ProductionReportService. */
 export const ROL_ACCION_PRODUCTION_REPORT = 47
+/** Time Tracking > Payroll (legacy show-rol-action-93, Payroll Excel Report): montos de payroll. */
+export const ROL_ACCION_TTK_PAYROLL = 93
 /** Same gate as legacy Time Tracking menu (show-rol-action-65 / Daily Punch). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 export const ROL_ACCION_ADD_EDIT_PUNCH = 67
