@@ -8,8 +8,11 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PunchAccessPolicyService, type PunchAccessPolicy } from '../punch-access-policy'
-import { PunchExportSemaphore } from '../punch-export-semaphore'
-import { PunchExportTicketStore, type PunchExportStoredFilters } from '../punch-export-ticket.store'
+import { PunchExportSemaphore } from '../../shared/export/punch-export-semaphore'
+import {
+  PunchExportTicketStore,
+  type PunchExportStoredFilters,
+} from '../../shared/export/punch-export-ticket.store'
 import {
   PunchExportPrepareDto,
   PunchExportPrepareResponseDto,

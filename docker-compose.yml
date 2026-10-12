@@ -74,6 +74,9 @@ services:
       # Para alcanzar MariaDB y demás servicios en el host.
       - "host.docker.internal:host-gateway"
       - "srs.com:host-gateway"
+      # Prod: Send Email / Create File del export de invoices llaman al PHP por SRS_API_URL.
+      # Mismo motivo que el front: sin Cloudflare y sin EAI_AGAIN (plan-export-invoices-nest §8.7).
+      - "main.srssuite.com:192.249.114.194"
     restart: always
     healthcheck:
       test:

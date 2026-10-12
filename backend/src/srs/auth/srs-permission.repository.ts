@@ -11,6 +11,9 @@ export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
 /** Legacy ROL_ACCION: Invoices > Create Invoice (`show-rol-action-16`). */
 export const ROL_ACCION_INVOICE_CREATE = 16
 
+/** Legacy ROL_ACCION: Invoices > Print Invoice — also gates the export (D23). */
+export const ROL_ACCION_INVOICE_PRINT = 19
+
 /** Legacy ROL_ACCION: District filter in billing (`show-rol-action-69`). */
 export const ROL_ACCION_BILLING_DISTRICT = 69
 

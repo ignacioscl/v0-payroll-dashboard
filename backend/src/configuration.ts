@@ -8,4 +8,6 @@ export default () => ({
   initAdmin: process.env.INIT_ADMIN,
   initAdminPassword: process.env.INIT_ADMIN_PASSWORD,
   apiEndpoint: process.env.API_ENDPOINT,
+  /** PHP of main (Apache vhost), for Send Email / Create File of the invoices export (§8.7). */
+  srsApiUrl: process.env.SRS_API_URL,
 })

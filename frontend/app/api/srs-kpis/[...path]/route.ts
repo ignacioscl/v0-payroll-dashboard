@@ -34,6 +34,9 @@ async function handle(request: NextRequest, context: RouteContext) {
   if (session.user.idDealerProvider && session.user.idDealerProvider > 0) {
     headers['x-srs-dealer-provider'] = String(session.user.idDealerProvider)
   }
+  // External user (dealer company): the invoices export writes COMPANY instead of DEALER (D24 of
+  // plans/plan-export-invoices-nest). Same rule: only the session sets it, never the browser.
+  headers['x-srs-company-type'] = session.user.isCompanyTypeCompany ? '1' : '0'
 
   const upstream = await fetchBackend(target, session.token, {
     method: request.method,

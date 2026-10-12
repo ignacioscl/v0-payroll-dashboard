@@ -242,23 +242,34 @@ export interface Messages {
     bulkSelectAll: string
     bulkSelectRow: string
     bulkExportTitle: string
-    bulkExportHint: string
-    bulkExportFormat: string
-    bulkExportDownload: string
-    bulkExportSendEmail: string
-    bulkExportEmailSuccess: string
-    bulkExportDownloadSuccess: string
-    bulkExportError: string
-    bulkExportType: string
-    bulkExportTypeGrid: string
-    bulkExportTypeGridHint: string
-    bulkExportTypeInvoice: string
-    bulkExportTypeInvoiceHint: string
-    bulkExportTypeWo: string
-    bulkExportTypeWoHint: string
-    bulkExportDelivery: string
-    bulkExportXlsxHint: string
-    bulkExportCsvHint: string
+    exportXlsTitle: string
+    exportXlsSubtitle: string
+    exportXlsVisualization: string
+    exportXlsTypeInvoice: string
+    exportXlsTypeWo: string
+    exportXlsFileName: string
+    exportXlsFileNameHint: string
+    exportXlsExport: string
+    exportXlsMaxChars: string
+    exportXlsAction: string
+    exportXlsActionSend: string
+    exportXlsActionQueue: string
+    exportXlsEmailTo: string
+    exportXlsEmailToHint: string
+    exportXlsLastAccount: string
+    exportXlsLastAccountPlaceholder: string
+    exportXlsQueueName: string
+    exportXlsQueueNameHint: string
+    exportXlsSubject: string
+    exportXlsMessage: string
+    exportXlsReplyTo: string
+    exportXlsTimeCard: string
+    exportXlsRequired: string
+    exportXlsInvalidEmails: string
+    exportXlsInvalidEmail: string
+    exportXlsSent: string
+    exportXlsQueued: string
+    exportXlsWorking: string
     bulkGsTitle: string
     bulkGsShort: string
     bulkGsHint: string

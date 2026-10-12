@@ -37,7 +37,6 @@ export const SrsPhpPath = {
   INVOICE_SENT_EMAIL_ACCOUNTS: 'php/api/payroll/invoice-sent-email-accounts.php',
   INVOICE_STATEMENT_EMAIL_LOG: 'php/api/payroll/invoice-statement-email-log.php',
   INVOICE_TTK_DETAIL: 'php/api/payroll/invoice-ttk-detail.php',
-  INVOICE_EXPORT: 'php/api/payroll/invoice-export.php',
   TTK_SAVE_PAYMENT: 'php/api/payroll/ttk-save-payment.php',
   DEALERS: 'php/api/payroll/dealers.php',
   ME: 'php/api/payroll/me.php',

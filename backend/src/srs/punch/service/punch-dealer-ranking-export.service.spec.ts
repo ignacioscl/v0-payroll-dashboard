@@ -11,8 +11,8 @@ import type {
   PunchDealerRankingRowDto,
 } from '../dto/punch-dealer-ranking.dto'
 import { PunchAccessPolicyService } from '../punch-access-policy'
-import { PunchExportSemaphore } from '../punch-export-semaphore'
-import { PunchExportTicketStore } from '../punch-export-ticket.store'
+import { PunchExportSemaphore } from '../../shared/export/punch-export-semaphore'
+import { PunchExportTicketStore } from '../../shared/export/punch-export-ticket.store'
 import { PunchDealerRankingRepository } from '../repository/punch-dealer-ranking.repository'
 import { PunchDealerRankingExportService } from './punch-dealer-ranking-export.service'
 

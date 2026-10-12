@@ -7,11 +7,11 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PunchAccessPolicyService, type PunchAccessPolicy } from '../punch-access-policy'
-import { PunchExportSemaphore } from '../punch-export-semaphore'
+import { PunchExportSemaphore } from '../../shared/export/punch-export-semaphore'
 import {
   PunchExportTicketStore,
   type DealerRankingExportStoredFilters,
-} from '../punch-export-ticket.store'
+} from '../../shared/export/punch-export-ticket.store'
 import { PunchExportPrepareResponseDto, PunchExportStatusDto } from '../dto/punch-export.dto'
 import { PunchDealerRankingExportPrepareDto } from '../dto/punch-dealer-ranking.dto'
 import { PunchDealerRankingRepository } from '../repository/punch-dealer-ranking.repository'
