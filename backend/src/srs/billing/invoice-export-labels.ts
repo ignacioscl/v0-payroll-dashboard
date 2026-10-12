@@ -40,6 +40,8 @@ export type InvoiceExportLabels = {
   yes: string
   no: string
   typeNames: { wo: string; ttk: string; generic: string }
+  /** DEPARTMENT of a Time Tracking invoice without department (§8.8, D34). */
+  ttkDepartment: string
   paymentValues: { all: string; paid: string; unpaid: string }
   sentValues: { all: string; sent: string; notSent: string }
   deletedValues: { hide: string; only: string; all: string }
@@ -81,6 +83,7 @@ const EN: InvoiceExportLabels = {
   yes: 'Yes',
   no: 'No',
   typeNames: { wo: 'Work Orders', ttk: 'Time Tracking', generic: 'Generic' },
+  ttkDepartment: 'Timesheets',
   paymentValues: { all: 'All', paid: 'Paid', unpaid: 'Unpaid' },
   sentValues: { all: 'All', sent: 'Sent', notSent: 'Not sent' },
   deletedValues: { hide: 'Hide', only: 'Only', all: 'Show all' },
@@ -122,6 +125,8 @@ const ES: InvoiceExportLabels = {
   yes: 'Sí',
   no: 'No',
   typeNames: { wo: 'Órdenes de trabajo', ttk: 'Seguimiento de tiempo', generic: 'Genéricas' },
+  // The name the customer chose: not translated.
+  ttkDepartment: 'Timesheets',
   paymentValues: { all: 'Todas', paid: 'Pagadas', unpaid: 'Impagas' },
   sentValues: { all: 'Todas', sent: 'Enviadas', notSent: 'Sin enviar' },
   deletedValues: { hide: 'Ocultar', only: 'Solo', all: 'Ver todas' },

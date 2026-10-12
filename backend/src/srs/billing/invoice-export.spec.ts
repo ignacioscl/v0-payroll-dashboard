@@ -6,6 +6,7 @@ import { InvoiceListQueryDto } from './dto/invoice-list.dto'
 import { invoiceExportLabels } from './invoice-export-labels'
 import {
   invoiceExportDaysOld,
+  invoiceExportDepartment,
   invoiceExportRowDiscount,
   invoiceExportServicesText,
   writeInvoiceExportWorkbook,
@@ -114,6 +115,22 @@ describe('invoiceExportServicesText — legacy SERVICES rule', () => {
   })
 })
 
+describe('invoiceExportDepartment (§8.8)', () => {
+  const en = invoiceExportLabels('en')
+  it('Time Tracking without department: "Timesheets", in both languages', () => {
+    expect(invoiceExportDepartment(row({ statementType: 5 }), en)).toBe('Timesheets')
+    expect(invoiceExportDepartment(row({ statementType: 5 }), invoiceExportLabels('es'))).toBe('Timesheets')
+  })
+  it('with a department: the department, also for Time Tracking', () => {
+    expect(invoiceExportDepartment(row({ statementType: 5, department: 'Sales' }), en)).toBe('Sales')
+    expect(invoiceExportDepartment(row({ statementType: 2, department: 'Service' }), en)).toBe('Service')
+  })
+  it('other types without department: empty', () => {
+    expect(invoiceExportDepartment(row({ statementType: 2 }), en)).toBe('')
+    expect(invoiceExportDepartment(row({ statementType: 6 }), en)).toBe('')
+  })
+})
+
 describe('invoiceExportRowDiscount (§8.6)', () => {
   it("the row's share of the discount, empty when 0", () => {
     expect(invoiceExportRowDiscount(row({ discount: 180, discountAmount: 113.6912 }))).toBe(113.69)
@@ -218,6 +235,7 @@ describe('writeInvoiceExportWorkbook', () => {
             }),
           ],
           [row({ id: 2, dealer: 'AutoNation Lexus of Palm Beach', displayFullNro: '=SUM(1)', total: 150, subtotal: 150 })],
+          [row({ id: 3, dealer: 'AutoNation Lexus of Palm Beach', displayFullNro: 'LPB100', statementType: 5, total: 900, subtotal: 900 })],
         ),
       }),
     )
@@ -249,6 +267,9 @@ describe('writeInvoiceExportWorkbook', () => {
     expect(r3.getCell(11).value).toBe(38)
     // A value starting with "=" is never a formula.
     expect(data.getRow(4).getCell(2).formula).toBeUndefined()
+    // A WO invoice without department stays empty; Time Tracking says "Timesheets" (§8.8).
+    expect(data.getRow(4).getCell(5).value ?? '').toBe('')
+    expect(data.getRow(5).getCell(5).value).toBe('Timesheets')
   })
 
   it('external user: COMPANY with the provider name', async () => {

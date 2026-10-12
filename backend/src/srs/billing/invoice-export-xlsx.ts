@@ -6,7 +6,11 @@ import { writeReportInfoSheet, type ReportInfoRow } from '../shared/export/repor
 import { THEME, applyHeaderRow, styleDataRow, thinBorder } from '../shared/export/xlsx-theme'
 import type { InvoiceRowDto } from './dto/invoice-list.dto'
 import type { InvoiceExportType } from './dto/invoice-export.dto'
-import { invoiceExportLabels, invoiceExportReportName } from './invoice-export-labels'
+import {
+  invoiceExportLabels,
+  invoiceExportReportName,
+  type InvoiceExportLabels,
+} from './invoice-export-labels'
 import type { InvoiceExportWoLineRow } from './repository/invoice.repository'
 import { formatFullNroWithNroBilled } from './invoice-nro-billed'
 
@@ -40,6 +44,15 @@ function woServiceNames(raw?: string): string {
   if (!raw) return ''
   const names = raw.split(',').map((item) => item.split('|')[0] ?? '')
   return names.join(',').replace(/,+$/, '')
+}
+
+/**
+ * DEPARTMENT of a grid row (type "Invoice"): its department; a Time Tracking invoice without one
+ * says "Timesheets", as the customer asked on 10/12/2026 (plans/plan-export-invoices-nest §8.8, D34).
+ */
+export function invoiceExportDepartment(row: InvoiceRowDto, labels: InvoiceExportLabels): string {
+  if (row.department) return row.department
+  return row.statementType === 5 ? labels.ttkDepartment : ''
 }
 
 /** A cell that starts with "=" stays text: no cell of the file is a formula (§1.5). */
@@ -266,7 +279,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
           row.displayFullNro || row.fullNro,
           row.fechaDesde ? ymdToUs(row.fechaDesde) : '',
           row.fechaHasta ? ymdToUs(row.fechaHasta) : '',
-          row.department ?? '',
+          invoiceExportDepartment(row, labels),
           invoiceExportServicesText(row),
           money(row.subtotal),
           invoiceExportRowDiscount(row),
