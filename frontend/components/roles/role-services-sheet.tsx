@@ -136,7 +136,8 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
         checked={flagOf(row, column)}
         disabled={pending.has(k)}
         aria-label={`${columnLabel(column)} · ${row.service}`}
-        className="cursor-pointer disabled:cursor-not-allowed"
+        // Only disabled while saving: wait cursor, not not-allowed.
+        className="cursor-pointer disabled:cursor-wait"
         onCheckedChange={(value) => {
           void save(column, [row.idService], value === true)
         }}
@@ -151,7 +152,7 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
         checked={headerState(column)}
         disabled={busy || filtered.length === 0}
         aria-label={t('roles.servicesCheckAll', { column: columnLabel(column) })}
-        className="cursor-pointer disabled:cursor-not-allowed"
+        className={busy ? 'cursor-pointer disabled:cursor-wait' : 'cursor-pointer disabled:cursor-not-allowed'}
         onCheckedChange={(value) => requestBulk(column, value === true)}
       />
     </div>
