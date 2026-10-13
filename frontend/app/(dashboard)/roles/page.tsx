@@ -102,7 +102,7 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4 p-4 md:p-6">
+    <div className="flex min-w-0 flex-col gap-4">
       <PageHeading
         icon={<Shield className="size-5 text-white" />}
         title={t('roles.title')}

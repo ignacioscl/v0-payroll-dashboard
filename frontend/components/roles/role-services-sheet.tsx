@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -29,6 +28,7 @@ import { useRoleServices, useSetRoleServices } from '@/hooks/use-role-services'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import type { RoleListRow, RoleServiceColumn, RoleServiceRow } from '@/lib/roles/roles-types'
+import { cn } from '@/lib/utils'
 
 /** Above this many services, "select all" asks before saving (plan E1.1). */
 const CONFIRM_ABOVE = 10
@@ -138,7 +138,7 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
         disabled={pending.has(k)}
         aria-label={`${columnLabel(column)} · ${row.service}`}
         // Only disabled while saving: wait cursor, not not-allowed.
-        className="cursor-pointer disabled:cursor-wait"
+        className="cursor-pointer border-muted-foreground/50 disabled:cursor-wait"
         onCheckedChange={(value) => {
           void save(column, [row.idService], value === true)
         }}
@@ -146,18 +146,25 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
     )
   }
 
+  // Header "select all" sits next to the column title, on the colored header (same look as the roles table).
   const renderHeaderCheck = (column: RoleServiceColumn) => (
-    <div className="flex flex-col items-center gap-1">
-      <span>{columnLabel(column)}</span>
+    <label className="inline-flex cursor-pointer items-center justify-center gap-1.5">
       <Checkbox
         checked={headerState(column)}
         disabled={busy || filtered.length === 0}
         aria-label={t('roles.servicesCheckAll', { column: columnLabel(column) })}
-        className={busy ? 'cursor-pointer disabled:cursor-wait' : 'cursor-pointer disabled:cursor-not-allowed'}
+        className={cn(
+          'cursor-pointer border-white bg-white data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-[var(--table-header)] disabled:opacity-70',
+          busy ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed',
+        )}
         onCheckedChange={(value) => requestBulk(column, value === true)}
       />
-    </div>
+      <span>{columnLabel(column)}</span>
+    </label>
   )
+
+  const headCell = 'h-9 px-3 text-xs font-semibold uppercase tracking-wide whitespace-nowrap text-white'
+  const headStyle: React.CSSProperties = { backgroundColor: 'var(--table-header)' }
 
   let body: React.ReactNode
   if (query.isLoading) {
@@ -179,30 +186,79 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
   } else if (filtered.length === 0) {
     body = <p className="py-8 text-center text-sm text-muted-foreground">{t('roles.servicesNoResults')}</p>
   } else {
+    const colgroup = (
+      <colgroup>
+        <col className="w-[26%]" />
+        <col className="w-[15%]" />
+        <col />
+        <col className="w-[120px]" />
+        <col className="w-[120px]" />
+      </colgroup>
+    )
+    const tableClass = 'w-full table-fixed border-separate border-spacing-0 text-sm'
     body = (
-      <div className="overflow-x-auto">
-        <Table className="min-w-[560px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('roles.servicesColDealer')}</TableHead>
-              <TableHead>{t('roles.servicesColDepartment')}</TableHead>
-              <TableHead>{t('roles.servicesColService')}</TableHead>
-              <TableHead className="h-auto w-[96px] py-2 text-center">{renderHeaderCheck('create')}</TableHead>
-              <TableHead className="h-auto w-[96px] py-2 text-center">{renderHeaderCheck('approve')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((row) => (
-              <TableRow key={row.idService}>
-                <TableCell className="max-w-[180px] truncate text-sm">{row.dealer}</TableCell>
-                <TableCell className="max-w-[140px] truncate text-sm">{row.department}</TableCell>
-                <TableCell className="text-sm">{row.service}</TableCell>
-                <TableCell className="text-center">{renderFlag(row, 'create')}</TableCell>
-                <TableCell className="text-center">{renderFlag(row, 'approve')}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      // No sticky header: on phones a sticky <th> inside a scroll box leaves a 1px seam and jitters.
+      // The header sits outside the vertical scroller; one horizontal scroller moves both together.
+      // Both parts reserve the same scrollbar gutter so their columns line up.
+      <div className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden rounded-md border border-border">
+        <div className="flex min-h-0 min-w-[620px] flex-1 flex-col">
+          <div
+            className="shrink-0 overflow-y-hidden [scrollbar-gutter:stable]"
+            style={{ backgroundColor: 'var(--table-header)' }}
+          >
+            <table className={tableClass}>
+              {colgroup}
+              <TableHeader className="[&_tr]:border-0">
+                <TableRow className="border-0 hover:bg-transparent">
+                  <TableHead className={headCell} style={headStyle}>
+                    {t('roles.servicesColDealer')}
+                  </TableHead>
+                  <TableHead className={headCell} style={headStyle}>
+                    {t('roles.servicesColDepartment')}
+                  </TableHead>
+                  <TableHead className={headCell} style={headStyle}>
+                    {t('roles.servicesColService')}
+                  </TableHead>
+                  <TableHead className={cn(headCell, 'px-1 text-center')} style={headStyle}>
+                    {renderHeaderCheck('create')}
+                  </TableHead>
+                  <TableHead className={cn(headCell, 'px-1 text-center')} style={headStyle}>
+                    {renderHeaderCheck('approve')}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+            </table>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+            <table className={tableClass}>
+              {colgroup}
+              <TableBody>
+                {filtered.map((row, index) => (
+                  <TableRow
+                    key={row.idService}
+                    className={cn('hover:bg-muted/60', index % 2 !== 0 ? 'bg-muted/25' : 'bg-card')}
+                  >
+                    <TableCell className="truncate border-b border-border/60 px-3 py-1.5 text-sm">
+                      {row.dealer}
+                    </TableCell>
+                    <TableCell className="truncate border-b border-border/60 px-3 py-1.5 text-sm">
+                      {row.department}
+                    </TableCell>
+                    <TableCell className="border-b border-border/60 px-3 py-1.5 text-sm whitespace-normal break-words">
+                      {row.service}
+                    </TableCell>
+                    <TableCell className="border-b border-border/60 px-3 py-1.5 text-center">
+                      {renderFlag(row, 'create')}
+                    </TableCell>
+                    <TableCell className="border-b border-border/60 px-3 py-1.5 text-center">
+                      {renderFlag(row, 'approve')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </table>
+          </div>
+        </div>
       </div>
     )
   }
@@ -278,7 +334,7 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 sm:px-4">{body}</div>
+        <div className="flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4">{body}</div>
       </SheetContent>
 
       <ConfirmActionDialog

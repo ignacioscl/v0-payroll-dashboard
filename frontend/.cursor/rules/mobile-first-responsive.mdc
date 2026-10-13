@@ -31,12 +31,33 @@ phone (375px wide)**, not only on desktop. A change that only looks right on des
   Desktop sizes never apply unchanged to a 375px screen.
 - **Tabs and toolbars** with many items use a grid or wrap that fits 375px (e.g. `grid-cols-2 sm:grid-cols-4`).
 
+## Sticky headers: no seam, no jitter
+
+Anything `position: sticky` over content that scrolls under it (table headers, group headers in a
+sheet, toolbars) shows a **1px line of the rows scrolling through above it** and **jitters while
+scrolling** on phones: the scroll box lands on a fractional pixel and the browser snaps its clip
+edge and the sticky element to different pixels.
+
+- **Tables: use the shared `DataTable`** (`components/shared/data-table`) when it fits.
+- A table built by hand inside a sheet or box **does not use a sticky header**. The header goes
+  **outside the vertical scroller**: an outer box with `overflow-x-auto` (one horizontal scroll for
+  both), the header table on top, and the rows in their own `overflow-y-auto` box below; both tables
+  share the same `colgroup` and both parts get `[scrollbar-gutter:stable]` so the columns line up.
+  A 1px `box-shadow` band was tried and **did not fix it** in Chrome's phone view (2026-10-13).
+  Reference: `components/roles/role-services-sheet.tsx`.
+- Don't add a page margin a layout already gives: `MainLayout` pads the page (`p-4 md:p-6`), so a
+  page's root `div` adds none — otherwise phones lose 16px per side for nothing.
+
 ## Check before delivering
 
 1. Open the screen in the Browser pane and switch to mobile: `resize_window` with `preset: "mobile"` (375×812).
 2. Confirm there is **no horizontal page scroll** (`document.documentElement.scrollWidth <= window.innerWidth`)
    and that nothing is cut at the right edge.
-3. Take a mobile screenshot as proof, then reset with `preset: "desktop"`.
+3. If the screen has a fixed header over scrolling rows, **scroll the content up and down at mobile width**
+   and zoom on the header's top edge: no line of rows above it, no jumping. Ignacio checks with Chrome's
+   phone view (DevTools device mode) on his Mac; a plain 390px window does not show the seam, so a
+   check there is not proof — say so.
+4. Take a mobile screenshot as proof, then reset with `preset: "desktop"`.
 
 If you cannot open the screen (for example it needs a login you can't enter), say so explicitly — do not
 report the change as verified on mobile.
@@ -50,4 +71,5 @@ report the change as verified on mobile.
 ## Why
 
 On 2026-09-18 Ignacio found the Dashboard cut off at the right on a phone right after a KPI card change
-was delivered without a mobile check.
+was delivered without a mobile check. On 2026-10-13 the Roles > Services sheet (a hand-built table)
+shipped with the header seam and jitter on phones, and the Roles pages with a doubled side margin.

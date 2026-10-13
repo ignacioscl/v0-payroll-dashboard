@@ -71,7 +71,7 @@ export default function RoleTemplatesPage() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4 p-4 md:p-6">
+    <div className="flex min-w-0 flex-col gap-4">
       <PageHeading
         title={t('roleTemplates.title')}
         subtitle={t('roleTemplates.subtitle')}
