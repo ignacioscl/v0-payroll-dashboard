@@ -311,7 +311,8 @@ export function RoleTemplatePermissionsSheet({
                                   id={`rt-perm-${perm.id}`}
                                   checked={perm.assigned}
                                   disabled={busy}
-                                  className="mt-0.5"
+                                  // Saving is not "forbidden": show the wait cursor, not not-allowed.
+                                  className={cn('mt-0.5', busy && 'disabled:cursor-wait')}
                                   onCheckedChange={(value) => {
                                     void toggleOne(perm.id, value === true)
                                   }}
