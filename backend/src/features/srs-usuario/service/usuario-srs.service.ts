@@ -24,6 +24,13 @@ export class UsuarioSrsService extends GlobalBaseService<UsuarioSrs, UsuarioSrsQ
     const user = await this.repository.findOne({ where: { idUsuario } })
     if (!user) return false
     if (user.idRol === 1 || user.idRol === 2) return true
+    // Admin Company lives in USUARIO_ROL_REL (rol 2); usuarios.id_rol is NULL on real rows.
+    // Same rule as SrsAuthContextService.resolveContext.
+    const companyAdmin = await this.repository.query(
+      `SELECT 1 AS ok FROM USUARIO_ROL_REL urr WHERE urr.id_usuario = ? AND urr.id_rol = 2 LIMIT 1`,
+      [idUsuario],
+    )
+    if (companyAdmin.length > 0) return true
     if (!user.idRolSystemV2 || user.idRolSystemV2 < 1) return false
     const count = await this.rolePerms.countForRoleAndAccion(user.idRolSystemV2, idAccion)
     return count > 0
