@@ -425,6 +425,8 @@ export class InvoiceRowDto {
   })
   nroBilled?: number | null
   @ApiProperty({ nullable: true }) fechaPago?: string
+  @ApiProperty({ nullable: true, description: 'Day the payment was entered in SRS (BILLING.fecha_alta)' })
+  fechaAltaPago?: string
   @ApiProperty({ nullable: true }) checkNumber?: string
   @ApiProperty({ nullable: true }) amount?: number
   @ApiProperty({
