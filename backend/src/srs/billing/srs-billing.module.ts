@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { SRS_CONNECTION } from '../srs.datasource'
 import { SrsAuthModule } from '../auth/srs-auth.module'
+import { SrsExportModule } from '../shared/export/srs-export.module'
 import { InvoiceStatement } from './entity/invoice-statement.srsentity'
 import { InvoiceStatementInvRel } from './entity/invoice-statement-inv-rel.srsentity'
 
@@ -15,9 +16,15 @@ import { InvoiceRepository } from './repository/invoice.repository'
 import { GenericInvoiceController } from './controller/generic-invoice.controller'
 import { GenericInvoiceService } from './service/generic-invoice.service'
 import { GenericInvoiceRepository } from './repository/generic-invoice.repository'
+import { InvoiceExportController } from './controller/invoice-export.controller'
+import { InvoiceExportService } from './service/invoice-export.service'
 
 @Module({
-  imports: [SrsAuthModule, TypeOrmModule.forFeature([InvoiceStatement, InvoiceStatementInvRel], SRS_CONNECTION)],
+  imports: [
+    SrsAuthModule,
+    SrsExportModule,
+    TypeOrmModule.forFeature([InvoiceStatement, InvoiceStatementInvRel], SRS_CONNECTION),
+  ],
   providers: [
     BillingKpiRepository,
     BillingKpiService,
@@ -25,8 +32,16 @@ import { GenericInvoiceRepository } from './repository/generic-invoice.repositor
     InvoiceService,
     GenericInvoiceRepository,
     GenericInvoiceService,
+    InvoiceExportService,
   ],
-  controllers: [BillingKpiController, InvoiceController, GenericInvoiceController],
+  // InvoiceExportController goes before InvoiceController so `/invoices/export` is never read
+  // as `/invoices/:id/...`.
+  controllers: [
+    BillingKpiController,
+    InvoiceExportController,
+    InvoiceController,
+    GenericInvoiceController,
+  ],
   exports: [BillingKpiService, InvoiceService],
 })
 export class SrsBillingModule {}

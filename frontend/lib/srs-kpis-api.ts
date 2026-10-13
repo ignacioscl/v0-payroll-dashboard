@@ -272,7 +272,7 @@ export interface PayrollSpendKpi {
 export const fetchPayrollSpend = (params: KpiQueryParams) =>
   getKpi<PayrollSpendKpi>('payroll/spend', params)
 
-async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
+export async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
   if (isSrsBusy(res)) throw new SrsBusyError()
   const text = await res.text()
   let parsed: unknown = null

@@ -1,6 +1,7 @@
 // Tipos = DTOs del backend NestJS (src/srs/billing/dto/invoice-*.dto). Datos REALES.
 
 import { isSrsBusy, SrsBusyError } from '@/lib/srs-busy-error'
+import { readNestJson } from '@/lib/srs-kpis-api'
 
 export type InvoiceStatementTypeToken = 'wo' | 'ttk' | 'generic'
 
@@ -222,6 +223,95 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.orderBy) qs.set('orderBy', params.orderBy)
   if (params.orderDir) qs.set('orderDir', params.orderDir)
   return `?${qs.toString()}`
+}
+
+/* -------------------------------------------------------------------------- */
+/* Export (Nest) — plans/plan-export-invoices-nest §2.1.2                       */
+/* -------------------------------------------------------------------------- */
+
+/** 1 = "Invoice" (one row per grid row); 2 = "Invoice with Wo Details". */
+export type InvoiceXlsExportType = 1 | 2
+
+export type InvoiceExportTicketStatus = {
+  status: 'pending' | 'running' | 'done' | 'error'
+  errorMessage?: string
+  errorCode?: string
+  /** Send Email / Create File, when the job ended well. */
+  result?: { idQueue: number; descripcion: string; timeCard: boolean; sent: boolean }
+}
+
+/** Download path of the proxy, without query (for `startTicketDownload`). */
+export const INVOICE_EXPORT_DOWNLOAD_PATH = '/api/srs-kpis/billing/invoices/export'
+
+/**
+ * Prepares the export with the SAME query as the grid (`buildInvoiceQuery`): the file can never
+ * read a filter differently than the list. `page`/`pageSize` go along and Nest ignores them.
+ */
+export async function fetchInvoiceExportPrepare(
+  params: Omit<InvoiceListParams, 'page' | 'pageSize'>,
+  body: { exportType: InvoiceXlsExportType; fileName?: string },
+): Promise<{ ticket: string; expiresAt: string }> {
+  const res = await fetch(
+    `${INVOICE_EXPORT_DOWNLOAD_PATH}/prepare${buildInvoiceQuery({ ...params, page: 1 })}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(body),
+    },
+  )
+  return readNestJson<{ ticket: string; expiresAt: string }>(
+    res,
+    `billing/invoices/export/prepare (${res.status})`,
+  )
+}
+
+export type InvoiceExportMailResult = {
+  idQueue: number
+  descripcion: string
+  timeCard: boolean
+  sent: boolean
+}
+
+/**
+ * Send Email / Create File to Email (§8.7): same grid query as the download. Answers at once with a
+ * ticket; the job keeps going in Nest and its status says when the PHP finished.
+ */
+export async function fetchInvoiceExportMail(
+  params: Omit<InvoiceListParams, 'page' | 'pageSize'>,
+  action: 'email' | 'queue',
+  body: {
+    exportType: InvoiceXlsExportType
+    fileName?: string
+    emailTo: string
+    subject: string
+    message: string
+    replyTo: string
+    queueName?: string
+    attachTimeCard: boolean
+  },
+): Promise<{ ticket: string }> {
+  const res = await fetch(
+    `${INVOICE_EXPORT_DOWNLOAD_PATH}/${action}${buildInvoiceQuery({ ...params, page: 1 })}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(body),
+    },
+  )
+  return readNestJson<{ ticket: string }>(res, `billing/invoices/export/${action} (${res.status})`)
+}
+
+export async function fetchInvoiceExportStatus(ticket: string): Promise<InvoiceExportTicketStatus> {
+  const qs = new URLSearchParams({ ticket })
+  const res = await fetch(`${INVOICE_EXPORT_DOWNLOAD_PATH}/status?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  return readNestJson<InvoiceExportTicketStatus>(
+    res,
+    `billing/invoices/export/status (${res.status})`,
+  )
 }
 
 export async function fetchInvoiceList(params: InvoiceListParams): Promise<InvoiceListResponse> {

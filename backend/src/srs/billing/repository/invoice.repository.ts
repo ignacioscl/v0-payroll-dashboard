@@ -46,6 +46,52 @@ import {
   type RowMoneyCents,
 } from '../../shared/kpi/srs-kpi-row-money'
 
+/**
+ * One valued WO line for the "Invoice with Wo Details" export (plans/plan-export-invoices-nest
+ * §8.6): the line, the row of the list it belongs to and its money, as legacy's
+ * InvoiceStatementLineDao::loadLines returns it.
+ */
+export type InvoiceExportWoLineRow = {
+  idStatement: number
+  fullNro: string
+  /** 1 balance, 2 whole-invoice payment, 3 own payment of the line. */
+  rowKind: number
+  idBilling: number | null
+  nroBilled: number | null
+  relId: number
+  woNro: number
+  woFullNro: string
+  ro: string
+  po: string
+  stockNumber: string
+  /** INVOICE.fecha_alta as the connection returns it (dateStrings): 'YYYY-MM-DD HH:MM:SS'. */
+  fechaAlta: string
+  vin: string
+  color: string
+  year: string
+  make: string
+  model: string
+  service: string
+  /** isr.price: unit price. */
+  price: number
+  approver: string
+  checkNumber: string
+  /** price × qty (× tax of a generic): list money of the line. */
+  lista: number
+  /** Net of the line, rounded cumulatively inside its row (legacy `neto_linea`). */
+  neto: number
+}
+
+/** `:prov` → `?` with one param per occurrence (the legacy SQL repeats the named param). */
+function bindProvider(sql: string, idDealerProvider: number): { sql: string; params: number[] } {
+  const params: number[] = []
+  const out = sql.replace(/:prov\b/g, () => {
+    params.push(idDealerProvider)
+    return '?'
+  })
+  return { sql: out, params }
+}
+
 function rowIdentity(row: InvoiceRowDto): InvoiceRowIdentity {
   return {
     id: row.id,
@@ -182,9 +228,130 @@ export class InvoiceRepository {
       return { results: [], hasMore: false }
     }
 
-    const statementIds = [...new Set(pageIdentities.map((r) => r.id))]
+    const results = await this.rowsOfIdentities(f, pageIdentities)
+    if (f.includePartial) {
+      const statementIds = [...new Set(pageIdentities.map((r) => r.id))]
+      await this.addPartialInvoiced(f, statementIds, results)
+    }
+    return { results, hasMore }
+  }
+
+  /**
+   * Every row of the filter, in the order of the grid, in chunks of `chunkSize` (export of the
+   * Invoices list, plans/plan-export-invoices-nest §2.1.3). The same two phases as `listPage`:
+   * the identity of every row first (four numbers per row), then the full rows and their money
+   * chunk by chunk. Not `pageSize = -1`: the second query builds one `UNION ALL` per row, and
+   * MariaDB 10.3 stops compiling it past ~10.000 rows.
+   */
+  async *exportRowChunks(
+    f: InvoiceListFilter,
+    chunkSize = 1000,
+  ): AsyncGenerator<InvoiceRowDto[]> {
+    const identityBranches = concatBranches(buildUnionBranches(f, 'identity'))
+    const identityRows = await this.srs.query(
+      `SELECT t.id, t.id_billing, t.nro_billed, t.id_billing_wo_rel
+       FROM (
+         ${identityBranches.sql}
+       ) t
+       ${orderBySql(f)}`,
+      identityBranches.params,
+    )
+    const identities: InvoiceRowIdentity[] = identityRows.map(mapIdentityRow)
+    for (let start = 0; start < identities.length; start += chunkSize) {
+      yield await this.rowsOfIdentities(f, identities.slice(start, start + chunkSize))
+    }
+  }
+
+  /**
+   * Names of the filters for the Report Info sheet of the export. Every query is scoped to the
+   * caller's provider (tenant-scope-every-query); dealers also go through the role restriction,
+   * so an id that arrives in the query never returns the name of a dealer the user can't see
+   * (plans/plan-export-invoices-nest §2.1.5).
+   */
+  async exportFilterNames(f: InvoiceListFilter): Promise<{
+    dealers: string[]
+    departments: string[]
+    services: string[]
+    authors: string[]
+    workers: string[]
+    providerName: string
+  }> {
+    const p = f.idDealerProvider
+    const namesOf = (rows: any[]) => rows.map((r) => String(r.name ?? ''))
+    const restrict =
+      f.dealerIds.length > 0
+        ? buildDealerRestrictionClause(f.idUsuario, f.dealerIds, f.skipDealerRestriction)
+        : null
+    const authorIds = [...new Set([...(f.idAuthor ? [f.idAuthor] : []), ...f.authorIds])]
+    const [dealers, departments, services, authors, workers, provider] = await Promise.all([
+      restrict
+        ? this.srs.query(
+            `SELECT GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS name
+             FROM CONTRATISTA c
+             WHERE EXISTS (SELECT 1 FROM DEALER_REL dr
+                            WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
+               ${restrict.and}
+             ORDER BY name`,
+            [p, p, ...restrict.params],
+          )
+        : Promise.resolve([]),
+      f.departmentIds.length
+        ? this.srs.query(
+            `SELECT d.nombre AS name FROM DEPARTMENT d
+             WHERE d.id IN (${sqlInInts(f.departmentIds)}) AND d.id_dealer_provider = ?
+             ORDER BY d.nombre`,
+            [p],
+          )
+        : Promise.resolve([]),
+      f.invoiceServiceIds.length
+        ? this.srs.query(
+            `SELECT ins.nombre AS name FROM INVOICE_SERVICE ins
+             INNER JOIN DEPARTMENT d ON d.id = ins.id_department
+             WHERE ins.id IN (${sqlInInts(f.invoiceServiceIds)}) AND d.id_dealer_provider = ?
+             ORDER BY ins.nombre`,
+            [p],
+          )
+        : Promise.resolve([]),
+      authorIds.length
+        ? this.srs.query(
+            `SELECT u.nombre AS name FROM usuarios u
+             WHERE u.id_usuario IN (${sqlInInts(authorIds)})
+               AND EXISTS (SELECT 1 FROM INVOICE_STATEMENT s
+                            WHERE s.id_author = u.id_usuario AND s.id_dealer_provider = ?)
+             ORDER BY u.nombre`,
+            [p],
+          )
+        : Promise.resolve([]),
+      f.employeeWorkedIds.length
+        ? this.srs.query(
+            `SELECT u.nombre AS name FROM usuarios u
+             WHERE u.id_usuario IN (${sqlInInts(f.employeeWorkedIds)})
+               AND EXISTS (SELECT 1 FROM TTK_EMPLOYEE_WORK tew
+                            WHERE tew.id_author = u.id_usuario AND tew.id_dealer_provider = ?)
+             ORDER BY u.nombre`,
+            [p],
+          )
+        : Promise.resolve([]),
+      this.srs.query('SELECT razon_social AS name FROM CONTRATISTA WHERE id = ? LIMIT 1', [p]),
+    ])
+    return {
+      dealers: namesOf(dealers),
+      departments: namesOf(departments),
+      services: namesOf(services),
+      authors: namesOf(authors),
+      workers: namesOf(workers),
+      providerName: String(provider[0]?.name ?? ''),
+    }
+  }
+
+  /** Full rows of these identities, in the order of the grid, with the money of each row (T2). */
+  private async rowsOfIdentities(
+    f: InvoiceListFilter,
+    identities: InvoiceRowIdentity[],
+  ): Promise<InvoiceRowDto[]> {
+    const statementIds = [...new Set(identities.map((r) => r.id))]
     const fullBranches = concatBranches(buildUnionBranches(f, 'full', statementIds))
-    const tuples = identityTupleSql(pageIdentities)
+    const tuples = identityTupleSql(identities)
     const rows = await this.srs.query(
       `SELECT t.*
        FROM (
@@ -200,12 +367,165 @@ export class InvoiceRepository {
        ${orderBySql(f)}`,
       fullBranches.params,
     )
-    const results = rows.map(mapInvoiceListRow)
-    await Promise.all([
-      this.addRowMoney(f, results),
-      f.includePartial ? this.addPartialInvoiced(f, statementIds, results) : Promise.resolve(),
-    ])
-    return { results, hasMore }
+    const results: InvoiceRowDto[] = rows.map(mapInvoiceListRow)
+    await this.addRowMoney(f, results)
+    return results
+  }
+
+  /**
+   * Valued WO lines of these invoices for the "Invoice with Wo Details" export: a literal copy of
+   * legacy's InvoiceStatementLineDao::buildSql + loadLines (public/php/dao/invoice/
+   * InvoiceStatementLineDao.php:34-204, :243-249), with the parameters binvoice_export_xls.php
+   * passes today (:245-254): provider, these invoices, WO lines only, withDetail, the Service and
+   * Department filters, and Payment on the row of the list (getRowWhere, :207-213). Same CTEs and
+   * the same cumulative rounding inside each row, so DISCOUNT / TOTAL per line match legacy to the
+   * cent. plans/plan-export-invoices-nest §8.6.
+   */
+  async exportWoValuedLines(
+    f: InvoiceListFilter,
+    statementIds: number[],
+  ): Promise<InvoiceExportWoLineRow[]> {
+    if (statementIds.length === 0) return []
+    const ids = sqlInInts(statementIds)
+    let where = ` AND s.id IN (${ids}) `
+    if (f.invoiceServiceIds.length) {
+      where += ` AND isr.id_service_invoice IN (${sqlInInts(f.invoiceServiceIds)}) `
+    }
+    if (f.departmentIds.length) {
+      where += ` AND sv.id_department IN (${sqlInInts(f.departmentIds)}) `
+    }
+    // lineTypes = ['wo']: one of three types, so the legacy OR list has a single member.
+    where += ' AND ( s.statement_type IN (1,2,3,4) ) '
+
+    let rowWhere = ''
+    if (f.payed === '0') rowWhere = ' AND l.row_kind = 1 '
+    else if (f.payed === '1') rowWhere = ' AND l.row_kind IN (2,3) '
+
+    const pl =
+      ' SELECT DISTINCT bw.id_statement_inv_rel AS rel, bw.id_billing, bw.nro_billed ' +
+      ' FROM BILLING_WO_REL bw ' +
+      ' JOIN BILLING b ON b.id = bw.id_billing AND b.estado = 1 AND b.id_dealer_provider = :prov ' +
+      ` JOIN INVOICE_STATEMENT_INV_REL lr ON lr.id = bw.id_statement_inv_rel AND lr.id_statement IN (${ids}) ` +
+      ' WHERE bw.id_statement_inv_rel IS NOT NULL '
+    const ps =
+      ' SELECT DISTINCT bw.id_statement AS sid, bw.id_billing ' +
+      ' FROM BILLING_WO_REL bw ' +
+      ' JOIN BILLING b ON b.id = bw.id_billing AND b.estado = 1 AND b.id_dealer_provider = :prov ' +
+      ' WHERE bw.id_statement IS NOT NULL ' +
+      ` AND bw.id_statement IN (${ids}) `
+    const fac =
+      ' SELECT s.id AS sid, ' +
+      '   CASE WHEN s.discount_type = 2 THEN IFNULL(1 - s.discount / NULLIF(GET_SUBTOTAL_BY_STATEMENT(s.id, NULL), 0), 1) ' +
+      '        ELSE 1 - 0.01 * s.discount END AS factor ' +
+      ' FROM INVOICE_STATEMENT s ' +
+      ' WHERE s.id_dealer_provider = :prov AND s.estado = 1 AND IFNULL(s.discount, 0) <> 0 ' +
+      ` AND s.id IN (${ids}) ` +
+      ' GROUP BY s.id '
+    const lin =
+      ' SELECT s.id AS sid, s.full_nro, s.statement_type, s.id_dealer, s.id_dealer_provider ' +
+      ' , s.fecha_create AS statement_fecha_create, s.fecha_desde, s.fecha_hasta, s.id_department AS statement_id_department ' +
+      ' , s.discount, s.discount_type, s.discount_detail, s.tax, s.invoice_service_sel_rel, s.id_author AS statement_id_author ' +
+      ' , r.id AS rel_id, r.fecha_create AS rel_fecha_create, r.description, r.generic_qty, r.amount, r.id_employee_work ' +
+      ' , i.id AS id_invoice, i.full_nro AS wo_full_nro, i.wo_nro, i.fecha_alta, i.ro, i.po, i.stock_number, i.tag ' +
+      ' , sv.id AS id_service, sv.nombre AS service_name, sv.id_department AS service_id_department ' +
+      ' , isr.price, isr.qty, isr.piecework, isr.comentario ' +
+      ' , tew.id_author AS ttk_author, ua.nombre AS ttk_author_name ' +
+      ' , NULL AS ttk_hours ' +
+      ' , c.vin, c.color, c.year, make.nombre AS make_nombre, model.nombre AS model_nombre ' +
+      ' , approver.nombre AS approver_name, sd.nombre AS service_department_name ' +
+      " , CASE WHEN s.statement_type IN (1,2,3,4) THEN 'wo' WHEN r.id_employee_work IS NOT NULL THEN 'ttk' ELSE 'generic' END AS line_type " +
+      ' , (CASE WHEN s.statement_type IN (1,2,3,4) THEN isr.price * IFNULL(isr.qty, 1) ' +
+      '         WHEN r.id_employee_work IS NOT NULL THEN IFNULL(r.amount, 0) ' +
+      '         ELSE IFNULL(r.generic_qty, 1) * IFNULL(r.amount, 0) END) AS lista ' +
+      ' , (CASE WHEN s.statement_type = 6 THEN 1 + IFNULL(s.tax, 0) / 100 ELSE 1 END) AS tax_factor ' +
+      ' , IFNULL(fac.factor, 1) AS factor ' +
+      ' , COALESCE(sv.id_department, s.id_department, 0) AS dept ' +
+      ' , CASE WHEN pl.id_billing IS NOT NULL THEN 3 WHEN ps.id_billing IS NOT NULL THEN 2 ELSE 1 END AS row_kind ' +
+      ' , COALESCE(pl.id_billing, ps.id_billing) AS id_billing ' +
+      ' , CASE WHEN pl.id_billing IS NOT NULL THEN pl.nro_billed WHEN ps.id_billing IS NOT NULL THEN 1 END AS nro_billed ' +
+      ' FROM INVOICE_STATEMENT s ' +
+      ' JOIN INVOICE_STATEMENT_INV_REL r ON r.id_statement = s.id AND IFNULL(r.only_timecard, 0) = 0 ' +
+      ' LEFT JOIN INVOICE i ON i.id = r.id_invoice AND i.estado = 1 AND i.id_dealer_provider = :prov ' +
+      ' LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id AND isr.id_service_invoice = r.id_invoice_service ' +
+      ' LEFT JOIN INVOICE_SERVICE sv ON sv.id = r.id_invoice_service ' +
+      ' LEFT JOIN TTK_EMPLOYEE_WORK tew ON tew.id = r.id_employee_work AND tew.estado = 1 AND tew.id_dealer_provider = :prov ' +
+      ' LEFT JOIN usuarios ua ON ua.id_usuario = tew.id_author ' +
+      ' LEFT JOIN CAR c ON c.id = i.id_car ' +
+      ' LEFT JOIN datos_parametricos make ON make.id_dato_parametrico = c.id_make ' +
+      ' LEFT JOIN datos_parametricos model ON model.id_dato_parametrico = c.id_model ' +
+      ' LEFT JOIN usuarios approver ON approver.id_usuario = i.id_approver ' +
+      ' LEFT JOIN DEPARTMENT sd ON sd.id = sv.id_department ' +
+      ' LEFT JOIN fac ON fac.sid = s.id ' +
+      ' LEFT JOIN pl ON pl.rel = r.id ' +
+      ' LEFT JOIN ps ON ps.sid = s.id ' +
+      ' WHERE s.id_dealer_provider = :prov AND s.estado = 1 ' +
+      ' AND ((s.statement_type IN (1,2,3,4) AND isr.id IS NOT NULL) ' +
+      '   OR (s.statement_type = 5 AND tew.id IS NOT NULL) ' +
+      '   OR (s.statement_type = 6 AND (r.id_employee_work IS NULL OR tew.id IS NOT NULL))) ' +
+      ' AND (s.statement_type NOT IN (1,2,3,4) OR NOT EXISTS ( ' +
+      '     SELECT 1 FROM INVOICE_STATEMENT_INV_REL e ' +
+      '     JOIN INVOICE_STATEMENT es ON es.id = e.id_statement AND es.estado = 1 AND es.id_dealer_provider = :prov ' +
+      '     WHERE e.id_invoice = r.id_invoice AND e.id_invoice_service = r.id_invoice_service ' +
+      '       AND e.id_statement < r.id_statement AND IFNULL(e.only_timecard, 0) = 0)) ' +
+      where
+    const sql =
+      ' WITH ' +
+      ` pl AS (${pl}), ` +
+      ` ps AS (${ps}), ` +
+      ` fac AS (${fac}), ` +
+      ` lin AS (${lin}), ` +
+      ' raw AS ( ' +
+      '   SELECT l.*, l.lista * l.tax_factor AS precio_tax, l.lista * l.tax_factor * l.factor AS neto_raw ' +
+      '   , SUM(l.lista * l.tax_factor * l.factor) OVER (PARTITION BY l.sid, l.row_kind, l.id_billing, l.nro_billed ' +
+      '       ORDER BY l.wo_nro, l.rel_id ROWS UNBOUNDED PRECEDING) AS acum ' +
+      '   , SUM(l.lista * l.tax_factor * l.factor) OVER (PARTITION BY l.sid, l.row_kind, l.id_billing, l.nro_billed) AS fila_raw ' +
+      '   , ROW_NUMBER() OVER (PARTITION BY l.sid, l.row_kind, l.id_billing, l.nro_billed ORDER BY l.wo_nro DESC, l.rel_id DESC) AS desde_el_final ' +
+      '   FROM lin l ), ' +
+      ' filas AS ( SELECT sid, row_kind, id_billing, nro_billed, SUM(neto_raw) AS fila_raw, ROUND(SUM(neto_raw), 2) AS fila_red ' +
+      '   FROM raw GROUP BY sid, row_kind, id_billing, nro_billed ), ' +
+      ' inv AS ( SELECT sid, ROUND(SUM(fila_raw), 2) AS inv_total, SUM(CASE WHEN row_kind <> 1 THEN fila_red ELSE 0 END) AS cobrado ' +
+      '   FROM filas GROUP BY sid ), ' +
+      ' objetivo AS ( SELECT f.sid, f.row_kind, f.id_billing, f.nro_billed ' +
+      '   , CASE WHEN f.row_kind = 1 THEN inv.inv_total - inv.cobrado ELSE f.fila_red END AS listado ' +
+      '   FROM filas f JOIN inv ON inv.sid = f.sid ), ' +
+      ' lineas AS ( SELECT r.*, o.listado AS fila_listado ' +
+      '   , ROUND(r.acum, 2) - ROUND(r.acum - r.neto_raw, 2) ' +
+      '     + CASE WHEN r.desde_el_final = 1 THEN o.listado - ROUND(r.fila_raw, 2) ELSE 0 END AS neto_linea ' +
+      '   FROM raw r JOIN objetivo o ON o.sid = r.sid AND o.row_kind = r.row_kind ' +
+      '     AND o.id_billing <=> r.id_billing AND o.nro_billed <=> r.nro_billed ) ' +
+      ' SELECT l.*, bb.check_number, bb.fecha AS billing_fecha, bb.amount AS billing_amount ' +
+      ' FROM lineas l ' +
+      ' LEFT JOIN BILLING bb ON bb.id = l.id_billing ' +
+      ` WHERE 1 ${rowWhere}` +
+      ' ORDER BY l.sid, l.row_kind, l.id_billing, l.nro_billed, l.wo_nro, l.rel_id'
+    const bound = bindProvider(sql, f.idDealerProvider)
+    const rows = await this.srs.query(bound.sql, bound.params)
+    const str = (v: unknown) => (v == null ? '' : String(v))
+    return rows.map((r: any) => ({
+      idStatement: Number(r.sid),
+      fullNro: str(r.full_nro),
+      rowKind: Number(r.row_kind),
+      idBilling: r.id_billing == null ? null : Number(r.id_billing),
+      nroBilled: r.nro_billed == null ? null : Number(r.nro_billed),
+      relId: Number(r.rel_id),
+      woNro: Number(r.wo_nro ?? 0),
+      woFullNro: str(r.wo_full_nro),
+      ro: str(r.ro),
+      po: str(r.po),
+      stockNumber: str(r.stock_number),
+      fechaAlta: str(r.fecha_alta),
+      vin: str(r.vin),
+      color: str(r.color),
+      year: str(r.year),
+      make: str(r.make_nombre),
+      model: str(r.model_nombre),
+      service: str(r.service_name),
+      price: Number(r.price ?? 0),
+      approver: str(r.approver_name),
+      checkNumber: str(r.check_number),
+      lista: Number(r.lista ?? 0),
+      neto: Math.round(Number(r.neto_linea ?? 0) * 100) / 100,
+    }))
   }
 
   /**

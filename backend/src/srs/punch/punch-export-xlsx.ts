@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs'
 import type { Writable } from 'stream'
 import type { PunchListRowDto } from './dto/punch-list.dto'
+import { writeReportInfoSheet } from '../shared/export/report-info-sheet'
+import { THEME, applyHeaderRow, styleDataRow, thinBorder } from '../shared/export/xlsx-theme'
 import { punchExportLabels } from './punch-export-labels'
 import {
   formatDurationHhMmSs,
@@ -13,16 +15,6 @@ import {
   resolvePunchEventMethod,
   type PunchExportLocale,
 } from './punch-export-format'
-
-const THEME = {
-  headerBg: 'FF173764',
-  headerFg: 'FFFFFFFF',
-  titleBg: 'FFE8ECF3',
-  titleFg: 'FF091C3A',
-  subtitleFg: 'FF546E7A',
-  zebraBg: 'FFF5F8FC',
-  border: 'FFD0D7DE',
-} as const
 
 const EXCEL_MAX_ROWS = 1_048_576
 const STAMP_ROWS = 2
@@ -42,11 +34,6 @@ export type WritePunchExportOptions = {
   reportMeta: PunchExportMetaRow[]
   rows: AsyncIterable<PunchListRowDto> | Iterable<PunchListRowDto>
   maxDataRowsPerSheet?: number
-}
-
-function thinBorder(): Partial<ExcelJS.Borders> {
-  const side: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: THEME.border } }
-  return { top: side, left: side, bottom: side, right: side }
 }
 
 function roleDept(row: PunchListRowDto): string {
@@ -142,29 +129,6 @@ function columnHeaders(
   return headers
 }
 
-function applyHeaderRow(sheet: ExcelJS.Worksheet, rowNumber: number, colCount: number) {
-  const row = sheet.getRow(rowNumber)
-  row.height = 22
-  for (let c = 1; c <= colCount; c++) {
-    const cell = row.getCell(c)
-    cell.font = { bold: true, color: { argb: THEME.headerFg }, size: 11 }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: THEME.headerBg } }
-    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-    cell.border = thinBorder()
-  }
-}
-
-function styleDataRow(row: ExcelJS.Row, colCount: number, zebra: boolean) {
-  row.height = 18
-  for (let c = 1; c <= colCount; c++) {
-    const cell = row.getCell(c)
-    cell.border = thinBorder()
-    if (zebra) {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: THEME.zebraBg } }
-    }
-  }
-}
-
 export async function writePunchExportWorkbook(opts: WritePunchExportOptions): Promise<void> {
   const locale = opts.locale
   const labels = punchExportLabels(locale)
@@ -183,22 +147,12 @@ export async function writePunchExportWorkbook(opts: WritePunchExportOptions): P
     useSharedStrings: false,
   })
 
-  const info = workbook.addWorksheet(labels.reportInfo, {
-    views: [{ state: 'frozen', ySplit: 1 }],
-  })
-  info.columns = [{ width: 28 }, { width: 90 }]
-  const infoHeader = info.addRow([labels.field, labels.value])
-  applyHeaderRow(info, 1, 2)
-  infoHeader.commit()
-  for (const meta of opts.reportMeta) {
-    const r = info.addRow([meta.field, meta.value])
-    r.height = 18
-    r.getCell(1).border = thinBorder()
-    r.getCell(2).border = thinBorder()
-    r.getCell(1).font = { bold: true, color: { argb: THEME.titleFg } }
-    r.commit()
-  }
-  info.commit()
+  writeReportInfoSheet(
+    workbook,
+    labels.reportInfo,
+    { field: labels.field, value: labels.value },
+    opts.reportMeta,
+  )
 
   const widths = [28, 22, 32, 14, 18, 18, 18, 18, 14, 14, 18]
 

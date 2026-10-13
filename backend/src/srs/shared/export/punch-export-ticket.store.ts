@@ -6,18 +6,20 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import type { DealerRankingStatus } from './dto/punch-dealer-ranking.dto'
-import type { PunchListLiveStatus } from './dto/punch-list.dto'
+import type { InvoiceExportStoredFilters } from '../../billing/dto/invoice-export.dto'
+import type { DealerRankingStatus } from '../../punch/dto/punch-dealer-ranking.dto'
+import type { PunchListLiveStatus } from '../../punch/dto/punch-list.dto'
 
 export type PunchExportTicketState = 'pending' | 'running' | 'done' | 'error'
 
 /**
- * Qué export emitió el ticket. El store y el semáforo son UNO SOLO para los dos
+ * Qué export emitió el ticket. El store y el semáforo son UNO SOLO para todos los
  * exports (el cupo protege el pool de 5 conexiones), así que el ticket lleva su
- * tipo: uno de Punch Report nunca se descarga por la ruta del ranking de dealers,
- * ni al revés. El default es `punch-list`, así las llamadas de P4 no cambian.
+ * tipo: uno de Punch Report nunca se descarga por la ruta del ranking de dealers
+ * ni por la de invoices, ni al revés. El default es `punch-list`, así las llamadas
+ * de P4 no cambian.
  */
-export type PunchExportTicketKind = 'punch-list' | 'dealer-ranking'
+export type PunchExportTicketKind = 'punch-list' | 'dealer-ranking' | 'invoice-export'
 
 export type PunchExportStoredFilters = {
   fechaDesde: string
@@ -48,11 +50,16 @@ export type DealerRankingExportStoredFilters = {
   status: DealerRankingStatus
 }
 
+export type PunchExportAnyStoredFilters =
+  | PunchExportStoredFilters
+  | DealerRankingExportStoredFilters
+  | InvoiceExportStoredFilters
+
 export type PunchExportTicket = {
   id: string
   idUsuario: number
   kind: PunchExportTicketKind
-  filters: PunchExportStoredFilters | DealerRankingExportStoredFilters
+  filters: PunchExportAnyStoredFilters
   state: PunchExportTicketState
   errorMessage?: string
   /** p.ej. DB_POOL_BUSY: el front lo traduce (plans/plan-pool-v0-saturacion §4.6). */
@@ -61,10 +68,16 @@ export type PunchExportTicket = {
   pendingTimer: ReturnType<typeof setTimeout> | null
   terminalTimer: ReturnType<typeof setTimeout> | null
   onExpirePending: () => void
+  /** Background jobs (Send Email / Create File of the invoices export): what the job returned. */
+  result?: unknown
+  /** Background jobs keep their outcome longer, so a slow tab still reads it (F3). */
+  terminalTtlMs?: number
 }
 
 const DEFAULT_PENDING_TTL_MS = 60_000
 const DEFAULT_TERMINAL_TTL_MS = 15_000
+/** Background jobs: 10 minutes after finishing (plans/plan-export-invoices-nest §2.1.1, F3). */
+export const BACKGROUND_JOB_TERMINAL_TTL_MS = 10 * 60_000
 
 @Injectable()
 export class PunchExportTicketStore {
@@ -81,7 +94,7 @@ export class PunchExportTicketStore {
 
   createPending(
     idUsuario: number,
-    filters: PunchExportStoredFilters | DealerRankingExportStoredFilters,
+    filters: PunchExportAnyStoredFilters,
     onExpirePending: () => void,
     kind: PunchExportTicketKind = 'punch-list',
   ): { ticket: string; expiresAt: string } {
@@ -101,6 +114,32 @@ export class PunchExportTicketStore {
     ticket.pendingTimer.unref?.()
     this.tickets.set(id, ticket)
     return { ticket: id, expiresAt: new Date(Date.now() + this.pendingTtlMs).toISOString() }
+  }
+
+  /**
+   * A background job that is already running: the request returns the ticket at once and the job
+   * keeps going in Nest (Send Email / Create File of the invoices export, F3). It has no pending
+   * phase and no download; it ends with markDone(id, result) or markError.
+   */
+  createRunning(
+    idUsuario: number,
+    filters: PunchExportAnyStoredFilters,
+    kind: PunchExportTicketKind,
+  ): { ticket: string } {
+    const id = randomUUID()
+    this.tickets.set(id, {
+      id,
+      idUsuario,
+      kind,
+      filters,
+      state: 'running',
+      createdAt: Date.now(),
+      pendingTimer: null,
+      terminalTimer: null,
+      onExpirePending: () => undefined,
+      terminalTtlMs: BACKGROUND_JOB_TERMINAL_TTL_MS,
+    })
+    return { ticket: id }
   }
 
   peek(id: string): PunchExportTicket | undefined {
@@ -128,15 +167,26 @@ export class PunchExportTicketStore {
     id: string,
     idUsuario: number,
     kind: PunchExportTicketKind = 'punch-list',
-  ): { status: PunchExportTicketState; errorMessage?: string; errorCode?: string } {
+  ): {
+    status: PunchExportTicketState
+    errorMessage?: string
+    errorCode?: string
+    result?: unknown
+  } {
     const ticket = this.requireOwned(id, idUsuario, kind)
-    return { status: ticket.state, errorMessage: ticket.errorMessage, errorCode: ticket.errorCode }
+    return {
+      status: ticket.state,
+      errorMessage: ticket.errorMessage,
+      errorCode: ticket.errorCode,
+      ...(ticket.result !== undefined ? { result: ticket.result } : {}),
+    }
   }
 
-  markDone(id: string): void {
+  markDone(id: string, result?: unknown): void {
     const ticket = this.tickets.get(id)
     if (!ticket || ticket.state === 'done' || ticket.state === 'error') return
     ticket.state = 'done'
+    if (result !== undefined) ticket.result = result
     this.scheduleDelete(ticket)
   }
 
@@ -160,7 +210,7 @@ export class PunchExportTicketStore {
     if (ticket.terminalTimer) clearTimeout(ticket.terminalTimer)
     ticket.terminalTimer = setTimeout(() => {
       this.tickets.delete(ticket.id)
-    }, this.terminalTtlMs)
+    }, ticket.terminalTtlMs ?? this.terminalTtlMs)
     ticket.terminalTimer.unref?.()
   }
 

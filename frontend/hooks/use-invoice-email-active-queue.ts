@@ -11,6 +11,8 @@ export type InvoiceEmailActiveQueueDraft = {
   message: string
   replyTo: string
   descripcion?: string
+  /** Active recipients of the queue (plans/plan-export-invoices-nest §8.7, M1). */
+  emails?: string[]
 }
 
 export function invoiceEmailActiveQueueQueryKey() {
@@ -32,8 +34,11 @@ export function useInvoiceEmailActiveQueue(enabled: boolean) {
       const raw = await apiRequest.getCustom('', undefined, {})
       throwIfSrsFail(raw, 'Failed to load email queue draft')
       if (raw && typeof raw === 'object' && 'data' in raw) {
-        const data = (raw as unknown as { data?: InvoiceEmailActiveQueueDraft | null }).data
-        return data ?? null
+        const data = (raw as unknown as { data?: InvoiceEmailActiveQueueDraft | 'null' | null }).data
+        // The PHP writes "no active queue" as the TEXT "null" (ErrorManager.php:40-42): taking it as
+        // a queue made every dialog say there was one (plans/plan-export-invoices-nest §1.2, §8.7).
+        if (data == null || data === 'null' || typeof data !== 'object') return null
+        return data
       }
       return null
     },

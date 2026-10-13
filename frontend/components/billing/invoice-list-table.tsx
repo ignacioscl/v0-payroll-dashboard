@@ -735,7 +735,7 @@ export function InvoiceListTable({
 
   const [printRows, setPrintRows] = React.useState<InvoiceRow[] | null>(null)
   const [gsRows, setGsRows] = React.useState<InvoiceRow[] | null>(null)
-  const [exportRows, setExportRows] = React.useState<InvoiceRow[] | null>(null)
+  const [exportOpen, setExportOpen] = React.useState(false)
 
   const {
     data,
@@ -1382,10 +1382,10 @@ export function InvoiceListTable({
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5 px-2"
-                onClick={() => {
-                  if (!requireSelection()) return
-                  setExportRows(selectedSliceRows)
-                }}
+                // Exports every invoice of the list with the grid's filters: no selection needed
+                // (plans/plan-export-invoices-nest §1.3).
+                disabled={!input}
+                onClick={() => setExportOpen(true)}
               >
                 <FileSpreadsheet className="size-3.5" />
                 <span className="text-muted-foreground">/</span>
@@ -1612,29 +1612,7 @@ export function InvoiceListTable({
         fechaHasta={input?.fechaHasta}
       />
 
-      <InvoiceExportDialog
-        open={exportRows != null}
-        onOpenChange={(open) => {
-          if (!open) setExportRows(null)
-        }}
-        rows={exportRows ?? []}
-        filters={{
-          idDealer,
-          fechaDesde: input?.fechaDesde,
-          fechaHasta: input?.fechaHasta,
-          payed: payedFilter,
-          idDepartment: input?.idDepartment,
-          idService: input?.idInvoiceService,
-          includeZero: input?.includeZero,
-          filterNotCero: input?.includeZero ? 0 : 1,
-          idsEmployees: input?.idAuthorIn
-            ? input.idAuthorIn
-            : input?.idAuthor
-              ? String(input.idAuthor)
-              : undefined,
-          isNotinIdsEmployees: input?.authorsExclude === 1,
-        }}
-      />
+      <InvoiceExportDialog open={exportOpen} onOpenChange={setExportOpen} input={input} />
     </>
   )
 }
