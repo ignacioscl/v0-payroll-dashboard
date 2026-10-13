@@ -118,6 +118,18 @@ export function ymdToUs(ymd: string): string {
   return `${m[2]}/${m[3]}/${m[1]}`
 }
 
+/**
+ * `YYYY-MM-DD` → a native Excel date (a `Date` at UTC midnight of that day, built from its
+ * components), so the cell can be filtered and sorted as a date; with `numFmt = 'mm/dd/yyyy'` it
+ * reads like `ymdToUs`. ExcelJS writes a `string` as text even with a date format. `''` when it
+ * doesn't match. plans/plan-export-invoices-nest §8.9.
+ */
+export function ymdToExcelDate(ymd?: string | null): Date | '' {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec((ymd ?? '').trim())
+  if (!m) return ''
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+}
+
 export function formatDurationHhMmSs(value?: string | null): string {
   if (!value) return ''
   const trimmed = value.trim()

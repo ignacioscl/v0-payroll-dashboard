@@ -1,7 +1,12 @@
 import ExcelJS from 'exceljs'
 import type { Writable } from 'stream'
 
-import { formatNyStamp, ymdToUs, type PunchExportLocale } from '../punch/punch-export-format'
+import {
+  formatNyStamp,
+  ymdToExcelDate,
+  ymdToUs,
+  type PunchExportLocale,
+} from '../punch/punch-export-format'
 import { writeReportInfoSheet, type ReportInfoRow } from '../shared/export/report-info-sheet'
 import { THEME, applyHeaderRow, styleDataRow, thinBorder } from '../shared/export/xlsx-theme'
 import type { InvoiceRowDto } from './dto/invoice-list.dto'
@@ -131,6 +136,10 @@ function headersOf(opts: WriteInvoiceExportOptions): string[] {
       'TYPE',
       'DAYS OLD',
       ...deleted,
+      // At the end, so no column the customer already uses shifts (§8.9, D35).
+      'CHECK#',
+      'CHECK DATE',
+      'PAYMENT ENTERED',
     ]
   }
   return [
@@ -187,7 +196,16 @@ export function sortWoLines(
   })
 }
 
-const WIDTHS_TYPE_1 = [32, 16, 13, 13, 18, 36, 13, 12, 13, 26, 12, 11, 10]
+/**
+ * CHECK#, CHECK DATE and PAYMENT ENTERED of a grid row (type "Invoice"): the payment of a paid row
+ * (branches 2 and 3 of the list); empty on the unpaid remainder (§8.9, D35).
+ */
+export function invoiceExportPaymentCells(row: InvoiceRowDto): (string | Date)[] {
+  if (row.isBilled !== 1) return ['', '', '']
+  return [row.checkNumber ?? '', ymdToExcelDate(row.fechaPago), ymdToExcelDate(row.fechaAltaPago)]
+}
+
+const WIDTHS_TYPE_1 = [32, 16, 13, 13, 18, 36, 13, 12, 13, 26, 12, 11, 10, 14, 13, 17]
 const WIDTHS_TYPE_2 = [32, 16, 13, 14, 20, 12, 8, 14, 26, 12, 12, 12, 18, 30, 12, 22, 14, 12, 12, 26, 10]
 
 /**
@@ -209,6 +227,11 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
       : ['PRICE', 'DISCOUNT', 'TOTAL']
     ).map((h) => headers.indexOf(h) + 1),
   )
+  // Native Excel dates, found by header so AUTHOR / DELETED never shift them (§8.9, D35).
+  const dateCols =
+    opts.exportType === 1
+      ? ['DATE FROM', 'DATE TO', 'CHECK DATE', 'PAYMENT ENTERED'].map((h) => headers.indexOf(h) + 1)
+      : []
 
   const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
     stream: opts.stream,
@@ -246,7 +269,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
   let sheet = openDataSheet(sheetIndex)
   let dataOnSheet = 0
 
-  const addDataRow = (values: (string | number)[]) => {
+  const addDataRow = (values: (string | number | Date)[]) => {
     if (dataOnSheet >= maxData) {
       sheet.commit()
       sheetIndex += 1
@@ -258,6 +281,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
     )
     styleDataRow(excelRow, colCount, dataOnSheet % 2 === 1)
     for (const col of amountCols) excelRow.getCell(col).numFmt = '0.00'
+    for (const col of dateCols) excelRow.getCell(col).numFmt = 'mm/dd/yyyy'
     excelRow.commit()
     dataOnSheet += 1
   }
@@ -277,8 +301,8 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
         addDataRow([
           entityOf(row),
           row.displayFullNro || row.fullNro,
-          row.fechaDesde ? ymdToUs(row.fechaDesde) : '',
-          row.fechaHasta ? ymdToUs(row.fechaHasta) : '',
+          ymdToExcelDate(row.fechaDesde),
+          ymdToExcelDate(row.fechaHasta),
           invoiceExportDepartment(row, labels),
           invoiceExportServicesText(row),
           money(row.subtotal),
@@ -288,6 +312,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
           row.statementType === 1 ? 'Individual' : '',
           invoiceExportDaysOld(row.fechaCreate, opts.generatedAt),
           ...deletedOf(row),
+          ...invoiceExportPaymentCells(row),
         ])
       }
       continue

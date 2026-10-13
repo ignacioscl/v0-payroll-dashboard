@@ -16,6 +16,7 @@ import {
   invoiceExportFilename,
 } from './service/invoice-export.service'
 import type { InvoiceExportWoLineRow } from './repository/invoice.repository'
+import { ymdToExcelDate } from '../punch/punch-export-format'
 
 function row(partial: Partial<InvoiceRowDto>): InvoiceRowDto {
   return {
@@ -112,6 +113,19 @@ describe('invoiceExportServicesText — legacy SERVICES rule', () => {
     expect(invoiceExportServicesText(row({ statementType: 4, invoiceServiceSelRel: 'PDI,Wax' }))).toBe(
       'PDI Wax',
     )
+  })
+})
+
+describe('ymdToExcelDate (§8.9)', () => {
+  it('the exact day, at UTC midnight, across year ends', () => {
+    expect(ymdToExcelDate('2026-09-21')).toEqual(new Date(Date.UTC(2026, 8, 21)))
+    expect(ymdToExcelDate('2025-12-31')).toEqual(new Date(Date.UTC(2025, 11, 31)))
+    expect(ymdToExcelDate('2026-01-01 00:00:00')).toEqual(new Date(Date.UTC(2026, 0, 1)))
+  })
+  it('empty when it is not a date', () => {
+    expect(ymdToExcelDate('')).toBe('')
+    expect(ymdToExcelDate(undefined)).toBe('')
+    expect(ymdToExcelDate('09/21/2026')).toBe('')
   })
 })
 
@@ -255,10 +269,18 @@ describe('writeInvoiceExportWorkbook', () => {
       'TOTAL',
       'TYPE',
       'DAYS OLD',
+      'CHECK#',
+      'CHECK DATE',
+      'PAYMENT ENTERED',
     ])
     const r3 = data.getRow(3)
     expect(r3.getCell(1).value).toBe('AutoNation Honda Hollywood')
-    expect(r3.getCell(3).value).toBe('09/21/2026')
+    // DATE FROM / DATE TO are native Excel dates that read MM/DD/YYYY (§8.9).
+    expect(r3.getCell(3).value).toEqual(new Date(Date.UTC(2026, 8, 21)))
+    expect(r3.getCell(3).numFmt).toBe('mm/dd/yyyy')
+    expect(r3.getCell(4).value).toEqual(new Date(Date.UTC(2026, 8, 21)))
+    // Unpaid remainder: no payment columns.
+    expect([12, 13, 14].map((c) => r3.getCell(c).value ?? '')).toEqual(['', '', ''])
     expect(r3.getCell(5).value).toBe('Sales')
     expect(r3.getCell(6).value).toBe('Full Detail')
     expect(r3.getCell(9).value).toBe(85)
@@ -270,6 +292,47 @@ describe('writeInvoiceExportWorkbook', () => {
     // A WO invoice without department stays empty; Time Tracking says "Timesheets" (§8.8).
     expect(data.getRow(4).getCell(5).value ?? '').toBe('')
     expect(data.getRow(5).getCell(5).value).toBe('Timesheets')
+  })
+
+  it('type 1: a paid row carries CHECK#, CHECK DATE and PAYMENT ENTERED as dates, after AUTHOR and DELETED (§8.9)', async () => {
+    const wb = await readWorkbook((stream) =>
+      writeInvoiceExportWorkbook({
+        ...base,
+        stream,
+        exportType: 1,
+        includeAuthor: true,
+        includeDeleted: true,
+        chunks: asChunks([
+          row({
+            id: 7,
+            dealer: 'AutoNation Land Rover Ft Lauderdale',
+            displayFullNro: 'LFT10782',
+            isBilled: 1,
+            checkNumber: '00123',
+            fechaPago: '2026-09-18',
+            fechaAltaPago: '2026-09-21',
+            total: 1272,
+            subtotal: 1272,
+          }),
+          row({ id: 8, isBilled: 0, checkNumber: 'X', fechaPago: '2026-09-18', fechaAltaPago: '2026-09-21' }),
+        ]),
+      }),
+    )
+    const data = wb.getWorksheet('Invoice Report')!
+    const headers = (data.getRow(2).values as unknown[]).slice(1)
+    expect(headers.slice(-5)).toEqual(['DAYS OLD', 'DELETED', 'CHECK#', 'CHECK DATE', 'PAYMENT ENTERED'])
+    const col = (h: string) => headers.indexOf(h) + 1
+    const paid = data.getRow(3)
+    expect(paid.getCell(col('CHECK#')).value).toBe('00123')
+    expect(paid.getCell(col('CHECK DATE')).value).toEqual(new Date(Date.UTC(2026, 8, 18)))
+    expect(paid.getCell(col('CHECK DATE')).numFmt).toBe('mm/dd/yyyy')
+    expect(paid.getCell(col('PAYMENT ENTERED')).value).toEqual(new Date(Date.UTC(2026, 8, 21)))
+    expect(paid.getCell(col('PAYMENT ENTERED')).numFmt).toBe('mm/dd/yyyy')
+    // The unpaid remainder never shows a payment, even if the row carried one.
+    const unpaid = data.getRow(4)
+    expect(
+      ['CHECK#', 'CHECK DATE', 'PAYMENT ENTERED'].map((h) => unpaid.getCell(col(h)).value ?? ''),
+    ).toEqual(['', '', ''])
   })
 
   it('external user: COMPANY with the provider name', async () => {
