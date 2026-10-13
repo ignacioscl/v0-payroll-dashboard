@@ -345,9 +345,17 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
         tone="warning"
         title={
           confirmBulk
-            ? applyUsers
-              ? t('roles.servicesConfirmUsers', { n: confirmBulk.ids.length, m: assignedUsers })
-              : t('roles.servicesConfirm', { n: confirmBulk.ids.length })
+            ? t(confirmBulk.checked ? 'roles.servicesConfirmMark' : 'roles.servicesConfirmUnmark', {
+                column: columnLabel(confirmBulk.column),
+                n: confirmBulk.ids.length,
+                // Users are only mentioned when the switch applies the change to them.
+                users:
+                  !applyUsers || assignedUsers < 1
+                    ? ''
+                    : assignedUsers === 1
+                      ? t('roles.servicesConfirmOneUser')
+                      : t('roles.servicesConfirmManyUsers', { m: assignedUsers }),
+              })
             : ''
         }
         description={confirmBulk ? `${columnLabel(confirmBulk.column)} · ${role?.nombre ?? ''}` : ''}

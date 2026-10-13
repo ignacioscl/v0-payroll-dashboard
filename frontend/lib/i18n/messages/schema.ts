@@ -121,8 +121,10 @@ export interface Messages {
     servicesNoResults: string
     servicesNoDealer: string
     servicesNoProvider: string
-    servicesConfirm: string
-    servicesConfirmUsers: string
+    servicesConfirmMark: string
+    servicesConfirmUnmark: string
+    servicesConfirmOneUser: string
+    servicesConfirmManyUsers: string
     servicesContinue: string
     selectRole: string
     selectAllRoles: string
