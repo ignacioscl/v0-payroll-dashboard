@@ -4,6 +4,7 @@ import * as React from 'react'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import {
   Check,
+  ClipboardList,
   History,
   MoreHorizontal,
   Pencil,
@@ -23,6 +24,8 @@ import {
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { AssignAllServicesDialog } from '@/components/roles/assign-all-services-dialog'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 import {
   DropdownMenu,
@@ -59,6 +62,7 @@ export type RolesDataTableProps = {
   onAccessLevel: (role: RoleListRow) => void
   onViewUsers: (role: RoleListRow) => void
   onViewActivity: (role: RoleListRow) => void
+  onOpenServices: (role: RoleListRow) => void
 }
 
 export function RolesDataTable({
@@ -73,6 +77,7 @@ export function RolesDataTable({
   onAccessLevel,
   onViewUsers,
   onViewActivity,
+  onOpenServices,
 }: RolesDataTableProps) {
   const { t } = useTranslation()
   const { selectedDealers } = useFilters()
@@ -93,9 +98,17 @@ export function RolesDataTable({
     action: 'inactivate' | 'activate' | 'delete'
   } | null>(null)
 
+  const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
+  const [assignOpen, setAssignOpen] = React.useState(false)
+
   React.useEffect(() => {
     setPageIndex(0)
   }, [typeFilter, showInactive, dealerKey, idTemplate])
+
+  // Selection is per visible page, like legacy (getRolesChecked on the DataTable page).
+  React.useEffect(() => {
+    setRowSelection({})
+  }, [typeFilter, showInactive, dealerKey, idTemplate, pageIndex, pageSize])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -119,6 +132,49 @@ export function RolesDataTable({
 
   const columns = React.useMemo<ColumnDef<RoleListRow>[]>(
     () => [
+      ...(canEdit
+        ? [
+            {
+              id: 'select',
+              size: 40,
+              minSize: 40,
+              maxSize: 44,
+              enableSorting: false,
+              enableHiding: false,
+              header: ({ table }) => (
+                <Checkbox
+                  checked={
+                    table.getIsAllPageRowsSelected()
+                      ? true
+                      : table.getIsSomePageRowsSelected()
+                        ? 'indeterminate'
+                        : false
+                  }
+                  onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                  aria-label={t('roles.selectAllRoles')}
+                  className="cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ),
+              cell: ({ row }) => (
+                <Checkbox
+                  checked={row.getIsSelected()}
+                  onCheckedChange={(value) => row.toggleSelected(!!value)}
+                  aria-label={t('roles.selectRole')}
+                  className="cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ),
+              meta: {
+                label: t('roles.selectRole'),
+                pin: 'left',
+                exportable: false,
+                headerClassName: 'w-[40px] px-2',
+                cellClassName: 'px-2',
+              } satisfies DataTableColumnMeta<RoleListRow>,
+            } satisfies ColumnDef<RoleListRow>,
+          ]
+        : []),
       {
         accessorKey: 'nombre',
         header: ({ column }) => (
@@ -291,6 +347,12 @@ export function RolesDataTable({
                         {t('roles.edit')}
                       </DropdownMenuItem>
                     ) : null}
+                    {canEdit ? (
+                      <DropdownMenuItem onClick={() => onOpenServices(r)}>
+                        <ClipboardList className="size-4" />
+                        {t('roles.services')}
+                      </DropdownMenuItem>
+                    ) : null}
                     {canViewUsers ? (
                       <DropdownMenuItem onClick={() => onViewUsers(r)}>
                         <Users className="size-4" />
@@ -343,6 +405,7 @@ export function RolesDataTable({
       onAccessLevel,
       onViewUsers,
       onViewActivity,
+      onOpenServices,
     ],
   )
 
@@ -370,6 +433,11 @@ export function RolesDataTable({
     extra,
   })
 
+  const selectedExternalIds = React.useMemo(
+    () => rows.filter((r) => rowSelection[String(r.id)] && r.tipo === 2).map((r) => r.id),
+    [rows, rowSelection],
+  )
+
   return (
     <div className="min-w-0 space-y-2">
       {error ? (
@@ -383,6 +451,23 @@ export function RolesDataTable({
         data={rows}
         isLoading={isFetching}
         getRowId={(r) => String(r.id)}
+        enableRowSelection={canEdit}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        recordsCountNote={
+          canEdit && selectedExternalIds.length > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="ml-2 h-7 gap-1.5 text-xs"
+              onClick={() => setAssignOpen(true)}
+            >
+              <ClipboardList className="size-3.5" />
+              {t('roles.assignAllServices')} ({selectedExternalIds.length})
+            </Button>
+          ) : null
+        }
         onRowClick={onOpenPermissions}
         pagination={{
           pageIndex,
@@ -420,6 +505,13 @@ export function RolesDataTable({
             <span className="text-xs text-muted-foreground">{t('roles.readOnlyHint')}</span>
           )
         }
+      />
+
+      <AssignAllServicesDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        roleIds={selectedExternalIds}
+        onDone={() => setRowSelection({})}
       />
 
       <ConfirmActionDialog

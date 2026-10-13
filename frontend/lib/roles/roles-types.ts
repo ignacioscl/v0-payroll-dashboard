@@ -84,3 +84,40 @@ export type DepartmentOption = {
   id: number
   label: string
 }
+
+/** Services by role (legacy "Services & Prices Admin"), php/api/payroll/roles-services.php. */
+export type RoleServiceRow = {
+  idService: number
+  dealer: string
+  department: string
+  service: string
+  isCreateWo: boolean
+  isApproveWo: boolean
+}
+
+export type RoleServicesResponse = {
+  idRol: number
+  services: RoleServiceRow[]
+  /** Distinct users with the role (includes inactive), the set "apply to users" changes. */
+  assignedUsers: number
+  /** Why the list is empty when the role has no dealer/department or no provider. */
+  reason: 'no_dealer' | 'no_provider' | null
+}
+
+export type RoleServiceColumn = 'create' | 'approve'
+
+export type SetRoleServicesPayload = {
+  action: 'set'
+  id_rol: number
+  ids_service: number[]
+  type: RoleServiceColumn
+  checked: boolean
+  apply_users: boolean
+}
+
+export type AssignAllServicesPayload = {
+  action: 'assign_all'
+  ids_rol: number[]
+  create: boolean
+  approve: boolean
+}

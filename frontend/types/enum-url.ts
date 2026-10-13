@@ -46,6 +46,7 @@ export const SrsPhpPath = {
   ROLES_ACTIONS: 'php/api/payroll/roles-actions.php',
   ROLES_USERS: 'php/api/payroll/roles-users.php',
   ROLES_DEPARTMENTS: 'php/api/payroll/roles-departments.php',
+  ROLES_SERVICES: 'php/api/payroll/roles-services.php',
 } as const
 
 /** Face recognition paths proxied via `/api/face/[...path]`. */

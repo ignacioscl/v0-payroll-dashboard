@@ -9,6 +9,7 @@ import { AccessLevelDialog } from '@/components/roles/access-level-dialog'
 import { RoleActivityPanel } from '@/components/roles/role-activity-panel'
 import { RoleFormDialog } from '@/components/roles/role-form-dialog'
 import { RolePermissionsSheet } from '@/components/roles/role-permissions-sheet'
+import { RoleServicesSheet } from '@/components/roles/role-services-sheet'
 import {
   RoleTemplateFilterCombobox,
   type RoleTemplateFilterOption,
@@ -55,6 +56,8 @@ export default function RolesPage() {
   const [usersOpen, setUsersOpen] = useState(false)
   const [activityRole, setActivityRole] = useState<RoleListRow | null>(null)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [servicesRole, setServicesRole] = useState<RoleListRow | null>(null)
+  const [servicesOpen, setServicesOpen] = useState(false)
 
   const onOpenPermissions = useCallback((role: RoleListRow) => {
     setPermRole(role)
@@ -87,6 +90,11 @@ export default function RolesPage() {
     if (role.idTemplate) return
     setActivityRole(role)
     setActivityOpen(true)
+  }, [])
+
+  const onOpenServices = useCallback((role: RoleListRow) => {
+    setServicesRole(role)
+    setServicesOpen(true)
   }, [])
 
   if (!loading && !canView) {
@@ -160,6 +168,7 @@ export default function RolesPage() {
         onAccessLevel={onAccessLevel}
         onViewUsers={onViewUsers}
         onViewActivity={onViewActivity}
+        onOpenServices={onOpenServices}
       />
 
       <RolePermissionsSheet
@@ -180,6 +189,8 @@ export default function RolesPage() {
       <AccessLevelDialog open={pondOpen} onOpenChange={setPondOpen} role={pondRole} />
 
       <RoleUsersSheet role={usersRole} open={usersOpen} onOpenChange={setUsersOpen} />
+
+      <RoleServicesSheet role={servicesRole} open={servicesOpen} onOpenChange={setServicesOpen} />
 
       <RoleActivityPanel
         role={activityRole}

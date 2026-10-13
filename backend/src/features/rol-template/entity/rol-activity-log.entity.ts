@@ -15,6 +15,9 @@ export enum RolActivityLogAction {
   CREATE_ROLES = 'create_roles',
   DELETE_ROLE = 'delete_role',
   SET_ROLE_ESTADO = 'set_role_estado',
+  /** Written by PHP (roles-services.php), migration 011. */
+  SET_SERVICES = 'set_services',
+  ASSIGN_SERVICES = 'assign_services',
 }
 
 /** Activity log for ROL_TEMPLATE and standalone ROL (who / what / when). */

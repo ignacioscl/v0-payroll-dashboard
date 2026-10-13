@@ -103,6 +103,35 @@ export interface Messages {
     basedOnTemplate: string
     selectTemplate: string
     templateRequired: string
+    services: string
+    servicesTitle: string
+    servicesApplyUsers: string
+    servicesApplyUsersHint: string
+    servicesSearch: string
+    servicesColDealer: string
+    servicesColDepartment: string
+    servicesColService: string
+    servicesColCreate: string
+    servicesColApprove: string
+    servicesCheckAll: string
+    servicesLoading: string
+    servicesEmpty: string
+    servicesNoResults: string
+    servicesNoDealer: string
+    servicesNoProvider: string
+    servicesConfirm: string
+    servicesConfirmUsers: string
+    servicesContinue: string
+    selectRole: string
+    selectAllRoles: string
+    assignAllServices: string
+    assignAllTitle: string
+    assignAllWarning: string
+    assignAllCreate: string
+    assignAllApprove: string
+    assignAllCount: string
+    assignAllApply: string
+    assignAllSuccess: string
   }
   roleTemplates: {
     title: string
