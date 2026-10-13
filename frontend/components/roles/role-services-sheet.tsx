@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { ArrowRight, Search } from 'lucide-react'
+import { ArrowRight, Search, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -51,14 +51,15 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
   const query = useRoleServices(idRol, open && idRol != null)
   const mutation = useSetRoleServices()
   const [search, setSearch] = React.useState('')
-  const [applyUsers, setApplyUsers] = React.useState(false)
+  const [applyUsers, setApplyUsers] = React.useState(true)
   const [pending, setPending] = React.useState<Set<string>>(new Set())
   const [confirmBulk, setConfirmBulk] = React.useState<PendingBulk | null>(null)
 
-  // Legacy kept "apply" checked between openings; here it always starts off (plan, deliberate difference 3).
+  // "Apply to users" starts ON on every opening (Ignacio, 13/10/2026). Legacy started off and kept
+  // the last value; turning it off shows a warning (plan, deliberate difference 3).
   React.useEffect(() => {
     if (open) {
-      setApplyUsers(false)
+      setApplyUsers(true)
       setSearch('')
     }
   }, [open, idRol])
@@ -242,7 +243,23 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
               <Label htmlFor="role-services-apply-users" className="cursor-pointer text-sm font-medium">
                 {t('roles.servicesApplyUsers')}
               </Label>
-              <p className="text-xs text-muted-foreground">{t('roles.servicesApplyUsersHint')}</p>
+              {applyUsers ? (
+                <p className="text-xs text-muted-foreground">
+                  {t('roles.servicesApplyUsersOn', { m: assignedUsers })}
+                </p>
+              ) : (
+                <p
+                  role="status"
+                  className="mt-1 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                >
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    {role?.tipo === 2
+                      ? t('roles.servicesApplyUsersOffExternal')
+                      : t('roles.servicesApplyUsersOffInternal')}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
           <div className="relative">

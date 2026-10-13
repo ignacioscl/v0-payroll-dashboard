@@ -111,8 +111,10 @@ export const en: Messages = {
     services: 'Services',
     servicesTitle: 'Services · {name}',
     servicesApplyUsers: 'Apply update to the users',
-    servicesApplyUsersHint:
-      'To apply the services to all users, turn this on before selecting the services.',
+    servicesApplyUsersOn: 'Changes also apply to the {m} users who have this role.',
+    servicesApplyUsersOffExternal:
+      "Users who already have this role won't be affected. Only users assigned this role from now on will get these services.",
+    servicesApplyUsersOffInternal: "Users who already have this role won't be affected.",
     servicesSearch: 'Search dealer, department or service',
     servicesColDealer: 'Dealer',
     servicesColDepartment: 'Department',

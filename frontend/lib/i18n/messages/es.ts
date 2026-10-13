@@ -111,8 +111,10 @@ export const es: Messages = {
     services: 'Servicios',
     servicesTitle: 'Servicios · {name}',
     servicesApplyUsers: 'Aplicar el cambio a los usuarios',
-    servicesApplyUsersHint:
-      'Para aplicar los servicios a todos los usuarios, activá esto antes de elegir los servicios.',
+    servicesApplyUsersOn: 'Los cambios también se aplican a los {m} usuarios que tienen este rol.',
+    servicesApplyUsersOffExternal:
+      'Los usuarios que ya tienen este rol no se van a ver afectados. Solo los que reciban el rol de ahora en adelante van a tener estos servicios.',
+    servicesApplyUsersOffInternal: 'Los usuarios que ya tienen este rol no se van a ver afectados.',
     servicesSearch: 'Buscar dealer, departamento o servicio',
     servicesColDealer: 'Dealer',
     servicesColDepartment: 'Departamento',

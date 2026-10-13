@@ -106,7 +106,9 @@ export interface Messages {
     services: string
     servicesTitle: string
     servicesApplyUsers: string
-    servicesApplyUsersHint: string
+    servicesApplyUsersOn: string
+    servicesApplyUsersOffExternal: string
+    servicesApplyUsersOffInternal: string
     servicesSearch: string
     servicesColDealer: string
     servicesColDepartment: string
