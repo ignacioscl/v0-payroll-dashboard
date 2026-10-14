@@ -82,6 +82,13 @@ interface LookupMultiSelectProps {
   onOpenChange?: (open: boolean) => void
   /** Employee thumbnails (usuarios.thumbnail_uuid / logo_img). */
   withPhotos?: boolean
+  /** The server cut the list at its safety ceiling: say so instead of pretending it is complete. */
+  truncated?: boolean
+  /**
+   * Runs when the popover closes with a changed draft. A returned message blocks the change: the
+   * popover stays open with the message and the applied value is left as it was.
+   */
+  validateDraft?: (draft: number[]) => string | null
 }
 
 export function LookupMultiSelect({
@@ -96,10 +103,17 @@ export function LookupMultiSelect({
   className,
   onOpenChange,
   withPhotos = false,
+  truncated = false,
+  validateDraft,
 }: LookupMultiSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<number[]>([])
+  const [draft, setDraftState] = useState<number[]>([])
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const setDraft: typeof setDraftState = (next) => {
+    setDraftError(null)
+    setDraftState(next)
+  }
   const [search, setSearch] = useState('')
   const [known, setKnown] = useState<Record<number, LookupOption>>({})
   /**
@@ -157,21 +171,31 @@ export function LookupMultiSelect({
   const isFiltering = search.trim().length > 0
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => draft.includes(id))
-  const checkAllLabel = isFiltering ? t('common.checkAllFiltered') : t('common.checkAll')
+  const checkAllLabel = isFiltering
+    ? t('common.checkAllFilteredCount', { count: visibleIds.length })
+    : t('common.checkAllCount', { count: visibleIds.length })
 
   const handleOpenChange = (next: boolean) => {
     if (disabled) return
-    onOpenChange?.(next)
     if (next) {
+      onOpenChange?.(next)
       setDraft([...value])
       setSearch('')
       onSearchChange('')
       setOpen(true)
       return
     }
-    setOpen(false)
     const same =
       draft.length === value.length && draft.every((id) => value.includes(id))
+    if (!same && validateDraft) {
+      const error = validateDraft(draft)
+      if (error) {
+        setDraftError(error)
+        return
+      }
+    }
+    onOpenChange?.(next)
+    setOpen(false)
     if (!same) onChange(draft)
   }
 
@@ -284,6 +308,15 @@ export function LookupMultiSelect({
             <RowCheckbox checked={allVisibleSelected} />
             <span className="font-medium">{checkAllLabel}</span>
           </button>
+          {draftError ? (
+            <p role="alert" className="border-b border-border px-2 py-1.5 text-[11px] text-destructive">
+              {draftError}
+            </p>
+          ) : truncated ? (
+            <p className="border-b border-border px-2 py-1.5 text-[11px] text-muted-foreground">
+              {t('common.lookupTruncated')}
+            </p>
+          ) : null}
           <CommandList
             className={cn(
               'max-h-[240px]',

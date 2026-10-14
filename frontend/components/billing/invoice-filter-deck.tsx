@@ -29,10 +29,12 @@ import { LookupMultiSelect } from '@/components/shared/lookup-multi-select'
 import { useInvoiceWorkerLookup } from '@/hooks/use-invoice-lookups'
 import {
   EMPTY_ADVANCED_FILTERS,
+  remainingFilterIds,
   type InvoiceAdvancedFilterState,
   woNumbersToInput,
 } from '@/lib/invoice-advanced-filters'
 import { type InvoiceDeletedMode } from '@/lib/invoice-search-lock'
+import { INVOICE_FILTER_MAX_IDS } from '@/lib/srs-invoices-api'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -227,7 +229,7 @@ export function InvoiceFilterDeck({
     if (employeeWorkedIds.length) {
       const one =
         employeeWorkedIds.length === 1
-          ? (workerQuery.data ?? []).find((o) => o.id === employeeWorkedIds[0])?.label
+          ? (workerQuery.data?.results ?? []).find((o) => o.id === employeeWorkedIds[0])?.label
           : undefined
       list.push({
         key: 'worked',
@@ -620,7 +622,19 @@ export function InvoiceFilterDeck({
                       {t('invoices.filterEmployeeWorkedLabel')}
                     </Label>
                     <LookupMultiSelect
-                      options={workerQuery.data ?? []}
+                      options={workerQuery.data?.results ?? []}
+                      truncated={workerQuery.data?.truncated}
+                      validateDraft={(draft) => {
+                        const max = remainingFilterIds(
+                          INVOICE_FILTER_MAX_IDS,
+                          advanced.departmentIds.length +
+                            advanced.serviceIds.length +
+                            advanced.authorIds.length,
+                        )
+                        return draft.length > max
+                          ? t('common.lookupTooManySelected', { count: draft.length, max })
+                          : null
+                      }}
                       value={employeeWorkedIds}
                       onChange={onEmployeeWorkedChange}
                       onSearchChange={setWorkerSearch}
@@ -753,6 +767,7 @@ export function InvoiceFilterDeck({
               onChange={onAdvancedChange}
               idDealer={idDealer}
               disabled={disabled}
+              employeeWorkedCount={employeeWorkedIds.length}
             />
           </div>
         </Card>

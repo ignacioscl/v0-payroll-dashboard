@@ -720,6 +720,10 @@ export interface Messages {
     clearAll: string
     checkAll: string
     checkAllFiltered: string
+    checkAllCount: string
+    checkAllFilteredCount: string
+    lookupTooManySelected: string
+    lookupTruncated: string
     fullScreen: string
     rows: string
     columns: string

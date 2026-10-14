@@ -36,7 +36,7 @@ export function DistrictMultiSelect({ className }: { className?: string }) {
   )
 
   const apply = (districtIds: number[]) => {
-    const options = query.data ?? []
+    const options = query.data?.results ?? []
     setSelectedDistricts(districtIds)
 
     if (!districtIds.length) {
@@ -63,7 +63,8 @@ export function DistrictMultiSelect({ className }: { className?: string }) {
 
   return (
     <LookupMultiSelect
-      options={query.data ?? []}
+      options={query.data?.results ?? []}
+      truncated={query.data?.truncated}
       value={selectedDistricts}
       onChange={apply}
       onSearchChange={setSearch}

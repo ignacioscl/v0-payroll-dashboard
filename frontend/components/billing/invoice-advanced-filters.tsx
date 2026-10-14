@@ -13,7 +13,11 @@ import {
   useInvoiceDepartmentLookup,
   useInvoiceServiceLookup,
 } from '@/hooks/use-invoice-lookups'
-import type { InvoiceAdvancedFilterState } from '@/lib/invoice-advanced-filters'
+import {
+  remainingFilterIds,
+  type InvoiceAdvancedFilterState,
+} from '@/lib/invoice-advanced-filters'
+import { INVOICE_FILTER_MAX_IDS } from '@/lib/srs-invoices-api'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -60,11 +64,14 @@ export function InvoiceAdvancedFilters({
   onChange,
   idDealer,
   disabled,
+  employeeWorkedCount = 0,
 }: {
   value: InvoiceAdvancedFilterState
   onChange: (next: InvoiceAdvancedFilterState) => void
   idDealer: string
   disabled?: boolean
+  /** Ids applied in «Employee worked» (lives in the deck), part of the joint id budget. */
+  employeeWorkedCount?: number
 }) {
   const { t } = useTranslation()
   const [deptOpen, setDeptOpen] = React.useState(false)
@@ -85,6 +92,14 @@ export function InvoiceAdvancedFilters({
 
   const patch = (partial: Partial<InvoiceAdvancedFilterState>) => {
     onChange({ ...value, ...partial })
+  }
+
+  /** Blocks a draft that would push the joint id budget over the limit (D2). */
+  const budgetCheck = (otherSelected: number) => (draft: number[]) => {
+    const max = remainingFilterIds(INVOICE_FILTER_MAX_IDS, otherSelected)
+    return draft.length > max
+      ? t('common.lookupTooManySelected', { count: draft.length, max })
+      : null
   }
 
   return (
@@ -143,7 +158,10 @@ export function InvoiceAdvancedFilters({
           {/* District lives in the header, left of the dealer combo (legacy layout). */}
           <FilterField label={t('invoices.filterDepartmentLabel')}>
             <LookupMultiSelect
-              options={deptQuery.data ?? []}
+              options={deptQuery.data?.results ?? []}
+              truncated={deptQuery.data?.truncated}
+              // Cambiar departamentos limpia los servicios: no cuentan para este presupuesto.
+              validateDraft={budgetCheck(value.authorIds.length + employeeWorkedCount)}
               value={value.departmentIds}
               onChange={(departmentIds) =>
                 patch({
@@ -160,7 +178,11 @@ export function InvoiceAdvancedFilters({
           </FilterField>
           <FilterField label={t('invoices.filterServiceLabel')}>
             <LookupMultiSelect
-              options={svcQuery.data ?? []}
+              options={svcQuery.data?.results ?? []}
+              truncated={svcQuery.data?.truncated}
+              validateDraft={budgetCheck(
+                value.departmentIds.length + value.authorIds.length + employeeWorkedCount,
+              )}
               value={value.serviceIds}
               onChange={(serviceIds) => patch({ serviceIds })}
               onSearchChange={setSvcSearch}
@@ -172,7 +194,11 @@ export function InvoiceAdvancedFilters({
           </FilterField>
           <FilterField label={t('invoices.filterCreatedByLabel')} className="sm:col-span-2">
             <LookupMultiSelect
-              options={authorQuery.data ?? []}
+              options={authorQuery.data?.results ?? []}
+              truncated={authorQuery.data?.truncated}
+              validateDraft={budgetCheck(
+                value.departmentIds.length + value.serviceIds.length + employeeWorkedCount,
+              )}
               value={value.authorIds}
               onChange={(authorIds) =>
                 patch({

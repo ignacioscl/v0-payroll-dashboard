@@ -21,6 +21,15 @@ export type InvoiceAdvancedFilterState = {
   overdue: boolean
 }
 
+/**
+ * Joint id budget of the Invoices filters (plan-filtros-tope-80, 2.3 D2). The four id lists travel
+ * together in one query string, so a selector may only take what the other three leave free.
+ * Returns the remaining budget for a selector, given how many ids the OTHER selectors hold.
+ */
+export function remainingFilterIds(maxIds: number, otherSelected: number): number {
+  return Math.max(0, maxIds - otherSelected)
+}
+
 export const EMPTY_ADVANCED_FILTERS: InvoiceAdvancedFilterState = {
   departmentIds: [],
   serviceIds: [],

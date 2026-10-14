@@ -19,6 +19,7 @@ import {
   InvoiceLookupResponseDto,
   buildDepartmentLookupFilter,
   buildServiceLookupFilter,
+  capLookupRows,
 } from '../dto/invoice-lookup.dto'
 
 @Injectable()
@@ -98,15 +99,15 @@ export class InvoiceService {
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
     }
-    const results = await this.repository.lookupDepartments({
+    const rows = await this.repository.lookupDepartments({
       idDealerProvider: ctx.idDealerProvider,
       idUsuario: ctx.idUsuario,
       dealerIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
       search,
-      limit,
+      limit: limit + 1,
     })
-    return { results }
+    return capLookupRows(rows, limit)
   }
 
   async lookupServices(
@@ -118,16 +119,16 @@ export class InvoiceService {
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
     }
-    const results = await this.repository.lookupServices({
+    const rows = await this.repository.lookupServices({
       idDealerProvider: ctx.idDealerProvider,
       idUsuario: ctx.idUsuario,
       dealerIds,
       departmentIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
       search,
-      limit,
+      limit: limit + 1,
     })
-    return { results }
+    return capLookupRows(rows, limit)
   }
 
   async lookupAuthors(
@@ -139,15 +140,15 @@ export class InvoiceService {
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
     }
-    const results = await this.repository.lookupAuthors({
+    const rows = await this.repository.lookupAuthors({
       idDealerProvider: ctx.idDealerProvider,
       idUsuario: ctx.idUsuario,
       dealerIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
       search,
-      limit,
+      limit: limit + 1,
     })
-    return { results }
+    return capLookupRows(rows, limit)
   }
 
   async lookupWorkers(
@@ -159,29 +160,32 @@ export class InvoiceService {
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
     }
-    const results = await this.repository.lookupWorkers({
+    const rows = await this.repository.lookupWorkers({
       idDealerProvider: ctx.idDealerProvider,
       idUsuario: ctx.idUsuario,
       dealerIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
       search,
-      limit,
+      limit: limit + 1,
     })
-    return { results }
+    return capLookupRows(rows, limit)
   }
 
   async lookupDistricts(
     ctx: SrsContext,
     query: InvoiceLookupQueryDto,
-  ): Promise<{ results: Array<{ id: number; label: string; dealerIds: number[] }> }> {
+  ): Promise<{
+    results: Array<{ id: number; label: string; dealerIds: number[] }>
+    truncated: boolean
+  }> {
     await this.assertInvoicesModuleAccess(ctx)
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_BILLING_DISTRICT)
     const { search, limit } = buildDepartmentLookupFilter(query)
-    const results = await this.repository.lookupDistricts({
+    const rows = await this.repository.lookupDistricts({
       idDealerProvider: ctx.idDealerProvider,
       search,
-      limit,
+      limit: limit + 1,
     })
-    return { results }
+    return capLookupRows(rows, limit)
   }
 }

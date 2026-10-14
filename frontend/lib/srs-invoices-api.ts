@@ -185,7 +185,21 @@ export type InvoiceLookupOption = {
 
 export interface InvoiceLookupResponse {
   results: InvoiceLookupOption[]
+  /** The server hit its safety ceiling (5,000) and cut the list. */
+  truncated?: boolean
 }
+
+export interface InvoiceLookupResult<T = InvoiceLookupOption> {
+  results: T[]
+  truncated: boolean
+}
+
+/**
+ * Joint budget for the ids the Invoices filters send in the query string (department + service +
+ * authors + workers). Each id costs about 8 characters (the comma goes as %2C); 500 keeps the
+ * request well under the 8 KB request line that common proxies allow (plan-filtros-tope-80, task 0).
+ */
+export const INVOICE_FILTER_MAX_IDS = 500
 
 function buildInvoiceQuery(params: InvoiceListParams): string {
   const qs = new URLSearchParams({
@@ -418,7 +432,7 @@ export async function fetchInvoiceDepartments(params: {
   idDealer: string
   search?: string
   limit?: number
-}): Promise<InvoiceLookupOption[]> {
+}): Promise<InvoiceLookupResult> {
   const res = await fetch(
     `/api/srs-kpis/billing/invoices/lookups/departments${buildLookupQuery(params)}`,
     { cache: 'no-store' },
@@ -426,7 +440,7 @@ export async function fetchInvoiceDepartments(params: {
   if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice departments (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
-  return data.results ?? []
+  return { results: data.results ?? [], truncated: Boolean(data.truncated) }
 }
 
 export async function fetchInvoiceServices(params: {
@@ -434,7 +448,7 @@ export async function fetchInvoiceServices(params: {
   idDepartment?: string
   search?: string
   limit?: number
-}): Promise<InvoiceLookupOption[]> {
+}): Promise<InvoiceLookupResult> {
   const res = await fetch(
     `/api/srs-kpis/billing/invoices/lookups/services${buildLookupQuery(params)}`,
     { cache: 'no-store' },
@@ -442,14 +456,14 @@ export async function fetchInvoiceServices(params: {
   if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice services (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
-  return data.results ?? []
+  return { results: data.results ?? [], truncated: Boolean(data.truncated) }
 }
 
 export async function fetchInvoiceAuthors(params: {
   idDealer: string
   search?: string
   limit?: number
-}): Promise<InvoiceLookupOption[]> {
+}): Promise<InvoiceLookupResult> {
   const res = await fetch(
     `/api/srs-kpis/billing/invoices/lookups/authors${buildLookupQuery(params)}`,
     { cache: 'no-store' },
@@ -457,14 +471,14 @@ export async function fetchInvoiceAuthors(params: {
   if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice authors (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
-  return data.results ?? []
+  return { results: data.results ?? [], truncated: Boolean(data.truncated) }
 }
 
 export async function fetchInvoiceWorkers(params: {
   idDealer: string
   search?: string
   limit?: number
-}): Promise<InvoiceLookupOption[]> {
+}): Promise<InvoiceLookupResult> {
   const res = await fetch(
     `/api/srs-kpis/billing/invoices/lookups/workers${buildLookupQuery(params)}`,
     { cache: 'no-store' },
@@ -472,7 +486,7 @@ export async function fetchInvoiceWorkers(params: {
   if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice workers (${res.status})`)
   const data = (await res.json()) as InvoiceLookupResponse
-  return data.results ?? []
+  return { results: data.results ?? [], truncated: Boolean(data.truncated) }
 }
 
 export type InvoiceDistrictOption = InvoiceLookupOption & { dealerIds: number[] }
@@ -480,7 +494,7 @@ export type InvoiceDistrictOption = InvoiceLookupOption & { dealerIds: number[] 
 export async function fetchInvoiceDistricts(params: {
   search?: string
   limit?: number
-}): Promise<InvoiceDistrictOption[]> {
+}): Promise<InvoiceLookupResult<InvoiceDistrictOption>> {
   const qs = new URLSearchParams()
   if (params.search) qs.set('search', params.search)
   if (params.limit) qs.set('limit', String(params.limit))
@@ -491,6 +505,6 @@ export async function fetchInvoiceDistricts(params: {
   )
   if (isSrsBusy(res)) throw new SrsBusyError()
   if (!res.ok) throw new Error(`Invoice districts (${res.status})`)
-  const data = (await res.json()) as { results?: InvoiceDistrictOption[] }
-  return data.results ?? []
+  const data = (await res.json()) as { results?: InvoiceDistrictOption[]; truncated?: boolean }
+  return { results: data.results ?? [], truncated: Boolean(data.truncated) }
 }
