@@ -54,6 +54,8 @@ export type RolesDataTableProps = {
   /** When set, list only roles created from this ROL_TEMPLATE. */
   idTemplate?: number | null
   showInactive: boolean
+  /** With a dealer selected in the header: also list internal roles without dealer. */
+  includeNoDealer: boolean
   enabled: boolean
   canEdit: boolean
   canViewUsers: boolean
@@ -69,6 +71,7 @@ export function RolesDataTable({
   typeFilter,
   idTemplate = null,
   showInactive,
+  includeNoDealer,
   enabled,
   canEdit,
   canViewUsers,
@@ -103,12 +106,12 @@ export function RolesDataTable({
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [typeFilter, showInactive, dealerKey, idTemplate])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer])
 
   // Selection is per visible page, like legacy (getRolesChecked on the DataTable page).
   React.useEffect(() => {
     setRowSelection({})
-  }, [typeFilter, showInactive, dealerKey, idTemplate, pageIndex, pageSize])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer, pageIndex, pageSize])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -413,15 +416,15 @@ export function RolesDataTable({
     () => ({
       type: typeFilter || undefined,
       show_inactive: showInactive ? 1 : 0,
-      ...(dealerKey ? { id_dealer: dealerKey } : {}),
+      ...(dealerKey ? { id_dealer: dealerKey, include_no_dealer: includeNoDealer ? 1 : 0 } : {}),
       ...(idTemplate && idTemplate > 0 ? { id_template: idTemplate } : {}),
     }),
-    [typeFilter, showInactive, dealerKey, idTemplate],
+    [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: rolesAdapter,
-    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate],
+    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer],
     queryFn: fetchRoles,
     enabled,
     pageIndex,

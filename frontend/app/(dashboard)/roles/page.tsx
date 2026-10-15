@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { useFilters } from '@/lib/filter-context'
 import {
   canEditRoles,
   canViewRoleUsers,
@@ -46,6 +47,9 @@ export default function RolesPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
   const [showInactive, setShowInactive] = useState(false)
+  const [includeNoDealer, setIncludeNoDealer] = useState(false)
+  const { selectedDealers } = useFilters()
+  const hasDealer = selectedDealers.length > 0
   const [permRole, setPermRole] = useState<RoleListRow | null>(null)
   const [permOpen, setPermOpen] = useState(false)
   const [formRole, setFormRole] = useState<RoleListRow | null>(null)
@@ -154,12 +158,26 @@ export default function RolesPage() {
             {t('roles.showInactive')}
           </Label>
         </div>
+
+        {hasDealer ? (
+          <div className="flex items-center gap-2 pb-1">
+            <Switch
+              id="roles-include-no-dealer"
+              checked={includeNoDealer}
+              onCheckedChange={setIncludeNoDealer}
+            />
+            <Label htmlFor="roles-include-no-dealer" className="text-sm font-normal">
+              {t('roles.includeNoDealer')}
+            </Label>
+          </div>
+        ) : null}
       </div>
 
       <RolesDataTable
         typeFilter={typeFilter}
         idTemplate={templateFilter?.id ?? null}
         showInactive={showInactive}
+        includeNoDealer={includeNoDealer}
         enabled={!loading && canView}
         canEdit={canEdit}
         canViewUsers={canViewUsers}

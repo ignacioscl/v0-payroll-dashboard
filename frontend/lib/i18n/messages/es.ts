@@ -30,6 +30,7 @@ export const es: Messages = {
     readOnlyHint: 'Solo lectura — podés ver permisos pero no modificarlos',
     autosaveHint: 'Los cambios se guardan al instante',
     showInactive: 'Mostrar inactivos',
+    includeNoDealer: 'Incluir roles sin dealer',
     type: 'Tipo',
     typeAll: 'Todos',
     typeInternal: 'Interno',
