@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { In, Not, Repository } from 'typeorm'
 
 import { BaseRepository } from 'src/commons/repository/base.repository'
 import { PaginationDto } from 'src/commons/pagination/Pagination.dto'
 import { SrsRolQueryDto } from '../dto/srs-rol.dto'
-import { Rol } from '../entity/rol.entity'
+import { Rol, ROL_ESTADO_ELIMINADO } from '../entity/rol.entity'
 
 @Injectable()
 export class RolRepository extends BaseRepository<Rol, SrsRolQueryDto> {
@@ -37,30 +37,34 @@ export class RolRepository extends BaseRepository<Rol, SrsRolQueryDto> {
     return this.applyPagination(query, payload)
   }
 
+  // Los roles eliminados (estado 2) no cuentan como hijos del template: no se listan, no se operan,
+  // no bloquean borrar el template ni volver a crear el rol de un dealer.
   countByTemplate(idTemplate: number) {
-    return this.count({ where: { idTemplate } })
+    return this.count({ where: { idTemplate, estado: Not(ROL_ESTADO_ELIMINADO) } })
   }
 
   findChildren(idTemplate: number) {
     return this.find({
-      where: { idTemplate },
+      where: { idTemplate, estado: Not(ROL_ESTADO_ELIMINADO) },
       relations: ['dealer'],
       order: { nombre: 'ASC' },
     })
   }
 
   findOwnedChild(idTemplate: number, idRol: number, idCompaniaOwner: number) {
-    return this.findOne({ where: { idRol, idTemplate, idCompaniaOwner } })
+    return this.findOne({
+      where: { idRol, idTemplate, idCompaniaOwner, estado: Not(ROL_ESTADO_ELIMINADO) },
+    })
   }
 
   hasInternalChild(idTemplate: number) {
-    return this.exist({ where: { idTemplate, tipo: 1 } })
+    return this.exist({ where: { idTemplate, tipo: 1, estado: Not(ROL_ESTADO_ELIMINADO) } })
   }
 
   async findExistingDealerIds(idTemplate: number, idDealers: number[]): Promise<number[]> {
     if (!idDealers.length) return []
     const rows = await this.find({
-      where: { idTemplate, idDealer: In(idDealers) },
+      where: { idTemplate, idDealer: In(idDealers), estado: Not(ROL_ESTADO_ELIMINADO) },
       select: ['idDealer'],
     })
     return rows.map((r) => Number(r.idDealer)).filter((n) => n > 0)
@@ -73,14 +77,5 @@ export class RolRepository extends BaseRepository<Rol, SrsRolQueryDto> {
       select: ['idRol', 'nombre'],
     })
     return new Map(rows.map((row) => [row.idRol, row.nombre]))
-  }
-
-  async countUsersAssigned(idRol: number): Promise<number> {
-    const rows = await this.createQueryBuilder()
-      .select('COUNT(*)', 'c')
-      .from('USUARIO_ROL_REL', 'urr')
-      .where('urr.id_rol = :idRol', { idRol })
-      .getRawOne<{ c: string }>()
-    return Number(rows?.c ?? 0)
   }
 }

@@ -89,6 +89,13 @@ export interface Messages {
     usersLoading: string
     usersError: string
     usersEmpty: string
+    usersDealer: string
+    usersRemove: string
+    usersRemoveConfirmTitle: string
+    usersRemoveConfirmDesc: string
+    usersRemoveConfirm: string
+    usersProRole: string
+    usersProRoleHint: string
     activity: string
     activityTitle: string
     activitySubtitle: string

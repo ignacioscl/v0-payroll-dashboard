@@ -91,7 +91,6 @@ export default function RolesPage() {
   }, [])
 
   const onViewActivity = useCallback((role: RoleListRow) => {
-    if (role.idTemplate) return
     setActivityRole(role)
     setActivityOpen(true)
   }, [])

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { In, Not, Repository } from 'typeorm'
 
 import { BaseRepository } from 'src/commons/repository/base.repository'
 import { PaginationDto } from 'src/commons/pagination/Pagination.dto'
-import { Rol } from '../entity/rol.entity'
+import { Rol, ROL_ESTADO_ELIMINADO } from '../entity/rol.entity'
 import { RolAccionRelQueryDto } from '../dto/srs-rol.dto'
 import { RolAccionRel } from '../entity/rol-accion-rel.entity'
 
@@ -60,6 +60,7 @@ export class RolAccionRelRepository extends BaseRepository<RolAccionRel, RolAcci
 
   /**
    * Replace permissions for every ROL with id_template = idTemplate.
+   * Eliminated roles (estado 2) keep the permissions they had when deleted.
    * Returns the child role ids that were updated.
    */
   async replaceForTemplateChildren(
@@ -68,7 +69,7 @@ export class RolAccionRelRepository extends BaseRepository<RolAccionRel, RolAcci
   ): Promise<number[]> {
     const childRows = await this.manager
       .getRepository(Rol)
-      .find({ where: { idTemplate }, select: ['idRol'] })
+      .find({ where: { idTemplate, estado: Not(ROL_ESTADO_ELIMINADO) }, select: ['idRol'] })
     const idRols = childRows.map((r) => Number(r.idRol)).filter((n) => n > 0)
     if (!idRols.length) return []
 

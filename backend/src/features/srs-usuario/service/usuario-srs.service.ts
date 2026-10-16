@@ -36,6 +36,11 @@ export class UsuarioSrsService extends GlobalBaseService<UsuarioSrs, UsuarioSrsQ
     return count > 0
   }
 
+  /** Usuarios activos con el rol: si hay alguno, el rol no se puede eliminar. */
+  countActiveAssignedToRole(idRol: number): Promise<number> {
+    return this.repository.countActiveAssignedToRole(idRol)
+  }
+
   async mapNombresByIds(ids: number[]): Promise<Map<number, string>> {
     const map = new Map<number, string>()
     const uniq = Array.from(new Set(ids.map(Number).filter((n) => n > 0)))

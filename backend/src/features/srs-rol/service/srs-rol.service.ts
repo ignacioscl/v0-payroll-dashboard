@@ -39,10 +39,6 @@ export class SrsRolService extends GlobalBaseService<Rol, SrsRolQueryDto> {
     return this.repository.findNombresByIds(ids)
   }
 
-  countUsersAssigned(idRol: number) {
-    return this.repository.countUsersAssigned(idRol)
-  }
-
   /** TypeORM maps `idRol` → `id_rol`; do not use updateByIdCustom('idRol') (raw WHERE). */
   updateEstado(idRol: number, estado: number) {
     return this.repository.update({ idRol }, { estado })

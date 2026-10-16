@@ -5,6 +5,12 @@ import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 't
 import { SrsEntityBase } from 'src/commons/entity/srs-entity-base'
 import { Contratista } from 'src/features/srs-contratista/entity/contratista.entity'
 
+/**
+ * ROL.estado del rol eliminado (1 activo, 0 inactivo): no aparece en ningún listado, no se asigna y conserva
+ * todo. Mismo valor que Rol::$ESTADO_ELIMINADO del PHP. Ver plans/plan-rol-activity-log-legacy (Etapa 2).
+ */
+export const ROL_ESTADO_ELIMINADO = 2
+
 /** Legacy SRS: ROL. PK is `id_rol`. */
 @Entity({ name: 'ROL', synchronize: false })
 export class Rol extends SrsEntityBase {

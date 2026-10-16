@@ -27,4 +27,17 @@ export class UsuarioSrs extends SrsEntityBase {
   @IsOptional()
   @Column({ name: 'nombre', type: 'varchar', length: 128, nullable: true })
   nombre?: string | null
+
+  /** Activo = estado 1 e is_inactive 0 (mismo criterio que UsuarioDao.php del PHP). */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Column({ name: 'estado', type: 'tinyint', nullable: true })
+  estado?: number | null
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Column({ name: 'is_inactive', type: 'tinyint', unsigned: true, nullable: true })
+  isInactive?: number | null
 }

@@ -323,71 +323,68 @@ export function RolesDataTable({
                   <TooltipContent side="top">{t('roles.permissions')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {(canEdit || canViewUsers || !templated) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="size-4" />
-                      <span className="sr-only">{t('roles.actions')}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    {!templated ? (
-                      <DropdownMenuItem onClick={() => onViewActivity(r)}>
-                        <History className="size-4" />
-                        {t('roles.activity')}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canEdit && !templated ? (
-                      <DropdownMenuItem onClick={() => onEdit(r)}>
-                        <Pencil className="size-4" />
-                        {t('roles.edit')}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canEdit ? (
-                      <DropdownMenuItem onClick={() => onOpenServices(r)}>
-                        <ClipboardList className="size-4" />
-                        {t('roles.services')}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canViewUsers ? (
-                      <DropdownMenuItem onClick={() => onViewUsers(r)}>
-                        <Users className="size-4" />
-                        {t('roles.viewUsers')}
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canEdit ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        {r.estado === 1 ? (
-                          <DropdownMenuItem onClick={() => setConfirm({ role: r, action: 'inactivate' })}>
-                            <UserX className="size-4" />
-                            {t('roles.setInactive')}
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem onClick={() => setConfirm({ role: r, action: 'activate' })}>
-                            <Check className="size-4" />
-                            {t('roles.setActive')}
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setConfirm({ role: r, action: 'delete' })}
-                        >
-                          <Trash2 className="size-4" />
-                          {t('roles.delete')}
+              {/* Activity está en todos los roles, con o sin template: el menú siempre se ve. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="size-4" />
+                    <span className="sr-only">{t('roles.actions')}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => onViewActivity(r)}>
+                    <History className="size-4" />
+                    {t('roles.activity')}
+                  </DropdownMenuItem>
+                  {canEdit && !templated ? (
+                    <DropdownMenuItem onClick={() => onEdit(r)}>
+                      <Pencil className="size-4" />
+                      {t('roles.edit')}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canEdit ? (
+                    <DropdownMenuItem onClick={() => onOpenServices(r)}>
+                      <ClipboardList className="size-4" />
+                      {t('roles.services')}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canViewUsers ? (
+                    <DropdownMenuItem onClick={() => onViewUsers(r)}>
+                      <Users className="size-4" />
+                      {t('roles.viewUsers')}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canEdit ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      {r.estado === 1 ? (
+                        <DropdownMenuItem onClick={() => setConfirm({ role: r, action: 'inactivate' })}>
+                          <UserX className="size-4" />
+                          {t('roles.setInactive')}
                         </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                      ) : (
+                        <DropdownMenuItem onClick={() => setConfirm({ role: r, action: 'activate' })}>
+                          <Check className="size-4" />
+                          {t('roles.setActive')}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setConfirm({ role: r, action: 'delete' })}
+                      >
+                        <Trash2 className="size-4" />
+                        {t('roles.delete')}
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )
         },

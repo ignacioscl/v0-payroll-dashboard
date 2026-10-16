@@ -17,6 +17,8 @@ export function useSaveRole() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles-list'] })
+      // Cada cambio deja una fila en el historial: el Activity se vuelve a pedir al abrirlo.
+      queryClient.invalidateQueries({ queryKey: ['role-activity'] })
     },
   })
 }
@@ -32,6 +34,8 @@ export function useRoleAction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles-list'] })
+      // Cada cambio deja una fila en el historial: el Activity se vuelve a pedir al abrirlo.
+      queryClient.invalidateQueries({ queryKey: ['role-activity'] })
     },
   })
 }

@@ -1,9 +1,13 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
-import type { DepartmentOption, RoleUsersResponse } from '@/lib/roles/roles-types'
+import type {
+  DepartmentOption,
+  RoleUserRemovePayload,
+  RoleUsersResponse,
+} from '@/lib/roles/roles-types'
 import { SrsPhpPath } from '@/types/enum-url'
 
 export function useRoleDepartments(
@@ -46,6 +50,23 @@ export function useRoleUsers(idRol: number | null, enabled = true) {
     queryFn: async () => {
       const raw = await api.getCustom('', undefined, { id_rol: idRol as number })
       return assertSrsSuccess<RoleUsersResponse>(raw, 'Failed to load users')
+    },
+  })
+}
+
+/** Tacho de View Users: le quita el rol al usuario en ese dealer (mismo efecto que el tacho de legacy). */
+export function useRemoveUserFromRole() {
+  const queryClient = useQueryClient()
+  const api = useSrsApiRequest<RoleUserRemovePayload, undefined, unknown>(SrsPhpPath.ROLES_USERS)
+
+  return useMutation({
+    mutationFn: async (payload: Omit<RoleUserRemovePayload, 'action'>) => {
+      const raw = await api.post({ action: 'remove', ...payload })
+      return assertSrsSuccess(raw, 'Failed to remove role')
+    },
+    onSuccess: (_data, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['roles-users', payload.id_rol] })
+      queryClient.invalidateQueries({ queryKey: ['roles-list'] })
     },
   })
 }

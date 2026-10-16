@@ -9,7 +9,7 @@ import {
 import { Transactional } from 'typeorm-transactional'
 
 import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
-import { Rol } from 'src/features/srs-rol/entity/rol.entity'
+import { Rol, ROL_ESTADO_ELIMINADO } from 'src/features/srs-rol/entity/rol.entity'
 import { SrsRolService } from 'src/features/srs-rol/service/srs-rol.service'
 import { RolAccionRelService } from 'src/features/srs-rol/service/rol-accion-rel.service'
 import { RolAccionService } from 'src/features/srs-rol-accion/service/rol-accion.service'
@@ -115,6 +115,32 @@ export class RoleTemplateFacadeService {
       // Never block the business op if logging fails (e.g. table not migrated yet).
       this.logger.warn(
         `ROL_ACTIVITY_LOG append failed (${action} template=${idRolTemplate}): ${(err as Error).message}`,
+      )
+    }
+  }
+
+  /**
+   * Fila del historial en el propio rol (además de la del template), para que se vea en su Activity.
+   * Mismo formato que escribe el PHP de payroll. Nunca bloquea la operación.
+   */
+  private async writeRoleLog(
+    ctx: SrsContext,
+    idRol: number,
+    action: RolActivityLogAction,
+    summary: string,
+    detail?: Record<string, unknown> | null,
+  ) {
+    try {
+      await this.activityLog.appendForRole({
+        idRol,
+        idAuthor: ctx.idUsuario,
+        action,
+        summary,
+        detail: detail ?? null,
+      })
+    } catch (err) {
+      this.logger.warn(
+        `ROL_ACTIVITY_LOG append failed (${action} rol=${idRol}): ${(err as Error).message}`,
       )
     }
   }
@@ -377,6 +403,13 @@ export class RoleTemplateFacadeService {
         `Created internal role #${created.idRol} from “${tpl.nombre}”`,
         { createdIds: [created.idRol] },
       )
+      await this.writeRoleLog(
+        ctx,
+        created.idRol,
+        RolActivityLogAction.CREATE,
+        `Created role “${created.nombre}” from template “${tpl.nombre}”`,
+        { tipo: 1, idDealer: null, idTemplate: id },
+      )
       return { idTemplate: id, createdIds: [created.idRol] }
     }
 
@@ -420,6 +453,13 @@ export class RoleTemplateFacadeService {
       } as Partial<Rol>)
       await this.rolePerms.replaceForRole(created.idRol, permissionIds)
       createdIds.push(created.idRol)
+      await this.writeRoleLog(
+        ctx,
+        created.idRol,
+        RolActivityLogAction.CREATE,
+        `Created role “${created.nombre}” from template “${tpl.nombre}”`,
+        { tipo: 2, idDealer: d.id, idTemplate: id },
+      )
     }
     await this.writeLog(
       ctx,
@@ -440,15 +480,20 @@ export class RoleTemplateFacadeService {
     const child = await this.roles.findOwnedChild(idTemplate, idRol, owner)
     if (!child) throw new NotFoundException('Role not found for this template')
 
-    const userCount = await this.roles.countUsersAssigned(idRol)
+    // Solo bloquean los usuarios activos (D3 del plan, Ignacio 14/10/2026). Eliminar no borra nada:
+    // el rol pasa a estado eliminado y conserva permisos, servicios, historial y asignaciones.
+    const userCount = await this.usuarios.countActiveAssignedToRole(idRol)
     if (userCount > 0) {
       throw new BadRequestException(
         `Cannot delete this role: it is still assigned to ${userCount} user(s).`,
       )
     }
 
-    await this.rolePerms.replaceForRole(idRol, [])
-    await this.roles.deleteByIdRol(idRol)
+    await this.roles.updateEstado(idRol, ROL_ESTADO_ELIMINADO)
+    await this.writeRoleLog(ctx, idRol, RolActivityLogAction.DELETE, `Deleted role “${child.nombre}”`, {
+      nombre: child.nombre,
+      tipo: child.tipo,
+    })
     await this.writeLog(
       ctx,
       idTemplate,
@@ -468,7 +513,17 @@ export class RoleTemplateFacadeService {
     if (!tpl) throw new NotFoundException('Template not found')
     const child = await this.roles.findOwnedChild(idTemplate, idRol, owner)
     if (!child) throw new NotFoundException('Role not found for this template')
+    const prev = Number(child.estado)
     await this.roles.updateEstado(idRol, estado)
+    if (prev !== estado) {
+      await this.writeRoleLog(
+        ctx,
+        idRol,
+        estado === 1 ? RolActivityLogAction.ACTIVATE : RolActivityLogAction.INACTIVATE,
+        estado === 1 ? `Activated role “${child.nombre}”` : `Set role “${child.nombre}” inactive`,
+        { before: { estado: prev }, after: { estado } },
+      )
+    }
     await this.writeLog(
       ctx,
       idTemplate,

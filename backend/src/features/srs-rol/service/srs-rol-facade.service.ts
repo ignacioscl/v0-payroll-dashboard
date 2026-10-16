@@ -15,6 +15,7 @@ import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.
 import { SetSrsRolPermissionsDto } from '../dto/srs-rol.dto'
 import { SrsRolService } from './srs-rol.service'
 import { RolAccionRelService } from './rol-accion-rel.service'
+import { ROL_ESTADO_ELIMINADO } from '../entity/rol.entity'
 
 export const ROL_ACCION_ROLES_LIST = 42
 export const ROL_ACCION_ROLES_EDIT = 43
@@ -43,15 +44,21 @@ export class SrsRolFacadeService {
     }
   }
 
-  private async requireOwnedStandaloneRole(ctx: SrsContext, idRol: number) {
+  /** El rol existe, no está eliminado y es de la compañía de la sesión (con o sin template). */
+  private async requireOwnedRole(ctx: SrsContext, idRol: number) {
     if (!ctx.idDealerProvider || ctx.idDealerProvider < 1) {
       throw new BadRequestException('Company not found')
     }
     const role = await this.roles.findById(idRol, 'id_rol')
-    if (!role) throw new NotFoundException('Role not found')
+    if (!role || Number(role.estado) === ROL_ESTADO_ELIMINADO) throw new NotFoundException('Role not found')
     if (Number(role.idCompaniaOwner) !== Number(ctx.idDealerProvider)) {
       throw new ForbiddenException('Forbidden')
     }
+    return role
+  }
+
+  private async requireOwnedStandaloneRole(ctx: SrsContext, idRol: number) {
+    const role = await this.requireOwnedRole(ctx, idRol)
     if (Number(role.idTemplate) > 0) {
       throw new ForbiddenException('This role is based on a template. Edit permissions from Role Templates.')
     }
@@ -88,7 +95,8 @@ export class SrsRolFacadeService {
 
   async listActivity(ctx: SrsContext, idRol: number) {
     await this.assertCanView(ctx)
-    await this.requireOwnedStandaloneRole(ctx, idRol)
+    // Activity también para roles con template: sus servicios, estado y borrado quedan en el rol.
+    await this.requireOwnedRole(ctx, idRol)
     const rows = await this.activityLog.listForRole(idRol, 200)
     const names = await this.usuarios.mapNombresByIds(rows.map((row) => row.idAuthor))
     return {

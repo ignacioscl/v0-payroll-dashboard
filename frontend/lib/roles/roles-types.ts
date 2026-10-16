@@ -73,11 +73,26 @@ export type RoleUserRow = {
   nombre: string
   email: string
   codigoInterno: string
+  /** USUARIO_ROL_REL.id_dealer_asigned; null en los externos (el dealer es el del rol). */
+  idDealerAsigned: number | null
+  dealer: string
+  /** Es el rol de PRO del usuario (id_rol_system_v2): no se le puede quitar. */
+  isProRole: boolean
 }
 
+/** Una fila por asignación (el mismo usuario sale una vez por dealer). */
 export type RoleUsersResponse = {
   idRol: number
   users: RoleUserRow[]
+  /** Permiso 25 «Users > Create User» o administrador: muestra el tacho. */
+  canRemove: boolean
+}
+
+export type RoleUserRemovePayload = {
+  action: 'remove'
+  id_rol: number
+  id_usuario: number
+  id_dealer_asigned: number | null
 }
 
 export type DepartmentOption = {
