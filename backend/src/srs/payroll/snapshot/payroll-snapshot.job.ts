@@ -26,7 +26,7 @@ export const PAYROLL_SNAPSHOT_JOB = 'payroll-snapshot'
  * Versión del cálculo. Subirla cuando cambia una regla o una función almacenada que el cálculo
  * usa: la huella cambia y la corrida siguiente recalcula todos los períodos de la ventana.
  */
-export const CALC_VERSION = 1
+export const CALC_VERSION = 2
 
 /** Los períodos que terminaron hace menos de 30 días se recalculan siempre. */
 const ALWAYS_RECALC_DAYS = 30

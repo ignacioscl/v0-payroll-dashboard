@@ -89,8 +89,10 @@ export class PayrollSourceRepository {
 
   /**
    * Una fila por ponchada del rango, con las horas y el piecework que legacy calcula por
-   * ponchada. Mismos filtros que `getFrom`: activa, de la empresa, usuario activo, sin las
-   * ponchadas de tipo Salary / Commission (y, por el `<>`, sin las que no tienen tipo).
+   * ponchada. Mismos filtros que `getFrom`: activa, de la empresa, sin las ponchadas de tipo
+   * Salary / Commission (y, por el `<>`, sin las que no tienen tipo). Las ponchadas de un
+   * empleado borrado (`usuarios.estado = 0`) entran: lo trabajado cuenta en su período aunque
+   * el empleado se borre después (plan-payroll-empleados-borrados).
    */
   async getPunchRows(idContratista: number, desde: string, hasta: string): Promise<PunchSourceRow[]> {
     const rows = await this.srs.query(
@@ -112,7 +114,7 @@ export class PayrollSourceRepository {
                    THEN GET_PIECEWORK_BY_EMPL_DATERANGE_PROV(tew.id_author, tew.punch_in, tew.punch_in, tew.id_dealer_provider, tew.id_payment_type, 0, tew.id_dealer)
                    ELSE 0 END AS flatRate
        FROM TTK_EMPLOYEE_WORK tew
-       INNER JOIN usuarios u ON u.id_usuario = tew.id_author AND u.estado = 1
+       INNER JOIN usuarios u ON u.id_usuario = tew.id_author
        WHERE tew.id_dealer_provider = ?
          AND tew.estado = 1
          AND tew.punch_in >= ?
@@ -175,7 +177,7 @@ export class PayrollSourceRepository {
                   WHERE lupr.id_usuario = ier.id_usuario AND lupr.id_payment_type IN (?, ?)
                 )
          INNER JOIN DEPARTMENT d ON d.id = i.id_department
-         INNER JOIN usuarios u ON u.id_usuario = ier.id_usuario AND u.estado = 1
+         INNER JOIN usuarios u ON u.id_usuario = ier.id_usuario
          WHERE i.id_dealer_provider = ?
            AND i.fecha_alta >= ?
            AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)

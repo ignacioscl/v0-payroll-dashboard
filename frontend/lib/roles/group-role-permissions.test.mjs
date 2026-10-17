@@ -52,3 +52,18 @@ test('filtra por nombre completo y descripción sin distinguir mayúsculas', () 
   ])
   assert.deepEqual(groupRolePermissions(permissions, 'missing', 'Other'), [])
 })
+
+test('cuenta asignados y total por grupo sobre la lista completa', async () => {
+  const { countPermissionsByGroup } = await import('./group-role-permissions.mjs')
+  const counts = countPermissionsByGroup(
+    [
+      { id: 1, nombre: 'Users > Create', description: '', assigned: true },
+      { id: 2, nombre: 'Users > Delete', description: '', assigned: false },
+      { id: 3, nombre: 'Users > Edit', description: '', assigned: true },
+      { id: 4, nombre: 'Standalone', description: '', assigned: false },
+    ],
+    'Other',
+  )
+  assert.deepEqual(counts.get('prefix:Users'), { assigned: 2, total: 3 })
+  assert.deepEqual(counts.get('other'), { assigned: 0, total: 1 })
+})

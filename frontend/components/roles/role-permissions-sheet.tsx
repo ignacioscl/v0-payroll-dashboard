@@ -30,11 +30,22 @@ import {
 import { useRolePermissions } from '@/hooks/use-role-permissions'
 import { useSetRolePermission } from '@/hooks/use-set-role-permission'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { groupRolePermissions } from '@/lib/roles/group-role-permissions.mjs'
+import {
+  countPermissionsByGroup,
+  groupRolePermissions,
+} from '@/lib/roles/group-role-permissions.mjs'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import type { RoleListRow } from '@/lib/roles/roles-types'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Info, Search } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Info,
+  List,
+  ListChecks,
+  Search,
+} from 'lucide-react'
 
 export type RolePermissionsSheetProps = {
   role: RoleListRow | null
@@ -65,18 +76,49 @@ export function RolePermissionsSheet({
   const [collapsedInitForRoleId, setCollapsedInitForRoleId] = React.useState<
     number | null
   >(null)
+  /** «Ver solo asignados»: ids tildados al apretar el botón (destildar no saca la fila). null = todos. */
+  const [assignedOnlyIds, setAssignedOnlyIds] = React.useState<Set<number> | null>(null)
 
   React.useEffect(() => {
     setCollapsedGroups(new Set())
     setCollapsedInitForRoleId(null)
+    setAssignedOnlyIds(null)
   }, [idRol])
 
-  const permissions = query.data?.permissions ?? []
+  const permissions = React.useMemo(() => query.data?.permissions ?? [], [query.data])
   const searchTerm = searchState.roleId === idRol ? searchState.value : ''
+  /** Rol de template: solo lectura, siempre solo los asignados y todos los grupos abiertos, sin botones. */
+  const templateRole = Boolean(role?.idTemplate && role.idTemplate > 0)
   const permissionGroups = React.useMemo(
-    () => groupRolePermissions(permissions, searchTerm, t('roles.otherPermissions')),
-    [permissions, searchTerm, t],
+    () =>
+      groupRolePermissions(
+        templateRole
+          ? permissions.filter((p) => p.assigned)
+          : assignedOnlyIds
+            ? permissions.filter((p) => assignedOnlyIds.has(p.id))
+            : permissions,
+        searchTerm,
+        t('roles.otherPermissions'),
+      ),
+    [permissions, templateRole, assignedOnlyIds, searchTerm, t],
   )
+  const noAssignedShown = templateRole
+    ? !permissions.some((p) => p.assigned)
+    : assignedOnlyIds != null && assignedOnlyIds.size === 0
+
+  const groupCounts = React.useMemo(
+    () => countPermissionsByGroup(permissions, t('roles.otherPermissions')),
+    [permissions, t],
+  )
+
+  const toggleAssignedOnly = () => {
+    if (assignedOnlyIds) {
+      setAssignedOnlyIds(null)
+      return
+    }
+    setAssignedOnlyIds(new Set(permissions.filter((p) => p.assigned).map((p) => p.id)))
+    setCollapsedGroups(new Set())
+  }
 
   React.useEffect(() => {
     if (idRol == null || permissionGroups.length === 0) return
@@ -190,23 +232,40 @@ export function RolePermissionsSheet({
               }}
             />
           </div>
-          {permissionGroups.length > 0 ? (
-            <div className="flex items-center gap-1.5">
+          {permissions.length > 0 && !templateRole ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {permissionGroups.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 border-border/80 px-2.5 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground"
+                  onClick={toggleAllGroups}
+                >
+                  {allGroupsExpanded ? (
+                    <ChevronsDownUp className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronsUpDown className="size-3.5" aria-hidden="true" />
+                  )}
+                  {allGroupsExpanded
+                    ? t('roles.collapseAllPermissionGroups')
+                    : t('roles.expandAllPermissionGroups')}
+                </Button>
+              ) : null}
               <Button
                 type="button"
-                variant="outline"
+                variant={assignedOnlyIds ? 'secondary' : 'outline'}
                 size="sm"
+                aria-pressed={assignedOnlyIds != null}
                 className="h-7 gap-1.5 border-border/80 px-2.5 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground"
-                onClick={toggleAllGroups}
+                onClick={toggleAssignedOnly}
               >
-                {allGroupsExpanded ? (
-                  <ChevronsDownUp className="size-3.5" aria-hidden="true" />
+                {assignedOnlyIds ? (
+                  <List className="size-3.5" aria-hidden="true" />
                 ) : (
-                  <ChevronsUpDown className="size-3.5" aria-hidden="true" />
+                  <ListChecks className="size-3.5" aria-hidden="true" />
                 )}
-                {allGroupsExpanded
-                  ? t('roles.collapseAllPermissionGroups')
-                  : t('roles.expandAllPermissionGroups')}
+                {assignedOnlyIds ? t('roles.showAllPermissions') : t('roles.showAssignedOnly')}
               </Button>
             </div>
           ) : null}
@@ -219,15 +278,17 @@ export function RolePermissionsSheet({
             <p className="py-8 text-center text-sm text-muted-foreground">{t('roles.emptyPermissions')}</p>
           ) : permissionGroups.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              {t('roles.noPermissionResults')}
+              {noAssignedShown
+                ? t('roles.noAssignedPermissions')
+                : t('roles.noPermissionResults')}
             </p>
           ) : (
             <TooltipProvider delayDuration={200}>
               <div className="space-y-2 py-3">
                 {permissionGroups.map((group) => {
                   const isOpen =
-                    collapsedInitForRoleId === idRol &&
-                    !collapsedGroups.has(group.key)
+                    templateRole ||
+                    (collapsedInitForRoleId === idRol && !collapsedGroups.has(group.key))
                   return (
                     <Collapsible
                       key={group.key}
@@ -279,7 +340,8 @@ export function RolePermissionsSheet({
                             variant="secondary"
                             className="shrink-0 px-1.5 py-0 text-[10px] font-medium tabular-nums"
                           >
-                            {group.permissions.length}
+                            {groupCounts.get(group.key)?.assigned ?? 0} /{' '}
+                            {groupCounts.get(group.key)?.total ?? group.permissions.length}
                           </Badge>
                         </button>
                       </CollapsibleTrigger>

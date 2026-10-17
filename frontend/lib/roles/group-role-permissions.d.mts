@@ -15,3 +15,8 @@ export function groupRolePermissions(
   searchTerm: string,
   otherLabel: string,
 ): RolePermissionGroup[]
+
+export function countPermissionsByGroup(
+  permissions: RolePermission[],
+  otherLabel: string,
+): Map<string, { assigned: number; total: number }>

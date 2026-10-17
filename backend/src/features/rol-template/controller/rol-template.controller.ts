@@ -95,6 +95,24 @@ export class RolTemplateController {
     return this.service.createRoles(request.srsContext, id, body)
   }
 
+  @Get(':id/assign-preview/:idRol')
+  assignPreview(
+    @Req() request: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idRol', ParseIntPipe) idRol: number,
+  ) {
+    return this.service.assignPreview(request.srsContext, id, idRol)
+  }
+
+  @Post(':id/assign/:idRol')
+  assignToRole(
+    @Req() request: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idRol', ParseIntPipe) idRol: number,
+  ) {
+    return this.service.assignToRole(request.srsContext, id, idRol)
+  }
+
   @Delete(':id/roles/:idRol')
   deleteRole(
     @Req() request: any,

@@ -34,6 +34,17 @@ import { diffIds, toNamed } from '../util/diff-named-ids'
 export const ROL_ACCION_ROLE_TEMPLATES = 144
 /** Roles Admin > list (filter “based on” uses template names). */
 export const ROL_ACCION_ROLES_LIST = 42
+/** Roles Admin > edit roles (mismo id que `srs-rol-facade.service.ts`; no se importa para no cruzar módulos). */
+const ROL_ACCION_ROLES_EDIT = 43
+
+/** Por qué un template no se puede asignar a un rol (lo muestra la ventana de PRO). */
+export type AssignTemplateBlocked = 'dealer_taken' | 'no_dealer' | 'dealer_out_of_scope'
+
+const ASSIGN_BLOCKED_MESSAGES: Record<AssignTemplateBlocked, string> = {
+  dealer_taken: 'A role already exists for this template and dealer.',
+  no_dealer: 'This external role has no dealer.',
+  dealer_out_of_scope: "This role's dealer is out of scope for your company.",
+}
 
 /**
  * HTTP orchestration for role templates.
@@ -469,6 +480,127 @@ export class RoleTemplateFacadeService {
       { createdIds, idDealers },
     )
     return { idTemplate: id, createdIds }
+  }
+
+  /**
+   * Lo que cambia al asignar el template `id` al rol existente `idRol` (sin template).
+   * Reglas de `createRoles` (un rol por dealer en los externos, nombre y ponderación del template),
+   * salvo que un template interno acepta varios roles asignados. Pide 144 (templates) y 43 (editar roles).
+   */
+  private async buildAssignPlan(ctx: SrsContext, id: number, idRol: number) {
+    await this.assertCanManage(ctx)
+    const canEditRoles = await this.usuarios.userHasRolAccion(ctx.idUsuario, ROL_ACCION_ROLES_EDIT)
+    if (!canEditRoles) throw new ForbiddenException('Forbidden')
+    const owner = this.requireOwner(ctx)
+    const tpl = await this.templates.findOwned(id, owner)
+    if (!tpl) throw new NotFoundException('Template not found')
+    const role = await this.roles.findOwnedStandalone(idRol, owner)
+    if (!role) throw new NotFoundException('Role not found')
+    if (Number(role.tipo) !== Number(tpl.tipo)) {
+      throw new BadRequestException('Template type does not match the role type.')
+    }
+
+    let blocked: AssignTemplateBlocked | null = null
+    let nombreAfter = tpl.nombre
+    // Interno: al asignar, un template acepta varios roles (cada uno con su sucursal y departamento).
+    // Al crear desde el template sigue habiendo uno solo (`createRoles`).
+    if (Number(tpl.tipo) !== 1) {
+      const idDealer = Number(role.idDealer ?? 0)
+      if (idDealer < 1) {
+        blocked = 'no_dealer'
+      } else if ((await this.roles.findExistingDealerIds(id, [idDealer])).length) {
+        blocked = 'dealer_taken'
+      } else {
+        const [dealer] = await this.dealers.findScopedByIds([idDealer], owner)
+        if (!dealer) blocked = 'dealer_out_of_scope'
+        else nombreAfter = `${tpl.nombre} - ${dealer.razonSocial}`.slice(0, 64)
+      }
+    }
+
+    const [beforeIds, afterIds] = await Promise.all([
+      this.rolePerms.listAccionIds(idRol),
+      this.templatePerms.listAccionIds(id),
+    ])
+    const diff = diffIds(beforeIds, afterIds)
+    const changedIds = [...diff.addedIds, ...diff.removedIds]
+    const names = changedIds.length
+      ? await this.acciones.findNombresByIds(changedIds)
+      : new Map<number, string>()
+
+    return {
+      tpl,
+      role,
+      afterIds,
+      blocked,
+      nombreBefore: role.nombre,
+      nombreAfter,
+      ponderacionBefore: role.ponderacion ?? null,
+      ponderacionAfter: tpl.ponderacion ?? null,
+      added: toNamed(diff.addedIds, names),
+      removed: toNamed(diff.removedIds, names),
+    }
+  }
+
+  async assignPreview(ctx: SrsContext, id: number, idRol: number) {
+    const plan = await this.buildAssignPlan(ctx, id, idRol)
+    return {
+      idTemplate: id,
+      templateNombre: plan.tpl.nombre,
+      idRol,
+      nombreBefore: plan.nombreBefore,
+      nombreAfter: plan.blocked ? null : plan.nombreAfter,
+      ponderacionBefore: plan.ponderacionBefore,
+      ponderacionAfter: plan.ponderacionAfter,
+      added: plan.added,
+      removed: plan.removed,
+      blocked: plan.blocked,
+    }
+  }
+
+  @Transactional()
+  async assignToRole(ctx: SrsContext, id: number, idRol: number) {
+    const plan = await this.buildAssignPlan(ctx, id, idRol)
+    // El preview pudo quedar viejo: el control se repite al confirmar.
+    if (plan.blocked) throw new BadRequestException(ASSIGN_BLOCKED_MESSAGES[plan.blocked])
+
+    await this.roles.assignTemplate(idRol, {
+      idTemplate: id,
+      nombre: plan.nombreAfter,
+      ponderacion: plan.ponderacionAfter,
+    })
+    await this.rolePerms.replaceForRole(idRol, plan.afterIds)
+
+    const parts = [`Assigned template “${plan.tpl.nombre}”`]
+    const before: Record<string, unknown> = {}
+    const after: Record<string, unknown> = {}
+    if (plan.nombreBefore !== plan.nombreAfter) {
+      parts.push(`name “${plan.nombreBefore}” → “${plan.nombreAfter}”`)
+      before.nombre = plan.nombreBefore
+      after.nombre = plan.nombreAfter
+    }
+    if (plan.ponderacionBefore !== plan.ponderacionAfter) {
+      parts.push(
+        `access level ${plan.ponderacionBefore ?? '—'} → ${plan.ponderacionAfter ?? '—'}`,
+      )
+      before.ponderacion = plan.ponderacionBefore
+      after.ponderacion = plan.ponderacionAfter
+    }
+    await this.writeRoleLog(ctx, idRol, RolActivityLogAction.ASSIGN_TEMPLATE, parts.join('; '), {
+      idTemplate: id,
+      templateNombre: plan.tpl.nombre,
+      added: plan.added,
+      removed: plan.removed,
+      before,
+      after,
+    })
+    await this.writeLog(
+      ctx,
+      id,
+      RolActivityLogAction.ASSIGN_TEMPLATE,
+      `Assigned role “${plan.nombreBefore}” (#${idRol}) to template “${plan.tpl.nombre}”`,
+      { idRol, nombreBefore: plan.nombreBefore, nombreAfter: plan.nombreAfter },
+    )
+    return { idTemplate: id, idRol }
   }
 
   @Transactional()

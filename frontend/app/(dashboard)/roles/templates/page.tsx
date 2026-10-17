@@ -5,6 +5,7 @@ import { Layers, Plus } from 'lucide-react'
 
 import { PageHeading } from '@/components/layout/page-heading'
 import { AccessDenied } from '@/components/layout/access-denied'
+import { RolesGuideButton } from '@/components/roles/roles-guide-button'
 import { RoleTemplateActivitySheet } from '@/components/roles/templates/role-template-activity-sheet'
 import { RoleTemplateFormDialog } from '@/components/roles/templates/role-template-form-dialog'
 import { RoleTemplatePermissionsSheet } from '@/components/roles/templates/role-template-permissions-sheet'
@@ -77,10 +78,13 @@ export default function RoleTemplatesPage() {
         subtitle={t('roleTemplates.subtitle')}
         icon={<Layers className="size-5 text-white" />}
         actions={
-          <Button type="button" size="sm" className="gap-1.5 cursor-pointer" onClick={onAdd}>
-            <Plus className="size-4" />
-            {t('roleTemplates.add')}
-          </Button>
+          <>
+            <RolesGuideButton />
+            <Button type="button" size="sm" className="gap-1.5 cursor-pointer" onClick={onAdd}>
+              <Plus className="size-4" />
+              {t('roleTemplates.add')}
+            </Button>
+          </>
         }
       />
 

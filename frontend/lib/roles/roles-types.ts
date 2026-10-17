@@ -15,6 +15,8 @@ export type RoleListRow = {
   companyTxt: string
   idTemplate?: number | null
   templateNombre?: string | null
+  /** false = internal role with no possible services (the menu hides «Services»). Only from roles-list. */
+  hasServices?: boolean
 }
 
 export type RolesListResponse = {

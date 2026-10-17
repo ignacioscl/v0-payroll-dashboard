@@ -18,6 +18,8 @@ export enum RolActivityLogAction {
   /** Written by PHP (roles-services.php), migration 011. */
   SET_SERVICES = 'set_services',
   ASSIGN_SERVICES = 'assign_services',
+  /** Template asignado a un rol existente, migration 012. */
+  ASSIGN_TEMPLATE = 'assign_template',
 }
 
 /** Activity log for ROL_TEMPLATE and standalone ROL (who / what / when). */

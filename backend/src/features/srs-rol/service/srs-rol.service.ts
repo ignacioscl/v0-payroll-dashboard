@@ -27,6 +27,18 @@ export class SrsRolService extends GlobalBaseService<Rol, SrsRolQueryDto> {
     return this.repository.findOwnedChild(idTemplate, idRol, idCompaniaOwner)
   }
 
+  findOwnedStandalone(idRol: number, idCompaniaOwner: number) {
+    return this.repository.findOwnedStandalone(idRol, idCompaniaOwner)
+  }
+
+  /** Vincula el rol al template con el nombre y la ponderación del template. */
+  assignTemplate(
+    idRol: number,
+    patch: { idTemplate: number; nombre: string; ponderacion: number | null },
+  ) {
+    return this.repository.update({ idRol }, patch)
+  }
+
   hasInternalChild(idTemplate: number) {
     return this.repository.hasInternalChild(idTemplate)
   }

@@ -70,6 +70,8 @@ export function RoleFormDialog({
   const { hasPermission, user } = useSrsMe()
   const canUseTemplates = canManageRoleTemplates(hasPermission, user?.isSystemAdmin)
   const isEdit = role != null && role.id > 0
+  /** Rol de template: solo el nombre (el PHP ignora departamento y nivel para estos roles). */
+  const templateNameOnly = isEdit && Boolean(role?.idTemplate && role.idTemplate > 0)
   const save = useSaveRole()
   const createFromTemplate = useCreateRolesFromTemplate()
   const { dealers } = useSrsDealers()
@@ -345,37 +347,47 @@ export function RoleFormDialog({
               />
             ) : null}
 
+            {templateNameOnly ? (
+              <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {t('roles.templateNameOnlyHint', {
+                  name: role?.templateNombre ?? String(role?.idTemplate ?? ''),
+                })}
+              </p>
+            ) : null}
+
             {!fromTemplate ? (
               <>
-                <FormField
-                  control={form.control}
-                  name="idDepartment"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('roles.colDepartment')}</FormLabel>
-                      <Select
-                        value={field.value || 'none'}
-                        onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}
-                        disabled={!dealerIdForDpto}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('roles.selectDepartment')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">{t('roles.departmentAll')}</SelectItem>
-                          {(dptos.data ?? []).map((d) => (
-                            <SelectItem key={d.id} value={String(d.id)}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {!templateNameOnly ? (
+                  <FormField
+                    control={form.control}
+                    name="idDepartment"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('roles.colDepartment')}</FormLabel>
+                        <Select
+                          value={field.value || 'none'}
+                          onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}
+                          disabled={!dealerIdForDpto}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t('roles.selectDepartment')} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">{t('roles.departmentAll')}</SelectItem>
+                            {(dptos.data ?? []).map((d) => (
+                              <SelectItem key={d.id} value={String(d.id)}>
+                                {d.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
 
                 <FormField
                   control={form.control}
@@ -391,19 +403,21 @@ export function RoleFormDialog({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="ponderation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel htmlFor="role-pond">{t('roles.accessLevel')}</FormLabel>
-                      <FormControl>
-                        <Input id="role-pond" type="number" min={1} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {!templateNameOnly ? (
+                  <FormField
+                    control={form.control}
+                    name="ponderation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="role-pond">{t('roles.accessLevel')}</FormLabel>
+                        <FormControl>
+                          <Input id="role-pond" type="number" min={1} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
               </>
             ) : null}
 

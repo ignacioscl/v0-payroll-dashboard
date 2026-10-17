@@ -229,6 +229,48 @@ export async function createRolesFromTemplate(
   )
 }
 
+export type AssignTemplateBlocked =
+  | 'dealer_taken'
+  | 'no_dealer'
+  | 'dealer_out_of_scope'
+
+export interface AssignTemplatePreview {
+  idTemplate: number
+  templateNombre: string
+  idRol: number
+  nombreBefore: string
+  /** null when the template cannot be assigned (`blocked`). */
+  nombreAfter: string | null
+  ponderacionBefore: number | null
+  ponderacionAfter: number | null
+  added: { id: number; nombre: string }[]
+  removed: { id: number; nombre: string }[]
+  blocked: AssignTemplateBlocked | null
+}
+
+/** What changes when template `id` is assigned to the existing role `idRol` (writes nothing). */
+export async function fetchAssignTemplatePreview(
+  id: number,
+  idRol: number,
+): Promise<AssignTemplatePreview> {
+  return requestJson(
+    `${BASE_URL}/${id}/assign-preview/${idRol}`,
+    { method: 'GET' },
+    'Failed to load template changes',
+  )
+}
+
+export async function assignTemplateToRole(
+  id: number,
+  idRol: number,
+): Promise<{ idTemplate: number; idRol: number }> {
+  return requestJson(
+    `${BASE_URL}/${id}/assign/${idRol}`,
+    { method: 'POST' },
+    'Failed to assign template',
+  )
+}
+
 export async function deleteRoleTemplateRole(id: number, idRol: number): Promise<{ id: number }> {
   return requestJson(
     `${BASE_URL}/${id}/roles/${idRol}`,

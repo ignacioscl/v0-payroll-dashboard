@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Not, Repository } from 'typeorm'
+import { In, IsNull, Not, Repository } from 'typeorm'
 
 import { BaseRepository } from 'src/commons/repository/base.repository'
 import { PaginationDto } from 'src/commons/pagination/Pagination.dto'
@@ -54,6 +54,13 @@ export class RolRepository extends BaseRepository<Rol, SrsRolQueryDto> {
   findOwnedChild(idTemplate: number, idRol: number, idCompaniaOwner: number) {
     return this.findOne({
       where: { idRol, idTemplate, idCompaniaOwner, estado: Not(ROL_ESTADO_ELIMINADO) },
+    })
+  }
+
+  /** Rol de la compañía, sin template y no eliminado: el único que puede tomar un template. */
+  findOwnedStandalone(idRol: number, idCompaniaOwner: number) {
+    return this.findOne({
+      where: { idRol, idCompaniaOwner, idTemplate: IsNull(), estado: Not(ROL_ESTADO_ELIMINADO) },
     })
   }
 

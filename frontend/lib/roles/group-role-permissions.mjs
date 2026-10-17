@@ -58,3 +58,23 @@ export function groupRolePermissions(permissions, searchTerm, otherLabel) {
 
   return Array.from(groups.values())
 }
+
+/**
+ * Asignados y total de cada grupo, sobre la lista completa (sin búsqueda ni filtro), para el
+ * contador «asignados / total» del encabezado. Mismas claves que `groupRolePermissions`.
+ *
+ * @param {RolePermission[]} permissions
+ * @param {string} otherLabel
+ * @returns {Map<string, { assigned: number, total: number }>}
+ */
+export function countPermissionsByGroup(permissions, otherLabel) {
+  /** @type {Map<string, { assigned: number, total: number }>} */
+  const counts = new Map()
+  for (const group of groupRolePermissions(permissions, '', otherLabel)) {
+    counts.set(group.key, {
+      assigned: group.permissions.filter((p) => p.assigned).length,
+      total: group.permissions.length,
+    })
+  }
+  return counts
+}

@@ -6,6 +6,7 @@ import {
   Check,
   ClipboardList,
   History,
+  Layers,
   MoreHorizontal,
   Pencil,
   Shield,
@@ -59,8 +60,11 @@ export type RolesDataTableProps = {
   enabled: boolean
   canEdit: boolean
   canViewUsers: boolean
+  /** Roles Admin > Role Templates (144): with canEdit, shows «Assign template» on roles without template. */
+  canManageTemplates: boolean
   onOpenPermissions: (role: RoleListRow) => void
   onEdit: (role: RoleListRow) => void
+  onAssignTemplate: (role: RoleListRow) => void
   onAccessLevel: (role: RoleListRow) => void
   onViewUsers: (role: RoleListRow) => void
   onViewActivity: (role: RoleListRow) => void
@@ -75,8 +79,10 @@ export function RolesDataTable({
   enabled,
   canEdit,
   canViewUsers,
+  canManageTemplates,
   onOpenPermissions,
   onEdit,
+  onAssignTemplate,
   onAccessLevel,
   onViewUsers,
   onViewActivity,
@@ -183,24 +189,24 @@ export function RolesDataTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('roles.colName')} />
         ),
-        cell: ({ row }) => {
-          const r = row.original
-          const based =
-            r.idTemplate && r.templateNombre
-              ? t('roles.basedOn', { name: r.templateNombre })
-              : r.idTemplate
-                ? t('roles.basedOn', { name: String(r.idTemplate) })
-                : null
-          return (
-            <div className="min-w-0">
-              <div className="truncate font-medium">{r.nombre}</div>
-              {based ? (
-                <div className="truncate text-xs text-muted-foreground">{based}</div>
-              ) : null}
-            </div>
-          )
-        },
+        cell: ({ row }) => (
+          <div className="min-w-0 truncate font-medium">{row.original.nombre}</div>
+        ),
         meta: { label: t('roles.colName'), sortKey: 'r.nombre' } satisfies DataTableColumnMeta<RoleListRow>,
+      },
+      {
+        // Template del rol (o «—»): reemplaza la línea «Based on: …» que iba debajo del nombre.
+        id: 'templateNombre',
+        accessorFn: (r) =>
+          r.idTemplate && r.idTemplate > 0 ? (r.templateNombre ?? String(r.idTemplate)) : '—',
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('roles.basedOnFilter')} />
+        ),
+        cell: ({ getValue }) => (
+          <span className="block min-w-0 truncate">{String(getValue())}</span>
+        ),
+        meta: { label: t('roles.basedOnFilter') } satisfies DataTableColumnMeta<RoleListRow>,
       },
       {
         accessorKey: 'departmentNombre',
@@ -342,13 +348,20 @@ export function RolesDataTable({
                     <History className="size-4" />
                     {t('roles.activity')}
                   </DropdownMenuItem>
-                  {canEdit && !templated ? (
+                  {/* Rol de template: Edit solo cambia el nombre (permisos y nivel vienen del template). */}
+                  {canEdit ? (
                     <DropdownMenuItem onClick={() => onEdit(r)}>
                       <Pencil className="size-4" />
                       {t('roles.edit')}
                     </DropdownMenuItem>
                   ) : null}
-                  {canEdit ? (
+                  {canEdit && canManageTemplates && !templated ? (
+                    <DropdownMenuItem onClick={() => onAssignTemplate(r)}>
+                      <Layers className="size-4" />
+                      {t('roles.assignTemplate')}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canEdit && r.hasServices !== false ? (
                     <DropdownMenuItem onClick={() => onOpenServices(r)}>
                       <ClipboardList className="size-4" />
                       {t('roles.services')}
@@ -400,8 +413,10 @@ export function RolesDataTable({
       t,
       canEdit,
       canViewUsers,
+      canManageTemplates,
       onOpenPermissions,
       onEdit,
+      onAssignTemplate,
       onAccessLevel,
       onViewUsers,
       onViewActivity,

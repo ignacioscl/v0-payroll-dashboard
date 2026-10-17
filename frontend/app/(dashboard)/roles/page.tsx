@@ -6,6 +6,7 @@ import { Plus, Shield } from 'lucide-react'
 import { PageHeading } from '@/components/layout/page-heading'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { AccessLevelDialog } from '@/components/roles/access-level-dialog'
+import { AssignTemplateDialog } from '@/components/roles/assign-template-dialog'
 import { RoleActivityPanel } from '@/components/roles/role-activity-panel'
 import { RoleFormDialog } from '@/components/roles/role-form-dialog'
 import { RolePermissionsSheet } from '@/components/roles/role-permissions-sheet'
@@ -15,6 +16,7 @@ import {
   type RoleTemplateFilterOption,
 } from '@/components/roles/role-template-filter-combobox'
 import { RoleUsersSheet } from '@/components/roles/role-users-sheet'
+import { RolesGuideButton } from '@/components/roles/roles-guide-button'
 import { RolesDataTable } from '@/components/roles/roles-data-table'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -30,6 +32,7 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { useFilters } from '@/lib/filter-context'
 import {
   canEditRoles,
+  canManageRoleTemplates,
   canViewRoleUsers,
   canViewRoles,
 } from '@/lib/auth/roles-permissions'
@@ -43,6 +46,7 @@ export default function RolesPage() {
   const canView = canViewRoles(hasPermission, user?.isSystemAdmin)
   const canEdit = canEditRoles(hasPermission, user?.isSystemAdmin)
   const canViewUsers = canViewRoleUsers(hasPermission, user?.isSystemAdmin)
+  const canManageTemplates = canManageRoleTemplates(hasPermission, user?.isSystemAdmin)
 
   const [typeFilter, setTypeFilter] = useState('')
   const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
@@ -62,6 +66,14 @@ export default function RolesPage() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [servicesRole, setServicesRole] = useState<RoleListRow | null>(null)
   const [servicesOpen, setServicesOpen] = useState(false)
+  const [assignRole, setAssignRole] = useState<RoleListRow | null>(null)
+  const [assignOpen, setAssignOpen] = useState(false)
+
+  const onAssignTemplate = useCallback((role: RoleListRow) => {
+    if (role.idTemplate) return
+    setAssignRole(role)
+    setAssignOpen(true)
+  }, [])
 
   const onOpenPermissions = useCallback((role: RoleListRow) => {
     setPermRole(role)
@@ -69,7 +81,6 @@ export default function RolesPage() {
   }, [])
 
   const onEdit = useCallback((role: RoleListRow) => {
-    if (role.idTemplate) return
     setFormRole(role)
     setFormOpen(true)
   }, [])
@@ -111,12 +122,15 @@ export default function RolesPage() {
         title={t('roles.title')}
         subtitle={t('roles.subtitle')}
         actions={
-          canEdit ? (
-            <Button type="button" size="sm" className="gap-1.5" onClick={onAdd}>
-              <Plus className="size-4" />
-              {t('roles.addRole')}
-            </Button>
-          ) : null
+          <>
+            <RolesGuideButton />
+            {canEdit ? (
+              <Button type="button" size="sm" className="gap-1.5" onClick={onAdd}>
+                <Plus className="size-4" />
+                {t('roles.addRole')}
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -180,8 +194,10 @@ export default function RolesPage() {
         enabled={!loading && canView}
         canEdit={canEdit}
         canViewUsers={canViewUsers}
+        canManageTemplates={canManageTemplates}
         onOpenPermissions={onOpenPermissions}
         onEdit={onEdit}
+        onAssignTemplate={onAssignTemplate}
         onAccessLevel={onAccessLevel}
         onViewUsers={onViewUsers}
         onViewActivity={onViewActivity}
@@ -204,6 +220,8 @@ export default function RolesPage() {
       />
 
       <AccessLevelDialog open={pondOpen} onOpenChange={setPondOpen} role={pondRole} />
+
+      <AssignTemplateDialog open={assignOpen} onOpenChange={setAssignOpen} role={assignRole} />
 
       <RoleUsersSheet role={usersRole} open={usersOpen} onOpenChange={setUsersOpen} />
 

@@ -3,7 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  assignTemplateToRole,
   createRolesFromTemplate,
+  fetchAssignTemplatePreview,
+  type AssignTemplatePreview,
   deleteRoleTemplateRole,
   fetchRoleTemplateRoles,
   setRoleTemplateRoleEstado,
@@ -39,6 +42,26 @@ export function useCreateRolesFromTemplate() {
     { id: number; payload: CreateRolesFromTemplatePayload }
   >({
     mutationFn: ({ id, payload }) => createRolesFromTemplate(id, payload),
+    onSuccess: (_data, vars) => invalidateRoles(queryClient, vars.id),
+  })
+}
+
+export function useAssignTemplatePreview(
+  idTemplate: number | null,
+  idRol: number | null,
+  enabled = true,
+) {
+  return useQuery<AssignTemplatePreview>({
+    queryKey: ['assign-template-preview', idTemplate ?? 0, idRol ?? 0],
+    enabled: enabled && idTemplate != null && idTemplate > 0 && idRol != null && idRol > 0,
+    queryFn: () => fetchAssignTemplatePreview(idTemplate as number, idRol as number),
+  })
+}
+
+export function useAssignTemplateToRole() {
+  const queryClient = useQueryClient()
+  return useMutation<{ idTemplate: number; idRol: number }, Error, { id: number; idRol: number }>({
+    mutationFn: ({ id, idRol }) => assignTemplateToRole(id, idRol),
     onSuccess: (_data, vars) => invalidateRoles(queryClient, vars.id),
   })
 }

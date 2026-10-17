@@ -111,6 +111,25 @@ export interface Messages {
     basedOnTemplate: string
     selectTemplate: string
     templateRequired: string
+    assignTemplate: string
+    assignTemplateSelect: string
+    assignTemplateWarning: string
+    templateNameOnlyHint: string
+    guide: string
+    guideTooltip: string
+    showAssignedOnly: string
+    showAllPermissions: string
+    noAssignedPermissions: string
+    assignTemplateName: string
+    assignTemplateAccessLevel: string
+    assignTemplateAdded: string
+    assignTemplateRemoved: string
+    assignTemplateSamePermissions: string
+    assignTemplateDealerTaken: string
+    assignTemplateNoDealer: string
+    assignTemplateDealerOutOfScope: string
+    assignTemplateSuccess: string
+    assignTemplateError: string
     services: string
     servicesTitle: string
     servicesApplyUsers: string
@@ -149,6 +168,7 @@ export interface Messages {
     title: string
     subtitle: string
     noAccess: string
+    noAssignedPermissions: string
     empty: string
     add: string
     edit: string
