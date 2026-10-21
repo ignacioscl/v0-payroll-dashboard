@@ -10,11 +10,13 @@ import { isJobsCronEnabled, jobsCronDisabledReason } from './jobs-env'
 const DAILY_CRON = '30 0 * * *'
 /** 09:00 NY: alerta si la corrida diaria no terminó ok en las últimas 26 h. */
 const WATCHDOG_CRON = '0 9 * * *'
+/** 01:00 NY: reconsulta de los VIN resueltos por patrón, después del snapshot (plans/plan-vin-recheck). */
+const VIN_RECHECK_CRON = '0 1 * * *'
 
 /**
  * Crons de los jobs, registrados al arrancar solo si corresponde (ver `jobs-env.ts`): en dev
- * nunca, en producción con JOBS_CRON_ENABLED=true. `JOBS_CRON_EXPR` / `JOBS_WATCHDOG_CRON_EXPR`
- * acortan las expresiones para probar en local con JOBS_DEV_FORCE.
+ * nunca, en producción con JOBS_CRON_ENABLED=true. `JOBS_CRON_EXPR` / `JOBS_WATCHDOG_CRON_EXPR` /
+ * `JOBS_VIN_RECHECK_CRON_EXPR` acortan las expresiones para probar en local con JOBS_DEV_FORCE.
  */
 @Injectable()
 export class JobsCron implements OnApplicationBootstrap {
@@ -35,6 +37,9 @@ export class JobsCron implements OnApplicationBootstrap {
     )
     this.add('jobs-watchdog', process.env.JOBS_WATCHDOG_CRON_EXPR?.trim() || WATCHDOG_CRON, () =>
       this.runner.run('watchdog', {}, 'watchdog'),
+    )
+    this.add('car-vin-recheck-daily', process.env.JOBS_VIN_RECHECK_CRON_EXPR?.trim() || VIN_RECHECK_CRON, () =>
+      this.runner.run('car-vin-recheck', {}, 'cron'),
     )
   }
 

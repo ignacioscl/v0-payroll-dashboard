@@ -10,7 +10,7 @@ import { emptyJobResult, JobContext, JobHandler, JobResult } from './job.interfa
 export const DAILY_RUN_MAX_AGE_MS = 26 * 3_600_000
 
 /** Jobs que el watchdog y `/api/health/jobs` vigilan (corren por cron una vez por día). */
-export const CRITICAL_DAILY_JOBS = ['payroll-snapshot'] as const
+export const CRITICAL_DAILY_JOBS = ['payroll-snapshot', 'car-vin-recheck'] as const
 
 /** Motivo por el que la corrida diaria de un job no está al día, o null si está bien. */
 export async function dailyRunProblem(runs: JobRunService, jobName: string): Promise<string | null> {

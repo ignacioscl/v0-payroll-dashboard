@@ -10,4 +10,6 @@ export default () => ({
   apiEndpoint: process.env.API_ENDPOINT,
   /** PHP of main (Apache vhost), for Send Email / Create File of the invoices export (§8.7). */
   srsApiUrl: process.env.SRS_API_URL,
+  /** Token de máquina del endpoint php/api/vin-recheck.php (job car-vin-recheck, plans/plan-vin-recheck). */
+  vinRecheckPhpToken: process.env.VIN_RECHECK_PHP_TOKEN,
 })

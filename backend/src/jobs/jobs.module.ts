@@ -6,6 +6,8 @@ import { JobRunModule } from '../features/job-run/job-run.module'
 import { JobRunLogModule } from '../features/job-run-log/job-run-log.module'
 import { PayrollPeriodStateModule } from '../features/payroll-period-state/payroll-period-state.module'
 import { SrsAuthModule } from '../srs/auth/srs-auth.module'
+import { CarVinRecheckJob } from '../srs/cars/vin-recheck/car-vin-recheck.job'
+import { CarVinRecheckModule } from '../srs/cars/vin-recheck/car-vin-recheck.module'
 import { PayrollSnapshotJob } from '../srs/payroll/snapshot/payroll-snapshot.job'
 import { PayrollSnapshotModule } from '../srs/payroll/snapshot/payroll-snapshot.module'
 import { JobAlertService } from './job-alert.service'
@@ -32,6 +34,7 @@ import { WatchdogJob } from './watchdog.job'
     SrsAuthModule,
     EmailModule,
     PayrollSnapshotModule,
+    CarVinRecheckModule,
     SrsContratistaModule,
   ],
   providers: [
@@ -44,7 +47,7 @@ import { WatchdogJob } from './watchdog.job'
     {
       provide: JOB_HANDLERS,
       useFactory: (...handlers: JobHandler<any>[]) => handlers,
-      inject: [NoopJob, WatchdogJob, PayrollSnapshotJob],
+      inject: [NoopJob, WatchdogJob, PayrollSnapshotJob, CarVinRecheckJob],
     },
   ],
   controllers: [JobsController],
