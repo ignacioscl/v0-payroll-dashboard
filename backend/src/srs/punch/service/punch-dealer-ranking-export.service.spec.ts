@@ -22,6 +22,7 @@ const CTX: SrsContext = {
   idRol: 5,
   idDealerProvider: 79,
   isUserDealer: false,
+  isActive: true,
 }
 
 const DEALER_NAME = 'AutoNation Mercedes-Benz of Coconut Creek'
