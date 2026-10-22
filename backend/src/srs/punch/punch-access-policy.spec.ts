@@ -11,6 +11,7 @@ function ctx(partial: Partial<SrsContext> = {}): SrsContext {
     idRol: 5,
     idDealerProvider: 79,
     isUserDealer: false,
+    isActive: true,
     ...partial,
   }
 }

@@ -20,6 +20,11 @@ export interface SrsContext {
   idDealerProvider: number
   /** El usuario es de tipo dealer (define cómo aplica RESTRICTION_DEALER_V2). */
   isUserDealer: boolean
+  /**
+   * `usuarios.estado = 1` e `is_inactive = 0`, igual que el login de legacy (UsuarioDao::login).
+   * El guard rechaza al inactivo aunque guarde un token (plan-seguridad-usuarios-legacy, 7.6).
+   */
+  isActive: boolean
 }
 
 /**
@@ -42,10 +47,12 @@ export class SrsAuthContextService {
     sessionIdDealerProvider?: number | null,
   ): Promise<SrsContext> {
     const rolRows = await this.srs.query(
-      `SELECT u.id_rol AS idRol FROM usuarios u WHERE u.id_usuario = ? LIMIT 1`,
+      `SELECT u.id_rol AS idRol, u.estado AS estado, u.is_inactive AS isInactive FROM usuarios u WHERE u.id_usuario = ? LIMIT 1`,
       [idUsuario],
     )
     const rawIdRol = Number(rolRows[0]?.idRol ?? 0)
+    // Sin fila → inactivo.
+    const isActive = rolRows.length > 0 && Number(rolRows[0].estado) === 1 && Number(rolRows[0].isInactive) === 0
 
     // PHP: Admin General = usuarios.id_rol 1. Admin Company = ROL 2 on USUARIO_ROL_REL
     // (login overwrites `$usr->rol`); usuarios.id_rol is NULL on almost all real rows.
@@ -101,6 +108,6 @@ export class SrsAuthContextService {
     const dealerRows = await this.srs.query(`SELECT IS_USER_DEALER(?) AS isDealer`, [idUsuario])
     const isUserDealer = Number(dealerRows[0]?.isDealer ?? 0) === 1
 
-    return { idUsuario, idUsuarioRolrel, idRol, idDealerProvider, isUserDealer }
+    return { idUsuario, idUsuarioRolrel, idRol, idDealerProvider, isUserDealer, isActive }
   }
 }

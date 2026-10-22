@@ -22,7 +22,7 @@ describe('SrsAuthContextService.resolveContext', () => {
   it('Admin Company: id_rol NULL + USUARIO_ROL_REL 2 + owner → idRol 2 y tenant = owner (ignora session de otra compañía)', async () => {
     const { svc, query } = serviceWith(async (sql: string) => {
       if (sql.includes('u.id_rol AS idRol') && !sql.includes('id_contratista_owner')) {
-        return [{ idRol: null }]
+        return [{ idRol: null, estado: 1, isInactive: 0 }]
       }
       if (sql.includes('USUARIO_ROL_REL') && sql.includes('urr.id_usuario')) {
         return [{ ok: 1 }]
@@ -40,13 +40,14 @@ describe('SrsAuthContextService.resolveContext', () => {
 
     expect(ctx.idRol).toBe(SRS_ROL_ADMIN_COMPANY)
     expect(ctx.idDealerProvider).toBe(79)
+    expect(ctx.isActive).toBe(true)
     expect(query.mock.calls.some((c) => String(c[0]).includes('IS_USER_DEALER'))).toBe(true)
   })
 
   it('Admin General: id_rol 1 sin owner → tenant = session (puede cambiar de compañía)', async () => {
     const { svc } = serviceWith(async (sql: string) => {
       if (sql.includes('u.id_rol AS idRol')) {
-        return [{ idRol: 1 }]
+        return [{ idRol: 1, estado: 1, isInactive: 0 }]
       }
       if (sql.includes('id_contratista_owner')) {
         return []
@@ -66,7 +67,7 @@ describe('SrsAuthContextService.resolveContext', () => {
   it('usuario con rol granular: no convierte a Admin Company si no hay REL 2', async () => {
     const { svc } = serviceWith(async (sql: string) => {
       if (sql.includes('u.id_rol AS idRol')) {
-        return [{ idRol: 5 }]
+        return [{ idRol: 5, estado: 1, isInactive: 0 }]
       }
       if (sql.includes('USUARIO_ROL_REL') && sql.includes('urr.id_usuario')) {
         return []
@@ -84,5 +85,38 @@ describe('SrsAuthContextService.resolveContext', () => {
 
     expect(ctx.idRol).toBe(5)
     expect(ctx.idDealerProvider).toBe(79)
+  })
+
+  it.each([
+    ['estado 0', { estado: 0, isInactive: 0 }],
+    ['is_inactive 1', { estado: 1, isInactive: 1 }],
+  ])('usuario inactivo (%s): isActive false', async (_label, flags) => {
+    const { svc } = serviceWith(async (sql: string) => {
+      if (sql.includes('u.id_rol AS idRol')) {
+        return [{ idRol: null, ...flags }]
+      }
+      if (sql.includes('USUARIO_ROL_REL') && sql.includes('urr.id_usuario')) {
+        return [{ ok: 1 }]
+      }
+      if (sql.includes('id_contratista_owner')) {
+        return [{ idDealerProvider: 79 }]
+      }
+      if (sql.includes('IS_USER_DEALER')) {
+        return [{ isDealer: 0 }]
+      }
+      return []
+    })
+
+    const ctx = await svc.resolveContext(76, null, null)
+
+    expect(ctx.isActive).toBe(false)
+  })
+
+  it('usuario inexistente: isActive false', async () => {
+    const { svc } = serviceWith(async () => [])
+
+    const ctx = await svc.resolveContext(999999, null, null)
+
+    expect(ctx.isActive).toBe(false)
   })
 })

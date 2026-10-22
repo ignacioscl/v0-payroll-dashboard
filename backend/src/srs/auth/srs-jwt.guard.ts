@@ -54,6 +54,10 @@ export class SrsJwtGuard implements CanActivate {
       data.idUsuarioRolrel ? Number(data.idUsuarioRolrel) : null,
       sessionProvider,
     )
+    // Cuenta desactivada (estado 0 o is_inactive 1): no usa PRO aunque guarde su token.
+    if (!context.isActive) {
+      throw new UnauthorizedException('Inactive user')
+    }
     if (!context.idDealerProvider) {
       throw new UnauthorizedException('No se pudo resolver el provider del usuario')
     }
