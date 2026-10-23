@@ -6,6 +6,7 @@ import { InvoiceListQueryDto } from './dto/invoice-list.dto'
 import { invoiceExportLabels } from './invoice-export-labels'
 import {
   invoiceExportDaysOld,
+  invoiceExportDaysOldStart,
   invoiceExportDepartment,
   invoiceExportRowDiscount,
   invoiceExportServicesText,
@@ -129,19 +130,38 @@ describe('ymdToExcelDate (§8.9)', () => {
   })
 })
 
-describe('invoiceExportDepartment (§8.8)', () => {
+describe('invoiceExportDepartment (§8.8, §8.11)', () => {
   const en = invoiceExportLabels('en')
   it('Time Tracking without department: "Timesheets", in both languages', () => {
     expect(invoiceExportDepartment(row({ statementType: 5 }), en)).toBe('Timesheets')
     expect(invoiceExportDepartment(row({ statementType: 5 }), invoiceExportLabels('es'))).toBe('Timesheets')
   })
-  it('with a department: the department, also for Time Tracking', () => {
+  it('Generic without department: "Timesheets", in both languages (§8.11)', () => {
+    expect(invoiceExportDepartment(row({ statementType: 6 }), en)).toBe('Timesheets')
+    expect(invoiceExportDepartment(row({ statementType: 6 }), invoiceExportLabels('es'))).toBe('Timesheets')
+  })
+  it('with a department: the department, also for Time Tracking and Generic', () => {
     expect(invoiceExportDepartment(row({ statementType: 5, department: 'Sales' }), en)).toBe('Sales')
+    expect(invoiceExportDepartment(row({ statementType: 6, department: 'Detail' }), en)).toBe('Detail')
     expect(invoiceExportDepartment(row({ statementType: 2, department: 'Service' }), en)).toBe('Service')
   })
   it('other types without department: empty', () => {
     expect(invoiceExportDepartment(row({ statementType: 2 }), en)).toBe('')
-    expect(invoiceExportDepartment(row({ statementType: 6 }), en)).toBe('')
+    expect(invoiceExportDepartment(row({ statementType: 4 }), en)).toBe('')
+  })
+})
+
+describe('invoiceExportDaysOldStart (§8.10)', () => {
+  it('Time Tracking with DATE FROM: DATE FROM', () => {
+    expect(invoiceExportDaysOldStart(row({ statementType: 5, fechaDesde: '2026-01-12' }))).toBe('2026-01-12')
+  })
+  it('Time Tracking without DATE FROM: the creation date', () => {
+    expect(invoiceExportDaysOldStart(row({ statementType: 5 }))).toBe('2026-09-01 10:00:00')
+  })
+  it('a WO invoice with DATE FROM: the creation date', () => {
+    expect(invoiceExportDaysOldStart(row({ statementType: 1, fechaDesde: '2026-09-21' }))).toBe(
+      '2026-09-01 10:00:00',
+    )
   })
 })
 
@@ -249,7 +269,18 @@ describe('writeInvoiceExportWorkbook', () => {
             }),
           ],
           [row({ id: 2, dealer: 'AutoNation Lexus of Palm Beach', displayFullNro: '=SUM(1)', total: 150, subtotal: 150 })],
-          [row({ id: 3, dealer: 'AutoNation Lexus of Palm Beach', displayFullNro: 'LPB100', statementType: 5, total: 900, subtotal: 900 })],
+          [
+            row({
+              id: 3,
+              dealer: 'AutoNation Lexus of Palm Beach',
+              displayFullNro: 'LPB100',
+              statementType: 5,
+              fechaDesde: '2026-01-12',
+              total: 900,
+              subtotal: 900,
+            }),
+            row({ id: 4, dealer: 'AutoNation Lexus of Palm Beach', displayFullNro: 'LPB101', statementType: 6, total: 50, subtotal: 50 }),
+          ],
         ),
       }),
     )
@@ -289,9 +320,15 @@ describe('writeInvoiceExportWorkbook', () => {
     expect(r3.getCell(11).value).toBe(38)
     // A value starting with "=" is never a formula.
     expect(data.getRow(4).getCell(2).formula).toBeUndefined()
-    // A WO invoice without department stays empty; Time Tracking says "Timesheets" (§8.8).
+    // A WO invoice without department stays empty; Time Tracking says "Timesheets" (§8.8), and so
+    // does Generic (§8.11).
     expect(data.getRow(4).getCell(5).value ?? '').toBe('')
     expect(data.getRow(5).getCell(5).value).toBe('Timesheets')
+    expect(data.getRow(6).getCell(5).value).toBe('Timesheets')
+    // Time Tracking counts DAYS OLD from DATE FROM 2026-01-12, not from its creation (§8.10).
+    expect(data.getRow(5).getCell(11).value).toBe(270)
+    // Generic still counts from its creation, like the WO row.
+    expect(data.getRow(6).getCell(11).value).toBe(38)
   })
 
   it('type 1: a paid row carries CHECK#, CHECK DATE and PAYMENT ENTERED as dates, after AUTHOR and DELETED (§8.9)', async () => {
