@@ -53,11 +53,12 @@ function woServiceNames(raw?: string): string {
 
 /**
  * DEPARTMENT of a grid row (type "Invoice"): its department; a Time Tracking invoice without one
- * says "Timesheets", as the customer asked on 10/12/2026 (plans/plan-export-invoices-nest §8.8, D34).
+ * says "Timesheets", as the customer asked on 10/12/2026 (plans/plan-export-invoices-nest §8.8, D34),
+ * and so does a Generic one since 10/18/2026 (§8.11, D37).
  */
 export function invoiceExportDepartment(row: InvoiceRowDto, labels: InvoiceExportLabels): string {
   if (row.department) return row.department
-  return row.statementType === 5 ? labels.ttkDepartment : ''
+  return row.statementType === 5 || row.statementType === 6 ? labels.ttkDepartment : ''
 }
 
 /** A cell that starts with "=" stays text: no cell of the file is a formula (§1.5). */
@@ -84,9 +85,15 @@ function nyYmd(date: Date): string {
 
 /**
  * DAYS OLD: whole days from the day the invoice was created to the day the file is generated
- * (New York). Asked by the customer on 10/09/2026: "calculated from the invoice creation date".
+ * (New York). Asked by the customer on 10/09/2026: "calculated from the invoice creation date"
+ * (D31). A Time Tracking invoice counts from its DATE FROM instead, asked on 10/14/2026 (§8.10, D36).
  * Calendar days by their components, never through a time zone conversion of `fecha_create`.
  */
+export function invoiceExportDaysOldStart(row: InvoiceRowDto): string {
+  if (row.statementType === 5 && row.fechaDesde) return row.fechaDesde
+  return row.fechaCreate
+}
+
 export function invoiceExportDaysOld(fechaCreate: string, generatedAt: Date): number | '' {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fechaCreate ?? '')
   if (!m) return ''
@@ -310,7 +317,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
           money(row.total),
           ...authorOf(row),
           row.statementType === 1 ? 'Individual' : '',
-          invoiceExportDaysOld(row.fechaCreate, opts.generatedAt),
+          invoiceExportDaysOld(invoiceExportDaysOldStart(row), opts.generatedAt),
           ...deletedOf(row),
           ...invoiceExportPaymentCells(row),
         ])

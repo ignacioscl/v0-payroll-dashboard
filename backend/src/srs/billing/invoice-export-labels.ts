@@ -40,7 +40,7 @@ export type InvoiceExportLabels = {
   yes: string
   no: string
   typeNames: { wo: string; ttk: string; generic: string }
-  /** DEPARTMENT of a Time Tracking invoice without department (§8.8, D34). */
+  /** DEPARTMENT of a Time Tracking or Generic invoice without department (§8.8, D34; §8.11, D37). */
   ttkDepartment: string
   paymentValues: { all: string; paid: string; unpaid: string }
   sentValues: { all: string; sent: string; notSent: string }
