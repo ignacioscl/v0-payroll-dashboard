@@ -5,7 +5,7 @@ import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { PayrollKpiService } from '../service/payroll-kpi.service'
-import { PayrollByTypeRowDto, PayrollKpiDto, PayrollSpendDto } from '../dto/payroll-kpi.dto'
+import { PayrollByTypeRowDto, PayrollKpiDto, PayrollPieceworkDiffRowDto, PayrollSpendDto } from '../dto/payroll-kpi.dto'
 
 @UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/payroll')
@@ -31,6 +31,16 @@ export class PayrollKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<PayrollSpendDto> {
     return this.service.getSpend(request.srsContext, query)
+  }
+
+  /** Detalle de la tarjeta Piecework: días en que el piecework de las WO difiere del de payroll. */
+  @Get('/piecework-diff')
+  @ApiOkResponse({ type: [PayrollPieceworkDiffRowDto] })
+  async getPayrollPieceworkDiff(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+  ): Promise<PayrollPieceworkDiffRowDto[]> {
+    return this.service.getPieceworkDiff(request.srsContext, query)
   }
 
   @Get('/by-type')

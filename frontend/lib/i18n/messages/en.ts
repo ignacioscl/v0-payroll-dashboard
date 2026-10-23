@@ -1467,6 +1467,9 @@ export const en: Messages = {
     hoursOver40One: '1 employee over 40 h',
     totalPayrollWithoutDealer: 'Includes {amount} salary of {employees} employees without dealer',
     totalPayrollWithoutDealerOne: 'Includes {amount} salary of 1 employee without dealer',
+    pieceworkWorkOrders: 'Work orders: {amount}',
+    pieceworkReportAllTypes: 'Piecework Report, all payment types: {amount}',
+    pieceworkDifference: 'Difference: {amount} · See detail',
     activeEmployeesHourlyRate: 'avg Hourly rate {rate}/h',
     piecework: 'Piecework',
     payrollOverProduction: 'payroll / production value',
@@ -1580,7 +1583,7 @@ export const en: Messages = {
     overtimeHours:
       'Hours over 40 in a week, per employee and dealer, for all employees, whether they are paid as overtime or not.',
     piecework:
-      'Piecework paid in the period, counted on the date the work order was created, at the work order\'s dealer.',
+      'Piecework paid in the period, counted on the date the work order was created, at the work order\'s dealer. The lines below show, for the same dates and dealers, the piecework of the work orders and the total of the Piecework Report with all payment types. If the piecework of the work orders is different, click the card to see which employees and days make the difference.',
     laborCost: 'Total Payroll ÷ Income. Total Payroll is the first card of this tab; Income is the Income card of the Billing tab, for the same dates and dealers.',
     costPerWo: 'Total Payroll ÷ WOs Completed. Total Payroll is the first card of this tab (includes piecework); WOs Completed is the WOs Completed card of the Production tab, for the same dates and dealers.',
     activeEmployees:
@@ -1603,6 +1606,17 @@ export const en: Messages = {
     incomeSummaryNoTax: 'Does not include tax.',
     payrollLastUpdated: 'Last updated: {date} at {time}',
     payrollNotCalculated: 'Not calculated yet',
+    pieceworkDiffTitle: 'Piecework: work orders vs. payroll',
+    pieceworkDiffDescription: 'Days when the piecework of the work orders is different from the piecework paid by payroll.',
+    pieceworkDiffColDate: 'Date',
+    pieceworkDiffColDealer: 'Dealer',
+    pieceworkDiffColEmployee: 'Employee',
+    pieceworkDiffColWorkOrders: 'Work orders',
+    pieceworkDiffColPayroll: 'Payroll',
+    pieceworkDiffColDifference: 'Difference',
+    pieceworkDiffColReason: 'Reason',
+    pieceworkDiffReasonNoType: 'No Piecework payment type',
+    pieceworkDiffReasonOtherType: 'Punched as {types} that day',
     payrollNoDataBefore: 'No data for this report before {date}.',
     payrollNoPeriod:
       'No pay period is configured for your company. Ask your administrator to set weekly, biweekly or monthly pay periods.',

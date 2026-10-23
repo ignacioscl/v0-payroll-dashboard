@@ -40,6 +40,7 @@ import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
 import { InvoiceCollectionMonthChart } from '@/components/dashboard/invoice-collection-month-chart'
 import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
 import { PayrollByTypeChart } from '@/components/dashboard/payroll-by-type-chart'
+import { PieceworkDiffDialog } from '@/components/dashboard/piecework-diff-dialog'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
 import {
@@ -166,6 +167,7 @@ export default function BusinessKpisPage() {
   const [includeZero, setIncludeZero] = useState(false)
   // Las tres tarjetas del resumen muestran solo título y total; un click en cualquiera abre el detalle de las tres.
   const [summaryDetailOpen, setSummaryDetailOpen] = useState(false)
+  const [pieceworkDiffOpen, setPieceworkDiffOpen] = useState(false)
   const toggleSummaryDetail = () => setSummaryDetailOpen((open) => !open)
   const [collectionsHistoryMonths, setCollectionsHistoryMonths] = useState<CollectionsHistoryMonths>(4)
   // WO Production está oculta (sin botón): la pestaña y sus consultas siguen en el
@@ -750,6 +752,8 @@ export default function BusinessKpisPage() {
                       : ''
                   }
                 />
+                {/* Payroll grande; debajo, lo de las WO y el Piecework Report tildado; si las WO difieren,
+                    la tarjeta abre el detalle (plan-piecework-payroll-vs-wo §2.3). */}
                 <KPICard
                   inline
                   help={t('businessKpisHelp.piecework')}
@@ -758,6 +762,27 @@ export default function BusinessKpisPage() {
                   {...kpiCentsProps(s?.piecework)}
                   icon={<Package className="h-5 w-5" />}
                   variant="info"
+                  onClick={s?.pieceworkHasDifference ? () => setPieceworkDiffOpen(true) : undefined}
+                  subtitle={
+                    s ? (
+                      <>
+                        <p>{t('mockKpis.pieceworkWorkOrders', { amount: fmtCents(s.pieceworkWorkOrders) })}</p>
+                        <p>{t('mockKpis.pieceworkReportAllTypes', { amount: fmtCents(s.pieceworkReportAllTypes) })}</p>
+                        {s.pieceworkHasDifference ? (
+                          <p className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                            <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
+                            <span>
+                              {t('mockKpis.pieceworkDifference', {
+                                amount: fmtCents(s.pieceworkWorkOrders - s.piecework),
+                              })}
+                            </span>
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      ''
+                    )
+                  }
                 />
               </div>
             </>
@@ -792,6 +817,11 @@ export default function BusinessKpisPage() {
                 ) : null}
                 {s.dealerRestricted ? <p>{t('businessKpis.payrollDealerRestricted')}</p> : null}
               </div>
+              <PieceworkDiffDialog
+                open={pieceworkDiffOpen}
+                onOpenChange={setPieceworkDiffOpen}
+                params={payrollKpiParams}
+              />
             </>
           ) : spend.isLoading ? (
             <PayrollByTypeChart loading rangeLabel={headerRangeLabel} dealerCount={selectedDealers.length} />

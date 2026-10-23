@@ -31,7 +31,11 @@ const numOrNull = (v: unknown): number | null => (v === null || v === undefined 
 export class PayrollSourceRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
 
-  /** Empresas con ponchadas desde `desde`, con su configuración de payroll. */
+  /**
+   * Empresas con ponchadas desde `desde`, o con WO desde `desde` de algún empleado con tipo de pago
+   * Piecework en su ficha (la misma condición de `getPieceworkDayRows`): una empresa que solo paga
+   * piecework por WO no poncha nunca (Alliance, plan-piecework-payroll-vs-wo §1).
+   */
   async listProviders(desde: string): Promise<PayrollProviderConfig[]> {
     const rows = await this.srs.query(
       `SELECT c.id AS idContratista,
@@ -43,8 +47,16 @@ export class PayrollSourceRepository {
          SELECT 1 FROM TTK_EMPLOYEE_WORK t
          WHERE t.id_dealer_provider = c.id AND t.punch_in >= ?
        )
+       OR EXISTS (
+         SELECT 1
+         FROM INVOICE i
+         INNER JOIN INVOICE_EMPLOYEE_REL ier ON ier.id_invoice = i.id
+         INNER JOIN USUARIO_PAYROLL_REL lupr
+                 ON lupr.id_usuario = ier.id_usuario AND lupr.id_payment_type IN (?, ?)
+         WHERE i.id_dealer_provider = c.id AND i.fecha_alta >= ?
+       )
        ORDER BY c.id`,
-      [desde],
+      [desde, PAYMENT_TYPE_IDS.PIECEWORK, PAYMENT_TYPE_IDS.PIECEWORK_BY_PERCENT, desde],
     )
     return rows.map(mapProvider)
   }

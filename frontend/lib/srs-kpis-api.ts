@@ -258,6 +258,12 @@ export interface PayrollSpendKpi {
   payrollTaxes: number
   overtime: { amount: number; hours: number; employeesOver40: number }
   piecework: number
+  /** Piecework de las WO (cada empleado de la WO), mismas fechas y dealers, hasta el último día calculado. */
+  pieceworkWorkOrders: number
+  /** Total del Piecework Report de legacy con «Include all of payment type» tildado, mismo rango. */
+  pieceworkReportAllTypes: number
+  /** `pieceworkWorkOrders` distinto de `piecework`: la tarjeta abre el detalle. */
+  pieceworkHasDifference: boolean
   byType: PayrollSpendTypeRow[]
   employees: number
   /** Salarios sin dealer; null para usuarios restringidos a dealers. */
@@ -271,6 +277,26 @@ export interface PayrollSpendKpi {
 
 export const fetchPayrollSpend = (params: KpiQueryParams) =>
   getKpi<PayrollSpendKpi>('payroll/spend', params)
+
+/** Un día, dealer y empleado en que el piecework de las WO difiere del de payroll. */
+export interface PayrollPieceworkDiffRow {
+  /** yyyy-MM-dd */
+  fecha: string
+  idDealer: number
+  dealer: string
+  idUsuario: number
+  employee: string
+  workOrders: number
+  payroll: number
+  /** workOrders − payroll. */
+  difference: number
+  reason: 'other_payment_type' | 'no_piecework_type' | null
+  /** Tipos ponchados ese día, para `other_payment_type`. */
+  punchTypes: string | null
+}
+
+export const fetchPayrollPieceworkDiff = (params: KpiQueryParams) =>
+  getKpi<PayrollPieceworkDiffRow[]>('payroll/piecework-diff', params)
 
 export async function readNestJson<T>(res: Response, fallback: string): Promise<T> {
   if (isSrsBusy(res)) throw new SrsBusyError()

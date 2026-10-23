@@ -2,13 +2,22 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { PayrollKpiRepository } from '../repository/payroll-kpi.repository'
 import { PayrollSnapshotKpiRepository, SnapshotTypeAgg } from '../repository/payroll-snapshot-kpi.repository'
-import { PayrollKpiDto, PayrollSpendDto, PayrollSpendTypeRowDto } from '../dto/payroll-kpi.dto'
+import { PayrollKpiDto, PayrollPieceworkDiffRowDto, PayrollSpendDto, PayrollSpendTypeRowDto } from '../dto/payroll-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { ROL_ACCION_TTK_PAYROLL, SrsPermissionRepository } from '../../auth/srs-permission.repository'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PAYMENT_TYPE_IDS, PIECEWORK_TYPE_IDS, proratedDayId } from '../snapshot/payment-type-ids'
-import { addDays, PAYROLL_TIME_ZONE, todayInZone, weekEnd, weekStart } from '../snapshot/payroll-dates'
+import {
+  addDays,
+  maxDate,
+  minDate,
+  PAYROLL_TIME_ZONE,
+  snapshotCutoff,
+  todayInZone,
+  weekEnd,
+  weekStart,
+} from '../snapshot/payroll-dates'
 import { overtimeHoursInRange } from '../snapshot/overtime-hours'
 import { payrollSnapshotFrom } from '../snapshot/payroll-snapshot.job'
 
@@ -137,6 +146,9 @@ export class PayrollKpiService {
         payrollTaxes: 0,
         overtime: { amount: 0, hours: 0, employeesOver40: 0 },
         piecework: 0,
+        pieceworkWorkOrders: 0,
+        pieceworkReportAllTypes: 0,
+        pieceworkHasDifference: false,
         byType: [],
         employees: 0,
         withoutDealer: null,
@@ -189,6 +201,13 @@ export class PayrollKpiService {
     const piecework = sumWhere((r) => PIECEWORK_TYPE_IDS.includes(r.idPaymentType))
     const ot = overtimeHoursInRange(hourRows, filter.fechaDesde, filter.fechaHasta, cfg.firstDayWeek)
 
+    // Las dos líneas de la tarjeta Piecework: mismas fechas y dealers, hasta el último día calculado.
+    const coveredUntil = await this.snapshot.lastCoveredDay(filter.idDealerProvider)
+    const range = pieceworkCompareRange(filter.fechaDesde, filter.fechaHasta, dataFrom, coveredUntil)
+    const woDays = range ? await this.snapshot.pieceworkWorkOrdersByDay(filter, range.desde, range.hasta) : []
+    const pieceworkWorkOrders = round2(woDays.reduce((a, r) => a + r.amount, 0))
+    const pieceworkReportAllTypes = round2(woDays.reduce((a, r) => a + (r.paidByLegacyRule ? r.amount : 0), 0))
+
     const withoutDealer = showWithoutDealer
       ? {
           amount: round2(withoutAggs.reduce((a, r) => a + r.monto + r.tax, 0)),
@@ -204,6 +223,9 @@ export class PayrollKpiService {
       payrollTaxes,
       overtime: { amount: overtimeAmount, hours: ot.hours, employeesOver40: ot.employeesOver40 },
       piecework,
+      pieceworkWorkOrders,
+      pieceworkReportAllTypes,
+      pieceworkHasDifference: pieceworkWorkOrders !== piecework,
       byType,
       employees: await this.snapshot.countEmployees(filter, showWithoutDealer && allDealers),
       withoutDealer,
@@ -211,4 +233,87 @@ export class PayrollKpiService {
       calculatedAt,
     }
   }
+
+  /**
+   * Detalle de la tarjeta Piecework: los días, dealers y empleados en que el piecework de las WO
+   * difiere del que paga payroll, con el motivo (plan-piecework-payroll-vs-wo §6.2).
+   */
+  async getPieceworkDiff(ctx: SrsContext, query: SrsKpiQueryDto): Promise<PayrollPieceworkDiffRowDto[]> {
+    await this.assertPayrollAccess(ctx)
+    const filter = buildSrsKpiFilter(ctx, query)
+    const cfg = await this.snapshot.getProviderConfig(filter.idDealerProvider)
+    if (cfg.paymentMethod === null) return []
+
+    const coveredUntil = await this.snapshot.lastCoveredDay(filter.idDealerProvider)
+    const range = pieceworkCompareRange(filter.fechaDesde, filter.fechaHasta, payrollSnapshotFrom(), coveredUntil)
+    if (!range) return []
+
+    const [woDays, paidDays] = await Promise.all([
+      this.snapshot.pieceworkWorkOrdersByDay(filter, range.desde, range.hasta),
+      this.snapshot.pieceworkPaidByDay(filter, range.desde, range.hasta),
+    ])
+    const byKey = new Map<string, { idUsuario: number; idDealer: number; fecha: string; wo: number; paid: number }>()
+    const keyOf = (r: { idUsuario: number; idDealer: number; fecha: string }) => `${r.idUsuario}|${r.idDealer}|${r.fecha}`
+    for (const r of woDays) {
+      byKey.set(keyOf(r), { idUsuario: r.idUsuario, idDealer: r.idDealer, fecha: r.fecha, wo: r.amount, paid: 0 })
+    }
+    for (const r of paidDays) {
+      const row = byKey.get(keyOf(r)) ?? { idUsuario: r.idUsuario, idDealer: r.idDealer, fecha: r.fecha, wo: 0, paid: 0 }
+      row.paid += r.amount
+      byKey.set(keyOf(r), row)
+    }
+    const diffs = [...byKey.values()].filter((r) => round2(r.wo) !== round2(r.paid))
+    if (!diffs.length) return []
+
+    const dayKeys = [...new Map(diffs.map((r) => [`${r.idUsuario}|${r.fecha}`, { idUsuario: r.idUsuario, fecha: r.fecha }])).values()]
+    const [infos, dealers] = await Promise.all([
+      this.snapshot.pieceworkEmployeeDayInfo(dayKeys),
+      this.snapshot.dealerNames(filter.idDealerProvider, [...new Set(diffs.map((r) => r.idDealer))]),
+    ])
+    const infoByKey = new Map(infos.map((i) => [`${i.idUsuario}|${i.fecha}`, i]))
+
+    return diffs
+      .map((r): PayrollPieceworkDiffRowDto => {
+        const info = infoByKey.get(`${r.idUsuario}|${r.fecha}`)
+        const reason: PayrollPieceworkDiffRowDto['reason'] =
+          info && info.otherTypes && !info.hasPieceworkPunch
+            ? 'other_payment_type'
+            : info && !info.hasPunch && !info.hasPieceworkType
+              ? 'no_piecework_type'
+              : null
+        return {
+          fecha: r.fecha,
+          idDealer: r.idDealer,
+          dealer: dealers.get(r.idDealer) ?? '',
+          idUsuario: r.idUsuario,
+          employee: info?.employee ?? '',
+          workOrders: round2(r.wo),
+          payroll: round2(r.paid),
+          difference: round2(r.wo - r.paid),
+          reason,
+          punchTypes: reason === 'other_payment_type' ? (info?.otherTypes ?? null) : null,
+        }
+      })
+      .sort(
+        (a, b) =>
+          a.fecha.localeCompare(b.fecha) || a.dealer.localeCompare(b.dealer) || a.employee.localeCompare(b.employee),
+      )
+  }
+}
+
+/**
+ * Rango en que se comparan el piecework de las WO y el de payroll: el del header, desde el primer
+ * día del snapshot y hasta el último día que cubre el snapshot (`lastCoveredDay`; sin snapshot,
+ * hoy − 2). Null si queda vacío.
+ */
+function pieceworkCompareRange(
+  fechaDesde: string,
+  fechaHasta: string,
+  dataFrom: string,
+  coveredUntil: string | null,
+): { desde: string; hasta: string } | null {
+  const corte = coveredUntil ?? snapshotCutoff()
+  const desde = maxDate(fechaDesde, dataFrom)
+  const hasta = minDate(fechaHasta, corte)
+  return desde <= hasta ? { desde, hasta } : null
 }

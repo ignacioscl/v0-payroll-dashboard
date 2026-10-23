@@ -1455,6 +1455,9 @@ export interface Messages {
     hoursOver40One: string
     totalPayrollWithoutDealer: string
     totalPayrollWithoutDealerOne: string
+    pieceworkWorkOrders: string
+    pieceworkReportAllTypes: string
+    pieceworkDifference: string
     activeEmployeesHourlyRate: string
     piecework: string
     payrollOverProduction: string
@@ -1563,6 +1566,17 @@ export interface Messages {
     incomeSummaryNoTax: string
     payrollLastUpdated: string
     payrollNotCalculated: string
+    pieceworkDiffTitle: string
+    pieceworkDiffDescription: string
+    pieceworkDiffColDate: string
+    pieceworkDiffColDealer: string
+    pieceworkDiffColEmployee: string
+    pieceworkDiffColWorkOrders: string
+    pieceworkDiffColPayroll: string
+    pieceworkDiffColDifference: string
+    pieceworkDiffColReason: string
+    pieceworkDiffReasonNoType: string
+    pieceworkDiffReasonOtherType: string
     payrollNoDataBefore: string
     payrollNoPeriod: string
     payrollChartTitle: string

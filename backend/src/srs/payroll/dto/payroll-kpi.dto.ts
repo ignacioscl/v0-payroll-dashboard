@@ -67,6 +67,12 @@ export class PayrollSpendDto {
   @ApiProperty({ example: 0 }) payrollTaxes!: number
   @ApiProperty() overtime!: { amount: number; hours: number; employeesOver40: number }
   @ApiProperty({ example: 17385.98 }) piecework!: number
+  /** Piecework de las WO (cada empleado de la WO), mismas fechas y dealers, hasta el último día calculado. */
+  @ApiProperty({ example: 19079.65 }) pieceworkWorkOrders!: number
+  /** Total del Piecework Report de legacy con «Include all of payment type» tildado, mismo rango. */
+  @ApiProperty({ example: 18449.65 }) pieceworkReportAllTypes!: number
+  /** `pieceworkWorkOrders` distinto de `piecework`: la tarjeta abre el detalle. */
+  @ApiProperty() pieceworkHasDifference!: boolean
   @ApiProperty({ type: [PayrollSpendTypeRowDto] }) byType!: PayrollSpendTypeRowDto[]
   @ApiProperty({ example: 812 }) employees!: number
   /** Salarios sin dealer; null para usuarios restringidos a dealers. */
@@ -77,4 +83,30 @@ export class PayrollSpendDto {
   @ApiProperty() dealerRestricted!: boolean
   /** Última corrida que escribió (UTC, 'YYYY-MM-DD HH:MM:SS'); null si no hay snapshot. */
   @ApiProperty({ nullable: true }) calculatedAt!: string | null
+}
+
+/**
+ * `GET /api/srs/kpis/payroll/piecework-diff`: una fila por (día, dealer, empleado) en que el
+ * piecework de las WO difiere del que paga payroll (plan-piecework-payroll-vs-wo §6.2).
+ */
+export class PayrollPieceworkDiffRowDto {
+  @ApiProperty({ example: '2026-09-23' }) fecha!: string
+  @ApiProperty({ example: 744 }) idDealer!: number
+  @ApiProperty({ example: 'AutoNation Nissan Miami' }) dealer!: string
+  @ApiProperty({ example: 4321 }) idUsuario!: number
+  @ApiProperty({ example: 'Yoandris J Gomez' }) employee!: string
+  @ApiProperty({ example: 390 }) workOrders!: number
+  @ApiProperty({ example: 0 }) payroll!: number
+  /** workOrders − payroll. */
+  @ApiProperty({ example: 390 }) difference!: number
+  /**
+   * other_payment_type: ese día ponchó con otro tipo y ninguna ponchada es Piecework;
+   * no_piecework_type: sin Piecework en su ficha y sin ponchadas ese día; null: otro motivo.
+   */
+  @ApiProperty({ enum: ['other_payment_type', 'no_piecework_type'], nullable: true }) reason!:
+    | 'other_payment_type'
+    | 'no_piecework_type'
+    | null
+  /** Tipos ponchados ese día (GENERIC_DATA.name), para el motivo other_payment_type. */
+  @ApiProperty({ nullable: true, example: 'Closing, Shop' }) punchTypes!: string | null
 }
