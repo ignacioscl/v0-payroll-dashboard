@@ -14,6 +14,7 @@ const filter: SrsKpiFilter = {
   filterDateDone: false,
   includeZero: false,
   skipDealerRestriction: false,
+  includeRemovedDealers: false,
 }
 
 const base = { pageSize: 25, issueType: 'all' as const }

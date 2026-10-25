@@ -24,17 +24,51 @@ export function skipDealerRestrictionForRol(idRol: number): boolean {
   return idRol === SRS_ROL_ADMIN_GENERAL || idRol === SRS_ROL_ADMIN_COMPANY
 }
 
-/** WHERE fragment for dealer scope (header combo + optional RESTRICTION_DEALER_V2). */
+/** What removedDealersProvider needs from a KPI filter or from the invoice list filter. */
+export interface RemovedDealersScope {
+  idDealerProvider: number
+  skipDealerRestriction: boolean
+  includeRemovedDealers?: boolean
+}
+
+/**
+ * «Include removed dealers» (T1.7 of plans/plan-totales-income-centavos/PLAN.md): the provider whose
+ * removed dealers are added, or null. Only for users that already see every dealer of their company
+ * (Admin General / Admin Company); for anyone else it is always null, whatever the request says.
+ * The provider is the one of the session (JWT), never one from the request.
+ * Backend only for now: no screen of PRO shows the switch (Ignacio, 24/10/2026).
+ */
+export function removedDealersProvider(f: RemovedDealersScope): number | null {
+  return f.includeRemovedDealers === true && f.skipDealerRestriction ? f.idDealerProvider : null
+}
+
+/**
+ * WHERE fragment for dealer scope (header combo + optional RESTRICTION_DEALER_V2).
+ *
+ * removedDealersOf (Admin General / Admin Company only, see removedDealersProvider): also lets in
+ * the dealers with no DEALER_REL row with that provider (removed with «Remove» in legacy). It never
+ * widens the company: every query that uses this clause filters its data table by
+ * id_dealer_provider = the session provider, so a removed dealer only brings its invoices and WO
+ * with this company. Ignored for restricted users.
+ */
 export function buildDealerRestrictionClause(
   idUsuario: number,
   dealerIds: number[],
   skipDealerRestriction = false,
+  removedDealersOf: number | null = null,
 ): Pick<SrsKpiDealerFilterSql, 'and' | 'params'> {
   if (dealerIds.length === 0) {
     throw new Error('At least one dealer id is required')
   }
   const placeholders = dealerIds.map(() => '?').join(',')
   if (skipDealerRestriction) {
+    if (removedDealersOf !== null && Number.isInteger(removedDealersOf) && removedDealersOf > 0) {
+      return {
+        and: ` AND (c.id IN (${placeholders}) OR NOT EXISTS (SELECT 1 FROM DEALER_REL dr_rm
+             WHERE dr_rm.id_dealer_customer = c.id AND dr_rm.id_dealer_provider = ?))`,
+        params: [...dealerIds, removedDealersOf],
+      }
+    }
     return {
       and: ` AND c.id IN (${placeholders})`,
       params: [...dealerIds],
@@ -55,8 +89,14 @@ export function buildDealerFilterSql(
   idUsuario: number,
   dealerIds: number[],
   skipDealerRestriction = false,
+  removedDealersOf: number | null = null,
 ): SrsKpiDealerFilterSql {
-  const { and, params } = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+  const { and, params } = buildDealerRestrictionClause(
+    idUsuario,
+    dealerIds,
+    skipDealerRestriction,
+    removedDealersOf,
+  )
 
   switch (kind) {
     case 'invoice':

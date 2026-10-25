@@ -8,12 +8,15 @@ import {
   BillingKpiDto,
   BillingPeriodCollectionKpiDto,
   BillingWeekRowDto,
+  IncomeByDealerRowDto,
+  IncomeByDealerYearDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
+  removedDealersProvider,
   woPeriodColumn,
   woStatusFilterSql,
 } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -55,7 +58,7 @@ export class BillingKpiRepository {
       skipDealerRestriction,
     } = filter
     const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
-    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
     const invPeriodParams = [idDealerProvider, ...inv.params, fechaDesde, fechaHasta]
     // WO Not Invoiced follows the same "Filter Date Completed" switch as the cards and the
     // Closing Report, so the three still add up with the box ticked (Tarea 10).
@@ -121,7 +124,7 @@ export class BillingKpiRepository {
     return {
       invoicedValue,
       statementsIssued,
-      avgInvoiceValue: statementsIssued > 0 ? Math.round(invoicedValue / statementsIssued) : 0,
+      avgInvoiceValue: statementsIssued > 0 ? roundMoney(invoicedValue / statementsIssued) : 0,
       unbilledWos: Number(u.unbilledWos ?? 0),
       unbilledValue: money(u.unbilledValue),
       unbilledServices: Number(u.unbilledServices ?? 0),
@@ -147,7 +150,13 @@ export class BillingKpiRepository {
   }
 
   async getUnbilledAging(filter: SrsKpiFilter): Promise<UnbilledAgingBucketDto[]> {
-    const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const inv = buildDealerFilterSql(
+      'invoice',
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+      removedDealersProvider(filter),
+    )
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
     const rows = await this.srs.query(
       `SELECT CASE WHEN DATEDIFF(NOW(), DATE(i.fecha_alta)) <= 7  THEN '0-7 days'
@@ -208,7 +217,13 @@ export class BillingKpiRepository {
   }
 
   async getUnbilledByDealer(filter: SrsKpiFilter): Promise<UnbilledDealerRowDto[]> {
-    const inv = buildDealerFilterSql('invoice', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const inv = buildDealerFilterSql(
+      'invoice',
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+      removedDealersProvider(filter),
+    )
     const woZero = applyZeroFilter(filter.includeZero, woHasPositiveTotalSql('i'))
     const rows = await this.srs.query(
       `SELECT c.id                                                  AS dealerId,
@@ -238,6 +253,122 @@ export class BillingKpiRepository {
       value: Number(r.value),
       oldestDays: Number(r.oldestDays ?? 0),
     }))
+  }
+
+  /**
+   * Income by Dealer (T1 of plans/plan-totales-income-centavos/PLAN.md): the Income of the Billing
+   * cards — WO + TTK + Generic Invoiced (discount, no tax) + WO Not Invoiced — split by dealer, one
+   * run per year. Each run is exactly getBillingKpis with the header range set to that year, so
+   * the Total of a year is the Income card of that year, to the cent. The years run one after the
+   * other (the SRS pool has 5 connections).
+   */
+  async getIncomeByDealer(
+    filter: SrsKpiFilter,
+    years: { year: number; fechaDesde: string; fechaHasta: string; partial: boolean }[],
+  ): Promise<IncomeByDealerYearDto[]> {
+    const out: IncomeByDealerYearDto[] = []
+    const dealerIdsSeen = new Set<number>()
+    const perYear: { meta: (typeof years)[number]; rows: Map<number, Omit<IncomeByDealerRowDto, 'dealer'>> }[] = []
+
+    for (const y of years) {
+      const rows = await this.incomeByDealerOfRange({ ...filter, fechaDesde: y.fechaDesde, fechaHasta: y.fechaHasta })
+      for (const id of rows.keys()) dealerIdsSeen.add(id)
+      perYear.push({ meta: y, rows })
+    }
+
+    const names = await this.dealerNames(filter.idDealerProvider, [...dealerIdsSeen])
+
+    for (const { meta, rows } of perYear) {
+      const dealers = [...rows.values()]
+        .map((r) => ({ ...r, dealer: names.get(r.dealerId) ?? '' }))
+        .sort((a, b) => b.income - a.income || a.dealer.localeCompare(b.dealer))
+      const totalCents = dealers.reduce((acc, r) => acc + Math.round(r.income * 100), 0)
+      out.push({
+        year: meta.year,
+        fechaDesde: meta.fechaDesde,
+        fechaHasta: meta.fechaHasta,
+        partial: meta.partial,
+        total: totalCents / 100,
+        dealers,
+      })
+    }
+    return out
+  }
+
+  /** The four Income parts of one range, by dealer (c.id of each builder, like the cards). */
+  private async incomeByDealerOfRange(
+    filter: SrsKpiFilter,
+  ): Promise<Map<number, Omit<IncomeByDealerRowDto, 'dealer'>>> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, filterDateDone, skipDealerRestriction } =
+      filter
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
+    const unbilledPeriodCol = woPeriodColumn(filterDateDone)
+    const { wo, ttk, gen } = billedBaseOpts(filter)
+    const byDealer = { groupBy: 'dealer' as const, productionValue: true }
+    const woQ = woBilledLinesSql({ ...wo, ...byDealer })
+    const ttkQ = ttkBilledLinesSql({ ...ttk, ...byDealer })
+    const genQ = genericBilledLinesSql({ ...gen, ...byDealer })
+
+    // WO Not Invoiced: the query of getBillingKpis, grouped by the dealer of the WO department.
+    const [unbilledRows, woRows, ttkRows, genRows] = await Promise.all([
+      this.srs.query(
+        `SELECT c.id AS dealerId,
+                ROUND(IFNULL(SUM(CASE WHEN isr.id_invoice IS NOT NULL AND ${woServiceNotInvoicedSql()}
+                  THEN isr.price * IFNULL(isr.qty, 1) END), 0), 2) AS unbilledValue
+         FROM INVOICE i
+         ${inv.join}
+         LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+         WHERE i.estado = 1
+           AND i.id_dealer_provider = ?
+           ${inv.and}
+           ${woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)}
+           AND ${unbilledPeriodCol} >= ? AND ${unbilledPeriodCol} < DATE_ADD(?, INTERVAL 1 DAY)
+           AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
+         GROUP BY c.id`,
+        [idDealerProvider, ...inv.params, fechaDesde, fechaHasta],
+      ),
+      this.srs.query(woQ.sql, woQ.params),
+      this.srs.query(ttkQ.sql, ttkQ.params),
+      this.srs.query(genQ.sql, genQ.params),
+    ])
+
+    const rows = new Map<number, Omit<IncomeByDealerRowDto, 'dealer'>>()
+    const ensure = (dealerId: number) => {
+      let r = rows.get(dealerId)
+      if (!r) {
+        r = { dealerId, wo: 0, ttk: 0, generic: 0, notInvoiced: 0, income: 0 }
+        rows.set(dealerId, r)
+      }
+      return r
+    }
+    for (const r of woRows) ensure(Number(r.dealerId)).wo = money(r.invoiced)
+    for (const r of ttkRows) ensure(Number(r.dealerId)).ttk = money(r.invoiced)
+    for (const r of genRows) ensure(Number(r.dealerId)).generic = money(r.invoiced)
+    for (const r of unbilledRows) ensure(Number(r.dealerId)).notInvoiced = money(r.unbilledValue)
+    for (const [id, r] of rows) {
+      r.income = roundMoney(r.wo + r.ttk + r.generic + r.notInvoiced)
+      // A dealer with every part at $0 (e.g. only zero-value lines) is not a row.
+      if (r.income === 0 && r.wo === 0 && r.ttk === 0 && r.generic === 0 && r.notInvoiced === 0) rows.delete(id)
+    }
+    return rows
+  }
+
+  /**
+   * Dealer names as the company calls them (rule dealer-display-name-by-provider). Only ids that
+   * came out of the provider-scoped queries above get here.
+   */
+  private async dealerNames(idDealerProvider: number, ids: number[]): Promise<Map<number, string>> {
+    const names = new Map<number, string>()
+    if (ids.length === 0) return names
+    const rows = await this.srs.query(
+      `SELECT c.id AS dealerId, GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer
+       FROM CONTRATISTA c
+       WHERE c.id IN (${ids.map(() => '?').join(',')})`,
+      [idDealerProvider, ...ids],
+    )
+    for (const r of rows) names.set(Number(r.dealerId), String(r.dealer ?? ''))
+    return names
   }
 
   async getPeriodCollectionKpis(filter: SrsKpiFilter): Promise<BillingPeriodCollectionKpiDto> {
@@ -312,7 +443,7 @@ export class BillingKpiRepository {
       incomeCollectionRatePct: collectionRatePct(incomeCollectedValue, incomeInvoicedValue),
       invoicedValue,
       statementsIssued,
-      avgInvoiceValue: statementsIssued > 0 ? Math.round(invoicedValue / statementsIssued) : 0,
+      avgInvoiceValue: statementsIssued > 0 ? roundMoney(invoicedValue / statementsIssued) : 0,
       collectedValue,
       collectionRatePct: collectionRatePct(collectedValue, invoicedValue),
       unpaidInPeriodValue,

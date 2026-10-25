@@ -11,6 +11,7 @@ export const es: Messages = {
     costsByDealer: 'Costos por sucursal',
     businessKpis: 'KPIs de negocio',
     productionVsGoal: 'Producción vs meta por sucursal',
+    incomeByDealer: 'Ingresos por sucursal',
     payrollReport: 'Reporte de nómina',
     reports: 'Reports',
     billing: 'Facturación',
@@ -1666,6 +1667,95 @@ export const es: Messages = {
     tooltipPctCollected: '% cobrado',
     unbilledWoTotal: 'Total WO: {amount}',
     unbilledServices: '{count} servicios sin facturar: {amount}',
+  },
+  incomeByDealer: {
+    title: 'Ingresos por sucursal',
+    allPeriods: 'Todos los períodos',
+    yearYtd: '{year} hasta la fecha',
+    chartTitle: 'Ingresos por año',
+    colIncome: 'Ingresos',
+    colPeriod: 'Período',
+    colDates: 'Fechas',
+    total: 'Total',
+    grandTotal: 'Total general',
+    noData: 'Sin ingresos en estas fechas.',
+    summarySheet: 'Resumen',
+    exportField: 'Campo',
+    exportValue: 'Valor',
+    exportGenerated: 'Generado',
+    exportGeneratedBy: 'Generado por',
+    exportScreen: 'Pantalla',
+    exportDates: 'Fechas',
+    yes: 'Sí',
+    no: 'No',
+    byYear: 'Por año',
+    yearsPlaceholder: 'Elegí los años',
+    allYears: 'Todos los años',
+    yearsCount: '{count} años',
+    selectYears: 'Elegí uno o más años en el encabezado.',
+    exportYears: 'Años',
+  },
+  reportRules: {
+    billing: {
+      title: 'Qué cuenta Ingresos',
+      item1:
+        'El trabajo de las fechas elegidas, facturado o no.',
+      item2:
+        'WO por fecha de creación (o de terminación, con «Filtrar por fecha de terminación»). Las WO sin facturar van a precio de lista.',
+      item3:
+        'Invoices TTK: cada ponchada cuenta en su día.',
+      item4:
+        'Las invoices Generic se reparten por día en su período: una invoice que cruza las fechas elegidas cuenta solo sus días de adentro.',
+      item5:
+        'Los montos facturados incluyen el descuento de la invoice. No incluyen tax.',
+      item6:
+        'Mismos montos que el Closing Report y que Ingresos por sucursal.',
+    },
+    collections: {
+      title: 'Qué cuenta CxC abierta',
+      item1:
+        'La CxC pendiente es todo lo que se debe hoy, de cualquier fecha. No sigue las fechas elegidas. Incluye tax y descuento.',
+      item2:
+        'El gráfico muestra, mes por mes, el trabajo hecho (igual que Ingresos, sin tax) y cuánto ya se cobró.',
+    },
+    payroll: {
+      title: 'Qué cuenta Gasto de nómina',
+      item1:
+        'Cada período de pago se reparte por día: solo cuentan los días dentro de las fechas elegidas.',
+      item2:
+        'Nómina total incluye todos los tipos de pago y los impuestos de nómina. Con todas las sucursales elegidas, también incluye los salarios sin sucursal.',
+    },
+    productionVsGoal: {
+      title: 'Qué cuenta Valor de producción',
+      item1:
+        'El trabajo hecho en las fechas elegidas, facturado o no. No muestra si se facturó o se cobró.',
+      item2:
+        'Servicios de las WO creadas en el período (o terminadas, con «Filtrar por fecha de terminación») y reportes diarios, a precio de lista, sin descuento.',
+      item3:
+        'Las invoices TTK y Generic cuentan solo si todo su período cae dentro de las fechas elegidas. Una invoice que cruza el inicio o el fin queda afuera.',
+      item4:
+        'No incluye tax.',
+      item5:
+        'Para el ingreso facturado, usá Ingresos por sucursal o KPIs de negocio › Facturación.',
+    },
+    invoices: {
+      title: 'Qué cuenta esta lista',
+      item1:
+        'Invoices cuyo período entero cae dentro de las fechas elegidas. Prendé «Incluir invoices parciales» para sumar las que las cruzan; «Parcial fact.» es solo su parte dentro de las fechas.',
+      item2:
+        'Total es el total de la invoice, con descuento y tax.',
+    },
+    incomeByDealer: {
+      title: 'Qué cuenta Ingresos',
+      item1:
+        'Los mismos ingresos que KPIs de negocio › Facturación y el Closing Report, por sucursal y por año calendario.',
+      item2:
+        'El trabajo de cada año, facturado o no: WO por fecha de creación (o de terminación), ponchadas TTK por su día e invoices Generic repartidas por día en su período.',
+      item3:
+        'Una invoice que cruza dos años cuenta en cada año solo sus días de ese año.',
+      item4:
+        'Los montos facturados incluyen el descuento de la invoice. No incluyen tax.',
+    },
   },
   mockPayrollReport: {
     title: 'Reporte de nómina',

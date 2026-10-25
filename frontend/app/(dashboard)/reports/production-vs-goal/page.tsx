@@ -3,10 +3,10 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Info, Target } from 'lucide-react'
+import { Target } from 'lucide-react'
 import { ProductionDealerTable } from '@/components/dashboard/production-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
-import { Badge } from '@/components/ui/badge'
+import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useFilters } from '@/lib/filter-context'
@@ -79,23 +79,9 @@ export default function ProductionVsGoalPage() {
         }
         icon={<Target />}
         variant="success"
-        actions={
-          <Badge
-            variant="outline"
-            className="border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-100"
-          >
-            {t('businessKpis.betaBadge')}
-          </Badge>
-        }
       />
 
-      <div
-        role="note"
-        className="flex gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
-      >
-        <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
-        <p>{t('businessKpis.betaDisclaimer')}</p>
-      </div>
+      <ReportRulesNotice screen="productionVsGoal" />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>

@@ -221,6 +221,34 @@ export const fetchUnbilledAging = (params: KpiQueryParams) =>
   getKpi<UnbilledAgingBucket[]>('billing/unbilled-aging', params)
 export const fetchUnbilledByDealer = (params: KpiQueryParams) =>
   getKpi<UnbilledDealerRow[]>('billing/unbilled-by-dealer', params)
+/** One dealer of one year of Income by Dealer (`GET kpis/billing/income-by-dealer`). */
+export interface IncomeByDealerRow {
+  dealerId: number
+  dealer: string
+  wo: number
+  ttk: number
+  generic: number
+  notInvoiced: number
+  income: number
+}
+
+export interface IncomeByDealerYear {
+  year: number
+  fechaDesde: string
+  fechaHasta: string
+  /** The header range covers only part of the year (YTD or a cropped start). */
+  partial: boolean
+  total: number
+  dealers: IncomeByDealerRow[]
+}
+
+export interface IncomeByDealer {
+  years: IncomeByDealerYear[]
+  grandTotal: number
+}
+
+export const fetchIncomeByDealer = (params: KpiQueryParams) =>
+  getKpi<IncomeByDealer>('billing/income-by-dealer', params)
 export const fetchBillingPeriodCollection = (params: KpiQueryParams) =>
   getKpi<BillingPeriodCollectionKpi>('billing/period-collection', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>

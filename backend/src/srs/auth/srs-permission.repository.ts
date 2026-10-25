@@ -26,6 +26,12 @@ export const ROL_ACCION_GENERIC_SERVICE_DELETE = 145
  */
 export const ROL_ACCION_TTK_PAYROLL = 93
 
+/**
+ * Reports > Production Report (legacy show-rol-action-47): Production vs Goal, the Billing tabs of
+ * Business KPIs and Income by Dealer.
+ */
+export const ROL_ACCION_PRODUCTION_REPORT = 47
+
 /** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 

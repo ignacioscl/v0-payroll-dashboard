@@ -97,6 +97,15 @@ interface FilterContextType {
   /** La pantalla lo publica cuando la búsqueda lo fuerza (invoice # o empleado). */
   invoiceIgnorePeriodLocked: boolean
   setInvoiceIgnorePeriodLocked: (value: boolean) => void
+  /**
+   * Income by Dealer: «By year» en el header cambia el calendario por un combo de años. Vive
+   * aparte de `dateRange`: al volver a las otras pantallas el calendario sigue con sus fechas.
+   */
+  incomeYearMode: boolean
+  setIncomeYearMode: (value: boolean) => void
+  /** Años marcados en el combo (cualquier combinación, también salteados). */
+  incomeYears: number[]
+  setIncomeYears: (value: number[]) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
   filtersHydrated: boolean
   clearFilters: () => void
@@ -141,6 +150,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [invoiceDateMode, setInvoiceDateMode] = useState<InvoiceDateMode>('range')
   const [invoiceIgnorePeriod, setInvoiceIgnorePeriod] = useState(false)
   const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
+  const [incomeYearMode, setIncomeYearMode] = useState(false)
+  const [incomeYears, setIncomeYears] = useState<number[]>([])
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const setDateRange = useCallback((value: DateRange | undefined) => {
@@ -281,6 +292,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setInvoiceIgnorePeriod,
       invoiceIgnorePeriodLocked,
       setInvoiceIgnorePeriodLocked,
+      incomeYearMode,
+      setIncomeYearMode,
+      incomeYears,
+      setIncomeYears,
       filtersHydrated,
       clearFilters
     }}>

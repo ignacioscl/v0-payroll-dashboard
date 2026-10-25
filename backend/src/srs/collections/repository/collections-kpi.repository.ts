@@ -6,7 +6,11 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { CollectionsByMonthRowDto } from '../dto/collections-by-month.dto'
 import { CollectionsKpiDto } from '../dto/collections-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { buildDealerFilterSql, buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  buildDealerFilterSql,
+  buildDealerRestrictionClause,
+  removedDealersProvider,
+} from '../../shared/kpi/srs-kpi-dealer-filter'
 import {
   buildMonthWindow,
   fillMonthlyGaps,
@@ -166,7 +170,7 @@ export class CollectionsKpiRepository {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, skipDealerRestriction } =
       filter
     const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('s'))
-    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+    const stmt = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
 
     // Drive from payments in range, then STRAIGHT_JOIN statements. MariaDB 10.3 otherwise
     // nested-loops CONTRATISTA → every invoice and runs IS_STATEMENT_BILLED /
@@ -243,7 +247,7 @@ export class CollectionsKpiRepository {
     const { rangeStart, rangeEnd, monthStarts } = buildMonthWindow(filter.fechaHasta, historyMonths)
     const { idDealerProvider, idUsuario, dealerIds, includeZero, skipDealerRestriction } = filter
     const woLineZero = applyZeroFilter(includeZero, woServiceLinePositiveSql())
-    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
     const billed = billedJoinsSql
     const notInvoiced = woServiceNotInvoicedSql()
     const range = { fechaDesde: rangeStart, fechaHasta: rangeEnd }
@@ -334,7 +338,13 @@ export class CollectionsKpiRepository {
   }
 
   async getArAging(filter: SrsKpiFilter): Promise<{ bucket: string; statements: number; value: number }[]> {
-    const stmt = buildDealerFilterSql('statement', filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const stmt = buildDealerFilterSql(
+      'statement',
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+      removedDealersProvider(filter),
+    )
     const stmtZero = applyZeroFilter(filter.includeZero, statementHasPositiveTotalSql('s'))
     const rows = await this.srs.query(
       `SELECT CASE WHEN t.ageDays <= 30 THEN '0-30 days'

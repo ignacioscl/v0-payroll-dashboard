@@ -44,6 +44,37 @@ function getExportColumns<TData>(table: Table<TData>, exportAllColumns: boolean)
   })
 }
 
+function exportLabel<TData>(column: ReturnType<Table<TData>['getAllLeafColumns']>[number]): string {
+  const meta = (column.columnDef.meta ?? {}) as { label?: string }
+  return (
+    meta.label ??
+    (typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id)
+  )
+}
+
+/** Money columns (`meta.money`): numeric cells get `#,##0.00` so Excel shows cents and thousands. */
+function applyMoneyFormat<TData>(
+  ws: XLSX.WorkSheet,
+  table: Table<TData>,
+  exportAllColumns: boolean,
+  headers: string[],
+): void {
+  const moneyLabels = new Set(
+    getExportColumns(table, exportAllColumns)
+      .filter((column) => (column.columnDef.meta as { money?: boolean } | undefined)?.money)
+      .map((column) => exportLabel(column)),
+  )
+  if (moneyLabels.size === 0 || !ws['!ref']) return
+  const range = XLSX.utils.decode_range(ws['!ref'])
+  headers.forEach((header, c) => {
+    if (!moneyLabels.has(header)) return
+    for (let r = range.s.r + 1; r <= range.e.r; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined
+      if (cell && cell.t === 'n') cell.z = '#,##0.00'
+    }
+  })
+}
+
 /** Build a flat dictionary of cell values for a given row. */
 function rowToRecord<TData>(
   table: Table<TData>,
@@ -56,9 +87,7 @@ function rowToRecord<TData>(
       label?: string
       exportValue?: (row: TData) => unknown
     }
-    const label =
-      meta.label ??
-      (typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id)
+    const label = exportLabel(column)
 
     if (meta.exportValue) {
       out[label] = meta.exportValue(row)
@@ -106,6 +135,7 @@ export function DataTableExport<TData>({
 
       if (records.length > 0) {
         const headers = Object.keys(records[0]!)
+        applyMoneyFormat(ws, table, exportAllColumns, headers)
         ws['!cols'] = headers.map((h) => ({
           wch: Math.min(
             40,

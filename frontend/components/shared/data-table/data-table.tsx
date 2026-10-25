@@ -73,6 +73,8 @@ export interface DataTableColumnMeta<TData> {
   mono?: boolean
   /** Convenience flag — applies `text-right` to header + body cell. */
   numeric?: boolean
+  /** Money column: the Excel export writes its cells with `#,##0.00`. */
+  money?: boolean
   /** Pin this column to the left/right edge. Reflected as a sticky CSS. */
   pin?: 'left' | 'right'
   /**

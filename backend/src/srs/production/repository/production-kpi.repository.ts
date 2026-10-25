@@ -10,6 +10,7 @@ import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
   buildDealerRestrictionClause,
+  removedDealersProvider,
   mysqlWeekBucketStartExpr,
   woCompletedPeriodColumn,
   woDoneAtJoinScoped,
@@ -240,11 +241,13 @@ export class ProductionKpiRepository {
     const drZero = applyZeroFilter(includeZero, dailyReportPositiveSql())
     const stmtZero = applyZeroFilter(includeZero, statementHasPositiveTotalSql('invs'))
     const genericZero = applyZeroFilter(includeZero, genericLinePositiveSql())
-    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction)
-    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction)
+    // «Include removed dealers» (T1.7): every query below filters its table by id_dealer_provider.
+    const removedOf = removedDealersProvider(filter)
+    const dealer = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedOf)
+    const drDealer = buildDealerFilterSql('dailyReport', idUsuario, dealerIds, skipDealerRestriction, removedOf)
     const woPeriod = woCompletedPeriodColumn(filterDateDone)
     const woStatus = woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)
-    const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction)
+    const stmtScope = buildDealerRestrictionClause(idUsuario, dealerIds, skipDealerRestriction, removedOf)
     const invoicePeriodParams = [idDealerProvider, ...dealer.params, fechaDesde, fechaHasta]
     const drParams = [idDealerProvider, ...drDealer.params, fechaDesde, fechaHasta]
     const stmtPeriodParams = [idDealerProvider, ...stmtScope.params, fechaDesde, fechaHasta]

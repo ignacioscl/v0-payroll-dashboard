@@ -1119,6 +1119,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colSubtotal'),
           numeric: true,
+          money: true,
           exportValue: (r) => r.subtotal,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
@@ -1166,6 +1167,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,
+          money: true,
           // Con el signo de la pantalla: −$2,421.06 en la grilla es −2421.06 en el Excel.
           exportValue: (r) => discountExportValue(r.discountAmount),
         } satisfies DataTableColumnMeta<InvoiceRow>,
@@ -1193,6 +1195,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colTotal'),
           numeric: true,
+          money: true,
           exportValue: (r) => r.total,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
@@ -1223,6 +1226,7 @@ export function InvoiceListTable({
               meta: {
                 label: t('invoices.colPartialInvoiced'),
                 numeric: true,
+                money: true,
                 exportValue: (r: InvoiceRow) => r.partialInvoiced ?? 0,
               } satisfies DataTableColumnMeta<InvoiceRow>,
             } as ColumnDef<InvoiceRow>,
@@ -1298,6 +1302,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colCheckAmount'),
           numeric: true,
+          money: true,
           exportValue: (r) => r.amount ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },

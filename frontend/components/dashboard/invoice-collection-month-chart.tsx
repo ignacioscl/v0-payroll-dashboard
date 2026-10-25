@@ -17,9 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { formatMonthBucketLabel } from '@/lib/kpi/month-bucket-label'
 import type { CollectionsByMonthPoint } from '@/lib/srs-kpis-api'
-import { fmtDollars, shownPending, sumShown } from '@/lib/kpi-money'
-
-const fmtMoneyK = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`)
+import { fmtMoney, fmtMoneyAxis as fmtMoneyK, shownPending, sumShown } from '@/lib/kpi-money'
 
 const PRODUCED_STACK = [
   { key: 'woInvoicedValue' as const, color: 'var(--chart-1)', nameKey: 'businessKpis.seriesWoInvoiced' },
@@ -71,28 +69,28 @@ function CollectionMonthTooltip({
     <div className="rounded-lg border border-border/80 bg-popover px-3 py-2 text-sm shadow-md">
       <p className="mb-1.5 font-semibold tabular-nums">{row.month}</p>
       <p>
-        {labels.produced}: {fmtDollars(produced)}
+        {labels.produced}: {fmtMoney(produced)}
       </p>
       <p className="pl-3 text-muted-foreground">
-        {labels.woInvoiced}: {fmtDollars(row.woInvoicedValue)}
+        {labels.woInvoiced}: {fmtMoney(row.woInvoicedValue)}
       </p>
       <p className="pl-3 text-muted-foreground">
-        {labels.ttkInvoiced}: {fmtDollars(row.ttkInvoicedValue)}
+        {labels.ttkInvoiced}: {fmtMoney(row.ttkInvoicedValue)}
       </p>
       <p className="pl-3 text-muted-foreground">
-        {labels.generics}: {fmtDollars(row.genericInvoicedValue)}
+        {labels.generics}: {fmtMoney(row.genericInvoicedValue)}
       </p>
       <p className="pl-3 text-muted-foreground">
-        {labels.woUnbilled}: {fmtDollars(row.woUnbilledValue)}
+        {labels.woUnbilled}: {fmtMoney(row.woUnbilledValue)}
       </p>
       <p>
-        {labels.collected}: {fmtDollars(collected)}
+        {labels.collected}: {fmtMoney(collected)}
       </p>
       <p>
-        {labels.pending}: {fmtDollars(pending)}
+        {labels.pending}: {fmtMoney(pending)}
       </p>
       <p>
-        {labels.notInvoiced}: {fmtDollars(row.woUnbilledValue)}
+        {labels.notInvoiced}: {fmtMoney(row.woUnbilledValue)}
       </p>
       <p className="mt-1 font-medium tabular-nums">
         {labels.rate}: {row.collectionRatePct}%

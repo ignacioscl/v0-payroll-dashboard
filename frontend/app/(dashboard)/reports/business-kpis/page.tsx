@@ -16,7 +16,6 @@ import {
   Fingerprint,
   HandCoins,
   Hourglass,
-  Info,
   Landmark,
   Package,
   Pencil,
@@ -43,6 +42,7 @@ import { PayrollByTypeChart } from '@/components/dashboard/payroll-by-type-chart
 import { PieceworkDiffDialog } from '@/components/dashboard/piecework-diff-dialog'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { PageHeading } from '@/components/layout/page-heading'
+import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import {
   Select,
   SelectContent,
@@ -51,7 +51,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useFilters } from '@/lib/filter-context'
@@ -79,15 +78,15 @@ import {
   type CollectionsHistoryMonths,
   type KpiQueryParams,
 } from '@/lib/srs-kpis-api'
-import { dollars, fmtDollars, shownPending, sumShown } from '@/lib/kpi-money'
+import { diffShown, dollars, fmtMoney as fmtMoneyCents, fmtMoneyAxis, shownPending, sumShown } from '@/lib/kpi-money'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
 
 const fmtMoney = (n: number | undefined) =>
-  n === undefined ? '—' : fmtDollars(n)
+  n === undefined ? '—' : fmtMoneyCents(n)
 const fmtMoneyK = (n: number | undefined) =>
-  n === undefined ? '—' : n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`
+  n === undefined ? '—' : fmtMoneyAxis(n)
 
-/** Abreviado en tarjeta ($40.2k); click muestra monto completo ($40,162). */
+/** Abreviado en tarjeta ($40.2k); click muestra monto completo con centavos ($40,162.35). */
 function kpiMoneyProps(n: number | undefined): { value: string; valueFull?: string } {
   if (n === undefined) return { value: '—' }
   const full = fmtMoney(n)
@@ -102,13 +101,13 @@ function billingSplitSubtitle(
   t: TranslateFn,
 ): string {
   if (!b || total === undefined || inRange === undefined) return ''
-  const shownOut = dollars(total) - dollars(inRange)
+  const shownOut = diffShown(total, inRange)
   if (shownOut === 0) {
-    return t('mockKpis.billingAllInRange', { inRange: fmtDollars(inRange) })
+    return t('mockKpis.billingAllInRange', { inRange: fmtMoney(inRange) })
   }
   return t('mockKpis.billingInRangeOutside', {
-    inRange: fmtDollars(inRange),
-    outside: fmtDollars(shownOut),
+    inRange: fmtMoney(inRange),
+    outside: fmtMoney(shownOut),
   })
 }
 
@@ -320,7 +319,7 @@ export default function BusinessKpisPage() {
   const unbilledShown = b ? dollars(b.unbilledValue) : undefined
   const incomeTotalShown =
     invoicedShown !== undefined && unbilledShown !== undefined
-      ? invoicedShown + unbilledShown
+      ? sumShown(invoicedShown, unbilledShown)
       : undefined
   // Collected se redondea igual que lo facturado: por tipo y después se suma. Redondeado una
   // sola vez sobre el total, Unpaid daba −$1 con todo cobrado.
@@ -333,29 +332,30 @@ export default function BusinessKpisPage() {
     : undefined
   const unpaidShown =
     invoicedShown !== undefined && collectedShown !== undefined
-      ? invoicedShown - collectedShown
+      ? diffShown(invoicedShown, collectedShown)
       : undefined
   // Plata real (con tax y descuento) de esas mismas líneas: subtítulos de Collected y Unpaid.
   const unpaidRealShown = pc
-    ? dollars(pc.incomeInvoicedRealValue) - dollars(pc.incomeCollectedRealValue)
+    ? diffShown(pc.incomeInvoicedRealValue, pc.incomeCollectedRealValue)
     : undefined
   // The chart shows the months without tax; the debt has tax, so it subtracts the same months as
   // real money, series by series like before.
   const outstandingOutsideChart =
     c && collByMonth.data
-      ? dollars(c.outstandingAr) -
-        collByMonth.data.reduce(
+      ? diffShown(
+          c.outstandingAr,
+          collByMonth.data.reduce(
           (acc, point) =>
-            acc +
-            shownPending({
+            sumShown(acc, shownPending({
               woInvoicedValue: point.woInvoicedRealValue,
               ttkInvoicedValue: point.ttkInvoicedRealValue,
               genericInvoicedValue: point.genericInvoicedRealValue,
               woCollectedValue: point.woCollectedRealValue,
               ttkCollectedValue: point.ttkCollectedRealValue,
               genericCollectedValue: point.genericCollectedRealValue,
-            }),
+            })),
           0,
+          ),
         )
       : undefined
 
@@ -370,23 +370,7 @@ export default function BusinessKpisPage() {
         }
         icon={<FileBarChart />}
         variant="info"
-        actions={
-          <Badge
-            variant="outline"
-            className="border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-100"
-          >
-            {t('businessKpis.betaBadge')}
-          </Badge>
-        }
       />
-
-      <div
-        role="note"
-        className="flex gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
-      >
-        <Info className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
-        <p>{t('businessKpis.betaDisclaimer')}</p>
-      </div>
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>
@@ -472,6 +456,7 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-6">
+          <ReportRulesNotice screen="billing" />
           <div className="flex items-center gap-3">
             <Switch
               id="billing-filter-date-done"
@@ -501,14 +486,14 @@ export default function BusinessKpisPage() {
                 help={t('businessKpisHelp.income')}
                 loading={bill.isLoading}
                 title={t('businessKpis.incomeTitle')}
-                value={incomeTotalShown === undefined ? '—' : fmtDollars(incomeTotalShown)}
+                value={incomeTotalShown === undefined ? '—' : fmtMoney(incomeTotalShown)}
                 icon={<Landmark className="h-5 w-5" />}
                 variant="success"
                 subtitle={
                   summaryDetailOpen && invoicedShown !== undefined && unbilledShown !== undefined ? (
                     <>
-                      <p>{t('businessKpis.incomeSummaryInvoiced', { amount: fmtDollars(invoicedShown) })}</p>
-                      <p>{t('businessKpis.incomeSummaryNotInvoiced', { amount: fmtDollars(unbilledShown) })}</p>
+                      <p>{t('businessKpis.incomeSummaryInvoiced', { amount: fmtMoney(invoicedShown) })}</p>
+                      <p>{t('businessKpis.incomeSummaryNotInvoiced', { amount: fmtMoney(unbilledShown) })}</p>
                       <p className="text-muted-foreground">{t('businessKpis.incomeSummaryNoTax')}</p>
                     </>
                   ) : (
@@ -523,13 +508,13 @@ export default function BusinessKpisPage() {
                 help={t('businessKpisHelp.collected')}
                 loading={periodColl.isLoading}
                 title={t('mockKpis.collected')}
-                value={collectedShown === undefined ? '—' : fmtDollars(collectedShown)}
+                value={collectedShown === undefined ? '—' : fmtMoney(collectedShown)}
                 icon={<DollarSign className="h-5 w-5" />}
                 variant="info"
                 subtitle={
                   summaryDetailOpen && pc ? (
                     <>
-                      <p>{t('mockKpis.withTaxDiscount', { amount: fmtDollars(pc.incomeCollectedRealValue) })}</p>
+                      <p>{t('mockKpis.withTaxDiscount', { amount: fmtMoney(pc.incomeCollectedRealValue) })}</p>
                       <p>{t('mockKpis.collectionRate') + ': ' + pc.incomeCollectionRatePct + '%'}</p>
                     </>
                   ) : (
@@ -544,21 +529,21 @@ export default function BusinessKpisPage() {
                 help={t('businessKpisHelp.unpaidInPeriod')}
                 loading={bill.isLoading || periodColl.isLoading}
                 title={t('mockKpis.unpaidInPeriod')}
-                value={unpaidShown === undefined ? '—' : fmtDollars(unpaidShown)}
+                value={unpaidShown === undefined ? '—' : fmtMoney(unpaidShown)}
                 icon={<Banknote className="h-5 w-5" />}
                 variant="danger"
                 subtitle={
                   summaryDetailOpen && pc && unpaidRealShown !== undefined ? (
                     <>
                       <p>
-                        {t('mockKpis.withTaxDiscount', { amount: fmtDollars(unpaidRealShown) })}
+                        {t('mockKpis.withTaxDiscount', { amount: fmtMoney(unpaidRealShown) })}
                         {' · '}
                         {t('mockKpis.unpaidInPeriodStatements', {
                           count: pc.unpaidInPeriodStatements,
                         })}
                       </p>
                       {b ? (
-                        <p>{t('mockKpis.unpaidNotInvoiced', { amount: fmtDollars(b.unbilledValue) })}</p>
+                        <p>{t('mockKpis.unpaidNotInvoiced', { amount: fmtMoney(b.unbilledValue) })}</p>
                       ) : null}
                     </>
                   ) : (
@@ -588,13 +573,13 @@ export default function BusinessKpisPage() {
               help={t('businessKpisHelp.unbilled')}
               loading={bill.isLoading}
               title={t('mockKpis.doneNotInvoiced')}
-              value={b ? fmtDollars(b.unbilledValue) : '—'}
+              value={b ? fmtMoney(b.unbilledValue) : '—'}
               icon={<Hourglass className="h-5 w-5" />}
               variant="danger"
             />
-            <KPICard inline help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} value={b ? fmtDollars(b.ttkInvoicedValue) : '—'} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedValue, b?.ttkInvoicedInRangeValue, t)} />
-            <KPICard inline help={t('businessKpisHelp.woInvoiced')} loading={bill.isLoading} title={t('mockKpis.woInvoiced')} value={b ? fmtDollars(b.woInvoicedValue) : '—'} icon={<Wrench className="h-5 w-5" />} variant="success" subtitle={billingSplitSubtitle(b, b?.woInvoicedValue, b?.woInvoicedInRangeValue, t)} />
-            <KPICard inline help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} value={b ? fmtDollars(b.genericInvoicedValue) : '—'} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedValue, b?.genericInvoicedInRangeValue, t)} />
+            <KPICard inline help={t('businessKpisHelp.ttkInvoiced')} loading={bill.isLoading} title={t('mockKpis.ttkInvoiced')} value={b ? fmtMoney(b.ttkInvoicedValue) : '—'} icon={<Fingerprint className="h-5 w-5" />} variant="info" subtitle={billingSplitSubtitle(b, b?.ttkInvoicedValue, b?.ttkInvoicedInRangeValue, t)} />
+            <KPICard inline help={t('businessKpisHelp.woInvoiced')} loading={bill.isLoading} title={t('mockKpis.woInvoiced')} value={b ? fmtMoney(b.woInvoicedValue) : '—'} icon={<Wrench className="h-5 w-5" />} variant="success" subtitle={billingSplitSubtitle(b, b?.woInvoicedValue, b?.woInvoicedInRangeValue, t)} />
+            <KPICard inline help={t('businessKpisHelp.genericInvoiced')} loading={bill.isLoading} title={t('mockKpis.genericInvoiced')} value={b ? fmtMoney(b.genericInvoicedValue) : '—'} icon={<FileBarChart className="h-5 w-5" />} variant="violet" subtitle={billingSplitSubtitle(b, b?.genericInvoicedValue, b?.genericInvoicedInRangeValue, t)} />
             </div>
           </section>
 
@@ -612,14 +597,14 @@ export default function BusinessKpisPage() {
 
         <TabsContent value="collections" className="space-y-6">
           <KpiErrorBanner q={coll} />
-          <p className="text-sm text-muted-foreground">{t('businessKpis.collectionsSnapshotNote')}</p>
+          <ReportRulesNotice screen="collections" />
           <div className={KPI_CARD_GRID}>
             <KPICard
               inline
               help={t('businessKpisHelp.outstandingAr')}
               loading={coll.isLoading}
               title={t('mockKpis.outstandingAr')}
-              value={c ? fmtDollars(c.outstandingAr) : '—'}
+              value={c ? fmtMoney(c.outstandingAr) : '—'}
               icon={<Banknote className="h-5 w-5" />}
               variant="warning"
               subtitle={
@@ -630,10 +615,10 @@ export default function BusinessKpisPage() {
                         ? t('mockKpis.outstandingArSubtitle', { count: c.openStatements })
                         : t('mockKpis.outstandingArOutsideChart', {
                             count: c.openStatements,
-                            amount: fmtDollars(outstandingOutsideChart),
+                            amount: fmtMoney(outstandingOutsideChart),
                           })}
                     </p>
-                    <p>{t('mockKpis.outstandingArNoTax', { amount: fmtDollars(c.outstandingArNoTax) })}</p>
+                    <p>{t('mockKpis.outstandingArNoTax', { amount: fmtMoney(c.outstandingArNoTax) })}</p>
                   </>
                 ) : (
                   ''
@@ -683,6 +668,7 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">
+          <ReportRulesNotice screen="payroll" />
           {s && s.paymentMethod === null ? (
             <p className="text-sm text-muted-foreground">{t('businessKpis.payrollNoPeriod')}</p>
           ) : (
@@ -813,7 +799,7 @@ export default function BusinessKpisPage() {
                 <p>{t('businessKpis.payrollNote5')}</p>
                 <p>{t('businessKpis.payrollNote6')}</p>
                 {s.withoutDealer && !s.allDealers && s.withoutDealer.amount !== 0 ? (
-                  <p>{t('businessKpis.payrollWithoutDealer', { amount: fmtDollars(s.withoutDealer.amount) })}</p>
+                  <p>{t('businessKpis.payrollWithoutDealer', { amount: fmtCents(s.withoutDealer.amount) })}</p>
                 ) : null}
                 {s.dealerRestricted ? <p>{t('businessKpis.payrollDealerRestricted')}</p> : null}
               </div>
