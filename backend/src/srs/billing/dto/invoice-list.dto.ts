@@ -4,6 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+import { includeRemovedDealersForSession } from '../../shared/kpi/srs-kpi-filter'
 import {
   parseDealerIds,
   parseFilterDateDone,
@@ -240,6 +241,8 @@ export interface InvoiceListFilter {
   /** When false (default), exclude statements with GET_TOTAL_BY_STATEMENT = 0. */
   includeZero: boolean
   skipDealerRestriction: boolean
+  /** «Include removed dealers» (T1.7): true only for Admin General / Admin Company. */
+  includeRemovedDealers: boolean
   departmentIds: number[]
   invoiceServiceIds: number[]
   woNumbers: string[]
@@ -291,6 +294,7 @@ export function buildInvoiceListFilter(
   const search = query.search?.trim() || undefined
   const ignorePeriod = parseFlag01(query.ignorePeriod)
   const page = query.page && query.page > 0 ? query.page : 1
+  const skipDealerRestriction = skipDealerRestrictionForRol(ctx.idRol)
   const pageSize =
     query.pageSize === -1
       ? -1
@@ -310,7 +314,8 @@ export function buildInvoiceListFilter(
     page,
     pageSize,
     includeZero: parseIncludeZero(query.includeZero),
-    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+    skipDealerRestriction,
+    includeRemovedDealers: includeRemovedDealersForSession(skipDealerRestriction, query.includeRemovedDealers),
     departmentIds: parseCsvPositiveInts(query.idDepartment),
     invoiceServiceIds: parseCsvPositiveInts(query.idInvoiceService),
     woNumbers: parseWoNumbers(query.wo),

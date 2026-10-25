@@ -10,8 +10,7 @@ import {
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 import { UNBILLED_LOOKBACK_MONTHS, type UnbilledDealerRow } from '@/lib/srs-kpis-api'
-
-const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`
+import { fmtMoney } from '@/lib/kpi-money'
 
 type UnbilledByDealerTableProps = {
   data?: UnbilledDealerRow[]
@@ -73,6 +72,7 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         meta: {
           label: t('mockKpis.tableUnbilledValue'),
           numeric: true,
+          money: true,
           exportValue: (row) => row.value,
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },

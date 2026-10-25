@@ -8,6 +8,7 @@ import { Plus, ReceiptText } from 'lucide-react'
 import { GenericInvoiceDialog } from '@/components/billing/generic-invoice-dialog'
 import { InvoiceFilterDeck } from '@/components/billing/invoice-filter-deck'
 import { PageHeading } from '@/components/layout/page-heading'
+import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import { Button } from '@/components/ui/button'
 import { useGenericInvoiceConfig } from '@/hooks/use-generic-invoice'
 import { InvoiceSummaryStrip } from '@/components/billing/invoice-summary-strip'
@@ -327,6 +328,8 @@ export default function InvoicesPage() {
         idDealer={idDealer}
         disabled={!ready}
       />
+
+      <ReportRulesNotice screen="invoices" />
 
       {showSummary ? (
         <InvoiceSummaryStrip

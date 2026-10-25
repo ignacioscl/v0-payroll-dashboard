@@ -15,6 +15,7 @@ import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
+import { IncomeYearFilter } from '@/components/filters/income-year-filter'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
@@ -107,6 +108,8 @@ export function Header() {
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
   const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
+  // Income by Dealer: switch «By year» que cambia el calendario por un combo de años.
+  const isIncomeByDealerPage = pathname === '/reports/income-by-dealer'
   const showDateFilter = !isRolesPage
   // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
   // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
@@ -193,6 +196,8 @@ export function Header() {
           {showDateFilter ? (
             isInvoicesPage ? (
               <DateRangePicker {...invoiceRangeProps} className="shrink-0" />
+            ) : isIncomeByDealerPage ? (
+              <IncomeYearFilter className="shrink-0" />
             ) : (
               <DateRangePicker
                 value={dateRange}
@@ -276,6 +281,8 @@ export function Header() {
                 <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
                 {isInvoicesPage ? (
                   <DateRangePicker {...invoiceRangeProps} className="w-full min-w-0" />
+                ) : isIncomeByDealerPage ? (
+                  <IncomeYearFilter />
                 ) : (
                   <DateRangePicker
                     value={dateRange}

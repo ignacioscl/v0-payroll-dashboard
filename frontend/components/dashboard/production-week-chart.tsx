@@ -19,9 +19,7 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 import { formatWeekBucketLabel } from '@/lib/kpi/week-bucket-label'
 import type { ProductionWeekPoint } from '@/lib/srs-kpis-api'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
-
-const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`
-const fmtMoneyK = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`)
+import { fmtMoney, fmtMoneyAxis as fmtMoneyK } from '@/lib/kpi-money'
 
 type ProductionWeekChartProps = {
   data?: ProductionWeekPoint[]

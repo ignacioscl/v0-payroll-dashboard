@@ -99,3 +99,32 @@ export class BillingPeriodCollectionKpiDto {
   /** incomeCollectedValue / incomeInvoicedValue. */
   @ApiProperty({ example: 78.3 }) incomeCollectionRatePct!: number
 }
+
+/** One dealer of one year of Income by Dealer: the same parts as the Income cards of Billing. */
+export class IncomeByDealerRowDto {
+  @ApiProperty({ example: 192 }) dealerId!: number
+  @ApiProperty({ example: 'Lamborghini Broward' }) dealer!: string
+  @ApiProperty({ example: 0, description: 'WO Invoiced (discount, no tax)' }) wo!: number
+  @ApiProperty({ example: 0, description: 'TTK Invoiced (discount, no tax)' }) ttk!: number
+  @ApiProperty({ example: 115637.24, description: 'Generic Invoiced, prorated by day (discount, no tax)' })
+  generic!: number
+  @ApiProperty({ example: 0, description: 'WO Not Invoiced (list price)' }) notInvoiced!: number
+  @ApiProperty({ example: 115637.24, description: 'wo + ttk + generic + notInvoiced' }) income!: number
+}
+
+/** One calendar year of the header range, cropped to it. */
+export class IncomeByDealerYearDto {
+  @ApiProperty({ example: 2024 }) year!: number
+  @ApiProperty({ example: '2024-01-01' }) fechaDesde!: string
+  @ApiProperty({ example: '2024-12-31' }) fechaHasta!: string
+  @ApiProperty({ example: false, description: 'True when the range covers only part of the year' })
+  partial!: boolean
+  @ApiProperty({ example: 7250314.02, description: 'Sum of the dealers of the year' }) total!: number
+  @ApiProperty({ type: [IncomeByDealerRowDto], description: 'Income desc' })
+  dealers!: IncomeByDealerRowDto[]
+}
+
+export class IncomeByDealerDto {
+  @ApiProperty({ type: [IncomeByDealerYearDto] }) years!: IncomeByDealerYearDto[]
+  @ApiProperty({ example: 22505068.07, description: 'Sum of every year' }) grandTotal!: number
+}

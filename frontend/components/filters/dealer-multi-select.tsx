@@ -75,6 +75,12 @@ interface DealerMultiSelectProps {
   maxHeight?: string
   loading?: boolean
   disabled?: boolean
+  /** Keep the order of `dealers` when the popover opens (default: checked first). */
+  keepOrder?: boolean
+  /** Placeholder of the search input (default: the dealer one). */
+  searchPlaceholder?: string
+  /** Trigger label with several items checked (default: «{count} dealers selected»). */
+  manySelectedLabel?: (count: number) => string
 }
 
 export function DealerMultiSelect({
@@ -89,6 +95,9 @@ export function DealerMultiSelect({
   maxHeight = 'max-h-[280px]',
   loading = false,
   disabled = false,
+  keepOrder = false,
+  searchPlaceholder,
+  manySelectedLabel,
 }: DealerMultiSelectProps) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('dealer.labelPlural')
@@ -122,8 +131,10 @@ export function DealerMultiSelect({
     if (value.length === 1) {
       return dealers.find((d) => d.id === value[0])?.label ?? t('dealer.oneSelected')
     }
-    return t('dealer.manySelected', { count: value.length })
-  }, [allSelected, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value])
+    return manySelectedLabel
+      ? manySelectedLabel(value.length)
+      : t('dealer.manySelected', { count: value.length })
+  }, [allSelected, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value, manySelectedLabel])
 
   const orderedDealers = dealersOnOpen ?? dealers
 
@@ -140,7 +151,7 @@ export function DealerMultiSelect({
     if (isDisabled) return
     if (next) {
       setDraftValue([...value])
-      setDealersOnOpen(sortDealersCheckedFirst(dealers, value))
+      setDealersOnOpen(keepOrder ? dealers : sortDealersCheckedFirst(dealers, value))
       setSearch('')
       setOpen(true)
       return
@@ -223,7 +234,7 @@ export function DealerMultiSelect({
       <PopoverContent className="w-[320px] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder={t('dealer.searchPlaceholder')}
+            placeholder={searchPlaceholder ?? t('dealer.searchPlaceholder')}
             className="h-9"
             value={search}
             onValueChange={setSearch}

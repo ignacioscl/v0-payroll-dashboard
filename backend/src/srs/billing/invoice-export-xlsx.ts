@@ -287,7 +287,7 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
       values.map((v) => (typeof v === 'string' ? safeText(v) : v)),
     )
     styleDataRow(excelRow, colCount, dataOnSheet % 2 === 1)
-    for (const col of amountCols) excelRow.getCell(col).numFmt = '0.00'
+    for (const col of amountCols) excelRow.getCell(col).numFmt = '#,##0.00'
     for (const col of dateCols) excelRow.getCell(col).numFmt = 'mm/dd/yyyy'
     excelRow.commit()
     dataOnSheet += 1

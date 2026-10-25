@@ -10,6 +10,7 @@ const FILTER: SrsKpiFilter = {
   filterDateDone: false,
   includeZero: false,
   skipDealerRestriction: false,
+  includeRemovedDealers: false,
 }
 
 function mockSrs(rows: unknown[] = []) {

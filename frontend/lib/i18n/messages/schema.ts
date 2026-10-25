@@ -10,6 +10,7 @@ export interface Messages {
     costsByDealer: string
     businessKpis: string
     productionVsGoal: string
+    incomeByDealer: string
     payrollReport: string
     reports: string
     billing: string
@@ -1612,6 +1613,74 @@ export interface Messages {
     tooltipPctCollected: string
     unbilledWoTotal: string
     unbilledServices: string
+  }
+  incomeByDealer: {
+    title: string
+    allPeriods: string
+    yearYtd: string
+    chartTitle: string
+    colIncome: string
+    colPeriod: string
+    colDates: string
+    total: string
+    grandTotal: string
+    noData: string
+    summarySheet: string
+    exportField: string
+    exportValue: string
+    exportGenerated: string
+    exportGeneratedBy: string
+    exportScreen: string
+    exportDates: string
+    yes: string
+    no: string
+    byYear: string
+    yearsPlaceholder: string
+    allYears: string
+    yearsCount: string
+    selectYears: string
+    exportYears: string
+  }
+  reportRules: {
+    billing: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+      item5: string
+      item6: string
+    }
+    collections: {
+      title: string
+      item1: string
+      item2: string
+    }
+    payroll: {
+      title: string
+      item1: string
+      item2: string
+    }
+    productionVsGoal: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+      item5: string
+    }
+    invoices: {
+      title: string
+      item1: string
+      item2: string
+    }
+    incomeByDealer: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+    }
   }
   mockPayrollReport: {
     title: string

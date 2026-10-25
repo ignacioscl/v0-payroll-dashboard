@@ -16,6 +16,29 @@ export interface SrsKpiFilter {
   includeZero: boolean
   /** Admin General / Admin Company: skip RESTRICTION_DEALER_V2 (PHP ProductionReportService). */
   skipDealerRestriction: boolean
+  /**
+   * «Include removed dealers» (T1.7): true only for Admin General / Admin Company; forced to false
+   * for every other user, whatever the request says. Only the screens with totals by dealer read it.
+   */
+  includeRemovedDealers: boolean
+}
+
+/** Parse the «Include removed dealers» flag of a request (boolean or 'true' / '1'). */
+function parseIncludeRemovedDealers(raw?: string | boolean): boolean {
+  if (raw === undefined || raw === null || raw === '') return false
+  if (typeof raw === 'boolean') return raw
+  return raw === '1' || raw.toLowerCase() === 'true'
+}
+
+/**
+ * The switch is honoured only when the session already sees every dealer of its company
+ * (skipDealerRestriction = rol 1 or 2 of the session). Shared by the two filter builders.
+ */
+export function includeRemovedDealersForSession(
+  skipDealerRestriction: boolean,
+  raw?: string | boolean,
+): boolean {
+  return skipDealerRestriction && parseIncludeRemovedDealers(raw)
 }
 
 /**
@@ -24,12 +47,13 @@ export interface SrsKpiFilter {
  */
 export function buildSrsKpiFilterNoPeriod(
   ctx: SrsContext,
-  query: { idDealer?: string; includeZero?: string | boolean },
+  query: { idDealer?: string; includeZero?: string | boolean; includeRemovedDealers?: string | boolean },
 ): SrsKpiFilter {
   const dealerIds = parseDealerIds(query.idDealer)
   if (dealerIds.length === 0) {
     throw new BadRequestException('idDealer is required (select dealer(s) in header)')
   }
+  const skipDealerRestriction = skipDealerRestrictionForRol(ctx.idRol)
   return {
     idDealerProvider: ctx.idDealerProvider,
     idUsuario: ctx.idUsuario,
@@ -38,7 +62,8 @@ export function buildSrsKpiFilterNoPeriod(
     fechaHasta: '',
     filterDateDone: false,
     includeZero: parseIncludeZero(query.includeZero),
-    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+    skipDealerRestriction,
+    includeRemovedDealers: includeRemovedDealersForSession(skipDealerRestriction, query.includeRemovedDealers),
   }
 }
 
@@ -47,6 +72,7 @@ export function buildSrsKpiFilter(ctx: SrsContext, query: SrsKpiQueryDto): SrsKp
   if (dealerIds.length === 0) {
     throw new BadRequestException('idDealer is required (select dealer(s) in header)')
   }
+  const skipDealerRestriction = skipDealerRestrictionForRol(ctx.idRol)
   return {
     idDealerProvider: ctx.idDealerProvider,
     idUsuario: ctx.idUsuario,
@@ -55,6 +81,7 @@ export function buildSrsKpiFilter(ctx: SrsContext, query: SrsKpiQueryDto): SrsKp
     fechaHasta: query.fechaHasta,
     filterDateDone: parseFilterDateDone(query.filterDateDone),
     includeZero: parseIncludeZero(query.includeZero),
-    skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+    skipDealerRestriction,
+    includeRemovedDealers: includeRemovedDealersForSession(skipDealerRestriction, query.includeRemovedDealers),
   }
 }

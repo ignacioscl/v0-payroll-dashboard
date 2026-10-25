@@ -10,8 +10,7 @@ import {
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 import type { ProductionDealerRow } from '@/lib/srs-kpis-api'
-
-const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`
+import { fmtMoney } from '@/lib/kpi-money'
 
 function AttainmentBadge({ pct }: { pct: number }) {
   const cls =
@@ -81,6 +80,7 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
         meta: {
           label: t('mockKpis.tableProductionValue'),
           numeric: true,
+          money: true,
           exportValue: (row) => row.value,
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
@@ -98,6 +98,7 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
         meta: {
           label: t('mockKpis.tableGoal'),
           numeric: true,
+          money: true,
           exportValue: (row) => (row.goal > 0 ? row.goal : null),
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },

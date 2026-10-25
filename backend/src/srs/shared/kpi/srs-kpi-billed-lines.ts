@@ -24,6 +24,7 @@ import { WorkflowStatus } from '../../production/entity/workflow.srsentity'
 import {
   buildDealerFilterSql,
   mysqlWeekBucketStartExpr,
+  removedDealersProvider,
   woPeriodColumn,
   woStatusFilterSql,
 } from './srs-kpi-dealer-filter'
@@ -50,7 +51,7 @@ import {
   woServiceLineNonZeroSql,
 } from './srs-kpi-zero-filter'
 
-export type BilledGroupBy = 'none' | 'month' | 'week' | 'statement' | 'row'
+export type BilledGroupBy = 'none' | 'month' | 'week' | 'statement' | 'row' | 'dealer'
 
 export type DateRange = { fechaDesde: string; fechaHasta: string }
 
@@ -124,6 +125,8 @@ export interface BilledBaseFilter {
   includeZero: boolean
   skipDealerRestriction: boolean
   filterDateDone?: boolean
+  /** «Include removed dealers» (T1.7): honoured only with skipDealerRestriction. */
+  includeRemovedDealers?: boolean
 }
 
 const PAID = 'ps.id_statement IS NOT NULL OR pl.id_statement_inv_rel IS NOT NULL'
@@ -236,12 +239,18 @@ function bucketSelect(groupBy: BilledGroupBy | undefined, dateExpr: string): str
   if (groupBy === 'statement') {
     return 's.id AS bucketStart,'
   }
+  if (groupBy === 'dealer') {
+    // c = the dealer joined by opts.dealer in every builder (WO department, punch, statement).
+    return 'c.id AS dealerId,'
+  }
   return ''
 }
 
 function bucketGroup(groupBy: BilledGroupBy | undefined): string {
   if (groupBy === 'row') return ' GROUP BY 1, 2, 3, 4'
-  return groupBy === 'month' || groupBy === 'week' || groupBy === 'statement' ? ' GROUP BY 1' : ''
+  return groupBy === 'month' || groupBy === 'week' || groupBy === 'statement' || groupBy === 'dealer'
+    ? ' GROUP BY 1'
+    : ''
 }
 
 function rangeParams(range?: DateRange | null): string[] {
@@ -312,6 +321,7 @@ function billedValueColumns(opts: BilledLinesOpts): string[] {
 function billedKeyColumns(opts: BilledLinesOpts): string[] {
   if (opts.groupBy === 'row') return [...ROW_KEY_COLUMNS]
   const g = opts.groupBy ?? 'none'
+  if (g === 'dealer') return ['dealerId']
   return g === 'month' || g === 'week' || g === 'statement' ? ['bucketStart'] : []
 }
 
@@ -366,17 +376,18 @@ export function billedBaseOpts(
     range,
     filterDateDone: filter.filterDateDone ?? false,
   }
-  const ttkDealer = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction)
+  const removedOf = removedDealersProvider(filter)
+  const ttkDealer = buildDealerFilterSql('ttk', idUsuario, dealerIds, skipDealerRestriction, removedOf)
   return {
     range,
     wo: {
       ...common,
-      dealer: buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction),
+      dealer: buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedOf),
     },
     ttk: { ...common, dealer: ttkDealer },
     gen: {
       ...common,
-      dealer: buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction),
+      dealer: buildDealerFilterSql('statement', idUsuario, dealerIds, skipDealerRestriction, removedOf),
       punchDealer: ttkDealer,
     },
   }
@@ -654,7 +665,9 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
       ? 'mo.ms AS bucketStart,'
       : groupBy === 'statement'
         ? 's.id AS bucketStart,'
-        : ''
+        : groupBy === 'dealer'
+          ? 'c.id AS dealerId,'
+          : ''
     selectSql = `SELECT ${bucketCol}
       ROUND(IFNULL(SUM(${valueExpr}), 0), 2) AS invoiced,
       ROUND(IFNULL(SUM(CASE WHEN ${PAID} THEN ${valueExpr} END), 0), 2) AS collected${real}${split}${over60}`

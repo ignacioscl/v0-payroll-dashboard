@@ -1,4 +1,4 @@
-import { buildDealerFilterSql } from '../shared/kpi/srs-kpi-dealer-filter'
+import { buildDealerFilterSql, removedDealersProvider } from '../shared/kpi/srs-kpi-dealer-filter'
 import {
   billedBaseOpts,
   billedRowKey,
@@ -216,7 +216,13 @@ function buildBranchWhere(
   f: InvoiceListFilter,
   idIn: number[] | undefined,
 ): SqlChunk {
-  const stmt = buildDealerFilterSql('statement', f.idUsuario, f.dealerIds, f.skipDealerRestriction)
+  const stmt = buildDealerFilterSql(
+    'statement',
+    f.idUsuario,
+    f.dealerIds,
+    f.skipDealerRestriction,
+    removedDealersProvider(f),
+  )
   const parts: string[] = [`s.id_dealer_provider = ?${stmt.and}`]
   const params: any[] = [f.idDealerProvider, ...stmt.params]
 
@@ -457,7 +463,13 @@ export function buildUnionBranches(
   mode: 'identity' | 'full',
   idIn?: number[],
 ): SqlChunk[] {
-  const stmt = buildDealerFilterSql('statement', f.idUsuario, f.dealerIds, f.skipDealerRestriction)
+  const stmt = buildDealerFilterSql(
+    'statement',
+    f.idUsuario,
+    f.dealerIds,
+    f.skipDealerRestriction,
+    removedDealersProvider(f),
+  )
   const kinds = kindsForPayed(f.payed)
   return kinds.map((kind) => {
     const where = buildBranchWhere(kind, f, idIn)

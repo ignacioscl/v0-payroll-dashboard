@@ -11,6 +11,7 @@ import {
   Blocks,
   FileBarChart,
   Target,
+  Landmark,
   Table as TableIcon,
   Wallet,
   ReceiptText,
@@ -47,6 +48,7 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     children: [
       { nameKey: 'nav.businessKpis', href: '/reports/business-kpis', icon: Gauge },
       { nameKey: 'nav.productionVsGoal', href: '/reports/production-vs-goal', icon: Target },
+      { nameKey: 'nav.incomeByDealer', href: '/reports/income-by-dealer', icon: Landmark },
     ],
   },
   {
@@ -76,8 +78,8 @@ export const PROD_NAV_HREFS_EXTERNAL = ['/issues'] as const
 /** Business KPIs: Admin General/Company, Production Report (47) or Time Tracking > Payroll (93). */
 export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 
-/** Production vs Goal: Admin General/Company or Production Report (47) only. */
-export const PROD_GOAL_HREFS = ['/reports/production-vs-goal'] as const
+/** Production vs Goal and Income by Dealer: Admin General/Company or Production Report (47) only. */
+export const PROD_GOAL_HREFS = ['/reports/production-vs-goal', '/reports/income-by-dealer'] as const
 
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const

@@ -53,6 +53,7 @@ const FILTER: InvoiceListFilter = {
   pageSize: 25,
   includeZero: false,
   skipDealerRestriction: false,
+  includeRemovedDealers: false,
   departmentIds: [],
   invoiceServiceIds: [],
   woNumbers: [],
@@ -315,6 +316,8 @@ describe('writeInvoiceExportWorkbook', () => {
     expect(r3.getCell(5).value).toBe('Sales')
     expect(r3.getCell(6).value).toBe('Full Detail')
     expect(r3.getCell(9).value).toBe(85)
+    // Money cells with cents and thousands (plans/plan-totales-income-centavos T3.3).
+    expect([7, 8, 9].map((c) => r3.getCell(c).numFmt)).toEqual(['#,##0.00', '#,##0.00', '#,##0.00'])
     expect(r3.getCell(10).value).toBe('Individual')
     // fechaCreate 2026-09-01, file generated 10/09/2026 in New York.
     expect(r3.getCell(11).value).toBe(38)

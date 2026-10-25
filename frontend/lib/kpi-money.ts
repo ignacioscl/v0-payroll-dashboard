@@ -1,18 +1,21 @@
-/** Visible KPI money: round to dollars, totals = sum of what is shown. */
+/** Visible KPI money: round to cents, totals = sum of what is shown (summed in whole cents). */
+
+function toCents(n: number): number {
+  return Math.round(n * 100)
+}
 
 export function dollars(n: number): number {
-  return Math.round(n)
+  return toCents(n) / 100
 }
 
 export function sumShown(...ns: number[]): number {
-  return ns.reduce((acc, n) => acc + dollars(n), 0)
+  return ns.reduce((acc, n) => acc + toCents(n), 0) / 100
 }
 
 /**
  * Invoiced − collected with the numbers on screen. Both sides are rounded the same way, type by
- * type (WO, TTK, Generic): rounding the collected money once over its total gave −$1 with
- * everything collected. No clamp to 0: by type the collected money never exceeds the invoiced
- * money, so a negative result would be a data problem to look at, not to hide.
+ * type (WO, TTK, Generic), to the cent. No clamp to 0: by type the collected money never exceeds
+ * the invoiced money, so a negative result would be a data problem to look at, not to hide.
  */
 export function shownPending(point: {
   woInvoicedValue: number
@@ -23,11 +26,29 @@ export function shownPending(point: {
   genericCollectedValue: number
 }): number {
   return (
-    sumShown(point.woInvoicedValue, point.ttkInvoicedValue, point.genericInvoicedValue) -
-    sumShown(point.woCollectedValue, point.ttkCollectedValue, point.genericCollectedValue)
-  )
+    toCents(sumShown(point.woInvoicedValue, point.ttkInvoicedValue, point.genericInvoicedValue)) -
+    toCents(sumShown(point.woCollectedValue, point.ttkCollectedValue, point.genericCollectedValue))
+  ) / 100
 }
 
-export function fmtDollars(n: number): string {
-  return `$${dollars(n).toLocaleString()}`
+/** Difference of two shown amounts, exact to the cent. */
+export function diffShown(a: number, b: number): number {
+  return (toCents(a) - toCents(b)) / 100
+}
+
+const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/** Full amount with cents: $115,637.24. */
+export function fmtMoney(n: number): string {
+  return MONEY_FORMAT.format(dollars(n))
+}
+
+/** Chart axes: abbreviated over 1000 ($12.3k); below, the full amount with cents ($850.40). */
+export function fmtMoneyAxis(n: number): string {
+  return Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmtMoney(n)
 }
