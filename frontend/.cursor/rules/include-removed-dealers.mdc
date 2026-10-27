@@ -1,0 +1,46 @@
+---
+description: Screens and exports with totals by dealer carry the «Include removed dealers» switch, shown only when the endpoint says there is something; a company never sees another one's data.
+globs: v0-payroll-dashboard/frontend/app/(dashboard)/reports/**,v0-payroll-dashboard/frontend/app/(dashboard)/billing/**,v0-payroll-dashboard/backend/src/srs/**
+alwaysApply: false
+---
+
+# «Include removed dealers»
+
+Origin: `plans/plan-totales-income-centavos/PLAN.md` (D3, T1.7 and §4). Applies to every screen or export of PRO
+with totals by dealer (today: Income by Dealer, Production vs Goal, Business KPIs › Billing and Open AR, Invoices).
+
+## What a removed dealer is
+
+A dealer the company removed with **«Remove»** in legacy (Dealers › dealer menu, Admin General only) **after**
+migration 017: it has a row in `DEALER_REL_REMOVED` of that company and **no** row in `DEALER_REL` with it. Dealers
+removed before the record existed never enter (D8). A dealer removed and added again with «Add» is back in the combo
+and is not counted twice.
+
+## Do
+
+- **Front:** use `useRemovedDealersSwitch` (`hooks/use-removed-dealers-available.ts`) and `RemovedDealersSwitch`
+  (`components/filters/removed-dealers-switch.tsx`), next to «Filter by completion date».
+- **Show it only when the endpoint says there is something:** `GET /srs/kpis/billing/removed-dealers-available` with
+  the screen's range (none = whole history) and its own «Filter by completion date». Plus `user.isSystemAdmin` and
+  «All dealers» in the combo. Off by default; when it stops showing (range, combo or filter changed) it goes back to
+  off.
+- Off = exactly the dealers of the combo (same totals as before the switch existed).
+- The value goes as `includeRemovedDealers` to every request of the screen that has totals by dealer (and in its
+  `queryKey`), including the cards without period of the same screen («Owed, all dates» of Invoices).
+- With the switch on, the export says it in **Report Info** (one line «Include removed dealers: Yes»).
+- Texts: EN «Include removed dealers» / help «Adds dealers that were removed from your dealer list but still have
+  invoices or Work Orders with your company in these dates.»; ES «Incluir dealers eliminados» / «Suma los dealers que
+  se eliminaron de tu lista de dealers pero todavía tienen invoices o Work Orders con tu empresa en estas fechas.»
+  (D7 and D9, approved word by word).
+- **Backend:** the dealer filter goes through `buildDealerRestrictionClause` / `buildDealerFilterSql`
+  (`src/srs/shared/kpi/srs-kpi-dealer-filter.ts`) with `removedDealersProvider(filter)`, and the query filters its
+  **data table** by `id_dealer_provider` = the session provider (not only `c`).
+
+## Never
+
+- Show the switch without asking the endpoint, or with dealers picked one by one in the combo.
+- Take the provider from the request: it is always the session one (JWT); the proxy drops `idDealerProvider`.
+- Honour the flag for users with assigned dealers or external users: `includeRemovedDealersForSession` forces it to
+  false, and the endpoint answers `available: false` without querying.
+- Count «dealers with no `DEALER_REL` row» without `DEALER_REL_REMOVED`: that brings the dealers removed before the
+  record (D8).

@@ -29,6 +29,7 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
 import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
 import { useInvoiceOutstanding } from '@/hooks/use-invoice-outstanding'
+import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
@@ -186,6 +187,16 @@ export default function InvoicesPage() {
   const hasDates = Boolean(headerRange.fechaDesde && headerRange.fechaHasta)
   const ready = filtersHydrated && hasDealer && hasDates
 
+  // «Include removed dealers» with the range of the list (whole history when it is ignored); on, the
+  // grid, the summary and «Owed, all dates» add the removed dealers (T1.7, M1).
+  const removedDealers = useRemovedDealersSwitch({
+    fechaDesde: ignorePeriodEffective ? undefined : headerRange.fechaDesde,
+    fechaHasta: ignorePeriodEffective ? undefined : headerRange.fechaHasta,
+    filterDateDone: filterDateDoneEffective,
+    ready,
+  })
+  const includeRemovedDealers = removedDealers.include
+
   const sortParams = useMemo(() => {
     const col = sorting[0]
     if (!col) return {} as { orderBy?: 'invoiceNro' | 'dateFrom'; orderDir?: 'asc' | 'desc' }
@@ -228,9 +239,11 @@ export default function InvoicesPage() {
       ignorePeriod: ignorePeriodEffective || undefined,
       includePartial: includePartialEffective || undefined,
       filterDateDone: filterDateDoneEffective || undefined,
+      includeRemovedDealers: includeRemovedDealers || undefined,
       ...sortParams,
     }
   }, [
+    includeRemovedDealers,
     ready,
     headerRange,
     idDealer,
@@ -264,7 +277,12 @@ export default function InvoicesPage() {
   const summary = summaryQuery.data?.summary
   // Con Payment = Unpaid, la tarjeta de lo que se debe sin filtro de fecha. Pedido aparte.
   const showOwedAllDates = ready && payed === '0'
-  const outstandingQuery = useInvoiceOutstanding(idDealer, includeZeroEffective, showOwedAllDates)
+  const outstandingQuery = useInvoiceOutstanding(
+    idDealer,
+    includeZeroEffective,
+    showOwedAllDates,
+    includeRemovedDealers,
+  )
   // A deleted invoice never adds up in the money (rule 15): with Only and Show all its total goes
   // to the Deleted card instead. Shared by the top strip and the table footer so the rule lives
   // in one place.
@@ -318,6 +336,7 @@ export default function InvoicesPage() {
         onIncludePartialChange={setIncludePartial}
         filterDateDone={filterDateDone}
         onFilterDateDoneChange={setFilterDateDone}
+        removedDealers={removedDealers}
         deleted={deleted}
         onDeletedChange={setDeleted}
         employeeWorkedIds={employeeWorkedIds}

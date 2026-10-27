@@ -1598,6 +1598,9 @@ export const es: Messages = {
   },
   businessKpis: {
     filterDateDone: 'Filtrar por fecha de terminación',
+    includeRemovedDealers: 'Incluir dealers eliminados',
+    includeRemovedDealersHelp:
+      'Suma los dealers que se eliminaron de tu lista de dealers pero todavía tienen invoices o Work Orders con tu empresa en estas fechas.',
     includeZero: 'Incluir valor cero',
     betaBadge: 'Beta',
     betaDisclaimer:

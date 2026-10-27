@@ -36,17 +36,65 @@ export interface RemovedDealersScope {
  * removed dealers are added, or null. Only for users that already see every dealer of their company
  * (Admin General / Admin Company); for anyone else it is always null, whatever the request says.
  * The provider is the one of the session (JWT), never one from the request.
- * Backend only for now: no screen of PRO shows the switch (Ignacio, 24/10/2026).
+ * The front shows the switch only when /srs/kpis/billing/removed-dealers-available says so (§4).
  */
 export function removedDealersProvider(f: RemovedDealersScope): number | null {
   return f.includeRemovedDealers === true && f.skipDealerRestriction ? f.idDealerProvider : null
 }
 
 /**
+ * «Removed dealer of this provider» (D8): the dealer is in DEALER_REL_REMOVED of the provider and
+ * has no DEALER_REL row with it (a dealer removed and added again is back in the combo).
+ * Bind `?` twice, both = the session provider.
+ */
+export function removedDealerOfProviderSql(dealerCol: string): string {
+  return `${dealerCol} IN (SELECT drr.id_dealer_customer FROM DEALER_REL_REMOVED drr
+                           WHERE drr.id_dealer_provider = ?)
+             AND NOT EXISTS (SELECT 1 FROM DEALER_REL dr_rm
+                             WHERE dr_rm.id_dealer_customer = ${dealerCol} AND dr_rm.id_dealer_provider = ?)`
+}
+
+/**
+ * Does the provider have a removed dealer (removedDealerOfProviderSql) with money in the range?
+ * Same money as the reports: a WO with some service with value (woHasPositiveTotalSql), dated
+ * like the reports (woPeriodColumn / Done only with filterDateDone), or a statement of any type
+ * overlapping the range with some line with amount. range = null: whole history («Owed, all dates»).
+ * Every table is filtered by id_dealer_provider = the session provider.
+ */
+export function removedDealersAvailableSql(
+  idDealerProvider: number,
+  range: { fechaDesde: string; fechaHasta: string } | null,
+  filterDateDone: boolean,
+  doneWorkflowId: number,
+): { sql: string; params: (number | string)[] } {
+  const p = idDealerProvider
+  const woPeriod = woPeriodColumn(filterDateDone)
+  const woDates = range ? ` AND ${woPeriod} >= ? AND ${woPeriod} < DATE_ADD(?, INTERVAL 1 DAY)` : ''
+  const woDateParams = range ? [range.fechaDesde, range.fechaHasta] : []
+  const stDates = range ? ' AND s.fecha_desde <= ? AND s.fecha_hasta >= ?' : ''
+  const stDateParams = range ? [range.fechaHasta, range.fechaDesde] : []
+  const sql = `SELECT (EXISTS (SELECT 1 FROM INVOICE i JOIN DEPARTMENT d ON d.id = i.id_department
+               WHERE i.estado = 1 AND i.id_dealer_provider = ?${woDates}
+                 ${woStatusFilterSql(filterDateDone, doneWorkflowId)}
+                 AND ${removedDealerOfProviderSql('d.id_dealer')}
+                 AND EXISTS (SELECT 1 FROM INVOICE_SERVICE_REL z WHERE z.id_invoice = i.id
+                             AND z.price * IFNULL(z.qty, 1) > 0))
+     OR EXISTS (SELECT 1 FROM INVOICE_STATEMENT s JOIN INVOICE_STATEMENT_INV_REL r ON r.id_statement = s.id
+               WHERE s.estado = 1 AND s.id_dealer_provider = ?${stDates} AND IFNULL(r.amount, 0) > 0
+                 AND ${removedDealerOfProviderSql('s.id_dealer')})) AS available`
+  return {
+    sql,
+    params: [p, ...woDateParams, p, p, p, ...stDateParams, p, p],
+  }
+}
+
+/**
  * WHERE fragment for dealer scope (header combo + optional RESTRICTION_DEALER_V2).
  *
  * removedDealersOf (Admin General / Admin Company only, see removedDealersProvider): also lets in
- * the dealers with no DEALER_REL row with that provider (removed with «Remove» in legacy). It never
+ * the dealers that provider removed with «Remove» in legacy (DEALER_REL_REMOVED, migration 017) and
+ * that have no DEALER_REL row with it again (re-added ones are already in the combo). Dealers removed
+ * before the record existed never enter (D8 of plans/plan-totales-income-centavos/PLAN.md §4). It never
  * widens the company: every query that uses this clause filters its data table by
  * id_dealer_provider = the session provider, so a removed dealer only brings its invoices and WO
  * with this company. Ignored for restricted users.
@@ -64,9 +112,8 @@ export function buildDealerRestrictionClause(
   if (skipDealerRestriction) {
     if (removedDealersOf !== null && Number.isInteger(removedDealersOf) && removedDealersOf > 0) {
       return {
-        and: ` AND (c.id IN (${placeholders}) OR NOT EXISTS (SELECT 1 FROM DEALER_REL dr_rm
-             WHERE dr_rm.id_dealer_customer = c.id AND dr_rm.id_dealer_provider = ?))`,
-        params: [...dealerIds, removedDealersOf],
+        and: ` AND (c.id IN (${placeholders}) OR (${removedDealerOfProviderSql('c.id')}))`,
+        params: [...dealerIds, removedDealersOf, removedDealersOf],
       }
     }
     return {

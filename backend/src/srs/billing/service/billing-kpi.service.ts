@@ -1,11 +1,17 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common'
 
 import { BillingKpiRepository } from '../repository/billing-kpi.repository'
-import { BillingKpiDto, IncomeByDealerDto } from '../dto/billing-kpi.dto'
+import {
+  BillingKpiDto,
+  IncomeByDealerDto,
+  RemovedDealersAvailableDto,
+  RemovedDealersAvailableQueryDto,
+} from '../dto/billing-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { ROL_ACCION_PRODUCTION_REPORT, SrsPermissionRepository } from '../../auth/srs-permission.repository'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
+import { parseFilterDateDone, skipDealerRestrictionForRol } from '../../shared/kpi/srs-kpi-dealer-filter'
 
 /** Header range split by calendar year, each year cropped to the range (D1). */
 export function splitRangeByYear(
@@ -65,5 +71,37 @@ export class BillingKpiService {
     const years = await this.repository.getIncomeByDealer(filter, splitRangeByYear(filter.fechaDesde, filter.fechaHasta))
     const grandCents = years.reduce((acc, y) => acc + Math.round(y.total * 100), 0)
     return { years, grandTotal: grandCents / 100 }
+  }
+
+  /**
+   * «Include removed dealers» is shown only when this says there is something to show.
+   * Company = the session one (never from the request). Users that do not see every dealer of
+   * their company (anyone but Admin General / Admin Company) get false without a query.
+   */
+  async getRemovedDealersAvailable(
+    ctx: SrsContext,
+    query: RemovedDealersAvailableQueryDto,
+  ): Promise<RemovedDealersAvailableDto> {
+    if (!skipDealerRestrictionForRol(ctx.idRol)) {
+      return { available: false }
+    }
+    const hasFrom = !!query.fechaDesde
+    const hasTo = !!query.fechaHasta
+    if (hasFrom !== hasTo) {
+      throw new BadRequestException('fechaDesde and fechaHasta go together')
+    }
+    let range: { fechaDesde: string; fechaHasta: string } | null = null
+    if (hasFrom) {
+      range = { fechaDesde: String(query.fechaDesde).slice(0, 10), fechaHasta: String(query.fechaHasta).slice(0, 10) }
+      if (range.fechaDesde > range.fechaHasta) {
+        throw new BadRequestException('fechaDesde must be on or before fechaHasta')
+      }
+    }
+    const available = await this.repository.hasRemovedDealersWithMoney(
+      ctx.idDealerProvider,
+      range,
+      parseFilterDateDone(query.filterDateDone),
+    )
+    return { available }
   }
 }

@@ -16,6 +16,7 @@ import {
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
+  removedDealersAvailableSql,
   removedDealersProvider,
   woPeriodColumn,
   woStatusFilterSql,
@@ -45,6 +46,17 @@ function money(v: unknown): number {
 @Injectable()
 export class BillingKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
+
+  /** «Include removed dealers» shows only when this is true (plan-totales-income-centavos §4.3). */
+  async hasRemovedDealersWithMoney(
+    idDealerProvider: number,
+    range: { fechaDesde: string; fechaHasta: string } | null,
+    filterDateDone: boolean,
+  ): Promise<boolean> {
+    const q = removedDealersAvailableSql(idDealerProvider, range, filterDateDone, WorkflowStatus.DONE)
+    const rows = await this.srs.query(q.sql, q.params)
+    return Number(rows[0]?.available ?? 0) === 1
+  }
 
   async getBillingKpis(filter: SrsKpiFilter): Promise<BillingKpiDto> {
     const {

@@ -176,6 +176,8 @@ export interface KpiQueryParams {
   filterDateDone?: boolean
   /** When true, include zero-value WO/invoice rows (default false, legacy exclude zeros). */
   includeZero?: boolean
+  /** «Include removed dealers»: only sent when the switch is on (the backend honours it only for admins). */
+  includeRemovedDealers?: boolean
   historyMonths?: CollectionsHistoryMonths
 }
 
@@ -190,6 +192,9 @@ function buildKpiQuery(params: KpiQueryParams): string {
   }
   if (params.includeZero !== undefined) {
     qs.set('includeZero', params.includeZero ? 'true' : 'false')
+  }
+  if (params.includeRemovedDealers) {
+    qs.set('includeRemovedDealers', 'true')
   }
   if (params.historyMonths !== undefined) {
     qs.set('historyMonths', String(params.historyMonths))
@@ -249,6 +254,34 @@ export interface IncomeByDealer {
 
 export const fetchIncomeByDealer = (params: KpiQueryParams) =>
   getKpi<IncomeByDealer>('billing/income-by-dealer', params)
+
+/**
+ * «Include removed dealers» is shown only when this is true: the company of the session has a
+ * dealer removed with «Remove» with money in the dates. No dates = whole history.
+ */
+export interface RemovedDealersAvailableParams {
+  fechaDesde?: string
+  fechaHasta?: string
+  filterDateDone: boolean
+}
+
+export async function fetchRemovedDealersAvailable(
+  params: RemovedDealersAvailableParams,
+): Promise<{ available: boolean }> {
+  const qs = new URLSearchParams({ filterDateDone: params.filterDateDone ? 'true' : 'false' })
+  if (params.fechaDesde && params.fechaHasta) {
+    qs.set('fechaDesde', params.fechaDesde)
+    qs.set('fechaHasta', params.fechaHasta)
+  }
+  const res = await fetch(`/api/srs-kpis/kpis/billing/removed-dealers-available?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  if (isSrsBusy(res)) throw new SrsBusyError()
+  if (!res.ok) {
+    throw new Error(`KPI billing/removed-dealers-available (${res.status})`)
+  }
+  return res.json() as Promise<{ available: boolean }>
+}
 export const fetchBillingPeriodCollection = (params: KpiQueryParams) =>
   getKpi<BillingPeriodCollectionKpi>('billing/period-collection', params)
 export const fetchCollectionsKpi = (params: KpiQueryParams) =>

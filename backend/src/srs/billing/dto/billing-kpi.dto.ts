@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger'
-import { IsDateString, IsNotEmpty } from 'class-validator'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
+import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator'
 
 export class BillingKpiQueryDto {
   @ApiProperty({ example: '2026-04-01' })
@@ -127,4 +128,42 @@ export class IncomeByDealerYearDto {
 export class IncomeByDealerDto {
   @ApiProperty({ type: [IncomeByDealerYearDto] }) years!: IncomeByDealerYearDto[]
   @ApiProperty({ example: 22505068.07, description: 'Sum of every year' }) grandTotal!: number
+}
+
+/**
+ * «Include removed dealers»: is there something to show? Dates optional (both or none; none = whole
+ * history, the «Owed, all dates» card). The company is always the session one.
+ */
+export class RemovedDealersAvailableQueryDto {
+  @ApiPropertyOptional({ description: 'Fecha desde (YYYY-MM-DD)', example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  fechaDesde?: string
+
+  @ApiPropertyOptional({ description: 'Fecha hasta (YYYY-MM-DD)', example: '2024-12-31' })
+  @IsOptional()
+  @IsDateString()
+  fechaHasta?: string
+
+  @ApiPropertyOptional({
+    description: 'Same «Filter by completion date» of the screen: WO by Done date (true) vs created date (false).',
+    example: 'false',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    if (value === true || value === 'true' || value === '1' || value === 1) return true
+    if (value === false || value === 'false' || value === '0' || value === 0) return false
+    return undefined
+  })
+  filterDateDone?: boolean
+}
+
+export class RemovedDealersAvailableDto {
+  @ApiProperty({
+    example: false,
+    description:
+      'True when the company has a dealer removed with «Remove» (DEALER_REL_REMOVED) and not added again with money in the dates. Always false for users with assigned dealers.',
+  })
+  available!: boolean
 }

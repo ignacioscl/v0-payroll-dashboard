@@ -129,6 +129,8 @@ export function buildInvoiceExportReportInfo(input: {
     { field: labels.checkDate, value: filter.checkDate ? ymdToUs(filter.checkDate) : labels.all },
     { field: labels.checkNumber, value: orAll(labels, filter.checkNumber) },
     { field: labels.overdueOnly, value: yesNo(labels, filter.dueOn) },
+    // «Include removed dealers»: only when it is on (and honoured: admins only, see the filter).
+    ...(filter.includeRemovedDealers ? [{ field: labels.includeRemovedDealers, value: labels.yes }] : []),
   ]
 }
 

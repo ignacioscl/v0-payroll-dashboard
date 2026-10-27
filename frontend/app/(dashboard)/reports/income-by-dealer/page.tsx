@@ -27,6 +27,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
+import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { useFilters } from '@/lib/filter-context'
@@ -123,6 +125,14 @@ export default function IncomeByDealerPage() {
   const rangeReady =
     filtersHydrated && selectedDealers.length > 0 && Boolean(headerRange.fechaDesde)
 
+  const removedDealers = useRemovedDealersSwitch({
+    fechaDesde: headerRange.fechaDesde,
+    fechaHasta: headerRange.fechaHasta,
+    filterDateDone,
+    ready: rangeReady,
+  })
+  const includeRemovedDealers = removedDealers.include
+
   const kpiParams = useMemo((): KpiQueryParams | null => {
     if (!rangeReady) return null
     return {
@@ -130,8 +140,9 @@ export default function IncomeByDealerPage() {
       fechaHasta: headerRange.fechaHasta,
       idDealer,
       filterDateDone,
+      includeRemovedDealers,
     }
-  }, [rangeReady, headerRange, idDealer, filterDateDone])
+  }, [rangeReady, headerRange, idDealer, filterDateDone, includeRemovedDealers])
 
   const income = useQuery({
     queryKey: ['srs-kpi', 'income-by-dealer', kpiParams],
@@ -230,6 +241,7 @@ export default function IncomeByDealerPage() {
             : { field: t('incomeByDealer.exportDates'), value: headerRangeLabel ?? '' },
           { field: t('dealer.labelPlural'), value: dealerNames },
           { field: t('businessKpis.filterDateDone'), value: filterDateDone ? yes : no },
+          ...(includeRemovedDealers ? [{ field: t('businessKpis.includeRemovedDealers'), value: yes }] : []),
         ],
       })
       toast.success(t('common.exportSuccess', { count: data.years.length }), { duration: TOAST_DURATION_MS })
@@ -278,6 +290,11 @@ export default function IncomeByDealerPage() {
             {t('businessKpis.filterDateDone')}
           </Label>
         </div>
+        <RemovedDealersSwitch
+          id="include-removed-dealers-income-by-dealer"
+          state={removedDealers}
+          disabled={!rangeReady}
+        />
         <Button
           type="button"
           variant="outline"
