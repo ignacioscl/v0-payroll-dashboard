@@ -34,11 +34,6 @@ export interface PieceworkDayAmount {
   amount: number
 }
 
-export interface PieceworkWorkOrderDay extends PieceworkDayAmount {
-  /** 1 si el Piecework Report de legacy con «Include all of payment type» lo cuenta; 0 si lo pone en $0. */
-  paidByLegacyRule: number
-}
-
 export interface PieceworkEmployeeDayInfo {
   idUsuario: number
   fecha: string
@@ -236,26 +231,18 @@ export class PayrollSnapshotKpiRepository {
   }
 
   /**
-   * Piecework de las WO por (empleado, dealer, día), para cada empleado de la WO, sin mirar su ficha
-   * ni sus ponchadas: la cuenta de `GET_PIECEWORK_EMPLOYEES_BY_WO` (DDL 6251-6267) — `iser.piecework`
-   * si está cargado, si no `isr.piecework` / empleados de la WO, redondeado por fila como su
-   * DECIMAL(10,2). Mismo dealer (departamento de la WO) y misma fecha (alta) que el snapshot.
-   *
-   * `paidByLegacyRule` replica el cursor de la función con `force_flat_rate = 0` (como la llama el
-   * Piecework Report, `ReportPieceWorkDao.php:211`): 0 si ese día el empleado ponchó, ninguna
-   * ponchada es Piecework y alguna tiene tipo. Plan plan-piecework-payroll-vs-wo §6.2.
+   * Piecework de las WO por (empleado, dealer, día), solo de los empleados con Piecework en su ficha
+   * (la condición del Piecework Report de legacy sin tildar, `ReportPieceWorkDao.php:66-68`), sin
+   * mirar sus ponchadas: la cuenta de `GET_PIECEWORK_EMPLOYEES_BY_WO` (DDL 6251-6267) —
+   * `iser.piecework` si está cargado, si no `isr.piecework` / empleados de la WO, redondeado por fila
+   * como su DECIMAL(10,2). Mismo dealer (departamento de la WO) y misma fecha (alta) que el snapshot.
+   * Plan plan-demo-prime-piecework-avisos §6.1.
    */
-  async pieceworkWorkOrdersByDay(filter: SrsKpiFilter, desde: string, hasta: string): Promise<PieceworkWorkOrderDay[]> {
+  async pieceworkWorkOrdersByDay(filter: SrsKpiFilter, desde: string, hasta: string): Promise<PieceworkDayAmount[]> {
     const dealer = buildDealerRestrictionClause(filter.idUsuario, filter.dealerIds, filter.skipDealerRestriction)
+    const types = PIECEWORK_TYPE_IDS.map(() => '?').join(',')
     const rows = await this.srs.query(
-      `SELECT w.idUsuario, w.idDealer, w.fecha, w.amount,
-              CASE WHEN EXISTS (SELECT 1 FROM TTK_EMPLOYEE_WORK t
-                                WHERE t.id_author = w.idUsuario AND t.id_payment_type IS NOT NULL
-                                  AND t.punch_in BETWEEN w.fecha AND DATE_ADD(w.fecha, INTERVAL 1 DAY))
-                    AND NOT EXISTS (SELECT 1 FROM TTK_EMPLOYEE_WORK t
-                                    WHERE t.id_author = w.idUsuario AND (t.id_payment_type = ? OR t.id_payment_type IS NULL)
-                                      AND t.punch_in BETWEEN w.fecha AND DATE_ADD(w.fecha, INTERVAL 1 DAY))
-                   THEN 0 ELSE 1 END AS paidByLegacyRule
+      `SELECT w.idUsuario, w.idDealer, w.fecha, w.amount
        FROM (
          SELECT ier.id_usuario AS idUsuario, d.id_dealer AS idDealer,
                 DATE_FORMAT(i.fecha_alta, '%Y-%m-%d') AS fecha,
@@ -272,17 +259,18 @@ export class PayrollSnapshotKpiRepository {
          WHERE i.estado = 1
            AND i.id_dealer_provider = ?
            AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
+           AND EXISTS (SELECT 1 FROM USUARIO_PAYROLL_REL lupr
+                       WHERE lupr.id_usuario = ier.id_usuario AND lupr.id_payment_type IN (${types}))
            ${dealer.and}
          GROUP BY ier.id_usuario, d.id_dealer, DATE(i.fecha_alta)
        ) w`,
-      [PAYMENT_TYPE_IDS.PIECEWORK, filter.idDealerProvider, desde, hasta, ...dealer.params],
+      [filter.idDealerProvider, desde, hasta, ...PIECEWORK_TYPE_IDS, ...dealer.params],
     )
     return rows.map((r: any) => ({
       idUsuario: num(r.idUsuario),
       idDealer: num(r.idDealer),
       fecha: String(r.fecha),
       amount: num(r.amount),
-      paidByLegacyRule: num(r.paidByLegacyRule),
     }))
   }
 

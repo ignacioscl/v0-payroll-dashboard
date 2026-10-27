@@ -738,8 +738,8 @@ export default function BusinessKpisPage() {
                       : ''
                   }
                 />
-                {/* Payroll grande; debajo, lo de las WO y el Piecework Report tildado; si las WO difieren,
-                    la tarjeta abre el detalle (plan-piecework-payroll-vs-wo §2.3). */}
+                {/* Payroll grande; debajo, lo de las WO de los empleados con Piecework en su ficha; si
+                    difieren, la tarjeta abre el detalle (plan-demo-prime-piecework-avisos §1). */}
                 <KPICard
                   inline
                   help={t('businessKpisHelp.piecework')}
@@ -753,7 +753,6 @@ export default function BusinessKpisPage() {
                     s ? (
                       <>
                         <p>{t('mockKpis.pieceworkWorkOrders', { amount: fmtCents(s.pieceworkWorkOrders) })}</p>
-                        <p>{t('mockKpis.pieceworkReportAllTypes', { amount: fmtCents(s.pieceworkReportAllTypes) })}</p>
                         {s.pieceworkHasDifference ? (
                           <p className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
                             <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />

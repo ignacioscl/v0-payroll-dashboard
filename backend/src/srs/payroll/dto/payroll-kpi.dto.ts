@@ -67,10 +67,8 @@ export class PayrollSpendDto {
   @ApiProperty({ example: 0 }) payrollTaxes!: number
   @ApiProperty() overtime!: { amount: number; hours: number; employeesOver40: number }
   @ApiProperty({ example: 17385.98 }) piecework!: number
-  /** Piecework de las WO (cada empleado de la WO), mismas fechas y dealers, hasta el último día calculado. */
-  @ApiProperty({ example: 19079.65 }) pieceworkWorkOrders!: number
-  /** Total del Piecework Report de legacy con «Include all of payment type» tildado, mismo rango. */
-  @ApiProperty({ example: 18449.65 }) pieceworkReportAllTypes!: number
+  /** Piecework de las WO de los empleados con Piecework en su ficha, mismas fechas y dealers, hasta el último día calculado. */
+  @ApiProperty({ example: 18279.65 }) pieceworkWorkOrders!: number
   /** `pieceworkWorkOrders` distinto de `piecework`: la tarjeta abre el detalle. */
   @ApiProperty() pieceworkHasDifference!: boolean
   @ApiProperty({ type: [PayrollSpendTypeRowDto] }) byType!: PayrollSpendTypeRowDto[]

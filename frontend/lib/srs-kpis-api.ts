@@ -286,10 +286,8 @@ export interface PayrollSpendKpi {
   payrollTaxes: number
   overtime: { amount: number; hours: number; employeesOver40: number }
   piecework: number
-  /** Piecework de las WO (cada empleado de la WO), mismas fechas y dealers, hasta el último día calculado. */
+  /** Piecework de las WO de los empleados con Piecework en su ficha, mismas fechas y dealers, hasta el último día calculado. */
   pieceworkWorkOrders: number
-  /** Total del Piecework Report de legacy con «Include all of payment type» tildado, mismo rango. */
-  pieceworkReportAllTypes: number
   /** `pieceworkWorkOrders` distinto de `piecework`: la tarjeta abre el detalle. */
   pieceworkHasDifference: boolean
   byType: PayrollSpendTypeRow[]

@@ -1469,7 +1469,6 @@ export const en: Messages = {
     totalPayrollWithoutDealer: 'Includes {amount} salary of {employees} employees without dealer',
     totalPayrollWithoutDealerOne: 'Includes {amount} salary of 1 employee without dealer',
     pieceworkWorkOrders: 'Work orders: {amount}',
-    pieceworkReportAllTypes: 'Piecework Report, all payment types: {amount}',
     pieceworkDifference: 'Difference: {amount} · See detail',
     activeEmployeesHourlyRate: 'avg Hourly rate {rate}/h',
     piecework: 'Piecework',
@@ -1584,7 +1583,7 @@ export const en: Messages = {
     overtimeHours:
       'Hours over 40 in a week, per employee and dealer, for all employees, whether they are paid as overtime or not.',
     piecework:
-      'Piecework paid in the period, counted on the date the work order was created, at the work order\'s dealer. The lines below show, for the same dates and dealers, the piecework of the work orders and the total of the Piecework Report with all payment types. If the piecework of the work orders is different, click the card to see which employees and days make the difference.',
+      'Piecework paid in the period, counted on the date the work order was created, at the work order\'s dealer. Below: the piecework of the work orders for the same dates and dealers, only for employees with the Piecework payment type. If it is different, click the card to see which employees and days make the difference.',
     laborCost: 'Total Payroll ÷ Income. Total Payroll is the first card of this tab; Income is the Income card of the Billing tab, for the same dates and dealers.',
     costPerWo: 'Total Payroll ÷ WOs Completed. Total Payroll is the first card of this tab (includes piecework); WOs Completed is the WOs Completed card of the Production tab, for the same dates and dealers.',
     activeEmployees:

@@ -1457,7 +1457,6 @@ export interface Messages {
     totalPayrollWithoutDealer: string
     totalPayrollWithoutDealerOne: string
     pieceworkWorkOrders: string
-    pieceworkReportAllTypes: string
     pieceworkDifference: string
     activeEmployeesHourlyRate: string
     piecework: string

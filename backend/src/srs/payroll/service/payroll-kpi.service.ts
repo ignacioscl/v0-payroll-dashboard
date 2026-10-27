@@ -147,7 +147,6 @@ export class PayrollKpiService {
         overtime: { amount: 0, hours: 0, employeesOver40: 0 },
         piecework: 0,
         pieceworkWorkOrders: 0,
-        pieceworkReportAllTypes: 0,
         pieceworkHasDifference: false,
         byType: [],
         employees: 0,
@@ -201,12 +200,12 @@ export class PayrollKpiService {
     const piecework = sumWhere((r) => PIECEWORK_TYPE_IDS.includes(r.idPaymentType))
     const ot = overtimeHoursInRange(hourRows, filter.fechaDesde, filter.fechaHasta, cfg.firstDayWeek)
 
-    // Las dos líneas de la tarjeta Piecework: mismas fechas y dealers, hasta el último día calculado.
+    // La línea `Work orders` de la tarjeta Piecework: mismas fechas y dealers, hasta el último día
+    // calculado, solo empleados con Piecework en su ficha.
     const coveredUntil = await this.snapshot.lastCoveredDay(filter.idDealerProvider)
     const range = pieceworkCompareRange(filter.fechaDesde, filter.fechaHasta, dataFrom, coveredUntil)
     const woDays = range ? await this.snapshot.pieceworkWorkOrdersByDay(filter, range.desde, range.hasta) : []
     const pieceworkWorkOrders = round2(woDays.reduce((a, r) => a + r.amount, 0))
-    const pieceworkReportAllTypes = round2(woDays.reduce((a, r) => a + (r.paidByLegacyRule ? r.amount : 0), 0))
 
     const withoutDealer = showWithoutDealer
       ? {
@@ -224,7 +223,6 @@ export class PayrollKpiService {
       overtime: { amount: overtimeAmount, hours: ot.hours, employeesOver40: ot.employeesOver40 },
       piecework,
       pieceworkWorkOrders,
-      pieceworkReportAllTypes,
       pieceworkHasDifference: pieceworkWorkOrders !== piecework,
       byType,
       employees: await this.snapshot.countEmployees(filter, showWithoutDealer && allDealers),

@@ -1473,7 +1473,6 @@ export const es: Messages = {
     totalPayrollWithoutDealer: 'Incluye {amount} de salario de {employees} empleados sin dealer',
     totalPayrollWithoutDealerOne: 'Incluye {amount} de salario de 1 empleado sin dealer',
     pieceworkWorkOrders: 'Órdenes de trabajo: {amount}',
-    pieceworkReportAllTypes: 'Piecework Report, todos los tipos de pago: {amount}',
     pieceworkDifference: 'Diferencia: {amount} · Ver detalle',
     activeEmployeesHourlyRate: 'tarifa prom. Hourly {rate}/h',
     piecework: 'Piecework',
@@ -1588,7 +1587,7 @@ export const es: Messages = {
     overtimeHours:
       'Horas sobre 40 en la semana, por empleado y dealer, de todos los empleados, se paguen o no como horas extra.',
     piecework:
-      'Piecework pagado en el período, contado en la fecha de creación de la orden de trabajo, en el dealer de la orden. Las líneas de abajo muestran, para las mismas fechas y dealers, el piecework de las órdenes de trabajo y el total del Piecework Report con todos los tipos de pago. Si el piecework de las órdenes de trabajo es distinto, haga click en la tarjeta para ver qué empleados y días hacen la diferencia.',
+      'Piecework pagado en el período, contado en la fecha de creación de la orden de trabajo, en el dealer de la orden. Abajo: el piecework de las órdenes de trabajo para las mismas fechas y dealers, solo de los empleados con tipo de pago Piecework. Si es distinto, haga click en la tarjeta para ver qué empleados y días hacen la diferencia.',
     laborCost: 'Total Payroll ÷ Ingresos. Total Payroll es la primera tarjeta de esta tab; Ingresos es la tarjeta Ingresos de la tab Billing, con las mismas fechas y dealers.',
     costPerWo: 'Total Payroll ÷ OT completadas. Total Payroll es la primera tarjeta de esta tab (incluye piecework); OT completadas es la tarjeta OT completadas de la tab Production, con las mismas fechas y dealers.',
     activeEmployees:
