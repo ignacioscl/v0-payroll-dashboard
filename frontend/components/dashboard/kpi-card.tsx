@@ -223,8 +223,10 @@ export function KPICard({
 
   // Una sola fila: ícono, número y al lado el título con el subtítulo. El número va
   // pegado al ícono y no en la otra punta, para que el texto use el ancho que sobra.
+  // Si el número con centavos no deja lugar (laptop, cuatro tarjetas por fila), el
+  // título y el subtítulo bajan abajo del número en vez de quedar cortados.
   const inlineBody = (
-    <div className="relative flex items-center gap-2.5">
+    <div className="relative flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
       <div
         className={cn(
           'flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] [&_svg]:h-3.5 [&_svg]:w-3.5 sm:h-8 sm:w-8 sm:rounded-[10px] sm:[&_svg]:h-4 sm:[&_svg]:w-4',
@@ -236,7 +238,7 @@ export function KPICard({
         {icon}
       </div>
       <div className="min-w-6 shrink-0">{valueNode}</div>
-      <div className="min-w-0 flex-1 border-l border-slate-400/20 pl-2.5">
+      <div className="min-w-[6.5rem] flex-1 border-l border-slate-400/20 pl-2.5">
         <div className="flex items-center gap-1">
           <p className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground sm:text-[11px]">
             {title}
