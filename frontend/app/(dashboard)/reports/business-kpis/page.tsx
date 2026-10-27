@@ -127,10 +127,9 @@ function formatSnapshotStamp(utc: string): { date: string; time: string } | null
 const fmtCents = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** Montos de Payroll: abreviado en la tarjeta ($745.9k); con un click, completo con centavos ($745,921.78). */
-function kpiCentsProps(n: number | undefined): { value: string; valueFull?: string } {
+/** Montos de Payroll: siempre completos con centavos en la tarjeta ($745,921.78), como Billing. */
+function kpiCentsProps(n: number | undefined): { value: string } {
   if (n === undefined) return { value: '—' }
-  if (n >= 1000) return { value: fmtMoneyK(n), valueFull: fmtCents(n) }
   return { value: fmtCents(n) }
 }
 
