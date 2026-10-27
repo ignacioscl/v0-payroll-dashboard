@@ -3,7 +3,11 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
-import { buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
+import {
+  buildDealerRestrictionClause,
+  removedDealerOfProviderSql,
+  removedDealersProvider,
+} from '../../shared/kpi/srs-kpi-dealer-filter'
 import { StatementType } from '../entity/invoice-statement.srsentity'
 import {
   InvoiceListFilter,
@@ -260,6 +264,31 @@ export class InvoiceRepository {
     for (let start = 0; start < identities.length; start += chunkSize) {
       yield await this.rowsOfIdentities(f, identities.slice(start, start + chunkSize))
     }
+  }
+
+  /**
+   * «Include removed dealers» on: the removed dealers that have rows in this export, after every
+   * filter of the list (the same branches as exportRowChunks), by name (§5 of
+   * plan-totales-income-centavos, M2). Their rows say «(removed)» and Report Info names them.
+   * Empty when the switch is off or not honoured.
+   */
+  async exportRemovedDealers(f: InvoiceListFilter): Promise<{ dealerId: number; dealer: string }[]> {
+    const p = removedDealersProvider(f)
+    if (p === null) return []
+    const identity = concatBranches(buildUnionBranches(f, 'identity'))
+    const rows: { dealerId: unknown; dealer: unknown }[] = await this.srs.query(
+      `SELECT s2.id_dealer AS dealerId, GET_DEALER_NAME_BY_PROVIDER(?, s2.id_dealer) AS dealer
+       FROM INVOICE_STATEMENT s2
+       WHERE s2.id IN (SELECT t.id FROM (
+               ${identity.sql}
+             ) t)
+         AND s2.id_dealer_provider = ?
+         AND ${removedDealerOfProviderSql('s2.id_dealer')}
+       GROUP BY s2.id_dealer
+       ORDER BY dealer`,
+      [p, ...identity.params, p, p, p],
+    )
+    return rows.map((r) => ({ dealerId: Number(r.dealerId), dealer: String(r.dealer ?? '') }))
   }
 
   /**

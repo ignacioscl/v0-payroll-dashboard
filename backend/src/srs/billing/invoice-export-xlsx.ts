@@ -117,6 +117,8 @@ export type WriteInvoiceExportOptions = {
   includeAuthor: boolean
   /** Only with Deleted = Only / Show all (D25). */
   includeDeleted: boolean
+  /** «Include removed dealers» on: their rows say «(removed)» after the dealer (§5). */
+  removedDealerIds?: ReadonlySet<number>
   /** Grid rows in chunks, in the order of the grid. */
   chunks: AsyncIterable<InvoiceRowDto[]>
   /** Type 2: the WO lines of the invoices of one chunk. */
@@ -293,8 +295,13 @@ export async function writeInvoiceExportWorkbook(opts: WriteInvoiceExportOptions
     dataOnSheet += 1
   }
 
-  const entityOf = (row: InvoiceRowDto) =>
-    opts.isCompanyTypeCompany ? opts.providerName : (row.dealer ?? '')
+  const entityOf = (row: InvoiceRowDto) => {
+    if (opts.isCompanyTypeCompany) return opts.providerName
+    const dealer = row.dealer ?? ''
+    return row.idDealer != null && opts.removedDealerIds?.has(row.idDealer)
+      ? `${dealer} ${labels.removedSuffix}`
+      : dealer
+  }
   const deletedOf = (row: InvoiceRowDto) =>
     opts.includeDeleted ? [row.estado === 0 ? labels.yes : ''] : []
   const authorOf = (row: InvoiceRowDto) => (opts.includeAuthor ? [row.author ?? ''] : [])

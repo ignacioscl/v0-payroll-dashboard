@@ -7,6 +7,8 @@ import {
   DataTableColumnHeader,
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
+import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 import type { ProductionDealerRow } from '@/lib/srs-kpis-api'
@@ -34,10 +36,17 @@ function AttainmentBadge({ pct }: { pct: number }) {
 type ProductionDealerTableProps = {
   data?: ProductionDealerRow[]
   loading?: boolean
+  /** «Include removed dealers» on: these rows show «Removed» and export «(removed)» (§5). */
+  removedIds?: ReadonlySet<number>
 }
 
-export function ProductionDealerTable({ data, loading }: ProductionDealerTableProps) {
+export function ProductionDealerTable({ data, loading, removedIds }: ProductionDealerTableProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
+  const columnPinning = React.useMemo(
+    () => (isMobile ? { left: [], right: [] } : { left: ['dealer'] }),
+    [isMobile],
+  )
   const rows = data ?? []
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'attainmentPct', desc: true },
@@ -51,12 +60,28 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('dealer.label')} />
         ),
-        cell: ({ row }) => (
-          <span className="block truncate font-medium">{row.original.dealer}</span>
-        ),
+        cell: ({ row }) =>
+          // On a phone the whole name wraps instead of «…» (rule data-table).
+          removedIds?.has(row.original.dealerId) ? (
+            <span className={cn('flex min-w-0 gap-2', isMobile ? 'flex-wrap items-start' : 'items-center')}>
+              <span className={cn('font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
+                {row.original.dealer}
+              </span>
+              <RemovedDealerBadge />
+            </span>
+          ) : (
+            <span className={cn('block font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
+              {row.original.dealer}
+            </span>
+          ),
         meta: {
           label: t('dealer.label'),
-          pin: 'left',
+          // No fixed columns on a phone: they cover the others (rule data-table).
+          pin: isMobile ? undefined : 'left',
+          exportValue: (row) =>
+            removedIds?.has(row.dealerId)
+              ? `${row.dealer} ${t('businessKpis.removedDealerSuffix')}`
+              : row.dealer,
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {
@@ -120,7 +145,7 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
     ],
-    [t],
+    [t, removedIds, isMobile],
   )
 
   return (
@@ -132,7 +157,7 @@ export function ProductionDealerTable({ data, loading }: ProductionDealerTablePr
       isLoading={loading}
       sorting={sorting}
       onSortingChange={setSorting}
-      columnPinning={{ left: ['dealer'] }}
+      columnPinning={columnPinning}
       defaultPageSize={25}
       includeAllPageSize
       enableGlobalFilter={false}

@@ -1594,6 +1594,14 @@ export const en: Messages = {
   },
   businessKpis: {
     filterDateDone: 'Filter by completion date',
+    includeRemovedDealers: 'Include removed dealers',
+    includeRemovedDealersHelp:
+      'Adds dealers that were removed from your dealer list but still have invoices or Work Orders with your company in these dates.',
+    removedDealerTag: 'Removed',
+    removedDealerTagHelp:
+      'This dealer was removed from your dealer list. It shows because "Include removed dealers" is on.',
+    removedDealerSuffix: '(removed)',
+    includesRemovedDealers: 'Includes removed dealers',
     includeZero: 'Include zero value',
     betaBadge: 'Beta',
     betaDisclaimer:

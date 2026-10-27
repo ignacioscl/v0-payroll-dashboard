@@ -169,6 +169,8 @@ export interface InvoiceListParams {
   includePartial?: boolean
   /** WO por fecha de terminado en vez de por fecha de alta (Filter Date Completed). */
   filterDateDone?: boolean
+  /** «Include removed dealers» (solo Admin General / Admin Company; el backend lo ignora para el resto). */
+  includeRemovedDealers?: boolean
   orderBy?: 'invoiceNro' | 'dateFrom'
   orderDir?: 'asc' | 'desc'
   page: number
@@ -234,6 +236,7 @@ function buildInvoiceQuery(params: InvoiceListParams): string {
   if (params.ignorePeriod) qs.set('ignorePeriod', 'true')
   if (params.includePartial) qs.set('includePartial', 'true')
   if (params.filterDateDone) qs.set('filterDateDone', 'true')
+  if (params.includeRemovedDealers) qs.set('includeRemovedDealers', 'true')
   if (params.orderBy) qs.set('orderBy', params.orderBy)
   if (params.orderDir) qs.set('orderDir', params.orderDir)
   return `?${qs.toString()}`
@@ -364,11 +367,14 @@ export async function fetchInvoiceSummary(
 export async function fetchInvoiceOutstanding(params: {
   idDealer: string
   includeZero?: boolean
+  /** El mismo valor del switch que la grilla (M1 de plan-totales-income-centavos). */
+  includeRemovedDealers?: boolean
 }): Promise<InvoiceOutstanding> {
   const qs = new URLSearchParams({ idDealer: params.idDealer })
   if (params.includeZero !== undefined) {
     qs.set('includeZero', params.includeZero ? 'true' : 'false')
   }
+  if (params.includeRemovedDealers) qs.set('includeRemovedDealers', 'true')
   const res = await fetch(`/api/srs-kpis/kpis/collections/outstanding?${qs.toString()}`, {
     cache: 'no-store',
   })

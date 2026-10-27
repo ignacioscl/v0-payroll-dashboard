@@ -1555,6 +1555,12 @@ export interface Messages {
   }
   businessKpis: {
     filterDateDone: string
+    includeRemovedDealers: string
+    includeRemovedDealersHelp: string
+    removedDealerTag: string
+    removedDealerTagHelp: string
+    removedDealerSuffix: string
+    includesRemovedDealers: string
     includeZero: string
     betaBadge: string
     betaDisclaimer: string

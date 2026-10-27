@@ -41,8 +41,10 @@ import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
 import { PayrollByTypeChart } from '@/components/dashboard/payroll-by-type-chart'
 import { PieceworkDiffDialog } from '@/components/dashboard/piecework-diff-dialog'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
+import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
 import { PageHeading } from '@/components/layout/page-heading'
 import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
+import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import {
   Select,
   SelectContent,
@@ -192,6 +194,17 @@ export default function BusinessKpisPage() {
   const rangeReady =
     filtersHydrated && selectedDealers.length > 0 && Boolean(headerRange.fechaDesde)
 
+  // «Include removed dealers»: one switch for the screen, only on Billing and Open AR (the tabs with
+  // totals by dealer). On the other tabs it is not shown and goes back to off.
+  const removedDealersTab = activeTab === 'billing' || activeTab === 'collections'
+  const removedDealers = useRemovedDealersSwitch({
+    fechaDesde: headerRange.fechaDesde,
+    fechaHasta: headerRange.fechaHasta,
+    filterDateDone,
+    ready: rangeReady && removedDealersTab,
+  })
+  const includeRemovedDealers = removedDealers.include
+
   const headerKpiParams = useMemo((): KpiQueryParams | null => {
     if (!rangeReady) return null
     return {
@@ -199,8 +212,9 @@ export default function BusinessKpisPage() {
       fechaHasta: headerRange.fechaHasta,
       idDealer,
       includeZero,
+      includeRemovedDealers,
     }
-  }, [rangeReady, headerRange, idDealer, includeZero])
+  }, [rangeReady, headerRange, idDealer, includeZero, includeRemovedDealers])
 
   const productionKpiParams = useMemo((): KpiQueryParams | null => {
     if (!headerKpiParams) return null
@@ -369,6 +383,11 @@ export default function BusinessKpisPage() {
         }
         icon={<FileBarChart />}
         variant="info"
+        titleAside={
+          activeTab === 'billing' || activeTab === 'collections' || activeTab === 'payroll' ? (
+            <ReportRulesNotice screen={activeTab} />
+          ) : undefined
+        }
       />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
@@ -389,6 +408,11 @@ export default function BusinessKpisPage() {
             {t('businessKpis.includeZero')}
           </Label>
         </div>
+        <RemovedDealersSwitch
+          id="include-removed-dealers-business-kpis"
+          state={removedDealers}
+          disabled={!rangeReady}
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-5">
@@ -455,7 +479,6 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-6">
-          <ReportRulesNotice screen="billing" />
           <div className="flex items-center gap-3">
             <Switch
               id="billing-filter-date-done"
@@ -596,7 +619,6 @@ export default function BusinessKpisPage() {
 
         <TabsContent value="collections" className="space-y-6">
           <KpiErrorBanner q={coll} />
-          <ReportRulesNotice screen="collections" />
           <div className={KPI_CARD_GRID}>
             <KPICard
               inline
@@ -667,7 +689,6 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">
-          <ReportRulesNotice screen="payroll" />
           {s && s.paymentMethod === null ? (
             <p className="text-sm text-muted-foreground">{t('businessKpis.payrollNoPeriod')}</p>
           ) : (

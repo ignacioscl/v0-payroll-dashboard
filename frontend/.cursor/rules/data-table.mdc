@@ -162,6 +162,13 @@ header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />
 meta: { pin: 'left' }    // o 'right'
 ```
 
+**En celular (menos de 768 px) ninguna columna va fija.** Una columna fija en 375 px tapa las demás y no deja leer
+la tabla. Con `useIsMobile()` (`hooks/use-mobile.ts`) la columna va sin `pin` y el `columnPinning` va vacío
+(`{ left: [], right: [] }`, memoizado: un objeto nuevo en cada render reinicia el pinning sin parar). Ejemplo:
+`components/dashboard/production-dealer-table.tsx`. En celular el texto de esa columna tampoco se corta con «…»: va
+en varias líneas (`whitespace-normal break-words`) para que se lea el nombre entero. *(Regla de Ignacio, 27/10/2026:
+Production vs Goal en celular, la columna Dealer tapaba Goal y Attainment, y después los nombres largos no se leían.)* Las tablas que hoy fijan columnas en celular se corrigen en su propio plan.
+
 - Múltiples columnas pueden estar pinned al mismo lado — se apilan en el orden
   de declaración.
 - Se aplica `position: sticky` y un shadow sutil en el borde interno para

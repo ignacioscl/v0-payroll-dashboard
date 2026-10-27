@@ -325,13 +325,13 @@ export class ProductionKpiRepository {
       ),
     ])
 
-    type DealerAcc = { dealer: string; wos: number; value: number; goal: number }
+    type DealerAcc = { dealerId: number; dealer: string; wos: number; value: number; goal: number }
     const byDealer = new Map<number, DealerAcc>()
 
     const ensure = (dealerId: number, dealerName: string): DealerAcc => {
       const existing = byDealer.get(dealerId)
       if (existing) return existing
-      const row = { dealer: dealerName, wos: 0, value: 0, goal: 0 }
+      const row = { dealerId, dealer: dealerName, wos: 0, value: 0, goal: 0 }
       byDealer.set(dealerId, row)
       return row
     }
@@ -357,6 +357,7 @@ export class ProductionKpiRepository {
         const value = this.roundMoney(row.value)
         const goal = this.roundMoney(row.goal)
         return {
+          dealerId: row.dealerId,
           dealer: row.dealer,
           wos: row.wos,
           value,

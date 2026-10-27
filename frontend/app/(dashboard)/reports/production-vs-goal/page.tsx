@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { Target } from 'lucide-react'
 import { ProductionDealerTable } from '@/components/dashboard/production-dealer-table'
+import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
+import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { PageHeading } from '@/components/layout/page-heading'
 import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import { Switch } from '@/components/ui/switch'
@@ -52,6 +54,14 @@ export default function ProductionVsGoalPage() {
   const rangeReady =
     filtersHydrated && selectedDealers.length > 0 && Boolean(headerRange.fechaDesde)
 
+  const removedDealers = useRemovedDealersSwitch({
+    fechaDesde: headerRange.fechaDesde,
+    fechaHasta: headerRange.fechaHasta,
+    filterDateDone,
+    ready: rangeReady,
+  })
+  const includeRemovedDealers = removedDealers.include
+
   const kpiParams = useMemo((): KpiQueryParams | null => {
     if (!rangeReady) return null
     return {
@@ -59,8 +69,9 @@ export default function ProductionVsGoalPage() {
       fechaHasta: headerRange.fechaHasta,
       idDealer,
       filterDateDone,
+      includeRemovedDealers,
     }
-  }, [rangeReady, headerRange, idDealer, filterDateDone])
+  }, [rangeReady, headerRange, idDealer, filterDateDone, includeRemovedDealers])
 
   const prodDealer = useQuery({
     queryKey: ['srs-kpi', 'production-by-dealer', kpiParams],
@@ -79,9 +90,8 @@ export default function ProductionVsGoalPage() {
         }
         icon={<Target />}
         variant="success"
+        titleAside={<ReportRulesNotice screen="productionVsGoal" />}
       />
-
-      <ReportRulesNotice screen="productionVsGoal" />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>
@@ -89,19 +99,26 @@ export default function ProductionVsGoalPage() {
         <p className="text-sm text-muted-foreground">{t('filters.selectDates')}</p>
       ) : null}
 
-      <div className="flex items-center gap-3">
-        <Switch
-          id="filter-date-done-production-vs-goal"
-          checked={filterDateDone}
-          onCheckedChange={setFilterDateDone}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="filter-date-done-production-vs-goal"
+            checked={filterDateDone}
+            onCheckedChange={setFilterDateDone}
+            disabled={!rangeReady}
+          />
+          <Label
+            htmlFor="filter-date-done-production-vs-goal"
+            className="cursor-pointer text-sm font-normal"
+          >
+            {t('businessKpis.filterDateDone')}
+          </Label>
+        </div>
+        <RemovedDealersSwitch
+          id="include-removed-dealers-production-vs-goal"
+          state={removedDealers}
           disabled={!rangeReady}
         />
-        <Label
-          htmlFor="filter-date-done-production-vs-goal"
-          className="cursor-pointer text-sm font-normal"
-        >
-          {t('businessKpis.filterDateDone')}
-        </Label>
       </div>
 
       {prodDealer.isError && !prodDealer.isLoading ? (
@@ -112,7 +129,11 @@ export default function ProductionVsGoalPage() {
         </div>
       ) : null}
 
-      <ProductionDealerTable data={prodDealer.data} loading={prodDealer.isLoading} />
+      <ProductionDealerTable
+        data={prodDealer.data}
+        loading={prodDealer.isLoading}
+        removedIds={removedDealers.removedIds}
+      />
     </div>
   )
 }

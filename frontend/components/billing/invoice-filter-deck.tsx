@@ -27,6 +27,7 @@ import { InvoiceAdvancedFilters } from '@/components/billing/invoice-advanced-fi
 import { InvoiceDeletedFilter } from '@/components/billing/invoice-deleted-filter'
 import { LookupMultiSelect } from '@/components/shared/lookup-multi-select'
 import { useInvoiceWorkerLookup } from '@/hooks/use-invoice-lookups'
+import type { RemovedDealersSwitchState } from '@/hooks/use-removed-dealers-available'
 import {
   EMPTY_ADVANCED_FILTERS,
   remainingFilterIds,
@@ -151,6 +152,7 @@ export function InvoiceFilterDeck({
   onIncludePartialChange,
   filterDateDone,
   onFilterDateDoneChange,
+  removedDealers,
   deleted,
   onDeletedChange,
   employeeWorkedIds,
@@ -180,6 +182,8 @@ export function InvoiceFilterDeck({
   /** WO por fecha de terminado, como «Filter Date Completed» del Closing. */
   filterDateDone: boolean
   onFilterDateDoneChange: (value: boolean) => void
+  /** «Include removed dealers»: shown only when the page's useRemovedDealersSwitch says so. */
+  removedDealers?: RemovedDealersSwitchState
   deleted: InvoiceDeletedMode
   onDeletedChange: (value: InvoiceDeletedMode) => void
   employeeWorkedIds: number[]
@@ -308,6 +312,14 @@ export function InvoiceFilterDeck({
         key: 'dateDone',
         label: t('invoices.filterDateDoneChip'),
         onRemove: () => onFilterDateDoneChange(false),
+      })
+    }
+
+    if (removedDealers?.include) {
+      list.push({
+        key: 'removedDealers',
+        label: t('businessKpis.includeRemovedDealers'),
+        onRemove: () => removedDealers.setChecked(false),
       })
     }
 
@@ -443,6 +455,7 @@ export function InvoiceFilterDeck({
     effectiveIgnorePeriod,
     effectiveIncludePartial,
     effectiveFilterDateDone,
+    removedDealers,
     deleted,
     searchLock,
     advanced,
@@ -472,10 +485,12 @@ export function InvoiceFilterDeck({
     onIgnorePeriodChange(false)
     onIncludePartialChange(false)
     onFilterDateDoneChange(false)
+    removedDealers?.setChecked(false)
     onDeletedChange('hide')
     onEmployeeWorkedChange([])
     onAdvancedChange(EMPTY_ADVANCED_FILTERS)
   }, [
+    removedDealers,
     onSearchChange,
     onTypesChange,
     onPayedChange,

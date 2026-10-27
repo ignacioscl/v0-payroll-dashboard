@@ -10,12 +10,15 @@ import {
   BillingWeekRowDto,
   IncomeByDealerRowDto,
   IncomeByDealerYearDto,
+  RemovedDealerDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
+  removedDealersOfProviderListSql,
+  removedDealersWithMoneySql,
   removedDealersProvider,
   woPeriodColumn,
   woStatusFilterSql,
@@ -45,6 +48,24 @@ function money(v: unknown): number {
 @Injectable()
 export class BillingKpiRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
+
+  /** «Include removed dealers» shows only when this is true (plan-totales-income-centavos §4.3). */
+  async hasRemovedDealersWithMoney(
+    idDealerProvider: number,
+    range: { fechaDesde: string; fechaHasta: string } | null,
+    filterDateDone: boolean,
+  ): Promise<boolean> {
+    const q = removedDealersWithMoneySql(idDealerProvider, range, filterDateDone, WorkflowStatus.DONE)
+    const rows = await this.srs.query(q.sql, q.params)
+    return rows.length > 0
+  }
+
+  /** Every removed dealer of the provider: the screens mark their rows as «Removed» (§5, M1). */
+  async removedDealersOfProvider(idDealerProvider: number): Promise<RemovedDealerDto[]> {
+    const q = removedDealersOfProviderListSql(idDealerProvider)
+    const rows: { dealerId: unknown; dealer: unknown }[] = await this.srs.query(q.sql, q.params)
+    return rows.map((r) => ({ dealerId: Number(r.dealerId), dealer: String(r.dealer ?? '') }))
+  }
 
   async getBillingKpis(filter: SrsKpiFilter): Promise<BillingKpiDto> {
     const {
