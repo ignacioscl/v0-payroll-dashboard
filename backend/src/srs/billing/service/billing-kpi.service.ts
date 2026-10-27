@@ -83,7 +83,7 @@ export class BillingKpiService {
     query: RemovedDealersAvailableQueryDto,
   ): Promise<RemovedDealersAvailableDto> {
     if (!skipDealerRestrictionForRol(ctx.idRol)) {
-      return { available: false }
+      return { available: false, dealers: [] }
     }
     const hasFrom = !!query.fechaDesde
     const hasTo = !!query.fechaHasta
@@ -97,11 +97,11 @@ export class BillingKpiService {
         throw new BadRequestException('fechaDesde must be on or before fechaHasta')
       }
     }
-    const available = await this.repository.hasRemovedDealersWithMoney(
+    const dealers = await this.repository.removedDealersWithMoney(
       ctx.idDealerProvider,
       range,
       parseFilterDateDone(query.filterDateDone),
     )
-    return { available }
+    return { available: dealers.length > 0, dealers }
   }
 }

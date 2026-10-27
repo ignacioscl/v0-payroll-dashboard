@@ -383,6 +383,11 @@ export default function BusinessKpisPage() {
         }
         icon={<FileBarChart />}
         variant="info"
+        titleAside={
+          activeTab === 'billing' || activeTab === 'collections' || activeTab === 'payroll' ? (
+            <ReportRulesNotice screen={activeTab} />
+          ) : undefined
+        }
       />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
@@ -474,7 +479,6 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-6">
-          <ReportRulesNotice screen="billing" />
           <div className="flex items-center gap-3">
             <Switch
               id="billing-filter-date-done"
@@ -615,7 +619,6 @@ export default function BusinessKpisPage() {
 
         <TabsContent value="collections" className="space-y-6">
           <KpiErrorBanner q={coll} />
-          <ReportRulesNotice screen="collections" />
           <div className={KPI_CARD_GRID}>
             <KPICard
               inline
@@ -686,7 +689,6 @@ export default function BusinessKpisPage() {
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">
-          <ReportRulesNotice screen="payroll" />
           {s && s.paymentMethod === null ? (
             <p className="text-sm text-muted-foreground">{t('businessKpis.payrollNoPeriod')}</p>
           ) : (

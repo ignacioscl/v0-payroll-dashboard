@@ -159,6 +159,14 @@ export class RemovedDealersAvailableQueryDto {
   filterDateDone?: boolean
 }
 
+export class RemovedDealerDto {
+  @ApiProperty({ example: 812 })
+  dealerId!: number
+
+  @ApiProperty({ example: 'Lamborghini Broward' })
+  dealer!: string
+}
+
 export class RemovedDealersAvailableDto {
   @ApiProperty({
     example: false,
@@ -166,4 +174,10 @@ export class RemovedDealersAvailableDto {
       'True when the company has a dealer removed with «Remove» (DEALER_REL_REMOVED) and not added again with money in the dates. Always false for users with assigned dealers.',
   })
   available!: boolean
+
+  @ApiProperty({
+    type: [RemovedDealerDto],
+    description: 'Those removed dealers, by name. The screens mark their rows as «Removed». Empty when available is false.',
+  })
+  dealers!: RemovedDealerDto[]
 }

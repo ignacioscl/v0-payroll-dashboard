@@ -47,6 +47,8 @@ interface PageHeadingProps {
   icon: ReactNode
   variant?: PageHeadingVariant
   actions?: ReactNode
+  /** Next to the title, on its line (e.g. ReportRulesNotice): no extra vertical space. */
+  titleAside?: ReactNode
   className?: string
 }
 
@@ -56,6 +58,7 @@ export function PageHeading({
   icon,
   variant = 'default',
   actions,
+  titleAside,
   className,
 }: PageHeadingProps) {
   const config = variantConfig[variant]
@@ -76,7 +79,14 @@ export function PageHeading({
           <span className="drop-shadow-sm [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6">{icon}</span>
         </div>
         <div className="min-w-0 pt-0.5">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
+          {titleAside ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
+              {titleAside}
+            </div>
+          ) : (
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
+          )}
           {subtitle ? (
             <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</div>
           ) : null}

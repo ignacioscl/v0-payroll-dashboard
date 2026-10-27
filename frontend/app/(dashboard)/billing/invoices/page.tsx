@@ -30,6 +30,7 @@ import { useInvoiceList, type InvoiceListInput } from '@/hooks/use-invoice-list'
 import { useInvoiceSummary } from '@/hooks/use-invoice-summary'
 import { useInvoiceOutstanding } from '@/hooks/use-invoice-outstanding'
 import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
+import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
 
 const ALL_TYPES: InvoiceTypeState = { wo: true, ttk: true, generic: true }
@@ -308,6 +309,7 @@ export default function InvoicesPage() {
         }
         icon={<ReceiptText />}
         variant="info"
+        titleAside={<ReportRulesNotice screen="invoices" />}
         actions={
           genericConfig.data?.canCreate ? (
             <Button type="button" onClick={() => setGenericOpen(true)}>
@@ -348,7 +350,7 @@ export default function InvoicesPage() {
         disabled={!ready}
       />
 
-      <ReportRulesNotice screen="invoices" />
+      <RemovedDealersSwitch id="invoice-include-removed-dealers" state={removedDealers} disabled={!ready} />
 
       {showSummary ? (
         <InvoiceSummaryStrip

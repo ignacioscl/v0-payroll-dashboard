@@ -210,8 +210,8 @@ export default function IncomeByDealerPage() {
             .filter((d) => selectedDealers.includes(d.id))
             .map((d) => d.label)
             .join(', ')
-      const yes = t('common.yes')
-      const no = t('common.no')
+      const yes = t('incomeByDealer.yes')
+      const no = t('incomeByDealer.no')
       await exportIncomeByDealerXlsx({
         data,
         generatedBy: user?.nombre ?? '',
@@ -263,9 +263,8 @@ export default function IncomeByDealerPage() {
         }
         icon={<Landmark />}
         variant="success"
+        titleAside={<ReportRulesNotice screen="incomeByDealer" />}
       />
-
-      <ReportRulesNotice screen="incomeByDealer" />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>

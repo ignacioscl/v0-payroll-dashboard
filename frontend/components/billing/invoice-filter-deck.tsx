@@ -764,16 +764,6 @@ export function InvoiceFilterDeck({
                     : t('invoices.filterDateDoneTooltip')
                 }
               />
-              {removedDealers?.visible ? (
-                <LockableSwitchRow
-                  id="invoice-include-removed-dealers"
-                  checked={removedDealers.checked}
-                  onCheckedChange={removedDealers.setChecked}
-                  disabled={disabled}
-                  label={t('businessKpis.includeRemovedDealers')}
-                  tooltip={t('businessKpis.includeRemovedDealersHelp')}
-                />
-              ) : null}
               <InvoiceDeletedFilter
                 value={deleted}
                 onChange={onDeletedChange}

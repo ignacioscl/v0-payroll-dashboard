@@ -55,13 +55,14 @@ export function removedDealerOfProviderSql(dealerCol: string): string {
 }
 
 /**
- * Does the provider have a removed dealer (removedDealerOfProviderSql) with money in the range?
- * Same money as the reports: a WO with some service with value (woHasPositiveTotalSql), dated
- * like the reports (woPeriodColumn / Done only with filterDateDone), or a statement of any type
- * overlapping the range with some line with amount. range = null: whole history («Owed, all dates»).
- * Every table is filtered by id_dealer_provider = the session provider.
+ * The removed dealers (removedDealerOfProviderSql) of the provider with money in the range, with
+ * their name for the provider (dealerId · dealer, by name). Same money as the reports: a WO with
+ * some service with value (woHasPositiveTotalSql), dated like the reports (woPeriodColumn / Done
+ * only with filterDateDone), or a statement of any type overlapping the range with some line with
+ * amount. range = null: whole history («Owed, all dates»). Every table is filtered by
+ * id_dealer_provider = the session provider. The screens mark these rows as «Removed».
  */
-export function removedDealersAvailableSql(
+export function removedDealersWithMoneySql(
   idDealerProvider: number,
   range: { fechaDesde: string; fechaHasta: string } | null,
   filterDateDone: boolean,
@@ -73,18 +74,21 @@ export function removedDealersAvailableSql(
   const woDateParams = range ? [range.fechaDesde, range.fechaHasta] : []
   const stDates = range ? ' AND s.fecha_desde <= ? AND s.fecha_hasta >= ?' : ''
   const stDateParams = range ? [range.fechaHasta, range.fechaDesde] : []
-  const sql = `SELECT (EXISTS (SELECT 1 FROM INVOICE i JOIN DEPARTMENT d ON d.id = i.id_department
-               WHERE i.estado = 1 AND i.id_dealer_provider = ?${woDates}
-                 ${woStatusFilterSql(filterDateDone, doneWorkflowId)}
-                 AND ${removedDealerOfProviderSql('d.id_dealer')}
-                 AND EXISTS (SELECT 1 FROM INVOICE_SERVICE_REL z WHERE z.id_invoice = i.id
-                             AND z.price * IFNULL(z.qty, 1) > 0))
-     OR EXISTS (SELECT 1 FROM INVOICE_STATEMENT s JOIN INVOICE_STATEMENT_INV_REL r ON r.id_statement = s.id
-               WHERE s.estado = 1 AND s.id_dealer_provider = ?${stDates} AND IFNULL(r.amount, 0) > 0
-                 AND ${removedDealerOfProviderSql('s.id_dealer')})) AS available`
+  const sql = `SELECT x.id_dealer AS dealerId, GET_DEALER_NAME_BY_PROVIDER(?, x.id_dealer) AS dealer
+     FROM (SELECT d.id_dealer FROM INVOICE i JOIN DEPARTMENT d ON d.id = i.id_department
+           WHERE i.estado = 1 AND i.id_dealer_provider = ?${woDates}
+             ${woStatusFilterSql(filterDateDone, doneWorkflowId)}
+             AND ${removedDealerOfProviderSql('d.id_dealer')}
+             AND EXISTS (SELECT 1 FROM INVOICE_SERVICE_REL z WHERE z.id_invoice = i.id
+                         AND z.price * IFNULL(z.qty, 1) > 0)
+           UNION
+           SELECT s.id_dealer FROM INVOICE_STATEMENT s JOIN INVOICE_STATEMENT_INV_REL r ON r.id_statement = s.id
+           WHERE s.estado = 1 AND s.id_dealer_provider = ?${stDates} AND IFNULL(r.amount, 0) > 0
+             AND ${removedDealerOfProviderSql('s.id_dealer')}) x
+     ORDER BY dealer`
   return {
     sql,
-    params: [p, ...woDateParams, p, p, p, ...stDateParams, p, p],
+    params: [p, p, ...woDateParams, p, p, p, ...stDateParams, p, p],
   }
 }
 

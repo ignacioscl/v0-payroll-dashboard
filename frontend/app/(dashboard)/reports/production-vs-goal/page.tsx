@@ -90,9 +90,8 @@ export default function ProductionVsGoalPage() {
         }
         icon={<Target />}
         variant="success"
+        titleAside={<ReportRulesNotice screen="productionVsGoal" />}
       />
-
-      <ReportRulesNotice screen="productionVsGoal" />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>

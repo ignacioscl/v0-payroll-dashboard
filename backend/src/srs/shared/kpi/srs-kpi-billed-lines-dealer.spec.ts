@@ -1,7 +1,7 @@
 import { billedBaseOpts, genericBilledLinesSql, ttkBilledLinesSql, woBilledLinesSql } from './srs-kpi-billed-lines'
 import {
   buildDealerRestrictionClause,
-  removedDealersAvailableSql,
+  removedDealersWithMoneySql,
   removedDealersProvider,
 } from './srs-kpi-dealer-filter'
 import { includeRemovedDealersForSession } from './srs-kpi-filter'
@@ -100,9 +100,10 @@ describe('removed-dealers-available (§4.3)', () => {
   const RANGE = { fechaDesde: '2024-04-23', fechaHasta: '2024-04-23' }
 
   it('every table filtered by the session provider; dates and params aligned', () => {
-    const q = removedDealersAvailableSql(188, RANGE, false, 8)
+    const q = removedDealersWithMoneySql(188, RANGE, false, 8)
     expect(countPlaceholders(q.sql)).toBe(q.params.length)
-    expect(q.params.filter((p) => p === 188)).toHaveLength(6)
+    expect(q.params.filter((p) => p === 188)).toHaveLength(7)
+    expect(q.sql).toContain('GET_DEALER_NAME_BY_PROVIDER(?, x.id_dealer) AS dealer')
     expect(q.sql).toContain('i.id_dealer_provider = ?')
     expect(q.sql).toContain('s.id_dealer_provider = ?')
     expect(q.sql.match(/DEALER_REL_REMOVED/g)).toHaveLength(2)
@@ -111,16 +112,16 @@ describe('removed-dealers-available (§4.3)', () => {
   })
 
   it('Filter by completion date: Done date and only Done WO (G1)', () => {
-    const q = removedDealersAvailableSql(188, RANGE, true, 8)
+    const q = removedDealersWithMoneySql(188, RANGE, true, 8)
     expect(q.sql).toContain('DATE(i.date_last_chg_workflow) >= ?')
     expect(q.sql).toContain('AND i.id_workflow = 8')
     expect(countPlaceholders(q.sql)).toBe(q.params.length)
   })
 
   it('no range («Owed, all dates»): no date condition', () => {
-    const q = removedDealersAvailableSql(188, null, false, 8)
+    const q = removedDealersWithMoneySql(188, null, false, 8)
     expect(q.sql).not.toContain('fecha_alta')
     expect(q.sql).not.toContain('s.fecha_desde')
-    expect(q.params).toEqual([188, 188, 188, 188, 188, 188])
+    expect(q.params).toEqual([188, 188, 188, 188, 188, 188, 188])
   })
 })
