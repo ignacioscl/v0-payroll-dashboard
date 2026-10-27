@@ -30,6 +30,10 @@ export type IncomeByDealerExportLabels = {
   total: string
   grandTotal: string
   generated: string
+  /** After the name of a removed dealer: "(removed)" (§5, D10). */
+  removedSuffix: string
+  /** Summary row under the Grand Total: "Includes removed dealers" (§5, D11). */
+  includesRemovedDealers: string
   /** Label of a year in the file: "2024", "2026 YTD"… */
   yearLabel: (year: IncomeByDealer['years'][number]) => string
   /** "01/01/2024 – 12/31/2024" */
@@ -42,6 +46,10 @@ export type IncomeByDealerExportInput = {
   /** Report Info rows after the generated stamp: screen, user, every filter with its screen name. */
   reportInfo: ReportInfoRow[]
   generatedBy: string
+  /** «Include removed dealers» on: rows of these dealers say `removedSuffix` (§5). */
+  removedIds?: ReadonlySet<number>
+  /** Removed dealers with a row in the file: one Summary row under the Grand Total (D11). */
+  removedNames?: string[]
 }
 
 function moneyCell(cell: ExcelJS.Cell, value: number, bold = false) {
@@ -70,7 +78,7 @@ function totalRowFill(row: ExcelJS.Row, colCount: number) {
  * Total and the Grand Total, then «Summary» (year · Income). Same numbers as the screen.
  */
 export async function exportIncomeByDealerXlsx(input: IncomeByDealerExportInput): Promise<void> {
-  const { data, labels, reportInfo, generatedBy } = input
+  const { data, labels, reportInfo, generatedBy, removedIds, removedNames = [] } = input
   const generatedAt = new Date()
   const stamp = `${labels.generated} ${formatUsDateTimeForExport(generatedAt.toISOString())} · ${generatedBy} · ${labels.title}`
 
@@ -92,7 +100,10 @@ export async function exportIncomeByDealerXlsx(input: IncomeByDealerExportInput)
     r += 1
     for (const row of year.dealers) {
       const excelRow = ws.getRow(r)
-      textCell(excelRow.getCell(1), row.dealer)
+      textCell(
+        excelRow.getCell(1),
+        removedIds?.has(row.dealerId) ? `${row.dealer} ${labels.removedSuffix}` : row.dealer,
+      )
       moneyCell(excelRow.getCell(2), row.income)
       r += 1
     }
@@ -129,6 +140,12 @@ export async function exportIncomeByDealerXlsx(input: IncomeByDealerExportInput)
   textCell(sumTotal.getCell(2), '')
   moneyCell(sumTotal.getCell(3), data.grandTotal, true)
   totalRowFill(sumTotal, 3)
+  if (removedNames.length > 0) {
+    // The totals above include them: say which ones (D11).
+    s += 1
+    sum.getCell(s, 1).value = `${labels.includesRemovedDealers}: ${removedNames.join(', ')}`
+    sum.getCell(s, 1).font = { italic: true }
+  }
   autoFitColumns(sum, 3, 3, s)
   sum.getColumn(3).width = Math.max(sum.getColumn(3).width ?? 0, 18)
 

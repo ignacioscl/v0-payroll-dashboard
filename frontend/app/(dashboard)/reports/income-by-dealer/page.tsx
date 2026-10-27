@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
 import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
@@ -132,6 +133,7 @@ export default function IncomeByDealerPage() {
     ready: rangeReady,
   })
   const includeRemovedDealers = removedDealers.include
+  const removedIds = removedDealers.removedIds
 
   const kpiParams = useMemo((): KpiQueryParams | null => {
     if (!rangeReady) return null
@@ -169,8 +171,22 @@ export default function IncomeByDealerPage() {
         accessorKey: 'dealer',
         size: 280,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealer.label')} />,
-        cell: ({ row }) => <span className="block truncate font-medium">{row.original.dealer}</span>,
-        meta: { label: t('dealer.label') } satisfies DataTableColumnMeta<IncomeByDealerRow>,
+        cell: ({ row }) =>
+          removedIds.has(row.original.dealerId) ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium">{row.original.dealer}</span>
+              <RemovedDealerBadge />
+            </span>
+          ) : (
+            <span className="block truncate font-medium">{row.original.dealer}</span>
+          ),
+        meta: {
+          label: t('dealer.label'),
+          exportValue: (row) =>
+            removedIds.has(row.dealerId)
+              ? `${row.dealer} ${t('businessKpis.removedDealerSuffix')}`
+              : row.dealer,
+        } satisfies DataTableColumnMeta<IncomeByDealerRow>,
       },
       {
         accessorKey: 'income',
@@ -187,7 +203,7 @@ export default function IncomeByDealerPage() {
         } satisfies DataTableColumnMeta<IncomeByDealerRow>,
       },
     ],
-    [t],
+    [t, removedIds],
   )
 
   const busyMessage = income.isError
@@ -212,8 +228,14 @@ export default function IncomeByDealerPage() {
             .join(', ')
       const yes = t('incomeByDealer.yes')
       const no = t('incomeByDealer.no')
+      // Removed dealers with a row in the file, once each (§5, M2).
+      const removedNames = [
+        ...new Set(data.years.flatMap((y) => y.dealers.filter((d) => removedIds.has(d.dealerId)).map((d) => d.dealer))),
+      ]
       await exportIncomeByDealerXlsx({
         data,
+        removedIds,
+        removedNames,
         generatedBy: user?.nombre ?? '',
         labels: {
           fileName: 'income-by-dealer',
@@ -230,6 +252,8 @@ export default function IncomeByDealerPage() {
           total: t('incomeByDealer.total'),
           grandTotal: t('incomeByDealer.grandTotal'),
           generated: t('incomeByDealer.exportGenerated'),
+          removedSuffix: t('businessKpis.removedDealerSuffix'),
+          includesRemovedDealers: t('businessKpis.includesRemovedDealers'),
           yearLabel: (y) => yearLabel(y, t),
           yearRange,
         },
@@ -241,7 +265,14 @@ export default function IncomeByDealerPage() {
             : { field: t('incomeByDealer.exportDates'), value: headerRangeLabel ?? '' },
           { field: t('dealer.labelPlural'), value: dealerNames },
           { field: t('businessKpis.filterDateDone'), value: filterDateDone ? yes : no },
-          ...(includeRemovedDealers ? [{ field: t('businessKpis.includeRemovedDealers'), value: yes }] : []),
+          ...(includeRemovedDealers
+            ? [
+                {
+                  field: t('businessKpis.includeRemovedDealers'),
+                  value: removedNames.length ? `${yes} — ${removedNames.join(', ')}` : yes,
+                },
+              ]
+            : []),
         ],
       })
       toast.success(t('common.exportSuccess', { count: data.years.length }), { duration: TOAST_DURATION_MS })

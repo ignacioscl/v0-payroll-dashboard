@@ -1,6 +1,7 @@
 import { billedBaseOpts, genericBilledLinesSql, ttkBilledLinesSql, woBilledLinesSql } from './srs-kpi-billed-lines'
 import {
   buildDealerRestrictionClause,
+  removedDealersOfProviderListSql,
   removedDealersWithMoneySql,
   removedDealersProvider,
 } from './srs-kpi-dealer-filter'
@@ -116,6 +117,14 @@ describe('removed-dealers-available (§4.3)', () => {
     expect(q.sql).toContain('DATE(i.date_last_chg_workflow) >= ?')
     expect(q.sql).toContain('AND i.id_workflow = 8')
     expect(countPlaceholders(q.sql)).toBe(q.params.length)
+  })
+
+  it('list of every removed dealer of the provider (M1): no money, no dates, session provider', () => {
+    const q = removedDealersOfProviderListSql(188)
+    expect(countPlaceholders(q.sql)).toBe(q.params.length)
+    expect(q.params).toEqual([188, 188, 188])
+    expect(q.sql).toContain('DEALER_REL_REMOVED')
+    expect(q.sql).not.toContain('INVOICE')
   })
 
   it('no range («Owed, all dates»): no date condition', () => {

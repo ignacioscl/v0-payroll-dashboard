@@ -1601,6 +1601,11 @@ export const es: Messages = {
     includeRemovedDealers: 'Incluir dealers eliminados',
     includeRemovedDealersHelp:
       'Suma los dealers que se eliminaron de tu lista de dealers pero todavía tienen invoices o Work Orders con tu empresa en estas fechas.',
+    removedDealerTag: 'Eliminado',
+    removedDealerTagHelp:
+      'Este dealer se eliminó de tu lista de dealers. Aparece porque "Incluir dealers eliminados" está prendido.',
+    removedDealerSuffix: '(eliminado)',
+    includesRemovedDealers: 'Incluye dealers eliminados',
     includeZero: 'Incluir valor cero',
     betaBadge: 'Beta',
     betaDisclaimer:

@@ -30,6 +30,7 @@ import {
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
+import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
@@ -685,6 +686,7 @@ export function InvoiceListTable({
   sorting,
   onSortingChange,
   showDealerSubline,
+  removedIds,
   idDealer,
   payedFilter,
   showExcludesDeleted,
@@ -711,6 +713,8 @@ export function InvoiceListTable({
   onSortingChange: (next: SortingState) => void
   /** Legacy: debajo del nro de invoice cuando hay multi-dealer en el header. */
   showDealerSubline?: boolean
+  /** «Include removed dealers» on: the subline of these dealers shows «Removed» (§5). */
+  removedIds?: ReadonlySet<number>
   idDealer: string
   payedFilter?: string
 }) {
@@ -912,7 +916,10 @@ export function InvoiceListTable({
                 </Badge>
               ) : null}
               {showDealerSubline && r.dealer ? (
-                <span className="text-[11px] text-muted-foreground">{r.dealer}</span>
+                <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  {r.dealer}
+                  {r.idDealer != null && removedIds?.has(r.idDealer) ? <RemovedDealerBadge /> : null}
+                </span>
               ) : null}
             </div>
           )
@@ -1334,7 +1341,7 @@ export function InvoiceListTable({
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
     ],
-    [t, showDealerSubline, idDealer, payedFilter, canEditPoRo, enableSelection, input, includePartial],
+    [t, showDealerSubline, removedIds, idDealer, payedFilter, canEditPoRo, enableSelection, input, includePartial],
   )
 
   const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {

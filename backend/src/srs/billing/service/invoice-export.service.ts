@@ -78,6 +78,8 @@ export function buildInvoiceExportReportInfo(input: {
   query: InvoiceListQueryDto
   filter: InvoiceListFilter
   names: { dealers: string[]; departments: string[]; services: string[]; authors: string[]; workers: string[] }
+  /** Removed dealers with rows in this export (exportRemovedDealers), by name. */
+  removedDealers?: string[]
 }): ReportInfoRow[] {
   const { labels, query, filter, names } = input
   const typeTokens = (query.types ?? '')
@@ -129,8 +131,18 @@ export function buildInvoiceExportReportInfo(input: {
     { field: labels.checkDate, value: filter.checkDate ? ymdToUs(filter.checkDate) : labels.all },
     { field: labels.checkNumber, value: orAll(labels, filter.checkNumber) },
     { field: labels.overdueOnly, value: yesNo(labels, filter.dueOn) },
-    // «Include removed dealers»: only when it is on (and honoured: admins only, see the filter).
-    ...(filter.includeRemovedDealers ? [{ field: labels.includeRemovedDealers, value: labels.yes }] : []),
+    // «Include removed dealers»: only when it is on (and honoured: admins only, see the filter),
+    // with the removed dealers that have rows in the file (§5, M2).
+    ...(filter.includeRemovedDealers
+      ? [
+          {
+            field: labels.includeRemovedDealers,
+            value: input.removedDealers?.length
+              ? `${labels.yes} — ${input.removedDealers.join(', ')}`
+              : labels.yes,
+          },
+        ]
+      : []),
   ]
 }
 
@@ -228,10 +240,11 @@ export class InvoiceExportService {
       await this.assertAccess(ctx)
       const filter = this.filterOf(ctx, stored.query)
       const generatedAt = new Date()
-      const [locale, generatedBy, names] = await Promise.all([
+      const [locale, generatedBy, names, removed] = await Promise.all([
         resolveLocale(this.srs, ctx),
         loadUserName(this.srs, ctx.idUsuario),
         this.repository.exportFilterNames(filter),
+        this.repository.exportRemovedDealers(filter),
       ])
       const reportInfo = buildInvoiceExportReportInfo({
         labels: invoiceExportLabels(locale),
@@ -241,6 +254,7 @@ export class InvoiceExportService {
         query: stored.query,
         filter,
         names,
+        removedDealers: removed.map((d) => d.dealer),
       })
 
       // Headers and Report Info go out before the heavy query (§2.1.4, F3).
@@ -262,6 +276,7 @@ export class InvoiceExportService {
         providerName: names.providerName,
         includeAuthor: filter.authorIds.length > 0 || filter.idAuthor != null,
         includeDeleted: filter.deleted !== 'hide',
+        removedDealerIds: new Set(removed.map((d) => d.dealerId)),
         chunks: this.repository.exportRowChunks(filter, EXPORT_CHUNK_SIZE),
         woLinesOf: (ids) => this.woLinesOf(filter, ids),
       })
@@ -346,10 +361,11 @@ export class InvoiceExportService {
 
       // 2. The same workbook as the download, in memory.
       const generatedAt = new Date()
-      const [locale, generatedBy, names] = await Promise.all([
+      const [locale, generatedBy, names, removed] = await Promise.all([
         resolveLocale(this.srs, ctx),
         loadUserName(this.srs, ctx.idUsuario),
         this.repository.exportFilterNames(filter),
+        this.repository.exportRemovedDealers(filter),
       ])
       const reportInfo = buildInvoiceExportReportInfo({
         labels: invoiceExportLabels(locale),
@@ -359,6 +375,7 @@ export class InvoiceExportService {
         query: stored.query,
         filter,
         names,
+        removedDealers: removed.map((d) => d.dealer),
       })
       const ttkIds = new Set<number>()
       const source = this.repository.exportRowChunks(filter, EXPORT_CHUNK_SIZE)
@@ -385,6 +402,7 @@ export class InvoiceExportService {
         providerName: names.providerName,
         includeAuthor: filter.authorIds.length > 0 || filter.idAuthor != null,
         includeDeleted: filter.deleted !== 'hide',
+        removedDealerIds: new Set(removed.map((d) => d.dealerId)),
         chunks,
         woLinesOf: (ids) => this.woLinesOf(filter, ids),
       })

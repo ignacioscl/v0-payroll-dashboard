@@ -129,7 +129,11 @@ export default function ProductionVsGoalPage() {
         </div>
       ) : null}
 
-      <ProductionDealerTable data={prodDealer.data} loading={prodDealer.isLoading} />
+      <ProductionDealerTable
+        data={prodDealer.data}
+        loading={prodDealer.isLoading}
+        removedIds={removedDealers.removedIds}
+      />
     </div>
   )
 }

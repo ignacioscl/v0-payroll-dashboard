@@ -55,12 +55,31 @@ export function removedDealerOfProviderSql(dealerCol: string): string {
 }
 
 /**
+ * Every removed dealer (removedDealerOfProviderSql) of the provider, with its name for the provider
+ * (dealerId · dealer, by name), without looking at money or dates: the screens mark every row of
+ * these dealers as «Removed», a deleted invoice included (§5 of plan-totales-income-centavos, M1).
+ */
+export function removedDealersOfProviderListSql(idDealerProvider: number): {
+  sql: string
+  params: number[]
+} {
+  const p = idDealerProvider
+  return {
+    sql: `SELECT c.id AS dealerId, GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer
+          FROM CONTRATISTA c
+          WHERE ${removedDealerOfProviderSql('c.id')}
+          ORDER BY dealer`,
+    params: [p, p, p],
+  }
+}
+
+/**
  * The removed dealers (removedDealerOfProviderSql) of the provider with money in the range, with
  * their name for the provider (dealerId · dealer, by name). Same money as the reports: a WO with
  * some service with value (woHasPositiveTotalSql), dated like the reports (woPeriodColumn / Done
  * only with filterDateDone), or a statement of any type overlapping the range with some line with
  * amount. range = null: whole history («Owed, all dates»). Every table is filtered by
- * id_dealer_provider = the session provider. The screens mark these rows as «Removed».
+ * id_dealer_provider = the session provider. «Include removed dealers» shows only when there is one.
  */
 export function removedDealersWithMoneySql(
   idDealerProvider: number,

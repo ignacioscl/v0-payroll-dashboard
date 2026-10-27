@@ -45,6 +45,8 @@ edge and the sticky element to different pixels.
   share the same `colgroup` and both parts get `[scrollbar-gutter:stable]` so the columns line up.
   A 1px `box-shadow` band was tried and **did not fix it** in Chrome's phone view (2026-10-13).
   Reference: `components/roles/role-services-sheet.tsx`.
+- **No fixed (pinned) columns on a phone**, and the first column's text wraps instead of «…»: detail in
+  `data-table.mdc` → «Columnas pinned (sticky)» (Ignacio, 2026-10-27, Production vs Goal).
 - Don't add a page margin a layout already gives: `MainLayout` pads the page (`p-4 md:p-6`), so a
   page's root `div` adds none — otherwise phones lose 16px per side for nothing.
 

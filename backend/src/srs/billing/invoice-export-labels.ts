@@ -37,6 +37,8 @@ export type InvoiceExportLabels = {
   checkNumber: string
   overdueOnly: string
   includeRemovedDealers: string
+  /** After the dealer of a removed dealer's row (§5, D10). */
+  removedSuffix: string
   all: string
   yes: string
   no: string
@@ -81,6 +83,7 @@ const EN: InvoiceExportLabels = {
   checkNumber: 'Check #',
   overdueOnly: 'Overdue only',
   includeRemovedDealers: 'Include removed dealers',
+  removedSuffix: '(removed)',
   all: 'All',
   yes: 'Yes',
   no: 'No',
@@ -124,6 +127,7 @@ const ES: InvoiceExportLabels = {
   checkNumber: 'N.º de cheque',
   overdueOnly: 'Solo vencidas',
   includeRemovedDealers: 'Incluir dealers eliminados',
+  removedSuffix: '(eliminado)',
   all: 'Todos',
   yes: 'Sí',
   no: 'No',

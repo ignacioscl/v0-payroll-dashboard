@@ -27,7 +27,12 @@ and is not counted twice.
 - Off = exactly the dealers of the combo (same totals as before the switch existed).
 - The value goes as `includeRemovedDealers` to every request of the screen that has totals by dealer (and in its
   `queryKey`), including the cards without period of the same screen («Owed, all dates» of Invoices).
-- With the switch on, the export says it in **Report Info** (one line «Include removed dealers: Yes»).
+- With the switch on, the export says it in **Report Info** (one line «Include removed dealers: Yes — <names>», with
+  the removed dealers that have rows in that file; just «Yes» when none).
+- **Mark the rows** (§5): every row of a removed dealer shows `RemovedDealerBadge`
+  (`components/filters/removed-dealer-badge.tsx`, «Removed» / «Eliminado» with its tooltip) and exports
+  «<dealer> (removed)» / «(eliminado)». Which dealers: `removedIds` of `useRemovedDealersSwitch` (every removed dealer
+  of the company, with or without money). Names in Report Info / Summary: only the ones with rows in the file.
 - Texts: EN «Include removed dealers» / help «Adds dealers that were removed from your dealer list but still have
   invoices or Work Orders with your company in these dates.»; ES «Incluir dealers eliminados» / «Suma los dealers que
   se eliminaron de tu lista de dealers pero todavía tienen invoices o Work Orders con tu empresa en estas fechas.»

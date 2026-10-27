@@ -177,7 +177,8 @@ export class RemovedDealersAvailableDto {
 
   @ApiProperty({
     type: [RemovedDealerDto],
-    description: 'Those removed dealers, by name. The screens mark their rows as «Removed». Empty when available is false.',
+    description:
+      'Every removed dealer of the company (with or without money in the dates), by name. The screens mark their rows as «Removed». Empty when available is false.',
   })
   dealers!: RemovedDealerDto[]
 }

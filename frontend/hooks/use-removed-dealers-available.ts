@@ -35,7 +35,11 @@ export interface RemovedDealersSwitchState {
   setChecked: (value: boolean) => void
   /** What goes to the backend as includeRemovedDealers: on only while it is visible. */
   include: boolean
+  /** Removed dealers whose rows show «Removed»; empty while `include` is off (§5). */
+  removedIds: ReadonlySet<number>
 }
+
+const NO_IDS: ReadonlySet<number> = new Set()
 
 /**
  * State of the «Include removed dealers» switch of one screen. It shows only for users that see
@@ -73,5 +77,12 @@ export function useRemovedDealersSwitch({
     if (checked && (!canUse || answeredNo)) setChecked(false)
   }, [checked, canUse, answeredNo])
 
-  return { visible, checked, setChecked, include: visible && checked }
+  const include = visible && checked
+  const removedList = query.data?.dealers
+  const removedIds = useMemo(
+    () => (include && removedList?.length ? new Set(removedList.map((d) => d.dealerId)) : NO_IDS),
+    [include, removedList],
+  )
+
+  return { visible, checked, setChecked, include, removedIds }
 }

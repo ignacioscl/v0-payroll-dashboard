@@ -374,7 +374,9 @@ export default function InvoicesPage() {
         onPageSizeChange={setPageSize}
         sorting={sorting}
         onSortingChange={setSorting}
-        showDealerSubline={selectedDealers.length > 1}
+        // With removed dealers in the grid, every row says whose it is, even with one active dealer (§5, M3).
+        showDealerSubline={selectedDealers.length > 1 || includeRemovedDealers}
+        removedIds={removedDealers.removedIds}
         idDealer={
           primaryDealerId != null
             ? String(primaryDealerId)

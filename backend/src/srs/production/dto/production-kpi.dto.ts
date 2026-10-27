@@ -31,6 +31,7 @@ export class WoStatusSliceDto {
 
 /** Producción por dealer (tabla Production vs Goal). */
 export class DealerProductionRowDto {
+  @ApiProperty({ example: 812, description: 'CONTRATISTA.id: the screen marks removed dealers by it' }) dealerId!: number
   @ApiProperty({ example: 'Toyota Miami' }) dealer!: string
   @ApiProperty({ example: 2218 }) wos!: number
   @ApiProperty({ example: 118400 }) value!: number

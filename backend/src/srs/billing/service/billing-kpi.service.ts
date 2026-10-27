@@ -97,11 +97,13 @@ export class BillingKpiService {
         throw new BadRequestException('fechaDesde must be on or before fechaHasta')
       }
     }
-    const dealers = await this.repository.removedDealersWithMoney(
+    const available = await this.repository.hasRemovedDealersWithMoney(
       ctx.idDealerProvider,
       range,
       parseFilterDateDone(query.filterDateDone),
     )
-    return { available: dealers.length > 0, dealers }
+    if (!available) return { available: false, dealers: [] }
+    // The rows to mark: every removed dealer, with or without money in these dates (§5, M1).
+    return { available: true, dealers: await this.repository.removedDealersOfProvider(ctx.idDealerProvider) }
   }
 }

@@ -34,6 +34,7 @@ export interface ProductionWeekPoint {
 }
 
 export interface ProductionDealerRow {
+  dealerId: number
   dealer: string
   wos: number
   value: number
@@ -265,9 +266,15 @@ export interface RemovedDealersAvailableParams {
   filterDateDone: boolean
 }
 
+/** `dealers`: every removed dealer of the company, to mark their rows as «Removed» (§5). */
+export interface RemovedDealersAvailable {
+  available: boolean
+  dealers: { dealerId: number; dealer: string }[]
+}
+
 export async function fetchRemovedDealersAvailable(
   params: RemovedDealersAvailableParams,
-): Promise<{ available: boolean }> {
+): Promise<RemovedDealersAvailable> {
   const qs = new URLSearchParams({ filterDateDone: params.filterDateDone ? 'true' : 'false' })
   if (params.fechaDesde && params.fechaHasta) {
     qs.set('fechaDesde', params.fechaDesde)
@@ -280,7 +287,7 @@ export async function fetchRemovedDealersAvailable(
   if (!res.ok) {
     throw new Error(`KPI billing/removed-dealers-available (${res.status})`)
   }
-  return res.json() as Promise<{ available: boolean }>
+  return res.json() as Promise<RemovedDealersAvailable>
 }
 export const fetchBillingPeriodCollection = (params: KpiQueryParams) =>
   getKpi<BillingPeriodCollectionKpi>('billing/period-collection', params)
