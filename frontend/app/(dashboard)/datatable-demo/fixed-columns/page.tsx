@@ -221,6 +221,7 @@ export default function DataTableFixedColumnsPage() {
           columns={columns}
           data={query.data?.results ?? []}
           isLoading={query.isFetching}
+          enableExport
           exportFileName="employees-pinned"
           pagination={{
             pageIndex,

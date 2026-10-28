@@ -507,6 +507,9 @@ export function RolesDataTable({
           setPageIndex(0)
         }}
         manualFiltering
+        // No Excel: it only took the visible page and legacy has no list export (decision B,
+        // plans/plan-report-info-exports-tablas).
+        enableExport={false}
         density="compact"
         headerVariant="colored"
         emptyState={

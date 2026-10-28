@@ -18,6 +18,8 @@ import { GenericInvoiceService } from './service/generic-invoice.service'
 import { GenericInvoiceRepository } from './repository/generic-invoice.repository'
 import { InvoiceExportController } from './controller/invoice-export.controller'
 import { InvoiceExportService } from './service/invoice-export.service'
+import { InvoiceListExportController } from './controller/invoice-list-export.controller'
+import { InvoiceListExportService } from './service/invoice-list-export.service'
 
 @Module({
   imports: [
@@ -33,12 +35,14 @@ import { InvoiceExportService } from './service/invoice-export.service'
     GenericInvoiceRepository,
     GenericInvoiceService,
     InvoiceExportService,
+    InvoiceListExportService,
   ],
-  // InvoiceExportController goes before InvoiceController so `/invoices/export` is never read
-  // as `/invoices/:id/...`.
+  // The export controllers go before InvoiceController so `/invoices/export` and
+  // `/invoices/list-export` are never read as `/invoices/:id/...`.
   controllers: [
     BillingKpiController,
     InvoiceExportController,
+    InvoiceListExportController,
     InvoiceController,
     GenericInvoiceController,
   ],

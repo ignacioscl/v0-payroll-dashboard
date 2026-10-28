@@ -80,6 +80,11 @@ export function buildInvoiceExportReportInfo(input: {
   names: { dealers: string[]; departments: string[]; services: string[]; authors: string[]; workers: string[] }
   /** Removed dealers with rows in this export (exportRemovedDealers), by name. */
   removedDealers?: string[]
+  /**
+   * The grid's own «Export» (plans/plan-report-info-exports-tablas §4.2): its report name, and two
+   * filters of the grid that go after «Overdue only». Export / Email does not pass it: unchanged.
+   */
+  listExport?: { reportName: string; extraRows: ReportInfoRow[] }
 }): ReportInfoRow[] {
   const { labels, query, filter, names } = input
   const typeTokens = (query.types ?? '')
@@ -104,7 +109,7 @@ export function buildInvoiceExportReportInfo(input: {
         ? labels.sentValues.notSent
         : labels.sentValues.all
   return [
-    { field: labels.report, value: invoiceExportReportName(input.exportType) },
+    { field: labels.report, value: input.listExport?.reportName ?? invoiceExportReportName(input.exportType) },
     { field: labels.generated, value: formatNyStamp(input.generatedAt) },
     { field: labels.generatedBy, value: input.generatedBy },
     { field: labels.screen, value: labels.screenValue },
@@ -131,6 +136,7 @@ export function buildInvoiceExportReportInfo(input: {
     { field: labels.checkDate, value: filter.checkDate ? ymdToUs(filter.checkDate) : labels.all },
     { field: labels.checkNumber, value: orAll(labels, filter.checkNumber) },
     { field: labels.overdueOnly, value: yesNo(labels, filter.dueOn) },
+    ...(input.listExport?.extraRows ?? []),
     // «Include removed dealers»: only when it is on (and honoured: admins only, see the filter),
     // with the removed dealers that have rows in the file (§5, M2).
     ...(filter.includeRemovedDealers

@@ -105,6 +105,25 @@ export function buildDealerRankingExportFilename(date: Date = new Date()): strin
 }
 
 /**
+ * Nombre de un export con el mismo formato que los de arriba (hora de NY, guiones en vez de
+ * barras y dos puntos) y el prefijo que se pida: `production_vs_goal_10-27-2026_03-15_PM.xlsx`
+ * (plans/plan-report-info-exports-tablas §5.1.5).
+ */
+export function buildNyStampedExportFilename(prefix: string, date: Date = new Date()): string {
+  const p = nyParts(date, {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  const hour = String(p.hour).padStart(2, '0')
+  const period = nyPeriod(p.dayPeriod)
+  return `${prefix}_${p.month}-${p.day}-${p.year}_${hour}-${p.minute}_${period}.xlsx`
+}
+
+/**
  * `YYYY-MM-DD` → `MM/DD/YYYY`, por los componentes y sin pasar por `Date`: un
  * `new Date('2026-08-27')` es medianoche UTC y en NY cae el día anterior. Si no
  * matchea, devuelve el valor tal cual.

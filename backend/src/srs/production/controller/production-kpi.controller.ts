@@ -1,5 +1,6 @@
-import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, Req, Res, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import type { Response } from 'express'
 
 import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
@@ -44,6 +45,17 @@ export class ProductionKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<DealerProductionRowDto[]> {
     return this.service.getDealerProduction(request.srsContext, query)
+  }
+
+  /** Excel of the grid with Report Info (plans/plan-report-info-exports-tablas §5.1). */
+  @Get('/by-dealer/export')
+  @ApiOkResponse({ description: 'XLSX: Report Info + Production vs Goal by Dealer' })
+  async exportDealerProduction(
+    @Req() request: any,
+    @Query() query: SrsKpiQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.service.exportDealerProduction(request.srsContext, query, res)
   }
 
   @Get('/by-week')

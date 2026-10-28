@@ -5,7 +5,8 @@
 // Web + DataTable version of the XLSX exported by
 // /modulos/ttk/php/ttk_payroll_report.php (tipo=payroll_xls).
 // Same columns as XlsPayrollReportService, red rows → Issues badge.
-// Export (CSV/XLSX) is built into the DataTable toolbar.
+// No Excel: example data, and an export without Report Info is not allowed
+// (decision C, plans/plan-report-info-exports-tablas).
 // =============================================================================
 
 import * as React from 'react'
@@ -401,8 +402,7 @@ export default function PayrollReportPage() {
         density="compact"
         zebraRows
         stickyHeader
-        enableExport
-        exportFileName={`payroll-report-${week}`}
+        enableExport={false}
         globalFilterPlaceholder={t('mockPayrollReport.searchPlaceholder')}
         tableScrollHeight="calc(100dvh - 24rem)"
         emptyState={

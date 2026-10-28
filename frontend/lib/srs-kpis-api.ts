@@ -182,7 +182,7 @@ export interface KpiQueryParams {
   historyMonths?: CollectionsHistoryMonths
 }
 
-function buildKpiQuery(params: KpiQueryParams): string {
+export function buildKpiQuery(params: KpiQueryParams): string {
   const qs = new URLSearchParams({
     fechaDesde: params.fechaDesde,
     fechaHasta: params.fechaHasta,
@@ -220,6 +220,10 @@ export const fetchProductionByWeek = (params: KpiQueryParams) =>
 
 export const fetchProductionByDealer = (params: KpiQueryParams) =>
   getKpi<ProductionDealerRow[]>('production/by-dealer', params)
+
+/** Excel of Production vs Goal, built by Nest with Report Info (plans/plan-report-info-exports-tablas §5.2). */
+export const productionByDealerExportUrl = (params: KpiQueryParams) =>
+  `/api/srs-kpis/kpis/production/by-dealer/export${buildKpiQuery(params)}`
 export const fetchBillingKpi = (params: KpiQueryParams) => getKpi<BillingKpi>('billing', params)
 export const fetchBillingByWeek = (params: KpiQueryParams) =>
   getKpi<BillingWeekPoint[]>('billing/by-week', params)

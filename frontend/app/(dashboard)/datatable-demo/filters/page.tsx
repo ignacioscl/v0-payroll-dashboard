@@ -226,6 +226,7 @@ export default function DataTableFiltersPage() {
           columns={columns}
           data={query.data?.results ?? []}
           isLoading={query.isFetching}
+          enableExport
           exportFileName="employees-filtered"
           pagination={{
             pageIndex,

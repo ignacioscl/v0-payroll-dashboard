@@ -267,6 +267,23 @@ export class InvoiceRepository {
   }
 
   /**
+   * The rows of the grid's own «Export» (plans/plan-report-info-exports-tablas §6): exportRowChunks
+   * plus Partial Invoiced per chunk when the grid has «Include partial invoices» on, as listPage
+   * does for a page. exportRowChunks stays as is for Export / Email.
+   */
+  async *listExportRowChunks(
+    f: InvoiceListFilter,
+    chunkSize = 1000,
+  ): AsyncGenerator<InvoiceRowDto[]> {
+    for await (const chunk of this.exportRowChunks(f, chunkSize)) {
+      if (f.includePartial) {
+        await this.addPartialInvoiced(f, [...new Set(chunk.map((r) => r.id))], chunk)
+      }
+      yield chunk
+    }
+  }
+
+  /**
    * «Include removed dealers» on: the removed dealers that have rows in this export, after every
    * filter of the list (the same branches as exportRowChunks), by name (§5 of
    * plan-totales-income-centavos, M2). Their rows say «(removed)» and Report Info names them.

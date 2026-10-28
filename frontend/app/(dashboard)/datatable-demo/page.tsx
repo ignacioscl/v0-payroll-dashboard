@@ -225,6 +225,7 @@ export default function DataTableBasicPage() {
         columns={columns}
         data={query.data?.results ?? []}
         isLoading={query.isFetching}
+        enableExport
         exportFileName="employees"
         pagination={{
           pageIndex,
