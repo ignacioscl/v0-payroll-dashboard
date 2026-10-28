@@ -120,8 +120,9 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
       enableGlobalFilter={false}
       recordsCount={totalWos}
       recordsCountLabel={t('mockKpis.tableUnbilledWos')}
-      enableExport
-      exportFileName="kpi-unbilled-by-dealer"
+      // No Excel while its tab is hidden: it would go out without Report Info (decision C,
+      // plans/plan-report-info-exports-tablas). When the tab comes back, it gets a Nest export.
+      enableExport={false}
       toolbarLeading={
         <div className="flex flex-col">
           <span className="text-base font-semibold">{t('mockKpis.chartUnbilledByDealer')}</span>

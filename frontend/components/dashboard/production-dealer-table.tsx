@@ -11,7 +11,12 @@ import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
-import type { ProductionDealerRow } from '@/lib/srs-kpis-api'
+import {
+  productionByDealerExportUrl,
+  type KpiQueryParams,
+  type ProductionDealerRow,
+} from '@/lib/srs-kpis-api'
+import { ServerXlsxExportButton } from '@/components/shared/server-xlsx-export-button'
 import { fmtMoney } from '@/lib/kpi-money'
 
 function AttainmentBadge({ pct }: { pct: number }) {
@@ -36,11 +41,18 @@ function AttainmentBadge({ pct }: { pct: number }) {
 type ProductionDealerTableProps = {
   data?: ProductionDealerRow[]
   loading?: boolean
-  /** «Include removed dealers» on: these rows show «Removed» and export «(removed)» (§5). */
+  /** «Include removed dealers» on: these rows show «Removed» (§5); Nest marks them in the Excel. */
   removedIds?: ReadonlySet<number>
+  /** Filters of the grid: the Excel is built by Nest with them (plans/plan-report-info-exports-tablas §5.2). */
+  exportParams?: KpiQueryParams | null
 }
 
-export function ProductionDealerTable({ data, loading, removedIds }: ProductionDealerTableProps) {
+export function ProductionDealerTable({
+  data,
+  loading,
+  removedIds,
+  exportParams,
+}: ProductionDealerTableProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const columnPinning = React.useMemo(
@@ -161,8 +173,16 @@ export function ProductionDealerTable({ data, loading, removedIds }: ProductionD
       defaultPageSize={25}
       includeAllPageSize
       enableGlobalFilter={false}
-      enableExport
-      exportFileName="kpi-production-by-dealer"
+      // The Excel comes from Nest with Report Info (D5), not from the DataTable exporter.
+      enableExport={false}
+      exportAction={
+        <ServerXlsxExportButton
+          url={exportParams ? productionByDealerExportUrl(exportParams) : null}
+          rowCount={rows.length}
+          fallbackFileName="production_vs_goal.xlsx"
+          disabled={Boolean(loading) || rows.length === 0}
+        />
+      }
       toolbarLeading={
         <span className="text-base font-semibold">{t('mockKpis.chartProductionVsGoal')}</span>
       }

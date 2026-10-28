@@ -464,11 +464,18 @@ export interface DataTableProps<TData, TValue = unknown> {
 
   // ---------- Toolbar ----------
   enableViewOptions?: boolean
+  /**
+   * The browser-side Excel of the grid. Off by default: every export carries Report Info
+   * (rule xls-export-report-info) and it is built in Nest (D5), so a PRO grid uses `exportAction`
+   * with a button that downloads the file from the backend (plans/plan-report-info-exports-tablas §8).
+   */
   enableExport?: boolean
   exportFileName?: string
   /** Formats offered in the toolbar export menu. Default both. */
   exportFormats?: Array<'xlsx' | 'csv'>
   fetchAllRowsForExport?: () => Promise<TData[]>
+  /** Export button of the grid, drawn where the DataTable export goes (right end of the toolbar). */
+  exportAction?: React.ReactNode
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
   /** When set, overrides the toolbar records counter (e.g. total WOs on grouped tables). */
@@ -554,10 +561,11 @@ export function DataTable<TData, TValue = unknown>({
   infiniteScroll,
   footer,
   enableViewOptions = true,
-  enableExport = true,
+  enableExport = false,
   exportFileName,
   exportFormats,
   fetchAllRowsForExport,
+  exportAction,
   toolbarLeading,
   toolbarTrailing,
   recordsCount,
@@ -1118,6 +1126,7 @@ export function DataTable<TData, TValue = unknown>({
         exportFileName={exportFileName}
         exportFormats={exportFormats}
         fetchAllRowsForExport={fetchAllRowsForExport}
+        exportAction={exportAction}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}
         showPageSize={showPageSizeInInfiniteScroll || !isInfinite}

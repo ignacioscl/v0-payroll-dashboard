@@ -11,6 +11,7 @@ import {
   buildDealerFilterSql,
   buildDealerRestrictionClause,
   removedDealersProvider,
+  removedDealersOfProviderListSql,
   mysqlWeekBucketStartExpr,
   woCompletedPeriodColumn,
   woDoneAtJoinScoped,
@@ -367,6 +368,40 @@ export class ProductionKpiRepository {
       })
       .filter((row) => row.wos > 0 || row.value > 0)
       .sort((a, b) => b.value - a.value)
+  }
+
+  /**
+   * Every removed dealer of the session provider (D8), as the screen marks them. Only for the export
+   * of Production vs Goal (plans/plan-report-info-exports-tablas §5.1.2).
+   */
+  async removedDealersOfProvider(idDealerProvider: number): Promise<{ dealerId: number; dealer: string }[]> {
+    const q = removedDealersOfProviderListSql(idDealerProvider)
+    const rows: { dealerId: unknown; dealer: unknown }[] = await this.srs.query(q.sql, q.params)
+    return rows.map((r) => ({ dealerId: Number(r.dealerId), dealer: String(r.dealer ?? '') }))
+  }
+
+  /**
+   * How many of the requested dealers are related to the session provider (DEALER_REL) and, for
+   * users with assigned dealers, pass RESTRICTION_DEALER_V2. The export names them in Report Info
+   * with GET_DEALER_NAME_BY_PROVIDER, which does not look at the scope: if the count is short, an id
+   * from elsewhere came in the request (same check as the dealer-ranking export).
+   */
+  async countRequestedDealersInScope(filter: SrsKpiFilter): Promise<number> {
+    const ids = [...new Set(filter.dealerIds)]
+    if (ids.length === 0) return 0
+    const placeholders = ids.map(() => '?').join(',')
+    const restriction = filter.skipDealerRestriction ? '' : 'AND RESTRICTION_DEALER_V2(?, dr.id_dealer_customer) = 1'
+    const params: number[] = [filter.idDealerProvider, ...ids]
+    if (!filter.skipDealerRestriction) params.push(filter.idUsuario)
+    const rows: { n: number | string }[] = await this.srs.query(
+      `SELECT COUNT(DISTINCT dr.id_dealer_customer) AS n
+       FROM DEALER_REL dr
+       WHERE dr.id_dealer_provider = ?
+         AND dr.id_dealer_customer IN (${placeholders})
+         ${restriction}`,
+      params,
+    )
+    return Number(rows[0]?.n ?? 0)
   }
 
   async getProductionByWeek(filter: SrsKpiFilter): Promise<ProductionWeekRowDto[]> {

@@ -20,6 +20,7 @@ import {
 import { GenericInvoiceDialog } from '@/components/billing/generic-invoice-dialog'
 import { InvoiceExportDialog } from '@/components/billing/invoice-export-dialog'
 import { InvoiceGeneralStatementDialog } from '@/components/billing/invoice-general-statement-dialog'
+import { InvoiceListExportButton } from '@/components/billing/invoice-list-export-button'
 import { InvoicePoRoDialog } from '@/components/billing/invoice-po-ro-dialog'
 import { InvoicePrintDialog } from '@/components/billing/invoice-print-dialog'
 import { InvoiceRowActions } from '@/components/billing/invoice-row-actions'
@@ -54,7 +55,6 @@ import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import {
   fetchInvoiceDetail,
-  fetchInvoiceList,
   type InvoiceRow,
   type InvoiceSummary,
 } from '@/lib/srs-invoices-api'
@@ -672,8 +672,6 @@ function TotalsBar({
 }
 
 /* -------------------------------- table ---------------------------------- */
-
-const EXPORT_PAGE_SIZE = 200
 
 export function InvoiceListTable({
   query,
@@ -1344,19 +1342,6 @@ export function InvoiceListTable({
     [t, showDealerSubline, removedIds, idDealer, payedFilter, canEditPoRo, enableSelection, input, includePartial],
   )
 
-  const fetchAllRowsForExport = React.useCallback(async (): Promise<InvoiceRow[]> => {
-    if (!input) return []
-    const all: InvoiceRow[] = []
-    let page = 1
-    for (;;) {
-      const res = await fetchInvoiceList({ ...input, page, pageSize: EXPORT_PAGE_SIZE })
-      all.push(...res.results)
-      if (!res.hasMore) break
-      page += 1
-    }
-    return all
-  }, [input])
-
   const emptyState = !hydrated ? (
     <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
   ) : !hasDealer ? (
@@ -1559,10 +1544,8 @@ export function InvoiceListTable({
             />
           ) : undefined
         }
-        enableExport
-        exportFormats={['xlsx']}
-        exportFileName="invoices"
-        fetchAllRowsForExport={fetchAllRowsForExport}
+        // The grid's Excel comes from Nest with Report Info (plans/plan-report-info-exports-tablas §6).
+        exportAction={<InvoiceListExportButton input={input} enabled={gateReady} />}
         tableScrollHeight="calc(100dvh - 22rem)"
         flexColumnId="detail"
         enableTableFocus

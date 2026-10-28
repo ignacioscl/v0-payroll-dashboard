@@ -133,6 +133,7 @@ export default function ProductionVsGoalPage() {
         data={prodDealer.data}
         loading={prodDealer.isLoading}
         removedIds={removedDealers.removedIds}
+        exportParams={kpiParams}
       />
     </div>
   )

@@ -144,3 +144,12 @@ export type InvoiceExportStoredFilters = {
   /** Send Email / Create File: the mail fields, as they passed validation. */
   mail?: InvoiceExportMailBodyDto & { action: 'email' | 'queue' }
 }
+
+/**
+ * «Export» of the grid's toolbar (plans/plan-report-info-exports-tablas §6): only the grid's query.
+ * `listExport` tells it apart from InvoiceExportStoredFilters in the ticket store's union.
+ */
+export type InvoiceListExportStoredFilters = {
+  listExport: true
+  query: InvoiceListQueryDto
+}

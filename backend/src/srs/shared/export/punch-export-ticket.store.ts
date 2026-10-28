@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import type { InvoiceExportStoredFilters } from '../../billing/dto/invoice-export.dto'
+import type {
+  InvoiceExportStoredFilters,
+  InvoiceListExportStoredFilters,
+} from '../../billing/dto/invoice-export.dto'
 import type { DealerRankingStatus } from '../../punch/dto/punch-dealer-ranking.dto'
 import type { PunchListLiveStatus } from '../../punch/dto/punch-list.dto'
 
@@ -19,7 +22,12 @@ export type PunchExportTicketState = 'pending' | 'running' | 'done' | 'error'
  * ni por la de invoices, ni al revés. El default es `punch-list`, así las llamadas
  * de P4 no cambian.
  */
-export type PunchExportTicketKind = 'punch-list' | 'dealer-ranking' | 'invoice-export'
+export type PunchExportTicketKind =
+  | 'punch-list'
+  | 'dealer-ranking'
+  | 'invoice-export'
+  /** Billing › Invoices, «Export» of the grid's toolbar (plans/plan-report-info-exports-tablas §6). */
+  | 'invoice-list-export'
 
 export type PunchExportStoredFilters = {
   fechaDesde: string
@@ -54,6 +62,7 @@ export type PunchExportAnyStoredFilters =
   | PunchExportStoredFilters
   | DealerRankingExportStoredFilters
   | InvoiceExportStoredFilters
+  | InvoiceListExportStoredFilters
 
 export type PunchExportTicket = {
   id: string

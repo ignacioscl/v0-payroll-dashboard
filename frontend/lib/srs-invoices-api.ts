@@ -331,6 +331,41 @@ export async function fetchInvoiceExportStatus(ticket: string): Promise<InvoiceE
   )
 }
 
+/* «Export» of the grid's toolbar, built by Nest with Report Info (plans/plan-report-info-exports-tablas §6). */
+
+/** Download path of the proxy, without query (for `startTicketDownload`). */
+export const INVOICE_LIST_EXPORT_DOWNLOAD_PATH = '/api/srs-kpis/billing/invoices/list-export'
+
+/** Same query as the grid (`buildInvoiceQuery`), so the file reads every filter and the order like the list. */
+export async function fetchInvoiceListExportPrepare(
+  params: Omit<InvoiceListParams, 'page' | 'pageSize'>,
+): Promise<{ ticket: string; expiresAt: string }> {
+  const res = await fetch(
+    `${INVOICE_LIST_EXPORT_DOWNLOAD_PATH}/prepare${buildInvoiceQuery({ ...params, page: 1 })}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: '{}',
+    },
+  )
+  return readNestJson<{ ticket: string; expiresAt: string }>(
+    res,
+    `billing/invoices/list-export/prepare (${res.status})`,
+  )
+}
+
+export async function fetchInvoiceListExportStatus(ticket: string): Promise<InvoiceExportTicketStatus> {
+  const qs = new URLSearchParams({ ticket })
+  const res = await fetch(`${INVOICE_LIST_EXPORT_DOWNLOAD_PATH}/status?${qs.toString()}`, {
+    cache: 'no-store',
+  })
+  return readNestJson<InvoiceExportTicketStatus>(
+    res,
+    `billing/invoices/list-export/status (${res.status})`,
+  )
+}
+
 export async function fetchInvoiceList(params: InvoiceListParams): Promise<InvoiceListResponse> {
   const res = await fetch(`/api/srs-kpis/billing/invoices${buildInvoiceQuery(params)}`, {
     cache: 'no-store',
