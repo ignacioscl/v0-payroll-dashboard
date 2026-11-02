@@ -17,6 +17,11 @@ import {
   ReceiptText,
   Shield,
   Layers,
+  Receipt,
+  List,
+  PieChart,
+  Repeat,
+  Settings,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
 
@@ -58,6 +63,17 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     children: [{ nameKey: 'nav.invoices', href: '/billing/invoices', icon: ReceiptText }],
   },
   {
+    nameKey: 'nav.expenses',
+    href: '/expenses',
+    icon: Receipt,
+    children: [
+      { nameKey: 'nav.expensesList', href: '/expenses', icon: List },
+      { nameKey: 'nav.expensesAnalytics', href: '/expenses/analytics', icon: PieChart },
+      { nameKey: 'nav.expensesRecurring', href: '/expenses/recurring', icon: Repeat },
+      { nameKey: 'nav.expensesSettings', href: '/expenses/settings', icon: Settings },
+    ],
+  },
+  {
     nameKey: 'nav.rolesAdmin',
     href: '/roles',
     icon: Shield,
@@ -93,6 +109,17 @@ const ROLE_TEMPLATES_NAV_HREFS = ['/roles/templates'] as const
 /** System settings — gated by ROL_ACCION 141 or system admin (`canAccessSystemConfig`). */
 export const SETTINGS_NAV_HREFS = ['/settings'] as const
 
+/**
+ * Expenses — gated by ROL_ACCION 111 or system admin (`canAccessExpenses`). The sub-routes
+ * (`/expenses/new`, `/expenses/[id]/edit`, `/expenses/recurring/[id]`) open by prefix.
+ */
+export const EXPENSES_NAV_HREFS = [
+  '/expenses',
+  '/expenses/analytics',
+  '/expenses/recurring',
+  '/expenses/settings',
+] as const
+
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
 }
@@ -106,11 +133,13 @@ export function isProdAllowedPath(
   canManageRoleTemplates = false,
   canAccessSystemConfig = false,
   canAccessProductionGoal = false,
+  canAccessExpenses = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
   const matches = (hrefs: readonly string[]) =>
     hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
+  if (canAccessExpenses && matches(EXPENSES_NAV_HREFS)) return true
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessProductionGoal && matches(PROD_GOAL_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
@@ -146,6 +175,8 @@ export function getVisibleNavigation(options: {
   canManageRoleTemplates?: boolean
   /** External dealer company (type === 1): hide Dashboard nav item. */
   isCompanyTypeCompany?: boolean
+  /** Expenses group (111 or admin). */
+  canAccessExpenses?: boolean
   t: (key: MessageKey) => string
 }): NavItem[] {
   const {
@@ -157,6 +188,7 @@ export function getVisibleNavigation(options: {
     canViewRoles = false,
     canManageRoleTemplates = false,
     isCompanyTypeCompany = false,
+    canAccessExpenses = false,
     t,
   } = options
 
@@ -172,7 +204,8 @@ export function getVisibleNavigation(options: {
     !canAccessProdKpis &&
     !canAccessBillingInvoices &&
     !canViewRoles &&
-    !canManageRoleTemplates
+    !canManageRoleTemplates &&
+    !canAccessExpenses
   ) {
     return []
   }
@@ -185,6 +218,7 @@ export function getVisibleNavigation(options: {
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
     ...(canViewRoles ? ['/roles'] : []),
     ...(canManageRoleTemplates ? ROLE_TEMPLATES_NAV_HREFS : []),
+    ...(canAccessExpenses ? EXPENSES_NAV_HREFS : []),
   ]
 
   return withoutDashboard(

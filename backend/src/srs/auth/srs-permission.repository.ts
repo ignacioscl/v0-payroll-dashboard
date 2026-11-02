@@ -50,6 +50,21 @@ export const ROL_ACCION_EDIT_PAYMENT_TYPE_ALT = 136
 /** Time Tracking > View Fake GPS (migration 004). Sin él, Fake GPS (flag 8) no se ve. */
 export const ROL_ACCION_VIEW_FAKE_GPS = 146
 
+/** Expenses > Allow adding expenses (legacy 110): Add Expense y las altas al vuelo de compañía/categoría. */
+export const ROL_ACCION_EXPENSES_ADD = 110
+
+/**
+ * Expenses > Expense approval or reject permission (legacy 111): el menú Expenses, las cuatro pantallas de Pro,
+ * aprobar/rechazar y toda la administración de reglas recurrentes y del catálogo (como el menú legacy).
+ */
+export const ROL_ACCION_EXPENSES_APPROVE = 111
+
+/** Expenses > Add an expense on behalf of another employee (legacy 117): el combo «Assign to employee». */
+export const ROL_ACCION_EXPENSES_ON_BEHALF = 117
+
+/** Expenses > Allow edit expense (legacy 118): editar, borrar y restaurar gastos. */
+export const ROL_ACCION_EXPENSES_EDIT = 118
+
 /**
  * Port parcial de `PayrollPermissionService::userHasRolAccion` /
  * `getPermissionIds` → `loadAssignedRolAccionesForRole` → `RolDao::loadRolAccion`

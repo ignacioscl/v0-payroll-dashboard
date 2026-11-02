@@ -1,0 +1,57 @@
+{
+  "_": "Casos compartidos de las reglas pareja de Expenses (backend/src/features/srs-expense/rules/expense-rules.ts <-> frontend/lib/expenses/expense-rules.ts). Los de amountBad/amountGood/split vienen de plans/plan-recurring-monto-fijo/pruebas/rules_cases.json (PHP y JS legacy pasan con ellos).",
+  "amountBad": ["", "abc", "-1", "0", "0.00", "10.123", "1e3", "100000000"],
+  "amountGood": ["0.01", "1250", "1250.5", "99999999.99"],
+  "percentBad": ["", "abc", "-1", "100.01", "10.123", "101"],
+  "percentGood": ["0", "100", "33.33", "0.5"],
+  "split": [
+    { "name": "dos dealers justos", "amount": "1000.00",
+      "assigns": [{"id": 1, "percentage": "60.00"}, {"id": 2, "percentage": "40.00"}],
+      "expected": {"1": "600.00", "2": "400.00"} },
+    { "name": "tres tercios: el centavo va al mas alto", "amount": "100.00",
+      "assigns": [{"id": 1, "percentage": "33.33"}, {"id": 2, "percentage": "33.33"}, {"id": 3, "percentage": "33.34"}],
+      "expected": {"1": "33.33", "2": "33.33", "3": "33.34"} },
+    { "name": "Payroll Taxes 8125: 12 + el resto", "amount": "8125.00",
+      "assigns": [{"id": 1, "percentage": "7.69"}, {"id": 2, "percentage": "7.69"}, {"id": 3, "percentage": "7.69"}, {"id": 4, "percentage": "7.69"}, {"id": 5, "percentage": "7.69"}, {"id": 6, "percentage": "7.69"}, {"id": 7, "percentage": "7.69"}, {"id": 8, "percentage": "7.69"}, {"id": 9, "percentage": "7.69"}, {"id": 10, "percentage": "7.69"}, {"id": 11, "percentage": "7.69"}, {"id": 12, "percentage": "7.69"}, {"id": 13, "percentage": "7.72"}],
+      "expected": {"1": "624.81", "2": "624.81", "3": "624.81", "4": "624.81", "5": "624.81", "6": "624.81", "7": "624.81", "8": "624.81", "9": "624.81", "10": "624.81", "11": "624.81", "12": "624.81", "13": "627.28"} },
+    { "name": "un dealer en 0 recibe 0.00", "amount": "50.00",
+      "assigns": [{"id": 1, "percentage": "100.00"}, {"id": 2, "percentage": "0.00"}],
+      "expected": {"1": "50.00", "2": "0.00"} },
+    { "name": "empate: el resto va al id mas alto", "amount": "100.01",
+      "assigns": [{"id": 1, "percentage": "50.00"}, {"id": 2, "percentage": "50.00"}],
+      "expected": {"1": "50.00", "2": "50.01"} }
+  ],
+  "splitEqual": [
+    { "name": "100 en 3", "amount": "100.00", "ids": [10, 20, 30], "expected": {"10": "33.33", "20": "33.33", "30": "33.34"} },
+    { "name": "10 en 4: dos centavos sobran, van a los ids mas altos", "amount": "10.00", "ids": [4, 3, 2, 1], "expected": {"1": "2.50", "2": "2.50", "3": "2.50", "4": "2.50"} },
+    { "name": "0.05 en 4: un centavo cada uno y el ultimo dos", "amount": "0.05", "ids": [1, 2, 3, 4], "expected": {"1": "0.01", "2": "0.01", "3": "0.01", "4": "0.02"} },
+    { "name": "1 en 1", "amount": "1.00", "ids": [7], "expected": {"7": "1.00"} }
+  ],
+  "percentSplitBad": [
+    { "name": "suma 99.99", "rows": [{"id": 1, "percentage": "50.00"}, {"id": 2, "percentage": "49.99"}] },
+    { "name": "suma 100.01", "rows": [{"id": 1, "percentage": "50.00"}, {"id": 2, "percentage": "50.01"}] },
+    { "name": "un solo dealer", "rows": [{"id": 1, "percentage": "100.00"}] },
+    { "name": "porcentaje invalido", "rows": [{"id": 1, "percentage": "abc"}, {"id": 2, "percentage": "100"}] }
+  ],
+  "percentSplitGood": [
+    { "name": "60/40", "rows": [{"id": 1, "percentage": "60"}, {"id": 2, "percentage": "40"}] },
+    { "name": "tres con decimales", "rows": [{"id": 1, "percentage": "33.33"}, {"id": 2, "percentage": "33.33"}, {"id": 3, "percentage": "33.34"}] }
+  ],
+  "amountSplitBad": [
+    { "name": "un cero", "rows": [{"id": 1, "amount": "10.00"}, {"id": 2, "amount": "0"}] },
+    { "name": "vacio", "rows": [{"id": 1, "amount": "10.00"}, {"id": 2, "amount": ""}] },
+    { "name": "un solo dealer", "rows": [{"id": 1, "amount": "10.00"}] }
+  ],
+  "amountSplitGood": [
+    { "name": "dos montos", "rows": [{"id": 1, "amount": "10.00"}, {"id": 2, "amount": "0.01"}], "expectedTotal": "10.01" }
+  ],
+  "receiptDate": {
+    "today": "2026-11-02",
+    "bad": ["", "2026-02-30", "2026-13-01", "02/11/2026", "2026-11-03", "2027-04-28", "abc", "2026-1-5"],
+    "good": ["2026-11-02", "2026-02-28", "2024-02-29", "2015-01-01", "0202-09-15"]
+  },
+  "ruleDates": {
+    "bad": [{"start": "", "end": null}, {"start": "2026-02-30", "end": null}, {"start": "2026-11-02", "end": "2026-11-01"}, {"start": "2026-11-02", "end": "2026-13-01"}],
+    "good": [{"start": "2026-11-02", "end": null}, {"start": "2026-11-02", "end": "2026-11-02"}, {"start": "2026-11-02", "end": "2027-01-01"}]
+  }
+}

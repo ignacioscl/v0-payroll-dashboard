@@ -29,7 +29,7 @@ function MainContent({ children }: { children: React.ReactNode }) {
         )}
       >
         <ProdRouteGuard>
-          <div className="p-4 md:p-6">{children}</div>
+          <div className="p-4 pb-32 md:p-6 md:pb-24">{children}</div>
         </ProdRouteGuard>
       </main>
     </>
