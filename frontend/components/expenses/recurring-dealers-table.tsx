@@ -235,7 +235,8 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
               <th className="px-3 py-2 text-left font-medium">{t('expenses.branch')}</th>
               {!isFixed ? <th className="w-36 px-3 py-2 text-left font-medium">{t('expenses.mode')}</th> : null}
               <th className="w-40 px-3 py-2 text-right font-medium">{isFixed ? t('expenses.amount') : t('expenses.percent')}</th>
-              <th className="w-32 px-3 py-2 text-right font-medium">{t('expenses.dealerAmount')}</th>
+              {/* By fixed amount: el importe es el que se escribe; una segunda columna lo repetiría. */}
+              {!isFixed ? <th className="w-32 px-3 py-2 text-right font-medium">{t('expenses.dealerAmount')}</th> : null}
               <th className="w-12 px-1 py-2" />
             </tr>
           </thead>
@@ -300,9 +301,11 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
                       </p>
                     ) : null}
                   </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                    {perRun[a.id] ? fmtAmount(perRun[a.id]) : '—'}
-                  </td>
+                  {!isFixed ? (
+                    <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                      {perRun[a.id] ? fmtAmount(perRun[a.id]) : '—'}
+                    </td>
+                  ) : null}
                   <td className="px-1 py-1.5 text-right">
                     <TooltipProvider delayDuration={300}>
                       <Tooltip>
@@ -333,7 +336,7 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
               >
                 {isFixed ? fmtAmount(fromCents(fixedTotal)) : pctTotal === null ? '—' : `${fromCents(pctTotal)}%`}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">{rule.amount ? fmtAmount(rule.amount) : '—'}</td>
+              {!isFixed ? <td className="px-3 py-2 text-right tabular-nums">{rule.amount ? fmtAmount(rule.amount) : '—'}</td> : null}
               <td />
             </tr>
           </tfoot>

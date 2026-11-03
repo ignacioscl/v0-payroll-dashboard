@@ -352,16 +352,18 @@ export function SearchableCombobox<T>({
       plural: minSearchChars === 1 ? '' : 's',
     })
 
+  // El encabezado se arma en cada render, también antes de que lleguen los items.
+  const resultCount = items?.length ?? 0
   const renderedHeading =
     resultsHeading ?? (
       <span className="flex items-center justify-between gap-2 px-1">
         <span>{t('combobox.results')}</span>
         <span className="text-[10px] font-normal text-muted-foreground/80">
-          {items!.length}
-          {typeof totalCount === 'number' && totalCount > items!.length
+          {resultCount}
+          {typeof totalCount === 'number' && totalCount > resultCount
             ? t('combobox.ofTotal', { total: totalCount })
             : ''}{' '}
-          {items!.length === 1 ? t('combobox.resultSingular') : t('combobox.resultPlural')}
+          {resultCount === 1 ?t('combobox.resultSingular') : t('combobox.resultPlural')}
         </span>
       </span>
     )

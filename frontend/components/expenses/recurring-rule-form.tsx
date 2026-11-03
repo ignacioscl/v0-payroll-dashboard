@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Save, Split, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
@@ -10,6 +9,8 @@ import { toast } from 'sonner'
 import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { Button } from '@/components/ui/button'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import { RecurringDealersTable } from '@/components/expenses/recurring-dealers-table'
+import { FormDialog, FormSection } from '@/components/layout/form-dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -38,15 +39,21 @@ function mapServerField(field: string): string {
   return field
 }
 
-/** Datos de la regla (F4.1). Alta: `POST` y la página pasa a `/expenses/recurring/[id]`. */
-export function RecurringRuleForm({ rule }: { rule?: RuleDetail }) {
+/** Datos y dealers de la regla, en modal (F4.1). Alta: `POST` y el modal sigue con la regla creada. */
+export function RecurringRuleForm({
+  rule,
+  onClose,
+  onCreated,
+}: {
+  rule?: RuleDetail
+  onClose: () => void
+  onCreated?: (id: number) => void
+}) {
   const { t } = useTranslation()
-  const router = useRouter()
   const createMut = useCreateRule()
   const updateMut = useUpdateRule()
   const splitMut = useChangeRuleSplit()
   const todayNy = React.useMemo(() => todayInNewYork(), [])
-  const isEdit = Boolean(rule)
 
   const schema = React.useMemo(
     () =>
@@ -88,7 +95,7 @@ export function RecurringRuleForm({ rule }: { rule?: RuleDetail }) {
       } else {
         const created = await createMut.mutateAsync(recurringFormValuesToCreatePayload(values))
         toast.success(t('expenses.toastRuleSaved'))
-        router.replace(`/expenses/recurring/${created.id}`)
+        onCreated?.(created.id)
       }
     } catch (err) {
       if (isExpensesApiError(err) && applyServerErrors(err.validationErrors, mapServerField)) return
@@ -119,9 +126,28 @@ export function RecurringRuleForm({ rule }: { rule?: RuleDetail }) {
   }
 
   return (
+    <FormDialog
+      open
+      onOpenChange={onClose}
+      title={rule ? rule.description : t('expenses.newRuleTitle')}
+      description={rule ? t('expenses.ruleTitle') : undefined}
+      busy={busy}
+      footer={
+        <>
+          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+            <X className="size-4" />
+            {t('expenses.cancel')}
+          </Button>
+          <Button type="submit" form={FORM_ID} disabled={busy}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {busy ? t('expenses.saving') : t('expenses.save')}
+          </Button>
+        </>
+      }
+    >
     <Form {...form}>
-      <form id={FORM_ID} className="flex min-w-0 flex-col gap-4 pb-20" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+      <form id={FORM_ID} className="flex min-w-0 flex-col gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
             name="description"
@@ -282,19 +308,16 @@ export function RecurringRuleForm({ rule }: { rule?: RuleDetail }) {
               </FormItem>
             )}
           />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => router.push('/expenses/recurring')}>
-            <X className="size-4" />
-            {isEdit ? t('expenses.back') : t('expenses.cancel')}
-          </Button>
-          <Button type="submit" form={FORM_ID} disabled={busy}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {busy ? t('expenses.saving') : t('expenses.save')}
-          </Button>
-        </div>
+        </FormSection>
       </form>
+
+      {rule ? (
+        <div className="mt-4">
+          <FormSection>
+            <RecurringDealersTable rule={rule} />
+          </FormSection>
+        </div>
+      ) : null}
 
       <ConfirmActionDialog
         open={confirmSplit !== null}
@@ -313,5 +336,6 @@ export function RecurringRuleForm({ rule }: { rule?: RuleDetail }) {
         onConfirm={() => void runSplitChange()}
       />
     </Form>
+    </FormDialog>
   )
 }

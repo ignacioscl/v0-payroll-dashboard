@@ -223,7 +223,9 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       const rows = await db.query('SELECT id_detailer, notes, description, receipt_number, id_exp_group, estado FROM EXP_EXPENSE WHERE id = ?', [detail.id])
       expect(rows[0]).toMatchObject({ id_detailer: PROVIDER, notes: '', description: 'Rollos', receipt_number: 'A-1', id_exp_group: null, estado: 1 })
       const logs = await db.query('SELECT description, tipo FROM LOG_GENERIC WHERE id_expense = ?', [detail.id])
-      expect(logs).toEqual([{ description: 'Expense created', tipo: 7 }])
+      expect(logs).toEqual([{ description: 'Expense created ($125.50)', tipo: 7 }])
+      // Un gasto suelto no lleva dealer en el log: es el del gasto.
+      expect((await facade.log(admin, detail.id)).data[0].dealer).toBeNull()
       const company = await db.query('SELECT id_parent FROM GENERIC_DATA WHERE id = ?', [COMPANY_1])
       expect(Number(company[0].id_parent)).toBe(CATEGORY_1)
       // La última categoría cambia con cada gasto.
@@ -253,7 +255,7 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(g[0].deleted_at).toBeNull()
       expect(Number(g[0].split_type)).toBe(1)
       const glog = await db.query('SELECT description, tipo FROM LOG_GENERIC WHERE id_exp_group = ?', [group.groupId])
-      expect(glog).toEqual([{ description: 'Group created (3 branches, Equal)', tipo: 7 }])
+      expect(glog).toEqual([{ description: 'Group created (3 dealers, Equal)', tipo: 7 }])
     }))
 
   it('crea grupos By percentage y By amount con la regla del cron', () =>
@@ -359,6 +361,12 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       // El log sí se ve.
       const log = await facade.log(restricted, rowA.id)
       expect(log.data.some((l) => l.scope === 'group')).toBe(true)
+      // Sin las líneas ni el nombre de los dealers fuera de su alcance.
+      const nameOf = async (id: number) => (await db.query('SELECT razon_social FROM CONTRATISTA WHERE id = ?', [id]))[0].razon_social
+      const dealers = log.data.map((l) => l.dealer)
+      expect(dealers).toContain(await nameOf(DEALER_A))
+      expect(dealers).not.toContain(await nameOf(DEALER_B))
+      expect((await facade.log(admin, rowA.id)).data.map((l) => l.dealer)).toContain(await nameOf(DEALER_B))
     }))
 
   it('estado mixto «k of n approved» y approve de grupo que respeta las ya decididas', () =>
@@ -378,7 +386,7 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       const stamps = await db.query('SELECT approved_date, is_approved FROM EXP_EXPENSE WHERE id IN (?, ?) ORDER BY id', [r1.id, r2.id])
       expect(stamps).toEqual(before)
       const logs = await db.query('SELECT description FROM LOG_GENERIC WHERE id_expense = ? ORDER BY id', [r1.id])
-      expect(logs.map((l: { description: string }) => l.description)).toEqual(['Expense created', 'Receipt approved'])
+      expect(logs.map((l: { description: string }) => l.description)).toEqual([expect.stringMatching(/^Expense created \(\$\d+\.\d{2}\)$/), 'Receipt approved'])
     }))
 
   it('editar un grupo con una fila aprobada: 409 solo si el reparto cambia de verdad; notes/description/receipt se aplican a todas', () =>
@@ -409,6 +417,18 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(changed.visibleTotal).toBe('50.00')
       const gone = await db.query('SELECT estado FROM EXP_EXPENSE WHERE id_exp_group = ? AND id_dealer = ?', [other.groupId, DEALER_B])
       expect(Number(gone[0].estado)).toBe(EXPENSE_ESTADO_RETIRED)
+      // El log del grupo trae las filas de todos los dealers, también la que salió, con su nombre e importe.
+      const names = await db.query('SELECT id, razon_social FROM CONTRATISTA WHERE id = ?', [DEALER_B])
+      const log = await facade.log(admin, changed.rows[0].id)
+      expect(log.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ description: 'Dealer removed ($50.00)', dealer: names[0].razon_social, scope: 'expense' }),
+          expect.objectContaining({ description: 'Expense created ($50.00)', dealer: names[0].razon_social }),
+          // El dealer que entra en una edición no se «crea»: se agrega.
+          expect.objectContaining({ description: 'Dealer added ($25.00)', dealer: (await db.query('SELECT razon_social FROM CONTRATISTA WHERE id = ?', [DEALER_C]))[0].razon_social }),
+        ]),
+      )
+      expect(log.data.find((l) => l.description.startsWith('Split changed'))?.dealer).toBeNull()
     }))
 
   it('borrar un grupo marca deleted_at y restaurar una fila lo reabre, con log por fila (tipo 7)', () =>
@@ -426,7 +446,7 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(g2[0].deleted_at).toBeNull()
       const log = await facade.log(admin, group.rows[0].id)
       const texts = log.data.map((l) => l.description)
-      expect(texts).toEqual(expect.arrayContaining(['Receipt activated', 'Receipt deleted', 'Expense created', 'Group deleted (3 branches)']))
+      expect(texts).toEqual(expect.arrayContaining(['Receipt activated', 'Receipt deleted', `Expense created ($${group.rows[0].amount})`, 'Group deleted (3 dealers)']))
       const tipos = await db.query('SELECT DISTINCT tipo FROM LOG_GENERIC WHERE id_expense = ? OR id_exp_group = ?', [group.rows[0].id, group.groupId])
       expect(tipos).toEqual([{ tipo: 7 }])
     }))
@@ -496,10 +516,10 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(g[0].deleted_at).toBeNull()
       const perRow = await db.query('SELECT COUNT(*) AS c FROM LOG_GENERIC WHERE id_expense IN (?, ?, ?) AND description = ?', [
         ...group.rows.map((r) => r.id),
-        'Group restored (3 branches)',
+        'Group restored (3 dealers)',
       ])
       expect(Number(perRow[0].c)).toBe(3)
-      const perGroup = await db.query('SELECT COUNT(*) AS c FROM LOG_GENERIC WHERE id_exp_group = ? AND id_expense IS NULL AND description = ?', [group.groupId, 'Group restored (3 branches)'])
+      const perGroup = await db.query('SELECT COUNT(*) AS c FROM LOG_GENERIC WHERE id_exp_group = ? AND id_expense IS NULL AND description = ?', [group.groupId, 'Group restored (3 dealers)'])
       expect(Number(perGroup[0].c)).toBe(1)
       // Ya restaurado: devuelve el grupo como está, sin escribir.
       const again = (await facade.restoreGroup(admin, group.groupId)) as ExpenseGroupRow
@@ -650,7 +670,7 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(info[0]).toEqual(['Field', 'Value'])
       expect(info.some((r) => r[0] === 'Screen' && r[1] === 'Expenses › Expenses List')).toBe(true)
       const data = await sheetRows(buffer(), 'Expenses')
-      expect(data[1]).toEqual(['Date', 'Company', 'Category', 'Branch', 'Amount', 'Assigned to', 'Created by', 'Status', 'Description', 'Receipt #', 'Notes'])
+      expect(data[1]).toEqual(['Date', 'Company', 'Category', 'Dealer', 'Amount', 'Assigned to', 'Created by', 'Status', 'Description', 'Receipt #', 'Notes'])
       expect(data.length - 2).toBeGreaterThanOrEqual(3)
     }))
 
@@ -734,6 +754,18 @@ describeIf('Expenses — integración contra la copia local (transacción que se
       expect(detail.amount).toBe('700.00')
       detail = await recurring.changeSplitType(admin, rule.id, { splitType: 'percent' })
       expect(detail.assigns[0]).toMatchObject({ automatic: true, percentage: '100.00', fixedAmount: null })
+
+      // Automatic grabados con el redondeo viejo del legacy (Insurance: 15 × 6.67 = 100.05 %): se usan recalculados,
+      // así que la regla corre, el detalle los muestra sumando 100 y el cambio a By fixed amount no queda bloqueado.
+      detail = await recurring.addDealers(admin, rule.id, { idDealers: [DEALER_B] })
+      await db.query('UPDATE EXP_EXPENSE_DEALER_ASSIGN SET percentage = 50.03 WHERE id_exp_repetitive = ?', [rule.id])
+      detail = await recurring.get(admin, rule.id)
+      expect(detail.canRun).toBeNull()
+      expect(detail.assigns.map((a) => a.percentage)).toEqual(['50.00', '50.00'])
+      expect(detail.totalPercent).toBe('100.00')
+      detail = await recurring.changeSplitType(admin, rule.id, { splitType: 'fixed' })
+      expect(detail.assigns.map((a) => a.fixedAmount)).toEqual(['350.00', '350.00'])
+      expect(detail.amount).toBe('700.00')
 
       await expect(recurring.get(otherCompany, rule.id)).rejects.toBeInstanceOf(NotFoundException)
       await recurring.remove(admin, rule.id)

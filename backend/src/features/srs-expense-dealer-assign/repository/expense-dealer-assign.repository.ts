@@ -41,10 +41,16 @@ export class ExpenseDealerAssignRepository extends BaseRepository<ExpenseDealerA
    * Los dealers de una regla con su nombre por `GET_DEALER_NAME_BY_PROVIDER(provider, dealer)` (regla
    * dealer-display-name-by-provider). El provider es el de la sesión.
    */
-  async listForRuleWithNames(idExpRepetitive: number, idDealerProvider: number): Promise<AssignWithDealer[]> {
+  listForRuleWithNames(idExpRepetitive: number, idDealerProvider: number): Promise<AssignWithDealer[]> {
+    return this.listForRulesWithNames([idExpRepetitive], idDealerProvider)
+  }
+
+  /** Lo mismo para varias reglas en una consulta (los avisos de una página del listado). */
+  async listForRulesWithNames(idsExpRepetitive: number[], idDealerProvider: number): Promise<AssignWithDealer[]> {
+    if (!idsExpRepetitive.length) return []
     const { entities, raw } = await this.createQueryBuilder('a')
       .addSelect('GET_DEALER_NAME_BY_PROVIDER(:prov, a.id_dealer)', 'dealerName')
-      .where('a.idExpRepetitive = :rule', { rule: idExpRepetitive })
+      .where('a.idExpRepetitive IN (:...rules)', { rules: idsExpRepetitive })
       .setParameter('prov', idDealerProvider)
       .orderBy('a.id', 'ASC')
       .getRawAndEntities()

@@ -1,6 +1,12 @@
 import {
   RULE_FREQUENCY_WEEKLY,
 } from 'src/features/srs-expense-repetitive/entity/expense-repetitive.entity'
+import {
+  SPLIT_BY_FIXED_AMOUNT,
+  checkRun,
+  dealersWithoutFixed,
+  type AssignLike,
+} from 'src/features/srs-expense/rules/expense-rules'
 import { addDays, dayOfMonth, weekDayOf } from './expense-period'
 
 /** Lo que la agenda necesita de una regla. */
@@ -54,6 +60,41 @@ export function runsInNextDays(rule: RuleSchedule, today: string, days: number):
     if (isRunDay(rule, addDays(today, i))) runs++
   }
   return runs
+}
+
+/** Un dealer de la regla, con su nombre, para el aviso. */
+export interface RuleWarningAssign extends AssignLike {
+  dealerName: string
+}
+
+/**
+ * Por qué la regla no va a generar lo que se espera (el ícono de aviso en Recurring Expenses). Lo que no se genera lo
+ * decide `checkRun`, el mismo control que el cron (cron.expense_recursive.php); acá se suman los dealers que el cron
+ * saltea por no tener importe y la regla a la que no le queda día de corrida antes del End date.
+ */
+export function ruleWarnings(
+  rule: RuleSchedule & { amount?: string | number | null; splitType: number },
+  assigns: readonly RuleWarningAssign[],
+  today: string,
+): string[] {
+  const warnings: string[] = []
+  if (rule.endDate && !isRunDay(rule, today) && nextRun(rule, today) === null) {
+    warnings.push("It won't run again: there is no run day left before the end date.")
+  }
+  if (!assigns.length) {
+    warnings.push("It has no dealers: it won't generate any expense.")
+    return warnings
+  }
+  const problem = checkRun(rule.amount ?? null, assigns, rule.splitType)
+  if (problem) {
+    warnings.push(`It won't generate any expense: ${problem}.`)
+  } else if (Number(rule.splitType) === SPLIT_BY_FIXED_AMOUNT) {
+    const missing = dealersWithoutFixed(assigns)
+    if (missing.length) {
+      warnings.push(`No amount for ${missing.map((a) => a.dealerName).join(', ')}: no expense is generated for them.`)
+    }
+  }
+  return warnings
 }
 
 /** Estimated monthly: Amount × 1 mensual, × 52/12 semanal (en centavos, redondeado). */

@@ -22,6 +22,7 @@ import {
   validatePercentSplit,
   validateReceiptDate,
   validateRuleDates,
+  withAutomaticRecalculated,
 } from './expense-rules'
 
 /** Casos compartidos con el front (vitest lee el mismo archivo). */
@@ -163,6 +164,37 @@ describe('expense-rules (pareja de frontend/lib/expenses/expense-rules.ts) — s
         { id: 2, percentage: null, automatic: true },
       ])).toEqual({ '2': '33.33', '3': '33.34' })
       expect(distributeAutomatic([{ id: 1, percentage: '10', automatic: false }])).toEqual({})
+    })
+
+    it('withAutomaticRecalculated: los Automatic grabados con el redondeo viejo (15 × 6.67 = 100.05 %) vuelven a sumar 100', () => {
+      const stale = Array.from({ length: 15 }, (_, i) => ({ id: i + 1, percentage: '6.67', automatic: true }))
+      expect(totalCents(stale)).toBe(10005)
+      const fresh = withAutomaticRecalculated(stale)
+      expect(totalCents(fresh)).toBe(10000)
+      expect(checkRun('5100.00', fresh)).toBeNull()
+      // Los Manual no se tocan.
+      const mixed = [
+        { id: 1, percentage: '60.00', automatic: false },
+        { id: 2, percentage: '40.03', automatic: true },
+      ]
+      expect(withAutomaticRecalculated(mixed).map((a) => a.percentage)).toEqual(['60.00', '40.00'])
+    })
+
+    it('el cron (checkRun + splitAmount) usa los Automatic recalculados: Insurance 15 × 6.67 genera $5,100.00 exactos', () => {
+      const stale = Array.from({ length: 15 }, (_, i) => ({ id: i + 1, percentage: '6.67', automatic: true }))
+      expect(checkRun('5100.00', stale)).toBeNull()
+      const amounts = splitAmount('5100.00', stale)
+      expect(Object.values(amounts).reduce((s, v) => s + toCents(v), 0)).toBe(510000)
+      expect(amounts['1']).toBe('339.66')
+      expect(amounts['15']).toBe('344.76')
+      // Payroll Taxes: 13 × 7.69 = 99.97 %.
+      const payroll = Array.from({ length: 13 }, (_, i) => ({ id: i + 1, percentage: '7.69', automatic: true }))
+      expect(checkRun('8125.00', payroll)).toBeNull()
+      // Los Manual que no suman 100 se siguen salteando (Expenses September 2026: 93.96 %).
+      expect(checkRun('1000.00', [
+        { id: 1, percentage: '90.00', automatic: false },
+        { id: 2, percentage: '3.96', automatic: false },
+      ])).toBe('percents add up to 93.96%')
     })
 
     it('validateManualSum rechaza Manual que pasan de 100 con el texto exacto', () => {

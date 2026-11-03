@@ -5,7 +5,7 @@
  *
  * Lo que recorre: menú → lista → Add Expense single con un campo faltante (la pantalla va al primer
  * campo con error y queda con el foco) → grupo By percentage con «Use a recurring expense's split»
- * → la lista muestra «All branches» y expandido N filas → Analytics da el mismo Total → Recurring:
+ * → la lista muestra «All dealers» y expandido N filas → Analytics da el mismo Total → Recurring:
  * alta, Add dealers, cambiar un porcentaje sin que el scroll se mueva y con el foco en el campo
  * siguiente, un porcentaje rechazado vuelve al valor grabado con el error debajo, Export dealers
  * (archivo con la hoja Dealers) → Settings muestra la última categoría de la compañía usada → Add
@@ -15,6 +15,13 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+
+/** «Show deleted» vive en el panel de filtros, que arranca cerrado. */
+async function clickShowDeleted(page: Page) {
+  const toggle = page.locator('#exp-show-deleted')
+  if (!(await toggle.isVisible())) await page.getByRole('button', { name: /^Filters/ }).click()
+  await toggle.click()
+}
 
 function loadEnv(): Record<string, string> {
   const file = resolve(__dirname, '../.env.e2e.local')
@@ -81,7 +88,6 @@ async function pickDealers(page: Page, count: number): Promise<string[]> {
 }
 
 test.describe.serial('Expenses — full path (F7)', () => {
-  let ruleId = ''
   let groupTotal = ''
 
   test('menu → Expenses List', async ({ page }) => {
@@ -96,7 +102,8 @@ test.describe.serial('Expenses — full path (F7)', () => {
 
   test('Add rule: the empty Description gets the focus (not the page <meta name="description">)', async ({ page }) => {
     await login(page)
-    await page.goto('/expenses/recurring/new')
+    await page.goto('/expenses/recurring')
+    await page.getByRole('button', { name: 'Add rule' }).click()
     await expect(page.getByRole('heading', { name: 'Add rule' })).toBeVisible()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Enter a description.')).toBeVisible()
@@ -105,9 +112,14 @@ test.describe.serial('Expenses — full path (F7)', () => {
 
   test('Add Expense single: a missing field gets focus and the screen scrolls to it', async ({ page }) => {
     await login(page)
-    await page.goto('/expenses/new')
+    await page.goto('/expenses')
+    await page.getByRole('button', { name: 'Add Expense' }).click()
     await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible()
     await page.locator('#exp-total').fill('10.50')
+    // Modal: encabezado y pie fijos, scrollea solo el cuerpo.
+    await page.locator('[data-slot="form-dialog-body"]').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+    await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Save' })).toBeInViewport()
     // El botón flotante «volver arriba» no puede tapar Save con la página scrolleada.
     const saveBox = await page.getByRole('button', { name: 'Save' }).boundingBox()
     const saveHit = await page.evaluate(
@@ -141,7 +153,8 @@ test.describe.serial('Expenses — full path (F7)', () => {
 
   test('Recurring: add rule, add dealers, edit a percent in place, rejected percent returns, export', async ({ page }) => {
     await login(page)
-    await page.goto('/expenses/recurring/new')
+    await page.goto('/expenses/recurring')
+    await page.getByRole('button', { name: 'Add rule' }).click()
     await page.locator('#rule-description').fill(RULE)
     await pickCombobox(page, 'company', COMPANY)
     await pickCombobox(page, 'category', CATEGORY)
@@ -150,8 +163,6 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await page.locator('#rule-amount').fill('100.00')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Rule saved.')).toBeVisible()
-    await page.waitForURL(/\/expenses\/recurring\/\d+$/)
-    ruleId = page.url().split('/').pop() ?? ''
 
     await pickDealers(page, 3)
     await page.getByRole('button', { name: 'Add dealers' }).click()
@@ -166,13 +177,14 @@ test.describe.serial('Expenses — full path (F7)', () => {
     // Change its percent: scroll does not move and the focus goes to the next field.
     const firstInput = rows.nth(0).getByRole('textbox')
     await firstInput.scrollIntoViewIfNeeded()
-    const scrollBefore = await page.evaluate(() => window.scrollY)
+    const body = page.locator('[data-slot="form-dialog-body"]')
+    const scrollBefore = await body.evaluate((el) => el.scrollTop)
     await firstInput.fill('50')
     await page.keyboard.press('Tab')
     await expect(rows.nth(0).getByRole('textbox')).toHaveValue('50.00')
     // Automatic ones recalculated in place: 25.00 each.
     await expect(rows.nth(1).getByRole('textbox')).toHaveValue('25.00')
-    const scrollAfter = await page.evaluate(() => window.scrollY)
+    const scrollAfter = await body.evaluate((el) => el.scrollTop)
     expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThanOrEqual(2)
     const focusedAssign = await page.locator(':focus').evaluate((el) => el.closest('tr')?.getAttribute('data-assign') ?? '')
     // El foco sigue en la tabla (el control siguiente), no se pierde en el body mientras se graba.
@@ -192,11 +204,13 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await noHorizontalScroll(page)
   })
 
-  test('Add Expense: Multiple branches By percentage from the rule → list shows «All branches»', async ({ page }) => {
+  test('Add Expense: Multiple dealers By percentage from the rule → list shows «All dealers»', async ({ page }) => {
     await login(page)
-    await page.goto(`/expenses/new?fromRule=${ruleId}`)
+    await page.goto('/expenses/recurring')
+    await page.getByRole('row').filter({ hasText: RULE }).first().getByRole('button', { name: 'Actions' }).click()
+    await page.getByRole('menuitem', { name: 'Add expense from this rule' }).click()
     await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible()
-    // Preloaded from the rule: By percentage selected, 3 branches, company and category.
+    // Preloaded from the rule: By percentage selected, 3 dealers, company and category.
     await expect(page.getByRole('button', { name: /By percentage/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-field="company"]')).toContainText(COMPANY)
     await page.locator('#exp-total').fill('100.00')
@@ -204,11 +218,11 @@ test.describe.serial('Expenses — full path (F7)', () => {
     groupTotal = '$100.00'
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Expense saved.')).toBeVisible()
-    await expect(page).toHaveURL(/\/expenses(\?|$)/)
+    await page.goto('/expenses')
 
     const groupRow = page.getByRole('row').filter({ hasText: `${STAMP} group` }).first()
-    await expect(groupRow.getByText(/All branches \(3\)/)).toBeVisible()
-    await groupRow.getByRole('button', { name: 'Show branches' }).click()
+    await expect(groupRow.getByText(/All dealers \(3\)/)).toBeVisible()
+    await groupRow.getByRole('button', { name: 'Show dealers' }).click()
     await expect(page.locator('table table tbody tr')).toHaveCount(3)
     await noHorizontalScroll(page)
   })
@@ -237,7 +251,8 @@ test.describe.serial('Expenses — full path (F7)', () => {
     const row = page.getByRole('row').filter({ hasText: COMPANY }).first()
     await expect(row).toContainText(CATEGORY)
 
-    await page.goto('/expenses/new')
+    await page.goto('/expenses')
+    await page.getByRole('button', { name: 'Add Expense' }).click()
     await pickCombobox(page, 'company', COMPANY)
     await expect(page.locator('[data-field="category"]')).toContainText(CATEGORY)
     await noHorizontalScroll(page)
@@ -258,19 +273,19 @@ test.describe.serial('Expenses — full path (F7)', () => {
 
     // The group: delete → Show deleted → Restore (group row, with its confirmation) → delete again.
     if (await deleteRow(`${STAMP} group`)) {
-      await page.locator('#exp-show-deleted').click()
+      await clickShowDeleted(page)
       const deleted = page.getByRole('row').filter({ hasText: `${STAMP} group` }).first()
       await expect(deleted).toBeVisible()
       await deleted.getByRole('button', { name: 'Actions' }).click()
       await page.getByRole('menuitem', { name: 'Restore' }).click()
-      await expect(page.getByText(/Restore this expense in all \d+ branches\?/)).toBeVisible()
+      await expect(page.getByText(/Restore this expense in all \d+ dealers\?/)).toBeVisible()
       await page.getByRole('button', { name: 'Yes, restore' }).click()
       await expect(page.getByText('Expense restored.')).toBeVisible()
-      await page.locator('#exp-show-deleted').click()
+      await clickShowDeleted(page)
       await deleteRow(`${STAMP} group`)
     }
     await deleteRow(`${STAMP} single`)
-    if (ruleId) {
+    {
       await page.goto('/expenses/recurring')
       const row = page.getByRole('row').filter({ hasText: RULE }).first()
       if (await row.isVisible().catch(() => false)) {

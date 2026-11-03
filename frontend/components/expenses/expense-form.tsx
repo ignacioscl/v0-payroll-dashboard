@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, Building2, Equal, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
@@ -12,7 +11,6 @@ import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
 import { ExpenseSplitTable } from '@/components/expenses/expense-split-table'
-import { RecurringRulePickerDialog } from '@/components/expenses/recurring-rule-picker-dialog'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { OptionTile } from '@/components/shared/option-tile'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -21,12 +19,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses-list'
-import { useRecurringRule } from '@/hooks/use-recurring-rules'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
+import { FormDialog, FormSection } from '@/components/layout/form-dialog'
 import { uploadAttachment } from '@/lib/expense-attachments'
-import { rowAttachmentLocation, toYmd } from '@/lib/expenses/expense-format'
+import { rowAttachmentLocation, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
 import {
   applyRuleToExpenseForm,
+  carrySplitToMode,
   createExpenseFormSchema,
   emptyExpenseFormValues,
   expenseFormValuesFromDetail,
@@ -35,19 +34,22 @@ import {
   type ExpenseFormValues,
 } from '@/lib/expenses/expense-form-schema'
 import { EXPENSE_LIMITS, todayInNewYork } from '@/lib/expenses/expense-rules'
+import { dealersToShowSaved, savedDealerIds } from '@/lib/expenses/expense-saved-visibility'
 import { useFilters } from '@/lib/filter-context'
 import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { isExpensesApiError, type ExpenseDetail, type ExpenseMode, type RuleDetail } from '@/lib/srs-expenses-api'
-import { cn } from '@/lib/utils'
 
 const FORM_ID = 'expense-form'
 
 export type ExpenseFormProps = {
   /** Edit: el gasto o grupo cargado por `GET /:id`. */
   detail?: ExpenseDetail
-  /** `/expenses/new?fromRule=:id`: precarga del reparto de la regla. */
-  fromRuleId?: number | null
+  title: string
+  description?: string
+  onClose: () => void
+  /** Alta desde «Generate expense from this recurring expense»: la regla con la que se precarga. */
+  fromRule?: RuleDetail
   /** Permiso 117: combo «Assign to employee». */
   canAssign: boolean
   /** Nombre del usuario que carga (sin 117 el gasto queda a su nombre). */
@@ -67,10 +69,9 @@ function mapServerField(field: string): string {
   return field
 }
 
-export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: ExpenseFormProps) {
+export function ExpenseForm({ title, description, onClose, detail, fromRule, canAssign, userName }: ExpenseFormProps) {
   const { t } = useTranslation()
-  const router = useRouter()
-  const { dateRange } = useFilters()
+  const { dateRange, setDateRange, setSelectedDealers } = useFilters()
   const { dealers, loading: dealersLoading } = useSrsDealers()
   const createMut = useCreateExpense()
   const updateMut = useUpdateExpense()
@@ -105,24 +106,13 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
 
   const { form, handleSubmit, applyServerErrors } = useFormWithFocus<ExpenseFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: detail ? expenseFormValuesFromDetail(detail, todayNy) : emptyExpenseFormValues(todayNy),
+    defaultValues: detail
+      ? expenseFormValuesFromDetail(detail, todayNy)
+      : fromRule
+        ? applyRuleToExpenseForm(emptyExpenseFormValues(todayNy), fromRule)
+        : emptyExpenseFormValues(todayNy),
     mode: 'onSubmit',
   })
-
-  // Precarga desde la regla (`?fromRule`), una sola vez cuando llega.
-  const ruleQuery = useRecurringRule(!isEdit && fromRuleId ? fromRuleId : null)
-  const appliedRule = React.useRef(false)
-  const applyRule = React.useCallback(
-    (rule: RuleDetail) => {
-      form.reset(applyRuleToExpenseForm(form.getValues(), rule))
-    },
-    [form],
-  )
-  React.useEffect(() => {
-    if (appliedRule.current || !ruleQuery.data) return
-    appliedRule.current = true
-    applyRule(ruleQuery.data)
-  }, [ruleQuery.data, applyRule])
 
   const mode = useWatch({ control: form.control, name: 'mode' })
   const idDealer = useWatch({ control: form.control, name: 'idDealer' })
@@ -130,26 +120,25 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
   const dealersCsv = mode === 'single' ? idDealer : (branchIds ?? []).join(',')
 
   const [files, setFiles] = React.useState<File[]>([])
-  const [pickerOpen, setPickerOpen] = React.useState(false)
   /** Gasto grabado cuya subida de adjuntos falló: queda «Retry upload» (T4). */
   const [pendingUpload, setPendingUpload] = React.useState<{ target: UploadTarget; files: File[] } | null>(null)
   const [uploading, setUploading] = React.useState(false)
   const busy = createMut.isPending || updateMut.isPending || uploading
 
-  const goBackToList = React.useCallback(
-    (ticketDate?: string) => {
+  const finish = React.useCallback(
+    (values: ExpenseFormValues) => {
+      const { ticketDate } = values
       const from = toYmd(dateRange?.from)
       const to = toYmd(dateRange?.to ?? dateRange?.from)
       // El gasto queda a la vista: si su fecha cae fuera del rango del header, se amplía (F7.2).
       if (ticketDate && from && (ticketDate < from || ticketDate > to)) {
-        const nextFrom = ticketDate < from ? ticketDate : from
-        const nextTo = ticketDate > to ? ticketDate : to
-        router.push(`/expenses?from=${nextFrom}&to=${nextTo}`)
-        return
+        setDateRange({ from: ymdToDate(ticketDate < from ? ticketDate : from), to: ymdToDate(ticketDate > to ? ticketDate : to) })
       }
-      router.push('/expenses')
+      // Lo mismo con el combo de dealers del header.
+      setSelectedDealers((prev) => dealersToShowSaved(prev, savedDealerIds(values)))
+      onClose()
     },
-    [dateRange, router],
+    [dateRange, setDateRange, setSelectedDealers, onClose],
   )
 
   /**
@@ -199,7 +188,7 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
         }
       }
       toast.success(t('expenses.toastSaved'))
-      goBackToList(values.ticketDate)
+      finish(values)
     } catch (err) {
       setUploading(false)
       if (isExpensesApiError(err) && applyServerErrors(err.validationErrors, mapServerField)) return
@@ -219,12 +208,18 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
     }
     setPendingUpload(null)
     toast.success(t('expenses.uploaded'))
-    goBackToList(form.getValues('ticketDate'))
+    finish(form.getValues())
   }
 
   const setMode = (next: ExpenseMode) => {
     if (locked || textOnly) return
+    // El modo nuevo arranca con el reparto que se veía (Equal → By amount: el monto de cada dealer).
+    const carried = carrySplitToMode(form.getValues(), next)
     form.setValue('mode', next, { shouldDirty: true })
+    if (carried) {
+      form.setValue('totalAmount', carried.totalAmount, { shouldDirty: true })
+      form.setValue('branches', carried.branches, { shouldDirty: true })
+    }
     form.clearErrors(['branchIds', 'idDealer', 'totalAmount'])
   }
   const isMultiple = mode !== 'single'
@@ -232,8 +227,35 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
   const tilesDisabled = locked || textOnly
 
   return (
+    <FormDialog
+      open
+      onOpenChange={onClose}
+      title={title}
+      description={description}
+      busy={busy}
+      footer={
+        <>
+          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+            <X className="size-4" />
+            {t('expenses.cancel')}
+          </Button>
+          {!pendingUpload ? (
+            <Button type="submit" form={FORM_ID} disabled={busy || locked}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {busy ? t('expenses.saving') : t('expenses.save')}
+            </Button>
+          ) : null}
+        </>
+      }
+    >
     <Form {...form}>
-      <form id={FORM_ID} className="flex min-w-0 flex-col gap-5 pb-20" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form id={FORM_ID} className="flex min-w-0 flex-col gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {fromRule ? (
+          <Alert>
+            <Repeat className="size-4" />
+            <AlertTitle className="line-clamp-none">{t('expenses.generatedFromRule', { name: fromRule.description })}</AlertTitle>
+          </Alert>
+        ) : null}
         {readOnlyGroup ? (
           <Alert>
             <AlertTriangle className="size-4" />
@@ -265,7 +287,7 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
           </Alert>
         ) : null}
 
-        <section className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+        <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
             name="ticketDate"
@@ -392,10 +414,9 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
             <div className="mb-2 text-sm font-medium">{t('expenses.attachment')}</div>
             <AttachmentPicker files={files} onChange={setFiles} disabled={busy || locked || Boolean(pendingUpload)} />
           </div>
-        </section>
+        </FormSection>
 
-        <section className="min-w-0 space-y-3">
-          <h2 className="text-sm font-semibold">{t('expenses.branches')}</h2>
+        <FormSection title={t('expenses.branches')} icon={Building2} className="space-y-3">
           <div className="grid gap-1.5 sm:grid-cols-2">
             <OptionTile
               dataField="mode"
@@ -532,40 +553,12 @@ export function ExpenseForm({ detail, fromRuleId, canAssign, userName }: Expense
                 )}
               </div>
 
-              {!isEdit ? (
-                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setPickerOpen(true)}>
-                  <Repeat className="size-4" />
-                  {t('expenses.useRecurringSplit')}
-                </Button>
-              ) : null}
-
               <ExpenseSplitTable disabled={busy || locked || textOnly} />
             </div>
           )}
-        </section>
-
-        {/* Barra de acciones: fija abajo en celular, en línea en escritorio. Los botones viven
-            fuera del <form> en la práctica (fixed), por eso `form={FORM_ID}`. */}
-        <div
-          className={cn(
-            'fixed inset-x-0 bottom-0 z-20 flex items-center justify-end gap-2 border-t border-border bg-card/95 px-4 py-3 backdrop-blur',
-            'md:static md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none',
-          )}
-        >
-          <Button type="button" variant="outline" disabled={busy} onClick={() => router.push('/expenses')}>
-            <X className="size-4" />
-            {t('expenses.cancel')}
-          </Button>
-          {!pendingUpload ? (
-            <Button type="submit" form={FORM_ID} disabled={busy || locked}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              {busy ? t('expenses.saving') : t('expenses.save')}
-            </Button>
-          ) : null}
-        </div>
+        </FormSection>
       </form>
-
-      <RecurringRulePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={applyRule} />
     </Form>
+    </FormDialog>
   )
 }

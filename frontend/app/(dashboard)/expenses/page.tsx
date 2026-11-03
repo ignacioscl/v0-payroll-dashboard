@@ -1,14 +1,15 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, Calculator, Hash, Plus, Receipt, Tag } from 'lucide-react'
+import { Calculator, Hash, Plus, Receipt, Tag } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { CatalogCombobox, type CatalogChoice } from '@/components/expenses/catalog-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
+import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpensesDataTable } from '@/components/expenses/expenses-data-table'
+import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
@@ -53,8 +54,9 @@ function ExpensesListPage() {
   const [amountMin, setAmountMin] = React.useState('')
   const [amountMax, setAmountMax] = React.useState('')
   const [showDeleted, setShowDeleted] = React.useState(false)
+  const [formTarget, setFormTarget] = React.useState<ExpenseFormTarget | null>(null)
 
-  // Llegada desde Analytics (click en una fila) o desde Add Expense (fecha fuera del rango):
+  // Llegada desde Analytics (click en una fila):
   // `?idCategory|idCompany|idDealer&name=…&from&to`. Se aplica una vez y se limpia la URL.
   const appliedParams = React.useRef(false)
   React.useEffect(() => {
@@ -69,7 +71,7 @@ function ExpensesListPage() {
     appliedParams.current = true
     if (idCategory) setCategory({ id: Number(idCategory), name })
     if (idCompany) setCompany({ id: Number(idCompany), name })
-    // Branch: el filtro de dealers es el combo del header.
+    // Dealer: el filtro de dealers es el combo del header.
     if (idDealerParam && /^\d+$/.test(idDealerParam)) setSelectedDealers([idDealerParam])
     if (from && isRealYmd(from)) {
       const toValue = to && isRealYmd(to) ? to : from
@@ -112,6 +114,19 @@ function ExpensesListPage() {
     { value: 'rejected', label: t('expenses.statusRejected') },
   ]
 
+  const filterChips: FilterPanelChip[] = [
+    ...(company ? [{ key: 'company', label: `${t('expenses.company')}: ${company.name}`, onRemove: () => setCompany(null) }] : []),
+    ...(category ? [{ key: 'category', label: `${t('expenses.category')}: ${category.name}`, onRemove: () => setCategory(null) }] : []),
+    ...(author ? [{ key: 'author', label: `${t('expenses.assignedTo')}: ${author.nombre}`, onRemove: () => setAuthor(null) }] : []),
+    ...(createdBy ? [{ key: 'createdBy', label: `${t('expenses.createdBy')}: ${createdBy.nombre}`, onRemove: () => setCreatedBy(null) }] : []),
+    ...(status !== 'all'
+      ? [{ key: 'status', label: statusOptions.find((o) => o.value === status)?.label ?? status, onRemove: () => setStatus('all') }]
+      : []),
+    ...(amountMin.trim() ? [{ key: 'amountMin', label: `${t('expenses.amountFrom')}: ${amountMin.trim()}`, onRemove: () => setAmountMin('') }] : []),
+    ...(amountMax.trim() ? [{ key: 'amountMax', label: `${t('expenses.amountTo')}: ${amountMax.trim()}`, onRemove: () => setAmountMax('') }] : []),
+    ...(showDeleted ? [{ key: 'deleted', label: t('expenses.showDeleted'), onRemove: () => setShowDeleted(false) }] : []),
+  ]
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <PageHeading
@@ -120,11 +135,9 @@ function ExpensesListPage() {
         icon={<Receipt />}
         actions={
           canAdd ? (
-            <Button asChild size="sm" className="gap-1.5">
-              <Link href="/expenses/new">
-                <Plus className="size-4" />
-                {t('expenses.addExpense')}
-              </Link>
+            <Button size="sm" className="gap-1.5" onClick={() => setFormTarget({ kind: 'new' })}>
+              <Plus className="size-4" />
+              {t('expenses.addExpense')}
             </Button>
           ) : undefined
         }
@@ -135,6 +148,78 @@ function ExpensesListPage() {
       ) : !from ? (
         <p className="text-sm text-muted-foreground">{t('filters.selectDates')}</p>
       ) : null}
+
+      <FilterPanel storageKey="expense-filters-open" chips={filterChips}>
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="min-w-0 space-y-1">
+          <Label className={FILTER_FIELD_LABEL}>{t('expenses.company')}</Label>
+          <CatalogCombobox kind="companies" value={company} onChange={setCompany} allowCreate={false} compact />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label className={FILTER_FIELD_LABEL}>{t('expenses.category')}</Label>
+          <CatalogCombobox kind="categories" value={category} onChange={setCategory} allowCreate={false} compact />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label className={FILTER_FIELD_LABEL}>{t('expenses.assignedTo')}</Label>
+          <ExpenseEmployeeCombobox value={author} onChange={setAuthor} idDealer={null} compact placeholder={t('expenses.all')} />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label className={FILTER_FIELD_LABEL}>{t('expenses.createdBy')}</Label>
+          <ExpenseEmployeeCombobox value={createdBy} onChange={setCreatedBy} idDealer={null} compact placeholder={t('expenses.all')} />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="exp-status" className={FILTER_FIELD_LABEL}>
+            {t('expenses.status')}
+          </Label>
+          <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+            <SelectTrigger id="exp-status" className="h-8 w-full cursor-pointer text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="cursor-pointer">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="exp-amount-min" className={FILTER_FIELD_LABEL}>
+            {t('expenses.amountFrom')}
+          </Label>
+          <Input
+            id="exp-amount-min"
+            inputMode="decimal"
+            className="h-8 text-xs"
+            value={amountMin}
+            onChange={(e) => setAmountMin(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="exp-amount-max" className={FILTER_FIELD_LABEL}>
+            {t('expenses.amountTo')}
+          </Label>
+          <Input
+            id="exp-amount-max"
+            inputMode="decimal"
+            className="h-8 text-xs"
+            value={amountMax}
+            onChange={(e) => setAmountMax(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+          <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />
+          <Label htmlFor="exp-show-deleted" className="cursor-pointer text-sm">
+            {t('expenses.showDeleted')}
+          </Label>
+          </div>
+        </div>
+      </FilterPanel>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KPICard
@@ -171,82 +256,9 @@ function ExpensesListPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="min-w-0 space-y-1">
-          <Label className="text-xs text-muted-foreground">{t('expenses.company')}</Label>
-          <CatalogCombobox kind="companies" value={company} onChange={setCompany} allowCreate={false} compact />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label className="text-xs text-muted-foreground">{t('expenses.category')}</Label>
-          <CatalogCombobox kind="categories" value={category} onChange={setCategory} allowCreate={false} compact />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label className="text-xs text-muted-foreground">{t('expenses.assignedTo')}</Label>
-          <ExpenseEmployeeCombobox value={author} onChange={setAuthor} idDealer={null} compact placeholder={t('expenses.all')} />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label className="text-xs text-muted-foreground">{t('expenses.createdBy')}</Label>
-          <ExpenseEmployeeCombobox value={createdBy} onChange={setCreatedBy} idDealer={null} compact placeholder={t('expenses.all')} />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="exp-status" className="text-xs text-muted-foreground">
-            {t('expenses.status')}
-          </Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
-            <SelectTrigger id="exp-status" className="h-8 w-full cursor-pointer text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value} className="cursor-pointer">
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="exp-amount-min" className="text-xs text-muted-foreground">
-            {t('expenses.amountFrom')}
-          </Label>
-          <Input
-            id="exp-amount-min"
-            inputMode="decimal"
-            className="h-8 text-xs"
-            value={amountMin}
-            onChange={(e) => setAmountMin(e.target.value)}
-            placeholder="0.00"
-          />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="exp-amount-max" className="text-xs text-muted-foreground">
-            {t('expenses.amountTo')}
-          </Label>
-          <Input
-            id="exp-amount-max"
-            inputMode="decimal"
-            className="h-8 text-xs"
-            value={amountMax}
-            onChange={(e) => setAmountMax(e.target.value)}
-            placeholder="0.00"
-          />
-        </div>
-        <div className="flex min-w-0 items-center gap-2 pt-5">
-          <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />
-          <Label htmlFor="exp-show-deleted" className="cursor-pointer text-sm">
-            {t('expenses.showDeleted')}
-          </Label>
-        </div>
-      </div>
-
       <ExpensesDataTable filters={filters} canApprove={canApprove} canEdit={canEdit} />
 
-      <div className="text-xs text-muted-foreground">
-        <Link href="/expenses/analytics" className="inline-flex items-center gap-1 hover:underline">
-          <BarChart3 className="size-3.5" />
-          {t('nav.expensesAnalytics')}
-        </Link>
-      </div>
+      <ExpenseFormDialog target={formTarget} onClose={() => setFormTarget(null)} />
     </div>
   )
 }

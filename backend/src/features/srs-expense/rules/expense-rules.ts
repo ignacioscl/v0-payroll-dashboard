@@ -33,8 +33,8 @@ export function msgSumOver100(sum: string): string {
 
 /** Textos de Add Expense y de la regla (T9 del plan). */
 export const MSG_DATE_INVALID = 'Choose a valid date (not in the future).'
-export const MSG_AT_LEAST_TWO_BRANCHES = 'Choose at least two branches.'
-export const MSG_CHOOSE_BRANCH = 'Choose a branch.'
+export const MSG_AT_LEAST_TWO_BRANCHES = 'Choose at least two dealers.'
+export const MSG_CHOOSE_BRANCH = 'Choose a dealer.'
 export const MSG_CHOOSE_COMPANY = 'Choose a company.'
 export const MSG_CHOOSE_CATEGORY = 'Choose a category.'
 export const MSG_ENTER_DESCRIPTION = 'Enter a description.'
@@ -42,10 +42,10 @@ export const MSG_CHOOSE_START_DATE = 'Choose a start date.'
 export const MSG_CHOOSE_WEEK_DAY = 'Choose the day of the week.'
 export const MSG_END_BEFORE_START = 'End date must be on or after the start date.'
 export const MSG_NAME_EXISTS = 'This name already exists.'
-export const MSG_BRANCH_OUT_OF_SCOPE = 'This branch is outside your dealers.'
-export const MSG_SOME_BRANCHES_OUTSIDE = 'Some branches are outside your dealers.'
+export const MSG_BRANCH_OUT_OF_SCOPE = "You don't have access to this dealer."
+export const MSG_SOME_BRANCHES_OUTSIDE = "You don't have access to some of these dealers."
 export const MSG_RECEIPT_APPROVED = "The receipt is approved and can't be edited."
-export const MSG_ATTACHMENT_BRANCH_LOCKED = "This expense has attachments: the branch can't be changed."
+export const MSG_ATTACHMENT_BRANCH_LOCKED = "This expense has attachments: the dealer can't be changed."
 export const MSG_ENTER_DEALER_AMOUNT = 'Enter the amount for this dealer.'
 export function msgPercentsSum(sum: string): string {
   return `Percents add up to ${sum}%. They must add up to 100%.`
@@ -162,7 +162,8 @@ export function checkRun(
   if (!(Number(amount) > 0)) {
     return 'the Amount is empty'
   }
-  const total = totalCents(assigns)
+  // Los Automatic con lo que les toca hoy, no con el redondeo viejo grabado (Insurance: 15 × 6.67 = 100.05 %).
+  const total = totalCents(withAutomaticRecalculated(assigns))
   if (total !== 10000) {
     return `percents add up to ${
       total === null ? 'an incomplete value (a dealer has no percent)' : `${fromCents(total)}%`
@@ -224,6 +225,16 @@ export function distributeAutomatic(assigns: readonly AssignLike[]): AmountById 
   return res
 }
 
+/**
+ * Los dealers con el porcentaje que hoy les da `distributeAutomatic` a los Automatic; los Manual quedan como están.
+ * Los Automatic grabados con el redondeo viejo del legacy (Insurance: 15 × 6.67 = 100.05 %) no suman 100 hasta el
+ * próximo cambio del reparto; `checkRun` y `splitAmount` (el cron, el cambio de Split, el export) los usan recalculados.
+ */
+export function withAutomaticRecalculated<T extends AssignLike>(assigns: readonly T[]): T[] {
+  const auto = distributeAutomatic(assigns)
+  return assigns.map((a) => (String(a.id) in auto ? { ...a, percentage: auto[String(a.id)] } : a))
+}
+
 /** Suma de todos los porcentajes en centésimos; null si algún dealer no tiene porcentaje (lo usa el cron). */
 export function totalCents(assigns: readonly AssignLike[]): number | null {
   let sum = 0
@@ -252,7 +263,7 @@ export function splitAmount(
     }
     return res
   }
-  const sorted = sortById(assigns)
+  const sorted = sortById(withAutomaticRecalculated(assigns))
   const total = toCents(amount)
   let given = 0
   const cents: Record<string, number> = {}

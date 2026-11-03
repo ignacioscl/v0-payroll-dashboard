@@ -21,7 +21,7 @@ export const EXPENSE_RULE_MESSAGES = {
   amountInvalid: 'Enter an amount greater than 0 (up to 2 decimals).',
   splitNeeds100: 'The percents must add up to 100% before changing the split.',
   percentsMustBe100: 'Percents add up to {sum}%. They must add up to 100%.',
-  atLeastTwoBranches: 'Choose at least two branches.',
+  atLeastTwoBranches: 'Choose at least two dealers.',
   receiptDateInvalid: 'Choose a valid date (not in the future).',
   startDateRequired: 'Choose a start date.',
   endBeforeStart: 'End date must be on or after the start date.',
@@ -137,7 +137,7 @@ export function checkRun(
     return null
   }
   if (!(Number(amount) > 0)) return 'the Amount is empty'
-  const total = totalCents(assigns)
+  const total = totalCents(withAutomaticRecalculated(assigns))
   if (total !== 10000) {
     return `percents add up to ${
       total === null ? 'an incomplete value (a dealer has no percent)' : `${fromCents(total)}%`
@@ -208,6 +208,18 @@ export function distributeAutomatic(assigns: RuleAssign[]): Record<number, strin
   return res
 }
 
+/**
+ * Los dealers con el porcentaje que hoy les da `distributeAutomatic` a los Automatic; los Manual quedan como están.
+ * Los Automatic grabados con el redondeo viejo del legacy (Insurance: 15 × 6.67 = 100.05 %) no suman 100 hasta el
+ * próximo cambio del reparto; `checkRun` y `splitAmount` los usan recalculados, como el cron (pareja del back).
+ */
+export function withAutomaticRecalculated<T extends Pick<RuleAssign, 'id' | 'percentage'> & { automatic?: boolean }>(
+  assigns: T[],
+): T[] {
+  const auto = distributeAutomatic(assigns.map((a) => ({ fixedAmount: null, ...a, automatic: !!a.automatic })))
+  return assigns.map((a) => (a.id in auto ? { ...a, percentage: auto[a.id] } : a))
+}
+
 /** Suma de todos los porcentajes en centésimos; null si algún dealer no tiene porcentaje. */
 export function totalCents(assigns: RuleAssign[]): number | null {
   let sum = 0
@@ -227,7 +239,7 @@ export function totalCents(assigns: RuleAssign[]): number | null {
  */
 export function splitAmount(
   amount: string | number,
-  assigns: Pick<RuleAssign, 'id' | 'percentage' | 'fixedAmount'>[],
+  assigns: (Pick<RuleAssign, 'id' | 'percentage' | 'fixedAmount'> & { automatic?: boolean })[],
   splitType: RuleSplitType = SPLIT_BY_PERCENT,
 ): Record<number, string> {
   if (splitType === SPLIT_BY_FIXED_AMOUNT) {
@@ -239,7 +251,7 @@ export function splitAmount(
     }
     return res
   }
-  const sorted = [...assigns].sort((a, b) => a.id - b.id)
+  const sorted = withAutomaticRecalculated(assigns).sort((a, b) => a.id - b.id)
   const total = toCents(amount)
   let given = 0
   const cents: Record<number, number> = {}
@@ -274,6 +286,30 @@ export function splitEqual(totalCentsValue: number, ids: number[]): Record<numbe
     rest -= 1
   }
   for (const id of sorted) res[id] = fromCents(cents[id])
+  return res
+}
+
+/**
+ * Porcentaje de cada dealer a partir de sus montos (al pasar de Equal o By amount a By percentage):
+ * su parte sobre el total, y lo que el redondeo deja va al de mayor monto (en un empate, el de mayor
+ * id), así suman 100.00 y `splitAmount` con esos porcentajes da los mismos montos. Pareja de
+ * `derivePercentages` del Nest (`expense-row-assembler.ts`).
+ * @returns id => porcentaje (string con dos decimales); vacío si el total es 0
+ */
+export function percentsFromAmounts(amounts: Record<number, string>): Record<number, string> {
+  const ids = Object.keys(amounts).map(Number)
+  const total = ids.reduce((acc, id) => acc + toCents(amounts[id]), 0)
+  const res: Record<number, string> = {}
+  if (total <= 0) return res
+  const pct: Record<number, number> = {}
+  let sum = 0
+  for (const id of ids) {
+    pct[id] = Math.round((toCents(amounts[id]) * 10000) / total)
+    sum += pct[id]
+  }
+  const biggest = [...ids].sort((a, b) => toCents(amounts[b]) - toCents(amounts[a]) || b - a)[0]
+  pct[biggest] += 10000 - sum
+  for (const id of ids) res[id] = fromCents(pct[id])
   return res
 }
 

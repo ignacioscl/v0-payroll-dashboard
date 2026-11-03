@@ -144,6 +144,8 @@ export interface ExpenseLogRow {
   author: NamedRef
   description: string
   scope: 'expense' | 'group'
+  /** Línea de una fila de un grupo: su dealer. */
+  dealer: string | null
 }
 
 export type AnalyticsGroupBy = 'category' | 'company' | 'dealer'
@@ -214,6 +216,8 @@ export interface RuleRow {
   dealersCount: number
   nextRun?: string | null
   active: boolean
+  /** Por qué la regla no va a generar lo que se espera (`ruleWarnings` del back); vacío si se genera completa. */
+  warnings?: string[]
 }
 
 export interface RuleAssignRow {

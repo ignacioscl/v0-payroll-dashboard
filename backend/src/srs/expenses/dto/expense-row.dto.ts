@@ -41,7 +41,7 @@ export interface ExpenseSingleRow {
   groupId?: number | null
 }
 
-/** Un gasto repartido entre dealers, como una fila «All branches (k of N)». */
+/** Un gasto repartido entre dealers, como una fila «All dealers (k of N)». */
 export interface ExpenseGroupRow {
   kind: 'group'
   groupId: number
@@ -108,4 +108,6 @@ export interface ExpenseLogEntry {
   author: NamedRef
   description: string
   scope: 'expense' | 'group'
+  /** Línea de una fila de un grupo: su dealer. Null en las del grupo y en un gasto suelto. */
+  dealer: string | null
 }

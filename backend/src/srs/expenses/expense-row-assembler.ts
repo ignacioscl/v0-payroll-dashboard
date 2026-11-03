@@ -145,7 +145,7 @@ export function derivePercentages(
 }
 
 /**
- * La fila padre «All branches (k of N)» (D8): `visibleRows` son las filas que pasan los filtros y el alcance del
+ * La fila padre «All dealers (k of N)» (D8): `visibleRows` son las filas que pasan los filtros y el alcance del
  * usuario; `totalRows` todas las del grupo con ese `estado`; `readOnly` cuando el alcance (no el filtro Branch)
  * deja afuera alguna fila: `agg.inScope < agg.total`.
  */

@@ -2115,11 +2115,6 @@ export const es: Messages = {
     byPercentageHint: 'Ingresá el porcentaje de cada sucursal. Tienen que sumar 100%.',
     byAmount: 'Por monto',
     byAmountHint: 'Ingresá el monto de cada sucursal. El total es la suma.',
-    useRecurringSplit: 'Usar el reparto de un gasto recurrente',
-    useRecurringSplitHint:
-      'Trae las sucursales de la regla con su porcentaje o monto, más su compañía, categoría y descripción. Todo queda editable.',
-    pickRule: 'Gasto recurrente',
-    apply: 'Aplicar',
     save: 'Guardar',
     saving: 'Guardando…',
     createNamed: 'Crear "{name}"',
@@ -2192,7 +2187,9 @@ export const es: Messages = {
     dontBlock: 'No bloquear cambios',
     addDealers: 'Agregar dealers',
     exportDealers: 'Exportar dealers',
-    addExpenseFromRule: 'Agregar gasto desde esta regla',
+    generateExpenseFromRule: 'Generar gasto desde este gasto recurrente',
+    generatedFromRule:
+      'Este gasto viene precargado con el gasto recurrente «{name}». Elegí la fecha y revisá los montos: al guardar, el gasto se crea con lo que está cargado acá.',
     deleteRuleTitle: '¿Eliminar esta regla?',
     deleteRuleHint: 'Los gastos que ya creó se conservan.',
     removeDealerTitle: '¿Quitar {dealer} de esta regla?',

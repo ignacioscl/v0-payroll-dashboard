@@ -40,7 +40,7 @@ export async function dealerIdsInScope(
   return new Set(await report.dealerIdsInRestriction(expenseScopeOf(ctx), scoped))
 }
 
-/** Todos los ids en el alcance, o 400 «This branch is outside your dealers.» en el campo que diga `fieldOf`. */
+/** Todos los ids en el alcance, o 400 «You don't have access to this dealer.» en el campo que diga `fieldOf`. */
 export async function assertDealersInScope(
   dealers: DealerLookup,
   report: DealerRestrictionLookup,

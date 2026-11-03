@@ -141,7 +141,12 @@ describe('ExpenseReportRepository — cada query bindea tantos parámetros como 
     await repo.amountsByDealer(filter())
     await repo.employees(79, 'an', [408, 86])
     await repo.employees(79, '', [])
-    await repo.logRows(9, 5)
+    await repo.logRows(9, 5, filter())
+    await repo.logRows(9, 5, filter({ skipDealerRestriction: true }))
+    // Un usuario de alcance parcial no ve las líneas ni el nombre de los dealers fuera de su alcance (D8).
+    const logCalls = calls.filter((c) => c.sql.includes('LOG_GENERIC'))
+    expect(logCalls[0].sql.match(/RESTRICTION_DEALER_V2/g)).toHaveLength(2)
+    expect(logCalls[1].sql).not.toContain('RESTRICTION_DEALER_V2')
     await repo.rowsByIds([1, 2], filter())
     await repo.rowsByGroup(5, 1, filter())
     await repo.exportRows(filter())

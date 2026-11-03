@@ -235,6 +235,8 @@ export interface RuleRowDto {
   dealersCount: number
   nextRun: string | null
   active: boolean
+  /** Por qué no va a generar lo que se espera (`ruleWarnings`); vacío si se genera completa. */
+  warnings: string[]
 }
 
 /** Detalle (contrato `RuleDetail`). */

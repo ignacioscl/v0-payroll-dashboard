@@ -16,6 +16,7 @@ import {
   splitAmount,
   splitEqual,
   toCents,
+  totalCents,
   validateAmount,
   validateAmountSplit,
   validateManualPercent,
@@ -78,6 +79,22 @@ describe('validateManualPercent', () => {
 describe('splitAmount (By percent, same cents as the cron)', () => {
   it.each(cases.split)('$name', (c) => {
     expect(splitAmount(c.amount, toAssigns(c.assigns), SPLIT_BY_PERCENT)).toEqual(c.expected)
+  })
+  it('uses Automatic percents recalculated, like the cron: Insurance 15 × 6.67 runs for $5,100.00', () => {
+    const stale: RuleAssign[] = Array.from({ length: 15 }, (_, i) => ({
+      id: i + 1,
+      percentage: '6.67',
+      fixedAmount: null,
+      automatic: true,
+    }))
+    expect(totalCents(stale)).toBe(10005)
+    expect(checkRun('5100.00', stale)).toBeNull()
+    const amounts = splitAmount('5100.00', stale)
+    expect(amounts[1]).toBe('339.66')
+    expect(amounts[15]).toBe('344.76')
+    expect(checkRun('1000.00', [{ id: 1, percentage: '93.96', fixedAmount: null, automatic: false }])).toBe(
+      'percents add up to 93.96%',
+    )
   })
   it('By fixed amount gives each dealer its amount and skips the ones without', () => {
     const assigns: RuleAssign[] = [

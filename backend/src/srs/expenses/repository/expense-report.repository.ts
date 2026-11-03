@@ -470,16 +470,25 @@ export class ExpenseReportRepository {
   }
 
   /** LOG_GENERIC del gasto y, si tiene grupo, del grupo (tipo 7), con el nombre del autor. */
-  async logRows(idExpense: number, idExpGroup: number | null): Promise<ExpenseLogEntry[]> {
-    const rows: { id: unknown; date: unknown; idAuthor: unknown; author: unknown; description: unknown; idExpGroup: unknown }[] =
+  /**
+   * El log de un gasto o, en un grupo, el del grupo y el de todas sus filas (también las retiradas), con el dealer de
+   * cada línea. De las filas fuera del alcance del usuario no se ve ni la línea ni el nombre (D8).
+   */
+  async logRows(idExpense: number, idExpGroup: number | null, scope: ExpenseScope): Promise<ExpenseLogEntry[]> {
+    const group = idExpGroup ?? 0
+    const inScope = this.inScopeSql(scope)
+    const rows: { id: unknown; date: unknown; idAuthor: unknown; author: unknown; description: unknown; idExpGroup: unknown; dealer: unknown }[] =
       await this.db.query(
         `SELECT lg.id, lg.date_update AS date, lg.id_author AS idAuthor, u.nombre AS author, lg.description,
-                lg.id_exp_group AS idExpGroup
+                lg.id_exp_group AS idExpGroup,
+                IF(? > 0 AND ${inScope.sql}, c.razon_social, NULL) AS dealer
            FROM LOG_GENERIC lg
            LEFT JOIN usuarios u ON u.id_usuario = lg.id_author
-          WHERE lg.tipo = 7 AND (lg.id_expense = ? OR (? > 0 AND lg.id_exp_group = ?))
+           LEFT JOIN EXP_EXPENSE e ON e.id = lg.id_expense
+           LEFT JOIN CONTRATISTA c ON c.id = e.id_dealer
+          WHERE lg.tipo = 7 AND (lg.id_expense = ? OR (? > 0 AND (lg.id_exp_group = ? OR (e.id_exp_group = ? AND ${inScope.sql}))))
           ORDER BY lg.id DESC`,
-        [idExpense, idExpGroup ?? 0, idExpGroup ?? 0],
+        [group, ...inScope.params, idExpense, group, group, group, ...inScope.params],
       )
     return rows.map((r) => ({
       id: Number(r.id),
@@ -487,6 +496,7 @@ export class ExpenseReportRepository {
       author: { id: Number(r.idAuthor ?? 0), name: String(r.author ?? '') },
       description: String(r.description ?? ''),
       scope: r.idExpGroup ? 'group' : 'expense',
+      dealer: r.dealer ? String(r.dealer) : null,
     }))
   }
 

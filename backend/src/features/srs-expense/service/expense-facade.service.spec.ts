@@ -209,6 +209,16 @@ describe('ExpenseFacadeService.update — idAuthor solo se valida si cambia (par
     expect(report.employeeAssigned).toHaveBeenCalledWith(PROVIDER, 200, [DEALER_A, DEALER_B])
   })
 
+  it('cambiar solo el empleado de un grupo no registra «Split changed»; cambiar el reparto sí', async () => {
+    const { facade, report, logs } = build()
+    report.rowsByGroup.mockResolvedValue(groupRows({ isApproved: null }))
+    report.groupAggregates.mockResolvedValue(new Map([[GROUP, aggregate({ approved: 0 })]]))
+    await facade.update(admin, GROUP, groupBody({ idAuthor: 200 }))
+    expect(logs.logGroup).not.toHaveBeenCalled()
+    await facade.update(admin, GROUP, groupBody({ totalAmount: '120.00' }))
+    expect(logs.logGroup).toHaveBeenCalledWith(GROUP, USER, expect.stringContaining('Split changed'))
+  })
+
   it('un gasto suelto sin mode da 400 en mode', async () => {
     const { facade } = build()
     const e = await errorOf(() => facade.update(admin, 1, singleBody({ mode: undefined })))
@@ -306,9 +316,9 @@ describe('ExpenseFacadeService.restoreGroup', () => {
     expect(expenses.findByGroup).toHaveBeenCalledWith(GROUP, PROVIDER, 0)
     expect(expenses.updateById).toHaveBeenCalledWith(1, { estado: 1, idAuthorDel: null, deletedDate: null })
     expect(expenses.updateById).toHaveBeenCalledWith(2, { estado: 1, idAuthorDel: null, deletedDate: null })
-    expect(logs.logExpense).toHaveBeenCalledWith(1, USER, 'Group restored (2 branches)')
-    expect(logs.logExpense).toHaveBeenCalledWith(2, USER, 'Group restored (2 branches)')
-    expect(logs.logGroup).toHaveBeenCalledWith(GROUP, USER, 'Group restored (2 branches)')
+    expect(logs.logExpense).toHaveBeenCalledWith(1, USER, 'Group restored (2 dealers)')
+    expect(logs.logExpense).toHaveBeenCalledWith(2, USER, 'Group restored (2 dealers)')
+    expect(logs.logGroup).toHaveBeenCalledWith(GROUP, USER, 'Group restored (2 dealers)')
     expect(groups.setDeleted).toHaveBeenCalledWith(GROUP, false)
   })
 

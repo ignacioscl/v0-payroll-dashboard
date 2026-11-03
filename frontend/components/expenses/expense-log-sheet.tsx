@@ -58,9 +58,15 @@ export function ExpenseLogSheet({
               {rows.map((row) => (
                 <li key={`${row.scope}-${row.id}`} className="rounded-md border border-border/80 bg-muted/20 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="font-mono text-[10px] font-normal">
-                      {row.scope === 'group' ? t('expenses.branches') : t('expenses.detail')}
-                    </Badge>
+                    {row.dealer ? (
+                      <Badge variant="outline" className="whitespace-normal text-left text-[10px] font-normal">
+                        {row.dealer}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-mono text-[10px] font-normal">
+                        {row.scope === 'group' ? t('expenses.branches') : t('expenses.detail')}
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">{formatUsDateTimeForExport(row.date) || row.date}</span>
                   </div>
                   <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-snug">{row.description}</p>

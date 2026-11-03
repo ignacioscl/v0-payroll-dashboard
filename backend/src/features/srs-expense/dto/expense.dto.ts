@@ -58,7 +58,7 @@ export class ExpenseBranchDto {
   @ApiProperty()
   @Type(() => Number)
   @IsInt()
-  @Min(1, { message: 'Choose a branch.' })
+  @Min(1, { message: 'Choose a dealer.' })
   idDealer!: number
 
   @ApiPropertyOptional({ description: 'By percentage: 0–100 con dos decimales.' })
@@ -149,12 +149,12 @@ export class CreateExpenseDto {
   @IsIn(EXPENSE_MODES, { message: 'Choose how to split the amount.' })
   mode!: ExpenseMode
 
-  /** Single branch. */
+  /** Single dealer. */
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(toOptionalInt)
   @IsInt()
-  @Min(1, { message: 'Choose a branch.' })
+  @Min(1, { message: 'Choose a dealer.' })
   idDealer?: number
 
   /** Single | Equal | By percentage. En By amount es la suma y no se escribe. */
@@ -173,7 +173,7 @@ export class CreateExpenseDto {
   @Type(() => ExpenseBranchDto)
   branches?: ExpenseBranchDto[]
 
-  /** Precarga desde una regla recurrente (F3): queda en cada fila para ver de dónde salió. */
+  /** «Generate expense from this recurring expense»: queda en cada fila para ver de dónde salió. */
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(toOptionalInt)

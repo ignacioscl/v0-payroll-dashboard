@@ -2047,10 +2047,6 @@ export interface Messages {
     byPercentageHint: string
     byAmount: string
     byAmountHint: string
-    useRecurringSplit: string
-    useRecurringSplitHint: string
-    pickRule: string
-    apply: string
     save: string
     saving: string
     createNamed: string
@@ -2126,7 +2122,8 @@ export interface Messages {
     dontBlock: string
     addDealers: string
     exportDealers: string
-    addExpenseFromRule: string
+    generateExpenseFromRule: string
+    generatedFromRule: string
     deleteRuleTitle: string
     deleteRuleHint: string
     removeDealerTitle: string

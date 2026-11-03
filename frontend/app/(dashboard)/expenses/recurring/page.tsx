@@ -1,15 +1,16 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { CalendarClock, Plus, Repeat, Sigma } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
+import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
+import { RecurringRuleDialog, type RecurringRuleTarget } from '@/components/expenses/recurring-rule-dialog'
 import { RecurringRulesDataTable } from '@/components/expenses/recurring-rules-data-table'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
-import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
+import { canAccessExpenses, canAddExpenses } from '@/lib/auth/expenses-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { fmtAmount } from '@/lib/expenses/expense-format'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -19,7 +20,10 @@ export default function RecurringExpensesPage() {
   const { t } = useTranslation()
   const { user, loading, hasPermission } = useSrsMe()
   const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAdd = canAddExpenses(hasPermission, user?.isSystemAdmin)
   const [cards, setCards] = React.useState<RuleListResponse['cards'] | null>(null)
+  const [ruleTarget, setRuleTarget] = React.useState<RecurringRuleTarget | null>(null)
+  const [expenseTarget, setExpenseTarget] = React.useState<ExpenseFormTarget | null>(null)
 
   if (!loading && !canAccess) return <AccessDenied message={t('expenses.noAccess')} />
 
@@ -31,11 +35,9 @@ export default function RecurringExpensesPage() {
         icon={<Repeat />}
         variant="violet"
         actions={
-          <Button asChild size="sm" className="gap-1.5">
-            <Link href="/expenses/recurring/new">
-              <Plus className="size-4" />
-              {t('expenses.addRule')}
-            </Link>
+          <Button size="sm" className="gap-1.5" onClick={() => setRuleTarget({ kind: 'new' })}>
+            <Plus className="size-4" />
+            {t('expenses.addRule')}
           </Button>
         }
       />
@@ -44,7 +46,14 @@ export default function RecurringExpensesPage() {
         <KPICard inline title={t('expenses.estimatedMonthly')} value={cards ? fmtAmount(cards.estimatedMonthly) : '—'} icon={<Sigma />} />
         <KPICard inline title={t('expenses.next30Days')} value={cards ? fmtAmount(cards.next30Days) : '—'} icon={<CalendarClock />} variant="info" />
       </div>
-      <RecurringRulesDataTable enabled={!loading && canAccess} onCards={setCards} />
+      <RecurringRulesDataTable
+        enabled={!loading && canAccess}
+        onCards={setCards}
+        onEdit={(id) => setRuleTarget({ kind: 'edit', id })}
+        onGenerateExpense={canAdd ? (ruleId) => setExpenseTarget({ kind: 'new', fromRuleId: ruleId }) : undefined}
+      />
+      <RecurringRuleDialog target={ruleTarget} onClose={() => setRuleTarget(null)} />
+      <ExpenseFormDialog target={expenseTarget} onClose={() => setExpenseTarget(null)} />
     </div>
   )
 }

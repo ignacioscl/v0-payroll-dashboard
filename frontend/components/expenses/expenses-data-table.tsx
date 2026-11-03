@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import {
   Check,
@@ -21,6 +20,7 @@ import { toast } from 'sonner'
 
 import { ExpenseAttachmentDialog } from '@/components/expenses/expense-attachment-dialog'
 import { ExpenseDetailSheet } from '@/components/expenses/expense-detail-sheet'
+import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpenseLogSheet } from '@/components/expenses/expense-log-sheet'
 import { ExpenseStatusBadge } from '@/components/expenses/expense-status-badge'
 import {
@@ -91,7 +91,6 @@ type Confirm = { row: ExpenseRow; action: ExpenseRowAction['action'] }
 
 export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesDataTableProps) {
   const { t } = useTranslation()
-  const router = useRouter()
   const isMobile = useIsMobile()
   const rowAction = useExpenseRowAction()
 
@@ -102,6 +101,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
   const [detailRow, setDetailRow] = React.useState<ExpenseRow | null>(null)
   const [logRow, setLogRow] = React.useState<ExpenseRow | null>(null)
   const [attachmentRow, setAttachmentRow] = React.useState<ExpenseRow | null>(null)
+  const [editTarget, setEditTarget] = React.useState<ExpenseFormTarget | null>(null)
 
   React.useEffect(() => {
     setPageIndex(0)
@@ -116,9 +116,9 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
   const openEdit = React.useCallback(
     (row: ExpenseRow) => {
       const id = rowDetailId(row)
-      if (id != null) router.push(`/expenses/${id}/edit`)
+      if (id != null) setEditTarget({ kind: 'edit', id })
     },
-    [router],
+    [],
   )
 
   const columns = React.useMemo<ColumnDef<ExpenseRow>[]>(
@@ -555,6 +555,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         title={attachmentRow ? `${attachmentRow.company.name} · ${fmtAmount(rowAmount(attachmentRow))} · ${fmtYmd(attachmentRow.ticketDate)}` : ''}
         canUpload={canEdit && !(attachmentRow?.kind === 'group' && attachmentRow.readOnly) && !attachmentRow?.deleted}
       />
+      <ExpenseFormDialog target={editTarget} onClose={() => setEditTarget(null)} />
     </div>
   )
 }

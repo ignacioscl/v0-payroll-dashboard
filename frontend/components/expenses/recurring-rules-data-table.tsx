@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { FileSpreadsheet, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -23,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { RULES_LIST_KEY, useDeleteRule } from '@/hooks/use-recurring-rules'
 import { downloadServerXlsx } from '@/lib/download-xlsx'
@@ -43,9 +43,19 @@ const rulesAdapter: DataTableServerAdapter<RuleRow, RuleListResponse> = {
   },
 }
 
-export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean; onCards?: (cards: RuleListResponse['cards']) => void }) {
+export function RecurringRulesDataTable({
+  enabled,
+  onCards,
+  onEdit,
+  onGenerateExpense,
+}: {
+  enabled: boolean
+  onCards?: (cards: RuleListResponse['cards']) => void
+  onEdit: (id: number) => void
+  /** «Generate expense from this recurring expense»: Add Expense precargado con la regla. Sin él, no se muestra. */
+  onGenerateExpense?: (ruleId: number) => void
+}) {
   const { t } = useTranslation()
-  const router = useRouter()
   const isMobile = useIsMobile()
   const deleteMut = useDeleteRule()
   const [pageIndex, setPageIndex] = React.useState(0)
@@ -56,7 +66,7 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
   const [exporting, setExporting] = React.useState<number | null>(null)
 
   const columnPinning = React.useMemo(
-    () => (isMobile ? { left: [], right: [] } : { left: [], right: ['actions'] }),
+    () => (isMobile ? { left: [], right: [] } : { left: ['description'], right: ['actions'] }),
     [isMobile],
   )
   const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
@@ -81,8 +91,45 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
         accessorKey: 'description',
         size: 220,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.ruleDescription')} />,
-        cell: ({ row }) => <span className={cn('block font-medium', wrap)}>{row.original.description}</span>,
-        meta: { label: t('expenses.ruleDescription') } satisfies DataTableColumnMeta<RuleRow>,
+        cell: ({ row }) => {
+          const warnings = row.original.warnings ?? []
+          const icon = <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          return (
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className={cn('min-w-0 font-medium', wrap)}>{row.original.description}</span>
+                {warnings.length && !isMobile ? (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="inline-flex shrink-0 rounded-sm" aria-label={warnings.join(' ')}>
+                          {icon}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm whitespace-pre-wrap break-words">
+                        {warnings.join('\n')}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+              </span>
+              {/* En celular no hay hover: el aviso va escrito debajo, como las notas en Expenses List. */}
+              {warnings.length && isMobile
+                ? warnings.map((w) => (
+                    <span key={w} className="flex items-start gap-1 whitespace-normal break-words text-xs text-amber-700 dark:text-amber-400">
+                      {icon}
+                      {w}
+                    </span>
+                  ))
+                : null}
+            </div>
+          )
+        },
+        meta: {
+          label: t('expenses.ruleDescription'),
+          // Fija en la compu; en celular ninguna columna fija (regla data-table).
+          pin: isMobile ? undefined : 'left',
+        } satisfies DataTableColumnMeta<RuleRow>,
       },
       {
         id: 'company',
@@ -184,7 +231,7 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
                 className="size-7"
                 onClick={(e) => {
                   e.stopPropagation()
-                  router.push(`/expenses/recurring/${r.id}`)
+                  onEdit(r.id)
                 }}
               >
                 <Pencil className="size-3.5" />
@@ -198,10 +245,12 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => router.push(`/expenses/new?fromRule=${r.id}`)}>
-                    <Plus className="size-4" />
-                    {t('expenses.addExpenseFromRule')}
-                  </DropdownMenuItem>
+                  {onGenerateExpense ? (
+                    <DropdownMenuItem className="cursor-pointer" onClick={() => onGenerateExpense(r.id)}>
+                      <Plus className="size-4" />
+                      {t('expenses.generateExpenseFromRule')}
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem className="cursor-pointer" disabled={exporting === r.id} onClick={() => void exportDealers(r)}>
                     <FileSpreadsheet className="size-4" />
                     {t('expenses.exportDealers')}
@@ -227,7 +276,7 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
         } satisfies DataTableColumnMeta<RuleRow>,
       },
     ],
-    [t, wrap, isMobile, router, exporting, exportDealers],
+    [t, wrap, isMobile, onEdit, onGenerateExpense, exporting, exportDealers],
   )
 
   const [cards, setCards] = React.useState<RuleListResponse['cards'] | null>(null)
@@ -281,7 +330,7 @@ export function RecurringRulesDataTable({ enabled, onCards }: { enabled: boolean
         isLoading={isFetching}
         getRowId={(r) => String(r.id)}
         columnPinning={columnPinning}
-        onRowClick={(r) => router.push(`/expenses/recurring/${r.id}`)}
+        onRowClick={(r) => onEdit(r.id)}
         pagination={{
           pageIndex,
           pageSize,

@@ -24,6 +24,10 @@ export class ExpenseDealerAssignService extends GlobalBaseService<ExpenseDealerA
     return this.repository.listForRuleWithNames(idExpRepetitive, idDealerProvider)
   }
 
+  listForRulesWithNames(idsExpRepetitive: number[], idDealerProvider: number) {
+    return this.repository.listForRulesWithNames(idsExpRepetitive, idDealerProvider)
+  }
+
   findWithRule(id: number) {
     return this.repository.findWithRule(id)
   }

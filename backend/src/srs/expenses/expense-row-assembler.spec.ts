@@ -81,7 +81,7 @@ describe('expense-row-assembler (F2 / D8)', () => {
     expect(groupStatus({ total: 3, approved: 1, rejected: 2 })).toBe('pending')
   })
 
-  it('buildGroupRow: «All branches (k of N)», visibleTotal de las visibles y readOnly por alcance (D8)', () => {
+  it('buildGroupRow: «All dealers (k of N)», visibleTotal de las visibles y readOnly por alcance (D8)', () => {
     const visible = [
       toSingle(raw({ id: 1, amount: '33.33' })),
       toSingle(raw({ id: 2, amount: '33.33', idDealer: 86 })),

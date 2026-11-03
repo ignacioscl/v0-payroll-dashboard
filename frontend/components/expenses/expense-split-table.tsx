@@ -7,15 +7,8 @@ import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/f
 import { Input } from '@/components/ui/input'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { fmtAmount } from '@/lib/expenses/expense-format'
-import type { ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
-import {
-  fromCents,
-  isValidAmount,
-  isValidPercent,
-  splitAmount,
-  splitEqual,
-  toCents,
-} from '@/lib/expenses/expense-rules'
+import { currentSplitAmounts, type ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
+import { fromCents, isValidAmount, isValidPercent, toCents } from '@/lib/expenses/expense-rules'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 
@@ -40,14 +33,11 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
   const preview = React.useMemo(() => {
     const ids = branchIds ?? []
     const totalOk = isValidAmount(totalAmount)
-    if (mode === 'equal') {
-      if (!totalOk || ids.length === 0) return { amounts: {} as Record<string, string>, total: totalOk ? totalAmount : '', pctSum: null }
-      const split = splitEqual(toCents(totalAmount), ids.map(Number))
-      const amounts: Record<string, string> = {}
-      for (const id of ids) amounts[id] = split[Number(id)]
-      return { amounts, total: fromCents(toCents(totalAmount)), pctSum: null }
-    }
-    if (mode === 'percent') {
+    const total = totalOk ? fromCents(toCents(totalAmount)) : ''
+    if (mode === 'equal' || mode === 'percent') {
+      // Mismo cálculo que el cambio de modo (`currentSplitAmounts`).
+      const amounts = currentSplitAmounts({ mode, totalAmount, branchIds: ids, branches }) ?? {}
+      if (mode === 'equal') return { amounts, total, pctSum: null }
       let sum = 0
       let allValid = ids.length > 0
       for (const id of ids) {
@@ -55,35 +45,29 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
         if (!isValidPercent(p)) allValid = false
         else sum += toCents(p)
       }
-      const amounts: Record<string, string> = {}
-      if (totalOk && allValid && sum === 10000) {
-        const split = splitAmount(
-          totalAmount,
-          ids.map((id) => ({ id: Number(id), percentage: branches?.[id]?.percentage ?? '0', fixedAmount: null })),
-        )
-        for (const id of ids) amounts[id] = split[Number(id)]
-      }
-      return { amounts, total: totalOk ? fromCents(toCents(totalAmount)) : '', pctSum: allValid ? sum : null }
+      return { amounts, total, pctSum: allValid ? sum : null }
     }
     // amount
-    let total = 0
+    let sumCents = 0
     let allValid = ids.length > 0
     const amounts: Record<string, string> = {}
     for (const id of ids) {
       const a = branches?.[id]?.amount ?? ''
       if (!isValidAmount(a)) allValid = false
       else {
-        total += toCents(a)
+        sumCents += toCents(a)
         amounts[id] = fromCents(toCents(a))
       }
     }
-    return { amounts, total: allValid ? fromCents(total) : '', pctSum: null }
+    return { amounts, total: allValid ? fromCents(sumCents) : '', pctSum: null }
   }, [mode, totalAmount, branchIds, branches])
 
   const ids = branchIds ?? []
   if (mode === 'single' || ids.length === 0) return null
 
   const showInput = mode === 'percent' || mode === 'amount'
+  // By amount: el importe es el que se escribe; una segunda columna lo repetiría.
+  const showPreview = mode !== 'amount'
   const pctOk = preview.pctSum === 10000
 
   return (
@@ -97,7 +81,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                 {mode === 'percent' ? t('expenses.percent') : t('expenses.amount')}
               </th>
             ) : null}
-            <th className="w-32 px-3 py-2 text-right font-medium">{t('expenses.dealerAmount')}</th>
+            {showPreview ? <th className="w-32 px-3 py-2 text-right font-medium">{t('expenses.dealerAmount')}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -127,9 +111,11 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                   />
                 </td>
               ) : null}
-              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                {preview.amounts[id] ? fmtAmount(preview.amounts[id]) : '—'}
-              </td>
+              {showPreview ? (
+                <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                  {preview.amounts[id] ? fmtAmount(preview.amounts[id]) : '—'}
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -143,10 +129,18 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                   mode === 'percent' && preview.pctSum !== null && (pctOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'),
                 )}
               >
-                {mode === 'percent' ? (preview.pctSum !== null ? `${fromCents(preview.pctSum)}%` : '—') : ''}
+                {mode === 'percent'
+                  ? preview.pctSum !== null
+                    ? `${fromCents(preview.pctSum)}%`
+                    : '—'
+                  : preview.total
+                    ? fmtAmount(preview.total)
+                    : '—'}
               </td>
             ) : null}
-            <td className="px-3 py-2 text-right tabular-nums">{preview.total ? fmtAmount(preview.total) : '—'}</td>
+            {showPreview ? (
+              <td className="px-3 py-2 text-right tabular-nums">{preview.total ? fmtAmount(preview.total) : '—'}</td>
+            ) : null}
           </tr>
         </tfoot>
       </table>

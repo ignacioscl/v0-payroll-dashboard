@@ -16,7 +16,7 @@ interface DealerComboboxProps {
   dataField?: string
 }
 
-/** Un solo dealer de la empresa (Single branch), con búsqueda local sobre `/api/dealers`. */
+/** Un solo dealer de la empresa (Single dealer), con búsqueda local sobre `/api/dealers`. */
 export function DealerCombobox({ value, onChange, disabled, className, dataField }: DealerComboboxProps) {
   const { t } = useTranslation()
   const { dealers, loading } = useSrsDealers()

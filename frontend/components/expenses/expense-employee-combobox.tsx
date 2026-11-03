@@ -11,7 +11,7 @@ interface ExpenseEmployeeComboboxProps {
   onChange: (value: TtkEmployeeOption | null) => void
   /** csv de dealers (Add/Edit) o null (filtros: toda la empresa). */
   idDealer: string | null
-  /** Add/Edit: con dealers elegidos; sin ellos muestra «Pick a branch first.». */
+  /** Add/Edit: con dealers elegidos; sin ellos muestra «Pick a dealer first.». */
   requireDealer?: boolean
   disabled?: boolean
   placeholder?: string

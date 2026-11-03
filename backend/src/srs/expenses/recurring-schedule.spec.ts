@@ -1,4 +1,4 @@
-import { estimatedMonthlyCents, isRunDay, nextRun, runsInNextDays } from './recurring-schedule'
+import { estimatedMonthlyCents, isRunDay, nextRun, ruleWarnings, runsInNextDays } from './recurring-schedule'
 import { addDays, monthRange, previousPeriod } from './expense-period'
 
 const monthly = { frequency: 1, weekDay: null, startDate: '2026-10-16', endDate: null, status: 1 }
@@ -35,6 +35,51 @@ describe('recurring-schedule (Next run, Next 30 days, Estimated monthly)', () =>
   it('estimatedMonthlyCents: × 1 mensual, × 52/12 semanal', () => {
     expect(estimatedMonthlyCents(monthly, 1057500)).toBe(1057500)
     expect(estimatedMonthlyCents(weeklyMonday, 510000)).toBe(2210000)
+  })
+})
+
+describe('ruleWarnings (el aviso de la lista: por qué la regla no va a generar lo que se espera)', () => {
+  const fixed = { ...monthly, amount: '44.00', splitType: 2 }
+  const percent = { ...monthly, amount: '1000.00', splitType: 1 }
+  const dealer = (id: number, name: string, extra: object) => ({ id, dealerName: name, ...extra })
+
+  it('una regla que se genera completa no tiene aviso', () => {
+    expect(ruleWarnings(percent, [dealer(1, 'A', { percentage: '60.00' }), dealer(2, 'B', { percentage: '40.00' })], '2026-11-03')).toEqual([])
+    expect(ruleWarnings(fixed, [dealer(1, 'A', { fixedAmount: '44.00' })], '2026-11-03')).toEqual([])
+  })
+
+  it('Automatic con el redondeo viejo (Insurance 15 × 6.67) no avisa: el cron los recalcula y genera', () => {
+    const stale = Array.from({ length: 15 }, (_, i) => dealer(i + 1, `D${i}`, { percentage: '6.67', automatic: true }))
+    expect(ruleWarnings({ ...percent, amount: '5100.00' }, stale, '2026-11-03')).toEqual([])
+  })
+
+  it('sin dealers', () => {
+    expect(ruleWarnings(percent, [], '2026-11-03')).toEqual(["It has no dealers: it won't generate any expense."])
+  })
+
+  it('el mismo control que el cron (checkRun): porcentajes que no suman 100', () => {
+    expect(
+      ruleWarnings(percent, [dealer(1, 'A', { percentage: '90.00' }), dealer(2, 'B', { percentage: '20.00' })], '2026-11-03'),
+    ).toEqual(["It won't generate any expense: percents add up to 110.00%."])
+  })
+
+  it('By fixed amount con dealers sin importe: el cron los saltea', () => {
+    expect(
+      ruleWarnings(
+        fixed,
+        [dealer(1, 'BMW Pines', { fixedAmount: '44.00' }), dealer(2, 'Bentley', { fixedAmount: null }), dealer(3, 'Mini', {})],
+        '2026-11-03',
+      ),
+    ).toEqual(['No amount for Bentley, Mini: no expense is generated for them.'])
+  })
+
+  it('sin día de corrida antes del End date (la test2: mensual del 03/11 al 04/11)', () => {
+    const rule = { ...fixed, startDate: '2026-11-03', endDate: '2026-11-04' }
+    expect(ruleWarnings(rule, [dealer(1, 'A', { fixedAmount: '44.00' })], '2026-11-03')).toEqual([
+      "It won't run again: there is no run day left before the end date.",
+    ])
+    // Hoy es día de corrida: todavía corre hoy.
+    expect(ruleWarnings({ ...rule, startDate: '2026-11-01' }, [dealer(1, 'A', { fixedAmount: '44.00' })], '2026-11-01')).toEqual([])
   })
 })
 

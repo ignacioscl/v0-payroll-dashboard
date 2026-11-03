@@ -98,7 +98,10 @@ export function useFormWithFocus<T extends FieldValues>(props: UseFormProps<T>):
   const handleSubmit = useCallback(
     (onValid: SubmitHandler<T>) =>
       form.handleSubmit(onValid, (errors) => {
-        focusFirstInvalidField(errors)
+        // Un error sin campo en pantalla deja Save mudo: que se vea en la consola al desarrollar.
+        if (!focusFirstInvalidField(errors) && process.env.NODE_ENV !== 'production') {
+          console.error('Form error on a field that is not on screen:', Object.keys(errors), errors)
+        }
       }),
     [form],
   )

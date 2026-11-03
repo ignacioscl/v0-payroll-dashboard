@@ -18,7 +18,7 @@ import {
 } from 'src/srs/punch/punch-export-format'
 import { loadUserName, resolveLocale } from 'src/srs/punch/punch-export-lookups'
 import { expenseExportLabels } from 'src/srs/expenses/expense-export-labels'
-import { estimatedMonthlyCents, nextRun, runsInNextDays } from 'src/srs/expenses/recurring-schedule'
+import { estimatedMonthlyCents, nextRun, ruleWarnings, runsInNextDays } from 'src/srs/expenses/recurring-schedule'
 import { nowNyStamp } from 'src/srs/expenses/expense-period'
 import { assertDealersInScope } from 'src/srs/expenses/expense-dealer-scope'
 import { ExpenseReportRepository } from 'src/srs/expenses/repository/expense-report.repository'
@@ -34,6 +34,7 @@ import {
   AssignRowDto,
 } from 'src/features/srs-expense-dealer-assign/dto/expense-dealer-assign.dto'
 import { ExpenseDealerAssignService } from 'src/features/srs-expense-dealer-assign/service/expense-dealer-assign.service'
+import type { AssignWithDealer } from 'src/features/srs-expense-dealer-assign/repository/expense-dealer-assign.repository'
 import {
   ExpenseRuleError,
   MSG_AMOUNT_INVALID,
@@ -59,6 +60,7 @@ import {
   validateManualPercent,
   validateManualSum,
   validateRuleDates,
+  withAutomaticRecalculated,
 } from 'src/features/srs-expense/rules/expense-rules'
 import {
   RecurringListQueryDto,
@@ -147,8 +149,20 @@ export class RecurringExpenseFacadeService {
       estimatedMonthly += estimatedMonthlyCents(rule, cents)
       next30Days += runsInNextDays(rule, today, 30) * cents
     }
+    const assigns = await this.assigns.listForRulesWithNames(
+      rows.map((r) => r.rule.id),
+      ctx.idDealerProvider,
+    )
     return {
-      data: rows.map((r) => this.toRow(r.rule, r.companyName, r.categoryName, r.dealersCount, today)),
+      data: rows.map((r) =>
+        this.toRow(
+          r.rule,
+          r.companyName,
+          r.categoryName,
+          assigns.filter((a) => Number(a.assign.idExpRepetitive) === Number(r.rule.id)),
+          today,
+        ),
+      ),
       total,
       page,
       pageSize,
@@ -178,25 +192,35 @@ export class RecurringExpenseFacadeService {
       this.generic.findOwned(rule.idCategory, EXPENSES_CATEGORY_CATEGORY, ctx.idDealerProvider),
       this.assigns.listForRuleWithNames(rule.id, ctx.idDealerProvider),
     ])
-    const ruleAssigns = assigns.map((a) => asRule(a.assign))
+    // Los Automatic con lo que les toca hoy, como los usa el cron (no el redondeo viejo grabado: 15 × 6.67 = 100.05 %).
+    const ruleAssigns = Number(rule.splitType) === SPLIT_BY_FIXED_AMOUNT
+      ? assigns.map((a) => asRule(a.assign))
+      : withAutomaticRecalculated(assigns.map((a) => asRule(a.assign)))
     const total = totalCents(ruleAssigns)
-    const rows: AssignRowDto[] = assigns.map((a) => ({
+    const rows: AssignRowDto[] = assigns.map((a, i) => ({
       id: a.assign.id,
       dealer: { id: a.assign.idDealer, name: a.dealerName },
       automatic: Number(a.assign.hasAutomaticPercentaje) === 1,
-      percentage: a.assign.percentage ?? null,
+      percentage: ruleAssigns[i].percentage === null ? null : String(ruleAssigns[i].percentage),
       fixedAmount: a.assign.fixedAmount ?? null,
     }))
     return {
-      ...this.toRow(rule, company?.name ?? '', category?.name ?? '', assigns.length, todayNy()),
+      ...this.toRow(rule, company?.name ?? '', category?.name ?? '', assigns, todayNy()),
       assigns: rows,
       totalPercent: total === null ? null : fromCents(total),
       canRun: assigns.length ? checkRun(rule.amount ?? null, ruleAssigns, rule.splitType) : 'no dealers',
     }
   }
 
-  private toRow(rule: ExpenseRepetitive, companyName: string, categoryName: string, dealersCount: number, today: string): RuleRowDto {
+  private toRow(
+    rule: ExpenseRepetitive,
+    companyName: string,
+    categoryName: string,
+    assigns: AssignWithDealer[],
+    today: string,
+  ): RuleRowDto {
     const weekly = Number(rule.frequency) === RULE_FREQUENCY_WEEKLY
+    const dealersCount = assigns.length
     return {
       id: rule.id,
       description: rule.description,
@@ -211,6 +235,11 @@ export class RecurringExpenseFacadeService {
       dealersCount,
       nextRun: nextRun(rule, today),
       active: Number(rule.status) === 1,
+      warnings: ruleWarnings(
+        rule,
+        assigns.map((a) => ({ ...asRule(a.assign), dealerName: a.dealerName })),
+        today,
+      ),
     }
   }
 

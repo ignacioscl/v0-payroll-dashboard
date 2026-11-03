@@ -6,6 +6,7 @@ import { PieChart, Receipt, TrendingUp } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { AnalyticsTable } from '@/components/expenses/analytics-table'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
+import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Label } from '@/components/ui/label'
@@ -35,7 +36,7 @@ export default function ExpensesAnalyticsPage() {
   const to = toYmd(dateRange?.to ?? dateRange?.from)
   const ready = filtersHydrated && !loading && canAccess && selectedDealers.length > 0 && Boolean(from)
 
-  // «Include removed dealers» solo en la solapa Branch (rule include-removed-dealers).
+  // «Include removed dealers» solo en la solapa Dealer (rule include-removed-dealers).
   const removedDealers = useRemovedDealersSwitch({
     fechaDesde: from || undefined,
     fechaHasta: to || undefined,
@@ -70,6 +71,15 @@ export default function ExpensesAnalyticsPage() {
     { value: 'rejected', label: t('expenses.statusRejected') },
   ]
 
+  const filterChips: FilterPanelChip[] = [
+    ...(status !== 'all'
+      ? [{ key: 'status', label: statusOptions.find((o) => o.value === status)?.label ?? status, onRemove: () => setStatus('all') }]
+      : []),
+    ...(tab === 'dealer' && removedDealers.include
+      ? [{ key: 'removedDealers', label: t('businessKpis.includeRemovedDealers'), onRemove: () => removedDealers.setChecked(false) }]
+      : []),
+  ]
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <PageHeading title={t('expenses.analyticsTitle')} subtitle={t('expenses.analyticsSubtitle')} icon={<PieChart />} variant="success" />
@@ -80,9 +90,10 @@ export default function ExpensesAnalyticsPage() {
         <p className="text-sm text-muted-foreground">{t('filters.selectDates')}</p>
       ) : null}
 
+      <FilterPanel storageKey="expense-analytics-filters-open" chips={filterChips}>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="an-status" className="text-xs text-muted-foreground">
+          <Label htmlFor="an-status" className={FILTER_FIELD_LABEL}>
             {t('expenses.status')}
           </Label>
           <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
@@ -100,6 +111,7 @@ export default function ExpensesAnalyticsPage() {
         </div>
         {tab === 'dealer' ? <RemovedDealersSwitch id="include-removed-dealers-expenses" state={removedDealers} disabled={!ready} /> : null}
       </div>
+      </FilterPanel>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <KPICard inline title={t('expenses.totalExpenses')} value={data ? fmtAmount(data.total) : '—'} icon={<Receipt />} loading={query.isLoading} />

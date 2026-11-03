@@ -84,7 +84,7 @@ type SplitBody = Pick<CreateExpenseDto, 'idDealer' | 'totalAmount' | 'branches'>
 const MSG_CHOOSE_MODE = 'Choose how to split the amount.'
 
 const MODE_LABEL: Record<ExpenseMode, string> = {
-  single: 'Single branch',
+  single: 'Single dealer',
   equal: 'Equal',
   percent: 'By percentage',
   amount: 'By amount',
@@ -127,7 +127,7 @@ export class ExpenseFacadeService {
   async log(ctx: SrsContext, id: number): Promise<{ data: ExpenseLogEntry[] }> {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_APPROVE)
     const meta = await this.requireVisible(ctx, id)
-    return { data: await this.report.logRows(id, meta.row.groupId ?? null) }
+    return { data: await this.report.logRows(id, meta.row.groupId ?? null, this.scope(ctx)) }
   }
 
   /** Un gasto o, si pertenece a un grupo, el grupo con sus filas visibles. 404 si no es de la empresa o no se ve. */
@@ -278,7 +278,7 @@ export class ExpenseFacadeService {
     const ids = branches.map((b) => Number(b.idDealer))
     const seen = new Set<number>()
     branches.forEach((b, i) => {
-      if (seen.has(Number(b.idDealer))) throw fieldError(`branches.${i}.idDealer`, 'This branch is already in the list.')
+      if (seen.has(Number(b.idDealer))) throw fieldError(`branches.${i}.idDealer`, 'This dealer is already in the list.')
       seen.add(Number(b.idDealer))
     })
 
@@ -335,7 +335,7 @@ export class ExpenseFacadeService {
     if (!idAuthor || idAuthor === ctx.idUsuario) return ctx.idUsuario
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_ON_BEHALF)
     if (!(await this.report.employeeAssigned(ctx.idDealerProvider, idAuthor, dealerIds))) {
-      throw fieldError('idAuthor', 'Choose an employee assigned to the selected branches.')
+      throw fieldError('idAuthor', 'Choose an employee assigned to the selected dealers.')
     }
     return idAuthor
   }
@@ -384,7 +384,7 @@ export class ExpenseFacadeService {
       ids.push(created.id)
     }
     await this.groups.setAttachmentExpense(group.id as number, Math.min(...ids))
-    await this.logs.logGroup(group.id as number, ctx.idUsuario, `Group created (${ids.length} branches, ${MODE_LABEL[split.mode]})`)
+    await this.logs.logGroup(group.id as number, ctx.idUsuario, `Group created (${ids.length} dealers, ${MODE_LABEL[split.mode]})`)
     await this.catalog.setLastCategory(ctx, common.idCompany, common.idCategory)
     return this.groupDetail(ctx, group.id as number, 1)
   }
@@ -396,6 +396,7 @@ export class ExpenseFacadeService {
     idAuthor: number,
     idExpRepetitive: number | null,
     idExpGroup: number | null,
+    logLabel = 'Expense created',
   ): Promise<Expense> {
     const created = await this.expenses.create({
       idDetailer: ctx.idDealerProvider,
@@ -415,7 +416,7 @@ export class ExpenseFacadeService {
       isApproved: null,
       estado: 1,
     })
-    await this.logs.logExpense(created.id, ctx.idUsuario, 'Expense created')
+    await this.logs.logExpense(created.id, ctx.idUsuario, `${logLabel} ($${fromCents(toCents(row.amount))})`)
     return created
   }
 
@@ -436,7 +437,7 @@ export class ExpenseFacadeService {
     const { meta } = await this.requireWritable(ctx, expense.id)
     if (Number(expense.isApproved) === 1) throw new ConflictException(MSG_RECEIPT_APPROVED)
     if (body.mode === undefined) throw fieldError('mode', MSG_CHOOSE_MODE)
-    if (body.mode !== 'single') throw fieldError('mode', 'A single expense keeps one branch.')
+    if (body.mode !== 'single') throw fieldError('mode', 'A single expense keeps one dealer.')
     const common = await this.resolveCommon(ctx, body)
     const idDealer = body.idDealer ?? expense.idDealer
     if (idDealer !== expense.idDealer) {
@@ -573,10 +574,11 @@ export class ExpenseFacadeService {
       if (attachmentRow && attachmentRow.row.hasAttachment && !keep.has(attachmentRow.row.dealer.id)) {
         throw fieldError('branches', MSG_ATTACHMENT_BRANCH_LOCKED)
       }
-      if (this.splitChanges(body, group.splitType, current)) {
+      const splitChanged = this.splitChanges(body, group.splitType, current)
+      if (splitChanged) {
         await this.retireDeletedRows(ctx, groupId)
         for (const r of current) {
-          if (!keep.has(r.row.dealer.id)) await this.retireRow(ctx, r.row.id)
+          if (!keep.has(r.row.dealer.id)) await this.retireRow(ctx, r.row.id, r.row.amount)
         }
       }
       const remainingIds: number[] = []
@@ -586,7 +588,7 @@ export class ExpenseFacadeService {
           await this.applyCommon(ctx, existing.row, common, idAuthor, row.amount)
           remainingIds.push(existing.row.id)
         } else {
-          const created = await this.insertRow(ctx, common, row, idAuthor, first.idExpRepetitive ?? null, groupId)
+          const created = await this.insertRow(ctx, common, row, idAuthor, first.idExpRepetitive ?? null, groupId, 'Dealer added')
           remainingIds.push(created.id)
         }
       }
@@ -594,7 +596,7 @@ export class ExpenseFacadeService {
       if (!group.idAttachmentExpense || !remainingIds.includes(group.idAttachmentExpense)) {
         await this.groups.setAttachmentExpense(groupId, Math.min(...remainingIds))
       }
-      await this.logs.logGroup(groupId, ctx.idUsuario, `Split changed (${split.rows.length} branches, ${MODE_LABEL[split.mode]})`)
+      if (splitChanged) await this.logs.logGroup(groupId, ctx.idUsuario, `Split changed (${split.rows.length} dealers, ${MODE_LABEL[split.mode]})`)
     } else {
       for (const r of current) await this.applyCommon(ctx, r.row, common, idAuthor, r.row.amount)
     }
@@ -676,7 +678,7 @@ export class ExpenseFacadeService {
       await this.applyApproval(ctx, e, body.approved)
       n++
     }
-    await this.logs.logGroup(groupId, ctx.idUsuario, `Group ${body.approved ? 'approved' : 'rejected'} (${n} pending branches)`)
+    await this.logs.logGroup(groupId, ctx.idUsuario, `Group ${body.approved ? 'approved' : 'rejected'} (${n} pending dealers)`)
     return this.groupDetail(ctx, groupId, 1)
   }
 
@@ -711,7 +713,7 @@ export class ExpenseFacadeService {
     // Restaurar devuelve el gasto como estaba al borrarlo: lo que ya estaba borrado no es parte de él.
     await this.retireDeletedRows(ctx, groupId)
     for (const e of rows) await this.softDelete(ctx, e.id)
-    await this.logs.logGroup(groupId, ctx.idUsuario, `Group deleted (${rows.length} branches)`)
+    await this.logs.logGroup(groupId, ctx.idUsuario, `Group deleted (${rows.length} dealers)`)
     await this.groups.setDeleted(groupId, true)
   }
 
@@ -721,14 +723,14 @@ export class ExpenseFacadeService {
   }
 
   /** La fila deja de ser parte del gasto (`EXPENSE_ESTADO_RETIRED`): queda por el histórico y no se restaura. */
-  private async retireRow(ctx: SrsContext, id: number): Promise<void> {
+  private async retireRow(ctx: SrsContext, id: number, amount: string): Promise<void> {
     await this.expenses.updateById(id, { estado: EXPENSE_ESTADO_RETIRED, idAuthorDel: ctx.idUsuario, deletedDate: nowNyStamp() })
-    await this.logs.logExpense(id, ctx.idUsuario, 'Receipt removed from the split')
+    await this.logs.logExpense(id, ctx.idUsuario, `Dealer removed ($${fromCents(toCents(amount))})`)
   }
 
   private async retireDeletedRows(ctx: SrsContext, groupId: number): Promise<void> {
     const deleted = await this.expenses.findByGroup(groupId, ctx.idDealerProvider, 0)
-    for (const e of deleted) await this.retireRow(ctx, e.id)
+    for (const e of deleted) await this.retireRow(ctx, e.id, e.amount)
   }
 
   private async closeGroupIfEmpty(ctx: SrsContext, groupId: number): Promise<void> {
@@ -749,7 +751,7 @@ export class ExpenseFacadeService {
 
   /**
    * Restaura todas las filas borradas del grupo (todas tienen que estar en el alcance: D8 → 403) y reabre el
-   * grupo; log «Group restored (N branches)» por fila y por grupo. Sin filas borradas devuelve el grupo como está.
+   * grupo; log «Group restored (N dealers)» por fila y por grupo. Sin filas borradas devuelve el grupo como está.
    */
   @Transactional()
   async restoreGroup(ctx: SrsContext, groupId: number): Promise<ExpenseDetail> {
@@ -760,7 +762,7 @@ export class ExpenseFacadeService {
     if (!agg) return this.groupDetail(ctx, groupId, 1)
     if (agg.inScope < agg.total) throw new ForbiddenException(MSG_SOME_BRANCHES_OUTSIDE)
     const deleted = await this.expenses.findByGroup(groupId, ctx.idDealerProvider, 0)
-    const text = `Group restored (${deleted.length} branches)`
+    const text = `Group restored (${deleted.length} dealers)`
     for (const e of deleted) {
       await this.reactivate(e.id)
       await this.logs.logExpense(e.id, ctx.idUsuario, text)

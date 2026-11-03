@@ -32,18 +32,6 @@ export function useRecurringRulesList(params: { term?: string; page: number; pag
   })
 }
 
-/** Combo «Use a recurring expense's split»: reglas de la empresa por término. */
-export function useRecurringRulesSearch(term: string, enabled = true) {
-  const trimmed = term.trim()
-  return useQuery({
-    queryKey: [...RULES_LIST_KEY, 'search', trimmed],
-    queryFn: async () => (await fetchRules({ term: trimmed, page: 1, pageSize: 50 })).data,
-    enabled,
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
-  })
-}
-
 export function useRecurringRule(id: number | null) {
   return useQuery<RuleDetail>({
     queryKey: ruleDetailKey(id ?? 0),

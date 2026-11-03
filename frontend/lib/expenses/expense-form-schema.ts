@@ -4,7 +4,13 @@ import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 import {
   EXPENSE_LIMITS,
   ExpenseRuleError,
+  fromCents,
   isRealYmd,
+  isValidAmount,
+  isValidPercent,
+  percentsFromAmounts,
+  splitAmount,
+  splitEqual,
   toCents,
   validateAmount,
   validateAmountSplit,
@@ -45,10 +51,10 @@ export interface ExpenseFormValues {
   notes: string
   author: TtkEmployeeOption | null
   mode: ExpenseMode
-  /** Single branch: id del dealer (string, como `DealerOption.id`). */
+  /** Single dealer: id del dealer (string, como `DealerOption.id`). */
   idDealer: string
   totalAmount: string
-  /** Multiple branches: ids de dealer (string). */
+  /** Multiple dealers: ids de dealer (string). */
   branchIds: string[]
   /** Por id de dealer: su porcentaje o su monto, según el modo. */
   branches: Record<string, BranchInputValue>
@@ -106,7 +112,10 @@ export function createExpenseFormSchema(ctx: ExpenseFormContext, m: ExpenseFormM
       idDealer: z.string(),
       totalAmount: z.string(),
       branchIds: z.array(z.string()),
-      branches: z.record(z.string(), z.object({ percentage: z.string(), amount: z.string() })),
+      // `.catch('')`: al cambiar de modo, RHF desmonta la columna que se deja de ver y borra su valor
+      // (By amount → By percentage deja `amount` en undefined). Sin esto, el error «Required» cae en un
+      // campo que no está en pantalla y Save no hace nada (Ignacio, 03/11/2026).
+      branches: z.record(z.string(), z.object({ percentage: z.string().catch(''), amount: z.string().catch('') })),
       idExpRepetitive: z.number().nullable(),
     })
     .superRefine((data, refine) => {
@@ -208,6 +217,72 @@ export const emptyExpenseFormValues = (todayNy: string): ExpenseFormValues => ({
   idExpRepetitive: null,
 })
 
+type SplitInput = Pick<ExpenseFormValues, 'mode' | 'totalAmount' | 'branchIds' | 'branches'>
+
+/**
+ * Monto de cada dealer del reparto que se está viendo, o null si todavía no está completo (falta el
+ * total, un porcentaje o un monto, o los porcentajes no suman 100). Lo usan la tabla de reparto y el
+ * cambio de modo.
+ */
+export function currentSplitAmounts(v: SplitInput): Record<string, string> | null {
+  const ids = v.branchIds ?? []
+  if (v.mode === 'single' || ids.length === 0) return null
+  const out: Record<string, string> = {}
+  if (v.mode === 'amount') {
+    for (const id of ids) {
+      const a = v.branches?.[id]?.amount ?? ''
+      if (!isValidAmount(a)) return null
+      out[id] = fromCents(toCents(a))
+    }
+    return out
+  }
+  if (!isValidAmount(v.totalAmount)) return null
+  if (v.mode === 'equal') {
+    const split = splitEqual(toCents(v.totalAmount), ids.map(Number))
+    for (const id of ids) out[id] = split[Number(id)]
+    return out
+  }
+  let sum = 0
+  for (const id of ids) {
+    const p = v.branches?.[id]?.percentage ?? ''
+    if (!isValidPercent(p)) return null
+    sum += toCents(p)
+  }
+  if (sum !== 10000) return null
+  const split = splitAmount(
+    v.totalAmount,
+    ids.map((id) => ({ id: Number(id), percentage: v.branches?.[id]?.percentage ?? '0', fixedAmount: null })),
+  )
+  for (const id of ids) out[id] = split[Number(id)]
+  return out
+}
+
+/**
+ * Al cambiar entre Equal, By percentage y By amount, el modo nuevo arranca con el reparto que se veía:
+ * By amount con el monto de cada dealer, By percentage con su porcentaje, y el total con la suma. Si el
+ * reparto no estaba completo, no se toca nada.
+ */
+export function carrySplitToMode(
+  v: SplitInput,
+  next: ExpenseMode,
+): Pick<ExpenseFormValues, 'totalAmount' | 'branches'> | null {
+  if (next === 'single' || next === v.mode) return null
+  const amounts = currentSplitAmounts(v)
+  if (!amounts) return null
+  const ids = Object.keys(amounts)
+  const total = fromCents(ids.reduce((acc, id) => acc + toCents(amounts[id]), 0))
+  const percents = next === 'percent' ? percentsFromAmounts(Object.fromEntries(ids.map((id) => [Number(id), amounts[id]]))) : {}
+  const branches: Record<string, BranchInputValue> = { ...v.branches }
+  for (const id of ids) {
+    const prev = branches[id] ?? { percentage: '', amount: '' }
+    branches[id] = {
+      percentage: next === 'percent' ? (percents[Number(id)] ?? '') : (prev.percentage ?? ''),
+      amount: next === 'amount' ? amounts[id] : (prev.amount ?? ''),
+    }
+  }
+  return { totalAmount: total, branches }
+}
+
 /** Porcentaje de una fila de un grupo By percentage cuando el Nest no lo manda: amount / total. */
 function derivePercent(amount: string, total: string): string {
   const a = toCents(amount)
@@ -249,7 +324,8 @@ export function expenseFormValuesFromDetail(detail: ExpenseDetail, todayNy: stri
   }
 }
 
-/** Precarga desde una regla recurrente (F3, «Use a recurring expense's split»). */
+
+/** «Generate expense from this recurring expense»: el formulario de alta con los datos de la regla. */
 export function applyRuleToExpenseForm(values: ExpenseFormValues, rule: RuleDetail): ExpenseFormValues {
   const branches: Record<string, BranchInputValue> = {}
   for (const a of rule.assigns) {
@@ -304,8 +380,8 @@ export function expenseFormValuesToPayload(
     ticketDate: values.ticketDate,
     ...expenseFormValuesToTextOnlyPayload(values),
     idAuthor: authorForPayload(values, opts),
-    mode: values.mode,
     idExpRepetitive: values.idExpRepetitive ?? undefined,
+    mode: values.mode,
   }
   if (values.company?.id != null) payload.idCompany = values.company.id
   else if (values.company) payload.newCompanyName = values.company.name.trim()
