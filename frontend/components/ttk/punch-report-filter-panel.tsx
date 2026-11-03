@@ -132,7 +132,7 @@ export function PunchReportFilterPanel({
     selectedTodayLiveStatus,
     setSelectedTodayLiveStatus,
     dateRange,
-    setDateRange,
+    resetDateRange,
     excludedErrorTypes,
     toggleErrorType,
     resetErrorTypes,
@@ -199,7 +199,7 @@ export function PunchReportFilterPanel({
       list.push({
         key: 'date',
         label: dateLabel,
-        onRemove: () => setDateRange(getDefaultDateRange()),
+        onRemove: () => resetDateRange(),
       })
     }
 
@@ -285,7 +285,7 @@ export function PunchReportFilterPanel({
     punchMinHours,
     punchMaxHours,
     paymentTypeLabel,
-    setDateRange,
+    resetDateRange,
     setSearch,
     setSelectedEmployee,
     setSelectedType,
@@ -308,7 +308,7 @@ export function PunchReportFilterPanel({
     // se usa en ningún lado: el reset que el usuario ve es éste.
     resetErrorTypes()
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
-    setDateRange(getDefaultDateRange())
+    resetDateRange()
     onPunchMinHoursChange('')
     onPunchMaxHoursChange('')
     onPaymentTypeFilterChange(PAYMENT_TYPE_FILTER_ALL)
@@ -318,7 +318,7 @@ export function PunchReportFilterPanel({
     setSelectedType,
     setErrorStatus,
     setSelectedTodayLiveStatus,
-    setDateRange,
+    resetDateRange,
     onPunchMinHoursChange,
     onPunchMaxHoursChange,
     onPaymentTypeFilterChange,

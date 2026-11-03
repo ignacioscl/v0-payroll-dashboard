@@ -29,6 +29,7 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { fmtAmount, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
 import { isRealYmd, isValidAmount } from '@/lib/expenses/expense-rules'
 import { useFilters } from '@/lib/filter-context'
+import { expenseListDefaultRange, isSameYmdRange } from '@/lib/filters/expense-list-date-range'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import type { ExpenseListFilters, ExpenseStatus } from '@/lib/srs-expenses-api'
 
@@ -39,7 +40,15 @@ function ExpensesListPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading, hasPermission } = useSrsMe()
-  const { dateRange, setDateRange, selectedDealers, setSelectedDealers, filtersHydrated } = useFilters()
+  const {
+    dateRange,
+    setDateRange,
+    dateRangeIsDefault,
+    showDefaultDateRange,
+    selectedDealers,
+    setSelectedDealers,
+    filtersHydrated,
+  } = useFilters()
 
   const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
   const canAdd = canAddExpenses(hasPermission, user?.isSystemAdmin)
@@ -79,6 +88,30 @@ function ExpensesListPage() {
     }
     router.replace('/expenses')
   }, [filtersHydrated, router, searchParams, setDateRange, setSelectedDealers])
+
+  // Mientras el usuario no eligió fechas, los 7 días hasta hoy (las demás pantallas terminan ayer), y el
+  // calendario del header los muestra. Un enlace de Analytics con fechas manda: los dos effects ven el
+  // mismo `dateRangeIsDefault` del render, así que se mira la URL (plans/plan-expenses-rango-hoy, M1).
+  // Al salir, si sigue sin tocar, se devuelve el rango que había, así las demás pantallas no cambian.
+  const rangeBeforeList = React.useRef<{ saved: boolean; range: typeof dateRange }>({ saved: false, range: undefined })
+  const isDefaultRef = React.useRef(dateRangeIsDefault)
+  React.useEffect(() => {
+    isDefaultRef.current = dateRangeIsDefault
+  }, [dateRangeIsDefault])
+  const urlHasDates = Boolean(searchParams.get('from') || searchParams.get('to'))
+  React.useEffect(() => {
+    if (!filtersHydrated || !dateRangeIsDefault || urlHasDates) return
+    const target = expenseListDefaultRange()
+    if (isSameYmdRange(dateRange, target)) return
+    if (!rangeBeforeList.current.saved) rangeBeforeList.current = { saved: true, range: dateRange }
+    showDefaultDateRange(target)
+  }, [filtersHydrated, dateRangeIsDefault, urlHasDates, dateRange, showDefaultDateRange])
+  React.useEffect(() => {
+    const before = rangeBeforeList
+    return () => {
+      if (isDefaultRef.current && before.current.saved) showDefaultDateRange(before.current.range)
+    }
+  }, [showDefaultDateRange])
 
   const from = toYmd(dateRange?.from)
   const to = toYmd(dateRange?.to ?? dateRange?.from)
