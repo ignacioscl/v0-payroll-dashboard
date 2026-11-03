@@ -5,10 +5,18 @@ import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Dentro de un modal, el bloqueo de scroll del Dialog se come la rueda del mouse en lo que va en un
+ * portal: un combo no scrolleaba su lista. `modal` le da al popover su propio bloqueo. `DialogContent`
+ * prende este contexto, así vale para todo combo dentro de cualquier modal.
+ */
+export const PopoverInDialogContext = React.createContext(false)
+
 function Popover({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+  const inDialog = React.useContext(PopoverInDialogContext)
+  return <PopoverPrimitive.Root data-slot="popover" modal={inDialog} {...props} />
 }
 
 function PopoverTrigger({

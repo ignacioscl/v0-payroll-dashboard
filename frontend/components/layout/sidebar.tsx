@@ -52,6 +52,7 @@ import {
   canAccessProductionReport,
 } from '@/lib/auth/payroll-access'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
+import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
 import { getVisibleNavigation, isDevEnvironment } from '@/lib/navigation'
 import { getAppTitle } from '@/lib/branding'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -116,6 +117,7 @@ function SidebarInner({
     canViewRoles: canViewRoles(hasPermission, user?.isSystemAdmin),
     canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
     isCompanyTypeCompany: Boolean(user?.isCompanyTypeCompany),
+    canAccessExpenses: canAccessExpenses(hasPermission, user?.isSystemAdmin),
     t,
   })
 

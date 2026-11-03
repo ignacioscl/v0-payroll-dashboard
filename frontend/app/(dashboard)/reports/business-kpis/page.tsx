@@ -391,7 +391,7 @@ export default function BusinessKpisPage() {
       />
 
       {!filtersHydrated || selectedDealers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('dealer.selectInHeader')}</p>
+        <p className="text-sm text-muted-foreground">{t('dealer.selectInHeaderToLoad')}</p>
       ) : !headerRange.fechaDesde ? (
         <p className="text-sm text-muted-foreground">{t('filters.selectDates')}</p>
       ) : null}

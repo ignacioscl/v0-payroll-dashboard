@@ -35,7 +35,8 @@ export function ScrollToTopButton({ threshold = DEFAULT_THRESHOLD }: ScrollToTop
       variant="secondary"
       aria-label={t('layout.scrollToTop')}
       className={cn(
-        'fixed bottom-6 right-6 z-50 size-10 cursor-pointer rounded-full shadow-lg',
+        // En celular va por encima de las barras de acciones fijas abajo: tapaba «Save» y el toque subía la página.
+        'fixed bottom-20 right-6 z-50 size-10 cursor-pointer rounded-full shadow-lg md:bottom-6',
         'border border-border bg-card/95 backdrop-blur-sm',
         'hover:bg-accent',
       )}

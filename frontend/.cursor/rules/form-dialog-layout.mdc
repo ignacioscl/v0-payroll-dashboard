@@ -1,0 +1,43 @@
+---
+description: Un formulario de alta o edición va en un modal grande con encabezado y pie fijos, nunca en una página suelta
+globs: v0-payroll-dashboard/frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Formularios: modal grande con `FormDialog`
+
+Todo alta o edición se abre sobre su lista, en `components/layout/form-dialog.tsx`:
+
+- Modal grande, con **encabezado y pie fijos**: scrollea solo el cuerpo y Save siempre se ve.
+- Los botones van en el pie, fuera del `<form>`, con `form={id}`. El foco al primer campo con error sigue siendo de
+  `useFormWithFocus`.
+- Un click afuera no lo cierra y con una grabación en curso no se cierra.
+- Encabezado y pie blancos y cuerpo gris suave: lo pone `FormDialog`. Cada bloque del cuerpo va en `FormSection`, una
+  tarjeta como la de Filters; ningún campo suelto sobre el gris.
+
+Prohibido: una ruta aparte para un formulario, campos sueltos sobre el fondo, Save al final de un scroll.
+
+**Un campo que se oculta no puede tener error.** Cuando un formulario cambia de modo y desmonta campos (columna Percent ↔
+Amount), react-hook-form les borra el valor. El esquema acepta esos campos vacíos (`.catch('')`) y valida solo los del
+modo que se ve: si no, el error cae en un campo que no está en pantalla, `useFormWithFocus` no tiene adónde ir y Save no
+hace nada. En desarrollo, `useFormWithFocus` lo avisa en la consola. Test: `lib/expenses/expense-form-schema.test.ts`.
+*(Ignacio, 03/11/2026: en Edit Expense, un grupo By amount pasado a By percentage no grababa ni decía por qué.)*
+
+**Antes de armar una pantalla nueva se abre una que ya exista del mismo tipo y se sigue su diseño.** Molde previo:
+`generic-invoice-dialog`.
+
+Se mira en el navegador en compu y a 375 px antes de entregar: que pase los tests no dice que se vea bien.
+
+## Filtros de una lista: `FilterPanel`
+
+Los filtros van en el panel plegable «Filters» (`components/shared/filter-panel.tsx`), en tarjeta, con chips de lo activo y
+«Clear all», arriba de las tarjetas de números. Es el diseño de Invoices y Punch Report; ninguno suelto sobre el fondo.
+*(Ignacio, 02/11/2026: en Expenses List iban sueltos.)*
+
+## Los términos son los del sistema
+
+Lo que en Pro es un **dealer** se dice «dealer» en toda pantalla en inglés. Un texto nuevo usa la palabra que ya usa el
+sistema aunque un plan traiga otra; `lib/expenses/expense-terms.test.ts` falla si vuelve «branch» a los textos.
+
+*(Regla de Ignacio, 02/11/2026: Add Expense quedó en una página, primero suelto a todo el ancho y después en tarjetas, y
+decía «Branch» donde todo el sistema dice «dealer».)*

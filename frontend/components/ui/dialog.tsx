@@ -4,6 +4,7 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
+import { PopoverInDialogContext } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 function Dialog({
@@ -65,7 +66,7 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
+        <PopoverInDialogContext.Provider value>{children}</PopoverInDialogContext.Provider>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"

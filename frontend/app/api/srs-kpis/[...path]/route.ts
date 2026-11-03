@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { fetchBackend } from '@/lib/backend-upstream'
+import { proxyResponseBody } from '@/lib/proxy-response'
 
 type RouteContext = { params: Promise<{ path: string[] }> }
 
@@ -62,7 +63,7 @@ async function handle(request: NextRequest, context: RouteContext) {
   }
 
   const buf = await upstream.arrayBuffer()
-  return new NextResponse(buf, {
+  return new NextResponse(proxyResponseBody(upstream.status, buf), {
     status: upstream.status,
     headers: { 'Content-Type': contentType },
   })

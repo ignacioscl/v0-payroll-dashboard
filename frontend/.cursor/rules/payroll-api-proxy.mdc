@@ -49,6 +49,7 @@ Futuros candidatos BFF: `/api/reports/*`, `/api/exports/*`.
 - Proxy genérico: `app/api/srs/[...path]/route.ts` + `lib/srs-proxy.ts`.
 - SSO exchange: `lib/srs-api.ts` directo a SRS (server-only, secret).
 - No llamar `SRS_API_URL` desde el browser.
+- Un proxy que reenvía el cuerpo del backend pasa por `proxyResponseBody` (`lib/proxy-response.ts`): `new NextResponse(buf, { status: 204 })` tira error y el browser recibe un 500 con el cambio ya hecho. *(02/11/2026: al borrar un gasto en Expenses.)*
 
 ## PHP (SRS)
 

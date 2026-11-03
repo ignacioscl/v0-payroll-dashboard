@@ -44,6 +44,15 @@ import { SrsPunchModule } from './srs/punch/srs-punch.module'
 import { SrsPayrollModule } from './srs/payroll/srs-payroll.module'
 import { RolTemplateModule } from './features/rol-template/rol-template.module'
 import { SrsContratistaModule } from './features/srs-contratista/srs-contratista.module'
+// --- Expenses en Pro (plans/plan-expenses-pro): reporte + 7 features, uno por tabla ---
+import { SrsExpensesModule } from './srs/expenses/srs-expenses.module'
+import { SrsGenericDataModule } from './features/srs-generic-data/srs-generic-data.module'
+import { SrsExpenseModule } from './features/srs-expense/srs-expense.module'
+import { ExpenseGroupModule } from './features/expense-group/expense-group.module'
+import { SrsExpenseRepetitiveModule } from './features/srs-expense-repetitive/srs-expense-repetitive.module'
+import { SrsExpenseDealerAssignModule } from './features/srs-expense-dealer-assign/srs-expense-dealer-assign.module'
+import { SrsLogGenericModule } from './features/srs-log-generic/srs-log-generic.module'
+import { SrsLogChangeModule } from './features/srs-log-change/srs-log-change.module'
 // --- Jobs (worker) ---
 import { jobsDataSourceOptions, JOBS_CONNECTION } from './jobs/jobs.datasource'
 import { JobsModule } from './jobs/jobs.module'
@@ -109,6 +118,14 @@ HttpModule.registerAsync({
     SrsPayrollModule,
     RolTemplateModule,
     SrsContratistaModule,
+    SrsExpensesModule,
+    SrsGenericDataModule,
+    SrsExpenseModule,
+    ExpenseGroupModule,
+    SrsExpenseRepetitiveModule,
+    SrsExpenseDealerAssignModule,
+    SrsLogGenericModule,
+    SrsLogChangeModule,
     JobsModule,
     //TemplateModule
     //NO BORRAR LA LINEA DE ARRIBA

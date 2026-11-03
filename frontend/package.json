@@ -10,7 +10,9 @@
     "pm2:stop": "pm2 stop payroll-dashboard",
     "pm2:reload": "pm2 reload payroll-dashboard",
     "pm2:logs": "pm2 logs payroll-dashboard",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -73,6 +75,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22",
     "@types/qs": "^6.15.1",
@@ -81,6 +84,7 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "vitest": "^5.1.0"
   }
 }

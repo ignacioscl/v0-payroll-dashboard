@@ -75,7 +75,18 @@ interface FilterContextType {
   selectedTodayLiveStatus: TodayLiveStatusFilter
   setSelectedTodayLiveStatus: (value: TodayLiveStatusFilter) => void
   dateRange: DateRange | undefined
+  /** Lo que elige el usuario. Con fechas, el rango deja de ser «sin tocar»; vacío («Clear»), vuelve a serlo. */
   setDateRange: (value: DateRange | undefined) => void
+  /**
+   * True mientras el usuario no eligió fechas (al entrar, al recargar y después de «Clear» o de un reset).
+   * Expenses List lo usa para mostrar los 7 días hasta hoy sin pisar un rango elegido
+   * (plans/plan-expenses-rango-hoy).
+   */
+  dateRangeIsDefault: boolean
+  /** Vuelve al rango por defecto (7 días hasta ayer) como «sin tocar». */
+  resetDateRange: () => void
+  /** Pone un rango sin marcarlo como elegido: el default propio de una pantalla. */
+  showDefaultDateRange: (value: DateRange | undefined) => void
   /** Invoice list: legacy-style period bounds (fecha_desde / fecha_hasta on statement). */
   invoiceDateFrom: Date | undefined
   invoiceDateTo: Date | undefined
@@ -145,6 +156,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
     useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
   const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
+  const [dateRangeIsDefault, setDateRangeIsDefault] = useState(true)
   const [invoiceDateFrom, setInvoiceDateFrom] = useState<Date | undefined>(undefined)
   const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
   const [invoiceDateMode, setInvoiceDateMode] = useState<InvoiceDateMode>('range')
@@ -154,12 +166,23 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [incomeYears, setIncomeYears] = useState<number[]>([])
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
-  const setDateRange = useCallback((value: DateRange | undefined) => {
+  const showDefaultDateRange = useCallback((value: DateRange | undefined) => {
     setDateRangeState(value)
     if (!isTodayOnlyDateRange(value)) {
       setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     }
   }, [])
+
+  const setDateRange = useCallback((value: DateRange | undefined) => {
+    showDefaultDateRange(value)
+    // «Clear» del calendario deja el rango vacío como siempre, pero vuelve a «sin tocar».
+    setDateRangeIsDefault(!value?.from)
+  }, [showDefaultDateRange])
+
+  const resetDateRange = useCallback(() => {
+    showDefaultDateRange(getDefaultDateRange())
+    setDateRangeIsDefault(true)
+  }, [showDefaultDateRange])
 
   const setSelectedDealers = useCallback((value: string[] | ((prev: string[]) => string[])) => {
     setSelectedDealersState((prev) => {
@@ -226,11 +249,11 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const def = getDefaultDateRange()
-    setDateRange(def)
+    resetDateRange()
     setInvoiceDateFrom(def.from)
     setInvoiceDateTo(def.to)
     setInvoiceDateMode('range')
-  }, [setDateRange])
+  }, [resetDateRange])
 
   const clearFilters = () => {
     setSearch('')
@@ -245,7 +268,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSelectedStatus('all')
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     const def = getDefaultDateRange()
-    setDateRange(def)
+    resetDateRange()
     setInvoiceDateFrom(def.from)
     setInvoiceDateTo(def.to)
     setInvoiceDateMode('range')
@@ -282,6 +305,9 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setSelectedTodayLiveStatus,
       dateRange,
       setDateRange,
+      dateRangeIsDefault,
+      resetDateRange,
+      showDefaultDateRange,
       invoiceDateFrom,
       invoiceDateTo,
       setInvoiceDateFrom,

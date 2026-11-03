@@ -107,6 +107,9 @@ export function Header() {
   const showStatusFilter = pathname === '/schedule'
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
+  // Expenses has its own «Assigned to» / «Created by» combos (Nest endpoint): the punch employee
+  // search of the header does not apply there. Dealers and date range do (list, analytics).
+  const isExpensesPage = pathname === '/expenses' || pathname.startsWith('/expenses/')
   const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
   // Income by Dealer: switch «By year» que cambia el calendario por un combo de años.
   const isIncomeByDealerPage = pathname === '/reports/income-by-dealer'
@@ -165,7 +168,7 @@ export function Header() {
 
         {/* Desktop filters */}
         <div className="hidden md:flex min-w-0 flex-1 items-center gap-2">
-          <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" />
+          {!isExpensesPage ? <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" /> : null}
 
           {isInvoicesPage ? (
             <DistrictMultiSelect className="w-[170px] shrink-0" />
@@ -240,10 +243,12 @@ export function Header() {
 
           <div className="flex flex-col gap-4 px-4">
             {/* Search */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-muted-foreground">{t('common.search')}</span>
-              <EmployeeSearchInput className="w-full" />
-            </div>
+            {!isExpensesPage ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-muted-foreground">{t('common.search')}</span>
+                <EmployeeSearchInput className="w-full" />
+              </div>
+            ) : null}
 
             {/* Dealers */}
             <div className="flex flex-col gap-1.5">

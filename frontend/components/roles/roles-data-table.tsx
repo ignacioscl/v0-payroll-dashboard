@@ -41,11 +41,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useRolesListFetcher } from '@/hooks/use-roles-list'
 import { useRoleAction } from '@/hooks/use-role-mutations'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { useFilters } from '@/lib/filter-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { cn } from '@/lib/utils'
 import type { RoleListRow } from '@/lib/roles/roles-types'
 
 const rolesAdapter = createPaginatedAdapter<RoleListRow>()
@@ -106,6 +108,16 @@ export function RolesDataTable({
     role: RoleListRow
     action: 'inactivate' | 'activate' | 'delete'
   } | null>(null)
+
+  // En la compu el nombre queda fijo al correr la tabla; en celular ninguna columna va fija (data-table.mdc).
+  const isMobile = useIsMobile()
+  const columnPinning = React.useMemo(
+    () =>
+      isMobile
+        ? { left: [], right: [] }
+        : { left: [...(canEdit ? ['select'] : []), 'nombre'], right: ['actions'] },
+    [isMobile, canEdit],
+  )
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
   const [assignOpen, setAssignOpen] = React.useState(false)
@@ -176,7 +188,7 @@ export function RolesDataTable({
               ),
               meta: {
                 label: t('roles.selectRole'),
-                pin: 'left',
+                pin: isMobile ? undefined : 'left',
                 exportable: false,
                 headerClassName: 'w-[40px] px-2',
                 cellClassName: 'px-2',
@@ -190,9 +202,15 @@ export function RolesDataTable({
           <DataTableColumnHeader column={column} title={t('roles.colName')} />
         ),
         cell: ({ row }) => (
-          <div className="min-w-0 truncate font-medium">{row.original.nombre}</div>
+          <div className={cn('min-w-0 font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
+            {row.original.nombre}
+          </div>
         ),
-        meta: { label: t('roles.colName'), sortKey: 'r.nombre' } satisfies DataTableColumnMeta<RoleListRow>,
+        meta: {
+          label: t('roles.colName'),
+          sortKey: 'r.nombre',
+          pin: isMobile ? undefined : 'left',
+        } satisfies DataTableColumnMeta<RoleListRow>,
       },
       {
         // Template del rol (o «—»): reemplaza la línea «Based on: …» que iba debajo del nombre.
@@ -403,7 +421,7 @@ export function RolesDataTable({
         },
         meta: {
           label: t('roles.actions'),
-          pin: 'right',
+          pin: isMobile ? undefined : 'right',
           headerClassName: 'px-1',
           cellClassName: 'px-1',
         } satisfies DataTableColumnMeta<RoleListRow>,
@@ -411,6 +429,7 @@ export function RolesDataTable({
     ],
     [
       t,
+      isMobile,
       canEdit,
       canViewUsers,
       canManageTemplates,
@@ -463,6 +482,7 @@ export function RolesDataTable({
       <DataTable<RoleListRow>
         tableId="roles.list.v2"
         columns={columns}
+        columnPinning={columnPinning}
         data={rows}
         isLoading={isFetching}
         getRowId={(r) => String(r.id)}
