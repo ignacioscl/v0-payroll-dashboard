@@ -4,7 +4,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# --legacy-peer-deps: npm 10 se cae («reading 'edgesOut'») con los peers opcionales de vitest/vite; el lock se
+# genera con el mismo flag (npm install --package-lock-only --legacy-peer-deps).
+RUN npm ci --legacy-peer-deps
 
 FROM node:22-alpine AS builder
 WORKDIR /app
