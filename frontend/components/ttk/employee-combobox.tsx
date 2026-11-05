@@ -132,7 +132,7 @@ export function EmployeeCombobox({
       minSearchChars={minSearchChars}
       compact={compact}
       placeholder={placeholder ?? t('employeeSearch.select')}
-      searchPlaceholder={t('employeeSearch.typeMinChars')}
+      searchPlaceholder={minSearchChars > 0 ? t('employeeSearch.typeMinChars') : t('employeeSearch.filterByName')}
       preSearchTitle={t('employeeSearch.startTyping')}
       preSearchDescription={t('employeeSearch.enterMinChars', { count: minSearchChars })}
       loadingMessage={t('employeeSearch.searching')}

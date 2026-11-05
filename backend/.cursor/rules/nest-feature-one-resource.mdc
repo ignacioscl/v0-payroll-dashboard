@@ -71,3 +71,12 @@ export class RolTemplateModule {}
 2. ¿Es `*_REL` / rol-accion-rel del dueño? → puede compartir ese feature.
 3. ¿Cualquier otra entity en el folder? → **sacar**.
 4. Orquestación multi-tabla → inyectar services de otros módulos.
+
+## Imports circulares: `forwardRef` en las dos puntas
+
+`SrsUsuarioModule` y `RolTemplateModule` se importan entre sí. Un módulo nuevo que importa `SrsUsuarioModule` cambia el
+orden de carga y Nest arranca con «RolTemplateModule imports index [3] undefined». Se usa
+`forwardRef(() => SrsUsuarioModule)` en el módulo nuevo **y** en `rol-template.module.ts`, que ya lo tiene. Si otro
+módulo cae en lo mismo, mismo arreglo; no se esquiva copiando el service.
+
+*(04/11/2026, Monthly Closing: `monthly-closing.module.ts` importa `SrsUsuarioModule` para los tinteros.)*

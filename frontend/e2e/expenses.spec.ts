@@ -12,9 +12,14 @@
  * Expense la precarga. Al final borra lo creado: el grupo se borra, se restaura desde «Show deleted»
  * (Restore de la fila de grupo) y se vuelve a borrar. Sin scroll horizontal de la página en 375.
  */
-import { readFileSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import {
+  E2E_MISSING_USER,
+  E2E_MISSING_USER_REASON,
+  login,
+  noHorizontalScroll,
+  openMobileMenuIfNeeded,
+} from './helpers'
 
 /** «Show deleted» vive en el panel de filtros, que arranca cerrado. */
 async function clickShowDeleted(page: Page) {
@@ -23,44 +28,12 @@ async function clickShowDeleted(page: Page) {
   await toggle.click()
 }
 
-function loadEnv(): Record<string, string> {
-  const file = resolve(__dirname, '../.env.e2e.local')
-  if (!existsSync(file)) return {}
-  const out: Record<string, string> = {}
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line)
-    if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '')
-  }
-  return out
-}
-
-const env = { ...loadEnv(), ...process.env }
-const USER = env.E2E_USER ?? ''
-const PASSWORD = env.E2E_PASSWORD ?? ''
 const STAMP = `e2e-${Date.now()}`
 const COMPANY = `${STAMP} Co`
 const CATEGORY = `${STAMP} Cat`
 const RULE = `${STAMP} rule`
 
-test.skip(!USER || !PASSWORD, 'Set E2E_USER and E2E_PASSWORD in frontend/.env.e2e.local')
-
-async function login(page: Page) {
-  await page.goto('/login')
-  await page.locator('#email').fill(USER)
-  await page.locator('#password').fill(PASSWORD)
-  await page.getByRole('button', { name: /sign in|log in|ingresar|entrar/i }).click()
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
-}
-
-async function noHorizontalScroll(page: Page) {
-  const ok = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-  expect(ok, 'page must not scroll horizontally').toBe(true)
-}
-
-async function openMobileMenuIfNeeded(page: Page) {
-  const burger = page.getByRole('button', { name: /open menu|abrir men/i })
-  if (await burger.isVisible().catch(() => false)) await burger.click()
-}
+test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
 
 async function pickCombobox(page: Page, fieldName: string, text: string, create = false) {
   const field = page.locator(`[data-field="${fieldName}"]`)
@@ -115,6 +88,9 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await page.goto('/expenses')
     await page.getByRole('button', { name: 'Add Expense' }).click()
     await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible()
+    // Dealers va primero (mail de Juan «Temas», 04/11): con el dealer elegido, el primer campo con error es Company.
+    await page.locator('[data-field="idDealer"] button[role="combobox"]').click()
+    await page.locator('[cmdk-item]').first().click()
     await page.locator('#exp-total').fill('10.50')
     // Modal: encabezado y pie fijos, scrollea solo el cuerpo.
     await page.locator('[data-slot="form-dialog-body"]').evaluate((el) => el.scrollTo(0, el.scrollHeight))
@@ -143,8 +119,6 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await pickCombobox(page, 'company', COMPANY, true)
     await pickCombobox(page, 'category', CATEGORY, true)
     await page.locator('#exp-description').fill(`${STAMP} single`)
-    await page.locator('[data-field="idDealer"] button[role="combobox"]').click()
-    await page.locator('[cmdk-item]').first().click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Expense saved.')).toBeVisible()
     await expect(page).toHaveURL(/\/expenses(\?|$)/)
@@ -202,6 +176,45 @@ test.describe.serial('Expenses — full path (F7)', () => {
     const file = await download
     expect(file.suggestedFilename()).toMatch(/\.xlsx$/)
     await noHorizontalScroll(page)
+  })
+
+  test('Add Expense By amount: amounts typed by hand keep the cents and the Total adds what was entered', async ({ page }) => {
+    // Mail de Juan (04/11): «75» quedaba sin centavos y, con un dealer sin monto, el Total mostraba «—».
+    await login(page)
+    await page.goto('/expenses')
+    await page.getByRole('button', { name: 'Add Expense' }).click()
+    await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible()
+    // Dealers va antes que los datos del gasto, con el empleado junto al dealer.
+    const dealerTop = await page.getByText('Assign to employee').boundingBox()
+    const dateTop = await page.getByText('Receipt date').boundingBox()
+    expect(dealerTop!.y).toBeLessThan(dateTop!.y)
+
+    await page.getByRole('button', { name: /Multiple dealers/ }).click()
+    const [, second, third] = await pickDealers(page, 3)
+    await page.locator('#exp-total').fill('450')
+    await page.locator('#exp-total').blur()
+    await expect(page.locator('#exp-total')).toHaveValue('450.00')
+    await page.getByRole('button', { name: /By amount/ }).click()
+
+    await page.getByRole('textbox', { name: `${second} Amount` }).fill('75')
+    await page.getByRole('textbox', { name: `${third} Amount` }).fill('')
+    await page.getByRole('textbox', { name: `${third} Amount` }).blur()
+    await expect(page.getByRole('textbox', { name: `${second} Amount` })).toHaveValue('75.00')
+    const foot = page.locator('form#expense-form tfoot')
+    await expect(foot).toContainText('$225.00')
+    await expect(foot).toContainText('1 dealer(s) without amount')
+
+    await page.getByRole('textbox', { name: `${third} Amount` }).fill('140')
+    await page.getByRole('textbox', { name: `${third} Amount` }).blur()
+    await expect(foot).toContainText('$365.00')
+    await expect(foot).not.toContainText('without amount')
+
+    // Con dealers elegidos, la lista de empleados se ve entera sin tipear.
+    await page.locator('[data-field="author"]').getByRole('combobox').click()
+    await expect(page.locator('[cmdk-item]').first()).toBeVisible()
+    await page.keyboard.press('Escape')
+    await noHorizontalScroll(page)
+    await page.getByRole('button', { name: 'Cancel' }).click()
   })
 
   test('Add Expense: Multiple dealers By percentage from the rule → list shows «All dealers»', async ({ page }) => {

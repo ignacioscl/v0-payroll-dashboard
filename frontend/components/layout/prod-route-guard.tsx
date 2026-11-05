@@ -6,6 +6,7 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import {
   canAccessBillingInvoices,
   canAccessBusinessKpis,
+  canAccessMonthlyClosing,
   canAccessPayrollDashboard,
   canAccessProductionReport,
 } from '@/lib/auth/payroll-access'
@@ -31,6 +32,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
   const canAccessRoleTemplates = canManageRoleTemplates(hasPermission, user?.isSystemAdmin)
   const canAccessSettings = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
   const canAccessExpensesModule = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccessClosing = canAccessMonthlyClosing(user, hasPermission)
   const hasAnyModule =
     canAccessTtk ||
     canAccessProdKpis ||
@@ -38,7 +40,8 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     canAccessRoles ||
     canAccessRoleTemplates ||
     canAccessSettings ||
-    canAccessExpensesModule
+    canAccessExpensesModule ||
+    canAccessClosing
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const homeFallback = isExternal ? '/issues' : '/'
 
@@ -63,6 +66,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
         canAccessSettings,
         canAccessProductionGoal,
         canAccessExpensesModule,
+        canAccessClosing,
       )
     ) {
       router.replace(homeFallback)
@@ -79,6 +83,7 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     canAccessRoleTemplates,
     canAccessSettings,
     canAccessExpensesModule,
+    canAccessClosing,
     isExternal,
     homeFallback,
     router,

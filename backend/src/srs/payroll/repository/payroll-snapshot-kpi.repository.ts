@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
-import { buildDealerRestrictionClause } from '../../shared/kpi/srs-kpi-dealer-filter'
+import { buildDealerRestrictionClause, removedDealersProvider } from '../../shared/kpi/srs-kpi-dealer-filter'
 import { PAYMENT_TYPE_IDS, PIECEWORK_TYPE_IDS } from '../snapshot/payment-type-ids'
 import { minDate, snapshotCutoff } from '../snapshot/payroll-dates'
 
@@ -334,6 +334,143 @@ export class PayrollSnapshotKpiRepository {
       hasPieceworkPunch: num(r.hasPieceworkPunch) === 1,
       otherTypes: r.otherTypes === null || r.otherTypes === undefined ? null : String(r.otherTypes),
     }))
+  }
+
+  /**
+   * Monthly Closing (T2 de plans/plan-monthly-closing/PLAN.md): montos sin redondear por (dealer,
+   * período, tipo, concepto) de los períodos pedidos (`periodo_desde IN`, usa `idx_psd_periodo`). El
+   * service redondea como legacy: por dealer, período y columna. `includeWithoutDealer` suma las
+   * filas con `id_dealer` NULL (idDealer null); `employeeIds` acota a esos empleados (el Window Tint
+   * Closing, T3 de plans/plan-reporte-tint/PLAN.md). Sin `employeeIds`, todos.
+   */
+  async amountsByDealerPeriodType(
+    filter: SrsKpiFilter,
+    periodDesdes: string[],
+    includeWithoutDealer: boolean,
+    employeeIds: number[] | null = null,
+  ): Promise<{ idDealer: number | null; periodoDesde: string; idPaymentType: number; concepto: string; monto: number; tax: number }[]> {
+    if (!periodDesdes.length || (employeeIds && !employeeIds.length)) return []
+    const dealer = buildDealerRestrictionClause(
+      filter.idUsuario,
+      filter.dealerIds,
+      filter.skipDealerRestriction,
+      removedDealersProvider(filter),
+    )
+    const periods = periodDesdes.map(() => '?').join(',')
+    const emp = employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : ''
+    const empParams = employeeIds ?? []
+    const rows = await this.srs.query(
+      `SELECT p.id_dealer AS idDealer, DATE_FORMAT(p.periodo_desde, '%Y-%m-%d') AS periodoDesde,
+              p.id_payment_type AS idPaymentType, p.concepto AS concepto,
+              SUM(p.monto) AS monto, SUM(p.monto_tax) AS tax
+       FROM PAYROLL_SNAPSHOT_DAY p
+       JOIN CONTRATISTA c ON c.id = p.id_dealer
+       WHERE p.id_contratista = ? AND p.periodo_desde IN (${periods})${emp} ${dealer.and}
+       GROUP BY p.id_dealer, p.periodo_desde, p.id_payment_type, p.concepto
+       ${
+         includeWithoutDealer
+           ? `UNION ALL
+       SELECT NULL, DATE_FORMAT(p.periodo_desde, '%Y-%m-%d'), p.id_payment_type, p.concepto,
+              SUM(p.monto), SUM(p.monto_tax)
+       FROM PAYROLL_SNAPSHOT_DAY p
+       WHERE p.id_contratista = ? AND p.id_dealer IS NULL AND p.periodo_desde IN (${periods})${emp}
+       GROUP BY p.periodo_desde, p.id_payment_type, p.concepto`
+           : ''
+       }`,
+      [
+        filter.idDealerProvider,
+        ...periodDesdes,
+        ...empParams,
+        ...dealer.params,
+        ...(includeWithoutDealer ? [filter.idDealerProvider, ...periodDesdes, ...empParams] : []),
+      ],
+    )
+    return rows.map((r: any) => ({
+      idDealer: r.idDealer === null ? null : num(r.idDealer),
+      periodoDesde: String(r.periodoDesde),
+      idPaymentType: num(r.idPaymentType),
+      concepto: String(r.concepto),
+      monto: num(r.monto),
+      tax: num(r.tax),
+    }))
+  }
+
+  /**
+   * Monthly Closing: monto + tax sin redondear por (dealer, período, empleado), con el nombre y la
+   * posición (`usuarios.id_position` → `datos_parametricos.nombre`). `dealer`: un id, 'all' (los del
+   * filtro) o 'none' (las filas sin dealer). El service los lleva a centavos con el mayor resto.
+   */
+  async amountsByDealerEmployeeForPeriods(
+    filter: SrsKpiFilter,
+    periodDesdes: string[],
+    dealer: number | 'all' | 'none',
+    employeeIds: number[] | null = null,
+  ): Promise<{ idDealer: number | null; periodoDesde: string; periodoHasta: string; idUsuario: number; employee: string; position: string; amount: number }[]> {
+    if (!periodDesdes.length || (employeeIds && !employeeIds.length)) return []
+    const periods = periodDesdes.map(() => '?').join(',')
+    const emp = employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : ''
+    let dealerSql: string
+    let dealerParams: unknown[]
+    if (dealer === 'none') {
+      dealerSql = 'AND p.id_dealer IS NULL'
+      dealerParams = []
+    } else {
+      const ids = dealer === 'all' ? filter.dealerIds : [dealer]
+      const clause = buildDealerRestrictionClause(
+        filter.idUsuario,
+        ids,
+        filter.skipDealerRestriction,
+        removedDealersProvider(filter),
+      )
+      dealerSql = `AND EXISTS (SELECT 1 FROM CONTRATISTA c WHERE c.id = p.id_dealer ${clause.and})`
+      dealerParams = clause.params
+    }
+    const rows = await this.srs.query(
+      `SELECT p.id_dealer AS idDealer, DATE_FORMAT(p.periodo_desde, '%Y-%m-%d') AS periodoDesde,
+              DATE_FORMAT(MAX(p.periodo_hasta), '%Y-%m-%d') AS periodoHasta, p.id_usuario AS idUsuario,
+              MAX(u.nombre) AS employee, MAX(pos.nombre) AS position,
+              SUM(p.monto) + SUM(p.monto_tax) AS amount
+       FROM PAYROLL_SNAPSHOT_DAY p
+       LEFT JOIN usuarios u ON u.id_usuario = p.id_usuario
+       LEFT JOIN datos_parametricos pos ON pos.id_dato_parametrico = u.id_position
+       WHERE p.id_contratista = ? AND p.periodo_desde IN (${periods})${emp}
+         ${dealerSql}
+       GROUP BY p.id_dealer, p.periodo_desde, p.id_usuario`,
+      [filter.idDealerProvider, ...periodDesdes, ...(employeeIds ?? []), ...dealerParams],
+    )
+    return rows.map((r: any) => ({
+      idDealer: r.idDealer === null ? null : num(r.idDealer),
+      periodoDesde: String(r.periodoDesde),
+      periodoHasta: String(r.periodoHasta),
+      idUsuario: num(r.idUsuario),
+      employee: String(r.employee ?? ''),
+      position: String(r.position ?? ''),
+      amount: num(r.amount),
+    }))
+  }
+
+  /**
+   * Monthly Closing §5.4.5: hasta qué día está calculado cada período pedido. Como `lastCoveredDay`,
+   * por período: su fin o el corte (hoy − 2) del momento en que se calculó, lo que sea antes. Un
+   * período sin filas no aparece.
+   */
+  async periodCoverage(idContratista: number, periodDesdes: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>()
+    if (!periodDesdes.length) return out
+    const rows = await this.srs.query(
+      `SELECT DATE_FORMAT(p.periodo_desde, '%Y-%m-%d') AS desde,
+              DATE_FORMAT(MAX(p.periodo_hasta), '%Y-%m-%d') AS hasta,
+              DATE_FORMAT(MAX(p.fecha_calculo), '%Y-%m-%d %H:%i:%s') AS at
+       FROM PAYROLL_SNAPSHOT_DAY p
+       WHERE p.id_contratista = ? AND p.periodo_desde IN (${periodDesdes.map(() => '?').join(',')})
+       GROUP BY p.periodo_desde`,
+      [idContratista, ...periodDesdes],
+    )
+    for (const r of rows) {
+      if (!r.hasta || !r.at) continue
+      out.set(String(r.desde), minDate(String(r.hasta), snapshotCutoff(new Date(`${String(r.at).replace(' ', 'T')}Z`))))
+    }
+    return out
   }
 
   /** Nombre de cada dealer como lo ve la empresa (`GET_DEALER_NAME_BY_PROVIDER`). */

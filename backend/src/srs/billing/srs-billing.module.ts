@@ -46,6 +46,7 @@ import { InvoiceListExportService } from './service/invoice-list-export.service'
     InvoiceController,
     GenericInvoiceController,
   ],
-  exports: [BillingKpiService, InvoiceService],
+  // BillingKpiRepository: Income por dealer y por línea para Monthly Closing (T1 de plans/plan-monthly-closing).
+  exports: [BillingKpiService, InvoiceService, BillingKpiRepository],
 })
 export class SrsBillingModule {}

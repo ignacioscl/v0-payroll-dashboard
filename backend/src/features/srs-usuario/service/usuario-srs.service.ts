@@ -36,6 +36,11 @@ export class UsuarioSrsService extends GlobalBaseService<UsuarioSrs, UsuarioSrsQ
     return count > 0
   }
 
+  /** Empleados de la empresa con un rol cuyo nombre contiene `fragment` (p. ej. 'tint' → «Tinter»), borrados incluidos. */
+  idsWithRoleNameLike(idCompania: number, fragment: string): Promise<number[]> {
+    return this.repository.idsWithRoleNameLike(idCompania, fragment)
+  }
+
   /** Usuarios activos con el rol: si hay alguno, el rol no se puede eliminar. */
   countActiveAssignedToRole(idRol: number): Promise<number> {
     return this.repository.countActiveAssignedToRole(idRol)

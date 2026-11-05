@@ -15,6 +15,9 @@ const ITEM_COUNT: Record<ReportRulesScreen, number> = {
   productionVsGoal: 5,
   invoices: 2,
   incomeByDealer: 4,
+  monthlyClosing: 3,
+  // One line per column of Window Tint Closing (D5 of plans/plan-reporte-tint).
+  tintClosing: 7,
 }
 
 /**

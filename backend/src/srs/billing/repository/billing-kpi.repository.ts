@@ -8,6 +8,7 @@ import {
   BillingKpiDto,
   BillingPeriodCollectionKpiDto,
   BillingWeekRowDto,
+  ClosingLineDto,
   IncomeByDealerRowDto,
   IncomeByDealerYearDto,
   RemovedDealerDto,
@@ -31,6 +32,7 @@ import {
   billedStatementCohortSql,
   billedOpenCountSql,
   collectionRatePct,
+  type ClosingLineKind,
   genericBilledLinesSql,
   roundMoney,
   ttkBilledLinesSql,
@@ -43,6 +45,27 @@ export const UNBILLED_LOOKBACK_MONTHS = 6
 
 function money(v: unknown): number {
   return Number(v ?? 0)
+}
+
+/** DATE columns come back as Date or 'YYYY-MM-DD' depending on the driver settings. */
+function ymd(v: unknown): string {
+  if (v instanceof Date) return v.toISOString().slice(0, 10)
+  return String(v ?? '').slice(0, 10)
+}
+
+function toClosingLine(r: Record<string, unknown>): ClosingLineDto {
+  return {
+    dealerId: Number(r.dealerId),
+    kind: String(r.kind) as ClosingLineKind,
+    nro: String(r.nro ?? ''),
+    dateFrom: ymd(r.dateFrom),
+    dateTo: ymd(r.dateTo),
+    department: String(r.department ?? ''),
+    service: String(r.service ?? ''),
+    qty: Number(r.qty ?? 1),
+    // Exact value: the caller rounds once per line for the screen and adds cents per dealer.
+    amount: money(r.amount),
+  }
 }
 
 @Injectable()
@@ -292,7 +315,7 @@ export class BillingKpiRepository {
     const perYear: { meta: (typeof years)[number]; rows: Map<number, Omit<IncomeByDealerRowDto, 'dealer'>> }[] = []
 
     for (const y of years) {
-      const rows = await this.incomeByDealerOfRange({ ...filter, fechaDesde: y.fechaDesde, fechaHasta: y.fechaHasta })
+      const rows = await this.incomeByDealerForRange({ ...filter, fechaDesde: y.fechaDesde, fechaHasta: y.fechaHasta })
       for (const id of rows.keys()) dealerIdsSeen.add(id)
       perYear.push({ meta: y, rows })
     }
@@ -316,8 +339,11 @@ export class BillingKpiRepository {
     return out
   }
 
-  /** The four Income parts of one range, by dealer (c.id of each builder, like the cards). */
-  private async incomeByDealerOfRange(
+  /**
+   * The four Income parts of one range, by dealer (c.id of each builder, like the cards). Income by
+   * Dealer and Monthly Closing both read it (T1 of plans/plan-monthly-closing/PLAN.md).
+   */
+  async incomeByDealerForRange(
     filter: SrsKpiFilter,
   ): Promise<Map<number, Omit<IncomeByDealerRowDto, 'dealer'>>> {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, filterDateDone, skipDealerRestriction } =
@@ -373,6 +399,50 @@ export class BillingKpiRepository {
       if (r.income === 0 && r.wo === 0 && r.ttk === 0 && r.generic === 0 && r.notInvoiced === 0) rows.delete(id)
     }
     return rows
+  }
+
+  /**
+   * Every line of the Closing in the range (T1 of plans/plan-monthly-closing/PLAN.md): the same
+   * four parts and WHERE as incomeByDealerForRange, one row per line, so the lines of a dealer add
+   * up to its Income. WO not invoiced is one row per WO service that is on no active invoice.
+   */
+  async incomeLinesForRange(filter: SrsKpiFilter): Promise<ClosingLineDto[]> {
+    const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, filterDateDone, skipDealerRestriction } =
+      filter
+    const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
+    const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
+    const periodCol = woPeriodColumn(filterDateDone)
+    const { wo, ttk, gen } = billedBaseOpts(filter)
+    const byLine = { groupBy: 'closingLine' as const, productionValue: true }
+    const woQ = woBilledLinesSql({ ...wo, ...byLine })
+    const ttkQ = ttkBilledLinesSql({ ...ttk, ...byLine })
+    const genQ = genericBilledLinesSql({ ...gen, ...byLine })
+
+    const [unbilledRows, woRows, ttkRows, genRows] = await Promise.all([
+      this.srs.query(
+        `SELECT c.id AS dealerId, 'woUnbilled' AS kind, i.full_nro AS nro,
+                ${periodCol} AS dateFrom, ${periodCol} AS dateTo, d.nombre AS department,
+                isv.nombre AS service, IFNULL(isr.qty, 1) AS qty,
+                isr.price * IFNULL(isr.qty, 1) AS amount
+         FROM INVOICE i
+         ${inv.join}
+         JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+         LEFT JOIN INVOICE_SERVICE isv ON isv.id = isr.id_service_invoice
+         WHERE i.estado = 1
+           AND i.id_dealer_provider = ?
+           ${inv.and}
+           ${woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)}
+           AND ${periodCol} >= ? AND ${periodCol} < DATE_ADD(?, INTERVAL 1 DAY)
+           AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
+           AND ${woServiceNotInvoicedSql()}`,
+        [idDealerProvider, ...inv.params, fechaDesde, fechaHasta],
+      ),
+      this.srs.query(woQ.sql, woQ.params),
+      this.srs.query(ttkQ.sql, ttkQ.params),
+      this.srs.query(genQ.sql, genQ.params),
+    ])
+
+    return [...woRows, ...unbilledRows, ...ttkRows, ...genRows].map(toClosingLine)
   }
 
   /**

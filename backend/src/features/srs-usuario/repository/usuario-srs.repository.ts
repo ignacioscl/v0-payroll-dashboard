@@ -44,4 +44,21 @@ export class UsuarioSrsRepository extends BaseRepository<UsuarioSrs, UsuarioSrsQ
       .setParameters({ idRol })
       .getCount()
   }
+
+  /**
+   * Usuarios de la empresa con algún rol de la empresa cuyo nombre contiene `fragment` (sin mayúsculas).
+   * Sin mirar `estado` ni `is_inactive`: un empleado borrado con ponchadas del período cuenta en el payroll
+   * (Window Tint Closing, T3 de plans/plan-reporte-tint/PLAN.md: los tinteros son el rol «Tinter»).
+   */
+  async idsWithRoleNameLike(idCompania: number, fragment: string): Promise<number[]> {
+    const rows: { id: unknown }[] = await this.query(
+      `SELECT DISTINCT urr.id_usuario AS id
+       FROM USUARIO_ROL_REL urr
+       JOIN ROL r ON r.id_rol = urr.id_rol
+       JOIN usuarios u ON u.id_usuario = urr.id_usuario
+       WHERE r.id_compania_owner = ? AND u.id_contratista_owner = ? AND LOWER(r.nombre) LIKE ?`,
+      [idCompania, idCompania, `%${fragment.toLowerCase()}%`],
+    )
+    return rows.map((r) => Number(r.id))
+  }
 }

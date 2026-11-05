@@ -53,6 +53,8 @@ import { SrsExpenseRepetitiveModule } from './features/srs-expense-repetitive/sr
 import { SrsExpenseDealerAssignModule } from './features/srs-expense-dealer-assign/srs-expense-dealer-assign.module'
 import { SrsLogGenericModule } from './features/srs-log-generic/srs-log-generic.module'
 import { SrsLogChangeModule } from './features/srs-log-change/srs-log-change.module'
+// --- Monthly Closing y Window Tint Closing (plans/plan-monthly-closing, plans/plan-reporte-tint) ---
+import { SrsMonthlyClosingModule } from './srs/monthly-closing/monthly-closing.module'
 // --- Jobs (worker) ---
 import { jobsDataSourceOptions, JOBS_CONNECTION } from './jobs/jobs.datasource'
 import { JobsModule } from './jobs/jobs.module'
@@ -119,6 +121,7 @@ HttpModule.registerAsync({
     RolTemplateModule,
     SrsContratistaModule,
     SrsExpensesModule,
+    SrsMonthlyClosingModule,
     SrsGenericDataModule,
     SrsExpenseModule,
     ExpenseGroupModule,

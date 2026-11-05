@@ -113,6 +113,22 @@ export class IncomeByDealerRowDto {
   @ApiProperty({ example: 115637.24, description: 'wo + ttk + generic + notInvoiced' }) income!: number
 }
 
+/** One line of the Closing Report (groupBy 'closingLine'), as Monthly Closing shows it. */
+export class ClosingLineDto {
+  @ApiProperty({ example: 192 }) dealerId!: number
+  @ApiProperty({ enum: ['wo', 'woUnbilled', 'ttk', 'genericFree', 'genericPunch'] })
+  kind!: 'wo' | 'woUnbilled' | 'ttk' | 'genericFree' | 'genericPunch'
+  @ApiProperty({ example: 'DG1632', description: 'WO or invoice number' }) nro!: string
+  @ApiProperty({ example: '2026-08-14' }) dateFrom!: string
+  @ApiProperty({ example: '2026-08-14' }) dateTo!: string
+  @ApiProperty({ example: 'Used', description: 'WO department; «TTK» or «Generic» for the others' })
+  department!: string
+  @ApiProperty({ example: 'Window Tint - 2 Doors', description: 'Service; the employee in TTK and generic punches' })
+  service!: string
+  @ApiProperty({ example: 1 }) qty!: number
+  @ApiProperty({ example: 75, description: 'Discount included, no tax; not rounded' }) amount!: number
+}
+
 /** One calendar year of the header range, cropped to it. */
 export class IncomeByDealerYearDto {
   @ApiProperty({ example: 2024 }) year!: number

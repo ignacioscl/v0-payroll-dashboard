@@ -22,7 +22,7 @@ import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses-list'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { FormDialog, FormSection } from '@/components/layout/form-dialog'
 import { uploadAttachment } from '@/lib/expense-attachments'
-import { rowAttachmentLocation, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
+import { amountOnBlur, rowAttachmentLocation, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
 import {
   applyRuleToExpenseForm,
   carrySplitToMode,
@@ -226,6 +226,35 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
 
   const tilesDisabled = locked || textOnly
 
+  // El empleado va junto al dealer: su lista sale de los dealers elegidos (mail de Juan «Temas», 04/11).
+  const authorField = (
+    <FormField
+      control={form.control}
+      name="author"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{t('expenses.assignToEmployee')}</FormLabel>
+          {canAssign ? (
+            <FormControl>
+              <ExpenseEmployeeCombobox
+                dataField="author"
+                value={field.value}
+                onChange={field.onChange}
+                idDealer={dealersCsv || null}
+                requireDealer
+                disabled={busy || locked || textOnly}
+                placeholder={t('expenses.selectEmployee')}
+              />
+            </FormControl>
+          ) : (
+            <Input value={field.value?.nombre ?? userName ?? ''} disabled readOnly />
+          )}
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  )
+
   return (
     <FormDialog
       open
@@ -287,6 +316,170 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
           </Alert>
         ) : null}
 
+        <FormSection title={t('expenses.branches')} icon={Building2} className="space-y-3">
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            <OptionTile
+              dataField="mode"
+              selected={!isMultiple}
+              onSelect={() => setMode('single')}
+              title={t('expenses.singleBranch')}
+              description={t('expenses.singleBranchHint')}
+              icon={Building2}
+              disabled={tilesDisabled}
+            />
+            <OptionTile
+              selected={isMultiple}
+              onSelect={() => setMode(mode === 'single' ? 'equal' : mode)}
+              title={t('expenses.multipleBranches')}
+              description={t('expenses.multipleBranchesHint')}
+              icon={Split}
+              disabled={tilesDisabled}
+            />
+          </div>
+
+          {!isMultiple ? (
+            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="idDealer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('expenses.branch')}</FormLabel>
+                    <FormControl>
+                      <DealerCombobox
+                        dataField="idDealer"
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={busy || locked || textOnly || branchLocked}
+                      />
+                    </FormControl>
+                    {branchLocked ? (
+                      <p className="text-xs text-muted-foreground">{t('expenses.attachmentsLockBranch')}</p>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {authorField}
+              <FormField
+                control={form.control}
+                name="totalAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="exp-total">{t('expenses.totalAmount')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="exp-total"
+                        inputMode="decimal"
+                        disabled={busy || locked || textOnly}
+                        className="tabular-nums"
+                        {...field}
+                        onBlur={() => {
+                          field.onChange(amountOnBlur(field.value ?? ''))
+                          field.onBlur()
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          ) : (
+            <div className="min-w-0 space-y-4">
+              <div className="grid gap-1.5 sm:grid-cols-3">
+                <OptionTile
+                  selected={mode === 'equal'}
+                  onSelect={() => setMode('equal')}
+                  title={t('expenses.equal')}
+                  description={t('expenses.equalHint')}
+                  icon={Equal}
+                  disabled={tilesDisabled}
+                />
+                <OptionTile
+                  selected={mode === 'percent'}
+                  onSelect={() => setMode('percent')}
+                  title={t('expenses.byPercentage')}
+                  description={t('expenses.byPercentageHint')}
+                  icon={Percent}
+                  disabled={tilesDisabled}
+                />
+                <OptionTile
+                  selected={mode === 'amount'}
+                  onSelect={() => setMode('amount')}
+                  title={t('expenses.byAmount')}
+                  description={t('expenses.byAmountHint')}
+                  icon={Sigma}
+                  disabled={tilesDisabled}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="branchIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('expenses.branches')}</FormLabel>
+                      <FormControl>
+                        <div data-field="branchIds" className="min-w-0">
+                          <DealerMultiSelect
+                            dealers={dealers}
+                            value={field.value}
+                            onChange={(next) => {
+                              field.onChange(next)
+                              // Entradas de los dealers que entran, sin pisar las que ya estaban.
+                              const current = form.getValues('branches')
+                              const merged = { ...current }
+                              for (const id of next) if (!merged[id]) merged[id] = { percentage: '', amount: '' }
+                              form.setValue('branches', merged)
+                            }}
+                            loading={dealersLoading}
+                            disabled={busy || locked || textOnly}
+                            placeholder={t('expenses.selectBranches')}
+                            className="w-full"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {authorField}
+                {mode !== 'amount' ? (
+                  <FormField
+                    control={form.control}
+                    name="totalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="exp-total">{t('expenses.totalAmount')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            id="exp-total"
+                            inputMode="decimal"
+                            disabled={busy || locked || textOnly}
+                            className="tabular-nums"
+                            {...field}
+                            onBlur={() => {
+                              field.onChange(amountOnBlur(field.value ?? ''))
+                              field.onBlur()
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="pt-6 text-xs text-muted-foreground">{t('expenses.byAmountHint')}</div>
+                )}
+              </div>
+
+              <ExpenseSplitTable disabled={busy || locked || textOnly} />
+            </div>
+          )}
+        </FormSection>
+
         <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -297,31 +490,6 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
                 <FormControl>
                   <Input id="exp-date" type="date" max={todayNy} disabled={busy || locked || textOnly} {...field} />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="author"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('expenses.assignToEmployee')}</FormLabel>
-                {canAssign ? (
-                  <FormControl>
-                    <ExpenseEmployeeCombobox
-                      dataField="author"
-                      value={field.value}
-                      onChange={field.onChange}
-                      idDealer={dealersCsv || null}
-                      requireDealer
-                      disabled={busy || locked || textOnly}
-                      placeholder={t('expenses.selectEmployee')}
-                    />
-                  </FormControl>
-                ) : (
-                  <Input value={field.value?.nombre ?? userName ?? ''} disabled readOnly />
-                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -414,148 +582,6 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
             <div className="mb-2 text-sm font-medium">{t('expenses.attachment')}</div>
             <AttachmentPicker files={files} onChange={setFiles} disabled={busy || locked || Boolean(pendingUpload)} />
           </div>
-        </FormSection>
-
-        <FormSection title={t('expenses.branches')} icon={Building2} className="space-y-3">
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            <OptionTile
-              dataField="mode"
-              selected={!isMultiple}
-              onSelect={() => setMode('single')}
-              title={t('expenses.singleBranch')}
-              description={t('expenses.singleBranchHint')}
-              icon={Building2}
-              disabled={tilesDisabled}
-            />
-            <OptionTile
-              selected={isMultiple}
-              onSelect={() => setMode(mode === 'single' ? 'equal' : mode)}
-              title={t('expenses.multipleBranches')}
-              description={t('expenses.multipleBranchesHint')}
-              icon={Split}
-              disabled={tilesDisabled}
-            />
-          </div>
-
-          {!isMultiple ? (
-            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="idDealer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('expenses.branch')}</FormLabel>
-                    <FormControl>
-                      <DealerCombobox
-                        dataField="idDealer"
-                        value={field.value}
-                        onChange={field.onChange}
-                        disabled={busy || locked || textOnly || branchLocked}
-                      />
-                    </FormControl>
-                    {branchLocked ? (
-                      <p className="text-xs text-muted-foreground">{t('expenses.attachmentsLockBranch')}</p>
-                    ) : null}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="totalAmount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel htmlFor="exp-total">{t('expenses.totalAmount')}</FormLabel>
-                    <FormControl>
-                      <Input id="exp-total" inputMode="decimal" disabled={busy || locked || textOnly} className="tabular-nums" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          ) : (
-            <div className="min-w-0 space-y-4">
-              <div className="grid gap-1.5 sm:grid-cols-3">
-                <OptionTile
-                  selected={mode === 'equal'}
-                  onSelect={() => setMode('equal')}
-                  title={t('expenses.equal')}
-                  description={t('expenses.equalHint')}
-                  icon={Equal}
-                  disabled={tilesDisabled}
-                />
-                <OptionTile
-                  selected={mode === 'percent'}
-                  onSelect={() => setMode('percent')}
-                  title={t('expenses.byPercentage')}
-                  description={t('expenses.byPercentageHint')}
-                  icon={Percent}
-                  disabled={tilesDisabled}
-                />
-                <OptionTile
-                  selected={mode === 'amount'}
-                  onSelect={() => setMode('amount')}
-                  title={t('expenses.byAmount')}
-                  description={t('expenses.byAmountHint')}
-                  icon={Sigma}
-                  disabled={tilesDisabled}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="branchIds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('expenses.branches')}</FormLabel>
-                      <FormControl>
-                        <div data-field="branchIds" className="min-w-0">
-                          <DealerMultiSelect
-                            dealers={dealers}
-                            value={field.value}
-                            onChange={(next) => {
-                              field.onChange(next)
-                              // Entradas de los dealers que entran, sin pisar las que ya estaban.
-                              const current = form.getValues('branches')
-                              const merged = { ...current }
-                              for (const id of next) if (!merged[id]) merged[id] = { percentage: '', amount: '' }
-                              form.setValue('branches', merged)
-                            }}
-                            loading={dealersLoading}
-                            disabled={busy || locked || textOnly}
-                            placeholder={t('expenses.selectBranches')}
-                            className="w-full"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {mode !== 'amount' ? (
-                  <FormField
-                    control={form.control}
-                    name="totalAmount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel htmlFor="exp-total">{t('expenses.totalAmount')}</FormLabel>
-                        <FormControl>
-                          <Input id="exp-total" inputMode="decimal" disabled={busy || locked || textOnly} className="tabular-nums" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <div className="pt-6 text-xs text-muted-foreground">{t('expenses.byAmountHint')}</div>
-                )}
-              </div>
-
-              <ExpenseSplitTable disabled={busy || locked || textOnly} />
-            </div>
-          )}
         </FormSection>
       </form>
     </Form>

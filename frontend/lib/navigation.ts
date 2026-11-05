@@ -22,6 +22,8 @@ import {
   PieChart,
   Repeat,
   Settings,
+  CalendarCheck,
+  CarFront,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
 
@@ -54,6 +56,8 @@ export const ALL_NAVIGATION: NavItemDef[] = [
       { nameKey: 'nav.businessKpis', href: '/reports/business-kpis', icon: Gauge },
       { nameKey: 'nav.productionVsGoal', href: '/reports/production-vs-goal', icon: Target },
       { nameKey: 'nav.incomeByDealer', href: '/reports/income-by-dealer', icon: Landmark },
+      { nameKey: 'nav.monthlyClosing', href: '/reports/monthly-closing', icon: CalendarCheck },
+      { nameKey: 'nav.windowTintClosing', href: '/reports/window-tint-closing', icon: CarFront },
     ],
   },
   {
@@ -97,6 +101,9 @@ export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 /** Production vs Goal and Income by Dealer: Admin General/Company or Production Report (47) only. */
 export const PROD_GOAL_HREFS = ['/reports/production-vs-goal', '/reports/income-by-dealer'] as const
 
+/** Monthly Closing and Window Tint Closing: Admin General/Company or «Reports > Closing» (140). */
+export const CLOSING_NAV_HREFS = ['/reports/monthly-closing', '/reports/window-tint-closing'] as const
+
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
 
@@ -134,6 +141,7 @@ export function isProdAllowedPath(
   canAccessSystemConfig = false,
   canAccessProductionGoal = false,
   canAccessExpenses = false,
+  canAccessMonthlyClosing = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
@@ -142,6 +150,7 @@ export function isProdAllowedPath(
   if (canAccessExpenses && matches(EXPENSES_NAV_HREFS)) return true
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessProductionGoal && matches(PROD_GOAL_HREFS)) return true
+  if (canAccessMonthlyClosing && matches(CLOSING_NAV_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
   if (canManageRoleTemplates && matches(ROLE_TEMPLATES_NAV_HREFS)) return true
   if (canAccessSystemConfig && matches(SETTINGS_NAV_HREFS)) return true
@@ -177,6 +186,8 @@ export function getVisibleNavigation(options: {
   isCompanyTypeCompany?: boolean
   /** Expenses group (111 or admin). */
   canAccessExpenses?: boolean
+  /** Monthly Closing and Window Tint Closing (140 or admin). */
+  canAccessMonthlyClosing?: boolean
   t: (key: MessageKey) => string
 }): NavItem[] {
   const {
@@ -189,6 +200,7 @@ export function getVisibleNavigation(options: {
     canManageRoleTemplates = false,
     isCompanyTypeCompany = false,
     canAccessExpenses = false,
+    canAccessMonthlyClosing = false,
     t,
   } = options
 
@@ -205,7 +217,8 @@ export function getVisibleNavigation(options: {
     !canAccessBillingInvoices &&
     !canViewRoles &&
     !canManageRoleTemplates &&
-    !canAccessExpenses
+    !canAccessExpenses &&
+    !canAccessMonthlyClosing
   ) {
     return []
   }
@@ -215,6 +228,7 @@ export function getVisibleNavigation(options: {
     ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
     ...(canAccessProductionGoal ? PROD_GOAL_HREFS : []),
+    ...(canAccessMonthlyClosing ? CLOSING_NAV_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
     ...(canViewRoles ? ['/roles'] : []),
     ...(canManageRoleTemplates ? ROLE_TEMPLATES_NAV_HREFS : []),

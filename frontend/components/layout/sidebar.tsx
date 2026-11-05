@@ -49,6 +49,7 @@ import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import {
   canAccessBusinessKpis,
   canAccessBillingInvoices,
+  canAccessMonthlyClosing,
   canAccessProductionReport,
 } from '@/lib/auth/payroll-access'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
@@ -118,6 +119,7 @@ function SidebarInner({
     canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
     isCompanyTypeCompany: Boolean(user?.isCompanyTypeCompany),
     canAccessExpenses: canAccessExpenses(hasPermission, user?.isSystemAdmin),
+    canAccessMonthlyClosing: canAccessMonthlyClosing(user, hasPermission),
     t,
   })
 

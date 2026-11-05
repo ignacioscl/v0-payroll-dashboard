@@ -13,6 +13,10 @@
  *
  * groupBy 'row' + rowMoney is the money of each row of the invoice list (T1/T2 of
  * plans/plan-invoices-totales-listado/PLAN.md): an opt-in mode, so the KPIs above do not change.
+ *
+ * groupBy 'closingLine' + productionValue is one row per line of the Closing Report, with the same
+ * WHERE as groupBy 'dealer' (T1 of plans/plan-monthly-closing/PLAN.md): Monthly Closing shows them
+ * and their sum per dealer is its Income. Opt-in too; no other caller passes it.
  */
 
 import {
@@ -51,7 +55,27 @@ import {
   woServiceLineNonZeroSql,
 } from './srs-kpi-zero-filter'
 
-export type BilledGroupBy = 'none' | 'month' | 'week' | 'statement' | 'row' | 'dealer'
+export type BilledGroupBy = 'none' | 'month' | 'week' | 'statement' | 'row' | 'dealer' | 'closingLine'
+
+/**
+ * Which part of the Closing a line comes from: a billed WO service, a WO service not on any active
+ * invoice, a TTK statement (its punches per employee), a free line of a generic, or a punch inside a
+ * generic. In 'ttk' and 'genericPunch' the service column is the employee name.
+ */
+export type ClosingLineKind = 'wo' | 'woUnbilled' | 'ttk' | 'genericFree' | 'genericPunch'
+
+/** Columns of groupBy 'closingLine', in SELECT order. */
+export const CLOSING_LINE_COLUMNS = [
+  'dealerId',
+  'kind',
+  'nro',
+  'dateFrom',
+  'dateTo',
+  'department',
+  'service',
+  'qty',
+  'amount',
+] as const
 
 export type DateRange = { fechaDesde: string; fechaHasta: string }
 
@@ -211,6 +235,14 @@ function assertRowMoneyOpts(opts: BilledLinesOpts): void {
   if (!opts.rowMoney) return
   if (opts.groupBy !== 'row' || opts.range || opts.filterDateDone || opts.debtOnly || opts.idsOnly) {
     throw new Error('rowMoney needs groupBy row, range null and filterDateDone off')
+  }
+}
+
+/** closingLine is Income lines: production value, every line of the range, nothing else on top. */
+function assertClosingLineOpts(opts: BilledLinesOpts): void {
+  if (opts.groupBy !== 'closingLine') return
+  if (!opts.productionValue || !opts.range || opts.debtOnly || opts.idsOnly || opts.statementIdIn) {
+    throw new Error('closingLine needs productionValue and a range, without debtOnly / idsOnly / statementIdIn')
   }
 }
 
@@ -395,7 +427,9 @@ export function billedBaseOpts(
 
 export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   assertRowMoneyOpts(opts)
+  assertClosingLineOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
+  const closingLine = groupBy === 'closingLine'
   const factor = statementNetFactorSql('s')
   const production = 'isr.price * IFNULL(isr.qty, 1)'
   // Billed production of a WO service: price × qty × the discount of its invoice, to the cent.
@@ -450,6 +484,11 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   let selectSql: string
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT w.stmt_id AS id'
+  } else if (closingLine) {
+    // One row per WO service, like the WO part of the Closing (GeneralReportDao::getSqlClosingWo).
+    selectSql = `SELECT c.id AS dealerId, 'wo' AS kind, i.full_nro AS nro,
+      ${periodCol} AS dateFrom, ${periodCol} AS dateTo, d.nombre AS department,
+      isv.nombre AS service, IFNULL(isr.qty, 1) AS qty, ${productionAmt} AS amount`
   } else if (rowMode && opts.rowMoney) {
     selectSql = rowMoneySelectSql(
       `${production} * ${statementTaxFactorSql('s')}`,
@@ -481,6 +520,7 @@ JOIN INVOICE_STATEMENT s ON s.id = w.stmt_id
 JOIN INVOICE i ON i.id = w.id_invoice AND i.estado = 1
 ${opts.dealer.join}
 JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id AND isr.id_service_invoice = w.id_invoice_service
+${closingLine ? 'LEFT JOIN INVOICE_SERVICE isv ON isv.id = isr.id_service_invoice' : ''}
 ${rowJoins}
 WHERE w.rn = 1${statementIdInSql(opts, 'w.stmt_id')}
   AND i.id_dealer_provider = ?
@@ -496,7 +536,10 @@ WHERE w.rn = 1${statementIdInSql(opts, 'w.stmt_id')}
 /** Punch lines (TTK statements, or the punches inside a generic) — one statement_type list. */
 function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType): BilledLinesSql {
   assertRowMoneyOpts(opts)
+  assertClosingLineOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
+  const closingLine = groupBy === 'closingLine'
+  const isGeneric = statementType === StatementType.GENERIC
   const factor = statementNetFactorSql('s')
   // Billed production of a punch: its amount × the discount of its invoice, to the cent.
   const productionAmt = `ROUND(isir.amount * ${lineValuationFactorSql('production', 's')}, 2)`
@@ -517,8 +560,20 @@ function punchBilledLinesSql(opts: BilledLinesOpts, statementType: StatementType
   }
 
   let selectSql: string
+  let closingGroup = ''
   if (idsOnly) {
     selectSql = 'SELECT DISTINCT s.id AS id'
+  } else if (closingLine && isGeneric) {
+    // A punch inside a generic: one row per line, the employee as service (GeneralReportDao.php:333-353).
+    selectSql = `SELECT c.id AS dealerId, 'genericPunch' AS kind, s.full_nro AS nro,
+      s.fecha_desde AS dateFrom, s.fecha_hasta AS dateTo, 'Generic' AS department,
+      u.nombre AS service, 1 AS qty, ${productionAmt} AS amount`
+  } else if (closingLine) {
+    // TTK: one row per dealer, invoice and employee, like the Closing (GeneralReportDao.php:286-305).
+    selectSql = `SELECT c.id AS dealerId, 'ttk' AS kind, MAX(s.full_nro) AS nro,
+      MAX(s.fecha_desde) AS dateFrom, MAX(s.fecha_hasta) AS dateTo, 'TTK' AS department,
+      MAX(u.nombre) AS service, 1 AS qty, SUM(${productionAmt}) AS amount`
+    closingGroup = ' GROUP BY c.id, s.id, tew.id_author'
   } else if (rowMode && opts.rowMoney) {
     selectSql = rowMoneySelectSql(
       `isir.amount * ${statementTaxFactorSql('s')}`,
@@ -552,13 +607,14 @@ JOIN INVOICE_STATEMENT_INV_REL isir ON isir.id_statement = s.id
 JOIN TTK_EMPLOYEE_WORK tew ON tew.id = isir.id_employee_work AND tew.estado = 1
   AND tew.id_dealer_provider = ?
 ${dealer.join}
+${closingLine ? 'LEFT JOIN usuarios u ON u.id_usuario = tew.id_author' : ''}
 ${billedJoinsSql('s.id', 'isir.id')}
 ${rowJoins}
 WHERE s.estado = 1 AND s.id_dealer_provider = ?
   AND s.statement_type = ${statementType}${statementIdInSql(opts, 's.id')}
   ${dealer.and}
   ${dateRangeSql('tew.punch_in', opts.range)}
-  ${unpaid ? `AND ${UNPAID}` : ''}${lineZero}${idsOnly ? '' : bucketGroup(groupBy)}`
+  ${unpaid ? `AND ${UNPAID}` : ''}${lineZero}${idsOnly ? '' : bucketGroup(groupBy)}${closingGroup}`
 
   params.push(...dealer.params, ...rangeParams(opts.range))
   return { sql, params }
@@ -598,6 +654,7 @@ function genericValueForOpts(
 /** Free lines (no punch) of a generic, prorated over the days of its period. */
 function genericFreeLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   assertRowMoneyOpts(opts)
+  assertClosingLineOpts(opts)
   const groupBy = opts.groupBy ?? 'none'
   const lineZero = applyZeroFilter(opts.includeZero, genericLineNonZeroSql())
   const unpaid = opts.debtOnly
@@ -645,7 +702,12 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
   const rowParams = rowMode ? payingBillingJoinsParams(opts.idDealerProvider) : []
 
   let selectSql: string
-  if (rowMode && opts.rowMoney) {
+  if (groupBy === 'closingLine') {
+    // A free line of a generic, prorated over the days of the range (GeneralReportDao.php:310-331).
+    selectSql = `SELECT c.id AS dealerId, 'genericFree' AS kind, s.full_nro AS nro,
+      s.fecha_desde AS dateFrom, s.fecha_hasta AS dateTo, 'Generic' AS department,
+      isir.description AS service, IFNULL(isir.generic_qty, 1) AS qty, ${valueExpr} AS amount`
+  } else if (rowMode && opts.rowMoney) {
     selectSql = rowMoneySelectSql(
       `${genericLineBaseSql('isir')} * ${statementTaxFactorSql('s')}`,
       genericLineAmountSql('isir', 's', 'net'),
@@ -731,6 +793,9 @@ WHERE s.estado = 1 AND s.statement_type = ${StatementType.GENERIC}
 export function genericBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   const free = genericFreeLinesSql(opts)
   const punches = punchBilledLinesSql(opts, StatementType.GENERIC)
+  if (opts.groupBy === 'closingLine') {
+    return { sql: `${free.sql}\nUNION ALL\n${punches.sql}`, params: [...free.params, ...punches.params] }
+  }
   if (opts.idsOnly) {
     return {
       sql: `${free.sql}

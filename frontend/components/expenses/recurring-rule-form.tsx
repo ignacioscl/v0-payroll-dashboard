@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useChangeRuleSplit, useCreateRule, useUpdateRule } from '@/hooks/use-recurring-rules'
-import { WEEK_DAY_KEYS } from '@/lib/expenses/expense-format'
+import { amountOnBlur, WEEK_DAY_KEYS } from '@/lib/expenses/expense-format'
 import { EXPENSE_LIMITS, todayInNewYork } from '@/lib/expenses/expense-rules'
 import {
   createRecurringFormSchema,
@@ -301,7 +301,18 @@ export function RecurringRuleForm({
               <FormItem>
                 <FormLabel htmlFor="rule-amount">{t('expenses.ruleAmount')}</FormLabel>
                 <FormControl>
-                  <Input id="rule-amount" inputMode="decimal" className="tabular-nums" disabled={busy || splitFixed} readOnly={splitFixed} {...field} />
+                  <Input
+                    id="rule-amount"
+                    inputMode="decimal"
+                    className="tabular-nums"
+                    disabled={busy || splitFixed}
+                    readOnly={splitFixed}
+                    {...field}
+                    onBlur={() => {
+                      if (!splitFixed) field.onChange(amountOnBlur(field.value ?? ''))
+                      field.onBlur()
+                    }}
+                  />
                 </FormControl>
                 {splitFixed ? <p className="text-xs text-muted-foreground">{t('expenses.amountIsSum')}</p> : null}
                 <FormMessage />

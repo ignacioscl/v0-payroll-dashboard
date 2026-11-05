@@ -6,8 +6,8 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
-import { fmtAmount } from '@/lib/expenses/expense-format'
-import { currentSplitAmounts, type ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
+import { amountOnBlur, fmtAmount } from '@/lib/expenses/expense-format'
+import { amountSplitTotal, currentSplitAmounts, type ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
 import { fromCents, isValidAmount, isValidPercent, toCents } from '@/lib/expenses/expense-rules'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
@@ -37,7 +37,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
     if (mode === 'equal' || mode === 'percent') {
       // Mismo cálculo que el cambio de modo (`currentSplitAmounts`).
       const amounts = currentSplitAmounts({ mode, totalAmount, branchIds: ids, branches }) ?? {}
-      if (mode === 'equal') return { amounts, total, pctSum: null }
+      if (mode === 'equal') return { amounts, total, pctSum: null, missing: 0 }
       let sum = 0
       let allValid = ids.length > 0
       for (const id of ids) {
@@ -45,21 +45,11 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
         if (!isValidPercent(p)) allValid = false
         else sum += toCents(p)
       }
-      return { amounts, total, pctSum: allValid ? sum : null }
+      return { amounts, total, pctSum: allValid ? sum : null, missing: 0 }
     }
-    // amount
-    let sumCents = 0
-    let allValid = ids.length > 0
-    const amounts: Record<string, string> = {}
-    for (const id of ids) {
-      const a = branches?.[id]?.amount ?? ''
-      if (!isValidAmount(a)) allValid = false
-      else {
-        sumCents += toCents(a)
-        amounts[id] = fromCents(toCents(a))
-      }
-    }
-    return { amounts, total: allValid ? fromCents(sumCents) : '', pctSum: null }
+    // amount: el Total suma lo cargado aunque falte algún dealer, y dice cuántos faltan.
+    const { total: sum, missing } = amountSplitTotal({ mode, totalAmount, branchIds: ids, branches })
+    return { amounts: {}, total: sum, pctSum: null, missing }
   }, [mode, totalAmount, branchIds, branches])
 
   const ids = branchIds ?? []
@@ -100,6 +90,10 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                             {...field}
                             value={field.value ?? ''}
                             inputMode="decimal"
+                            onBlur={() => {
+                              if (mode === 'amount') field.onChange(amountOnBlur(field.value ?? ''))
+                              field.onBlur()
+                            }}
                             disabled={disabled}
                             className="h-8 text-right text-sm tabular-nums"
                             aria-label={`${dealerName(id)} ${mode === 'percent' ? t('expenses.percent') : t('expenses.amount')}`}
@@ -133,9 +127,12 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                   ? preview.pctSum !== null
                     ? `${fromCents(preview.pctSum)}%`
                     : '—'
-                  : preview.total
-                    ? fmtAmount(preview.total)
-                    : '—'}
+                  : fmtAmount(preview.total)}
+                {preview.missing ? (
+                  <div className="text-[11px] font-normal text-amber-700 dark:text-amber-400">
+                    {t('expenses.dealersWithoutAmount', { count: preview.missing })}
+                  </div>
+                ) : null}
               </td>
             ) : null}
             {showPreview ? (

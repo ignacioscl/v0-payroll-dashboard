@@ -1,5 +1,6 @@
 import type { SrsMeUser } from './types'
 import {
+  ROL_ACCION_CLOSING,
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   ROL_ACCION_PRODUCTION_REPORT,
   ROL_ACCION_TTK_PAYROLL,
@@ -37,6 +38,19 @@ export function canAccessProductionReport(
   if (!user) return false
   if (user.isSystemAdmin) return true
   return hasPermission(ROL_ACCION_PRODUCTION_REPORT)
+}
+
+/**
+ * «Reports > Closing / Inc. Pay. Status» (140): `/reports/monthly-closing` y `/reports/window-tint-closing`
+ * (plans/plan-monthly-closing T0, plans/plan-reporte-tint D6).
+ */
+export function canAccessMonthlyClosing(
+  user: SrsMeUser | null | undefined,
+  hasPermission: (id: number) => boolean,
+): boolean {
+  if (!user) return false
+  if (user.isSystemAdmin) return true
+  return hasPermission(ROL_ACCION_CLOSING)
 }
 
 /** Tab Payroll Spend: montos de payroll, mismo permiso que el Payroll Excel Report de legacy (93). */

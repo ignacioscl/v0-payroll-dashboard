@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { IncomeYearFilter } from '@/components/filters/income-year-filter'
+import { MonthFilter } from '@/components/filters/month-filter'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
@@ -113,6 +114,8 @@ export function Header() {
   const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
   // Income by Dealer: switch «By year» que cambia el calendario por un combo de años.
   const isIncomeByDealerPage = pathname === '/reports/income-by-dealer'
+  // Monthly Closing y Window Tint Closing: el combo de mes en vez del calendario (MC §5.4.1).
+  const isClosingPage = pathname === '/reports/monthly-closing' || pathname === '/reports/window-tint-closing'
   const showDateFilter = !isRolesPage
   // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
   // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
@@ -201,6 +204,8 @@ export function Header() {
               <DateRangePicker {...invoiceRangeProps} className="shrink-0" />
             ) : isIncomeByDealerPage ? (
               <IncomeYearFilter className="shrink-0" />
+            ) : isClosingPage ? (
+              <MonthFilter className="shrink-0" />
             ) : (
               <DateRangePicker
                 value={dateRange}
@@ -283,11 +288,15 @@ export function Header() {
             {/* Date range / invoice period — hidden on Roles */}
             {showDateFilter ? (
               <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-muted-foreground">{t('filters.dateRange')}</span>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {isClosingPage ? t('monthlyClosing.month') : t('filters.dateRange')}
+                </span>
                 {isInvoicesPage ? (
                   <DateRangePicker {...invoiceRangeProps} className="w-full min-w-0" />
                 ) : isIncomeByDealerPage ? (
                   <IncomeYearFilter />
+                ) : isClosingPage ? (
+                  <MonthFilter className="w-full" />
                 ) : (
                   <DateRangePicker
                     value={dateRange}

@@ -220,6 +220,21 @@ export const emptyExpenseFormValues = (todayNy: string): ExpenseFormValues => ({
 type SplitInput = Pick<ExpenseFormValues, 'mode' | 'totalAmount' | 'branchIds' | 'branches'>
 
 /**
+ * Pie de By amount: la suma de los montos válidos y cuántos dealers no tienen uno. Suma aunque falte
+ * alguno, porque el Total es lo que se mira para controlar lo cargado (mail de Juan, 04/11).
+ */
+export function amountSplitTotal(v: SplitInput): { total: string; missing: number } {
+  let cents = 0
+  let missing = 0
+  for (const id of v.branchIds ?? []) {
+    const a = v.branches?.[id]?.amount ?? ''
+    if (isValidAmount(a)) cents += toCents(a)
+    else missing += 1
+  }
+  return { total: fromCents(cents), missing }
+}
+
+/**
  * Monto de cada dealer del reparto que se está viendo, o null si todavía no está completo (falta el
  * total, un porcentaje o un monto, o los porcentajes no suman 100). Lo usan la tabla de reparto y el
  * cambio de modo.
