@@ -10,6 +10,14 @@ import { ContratistaRepository } from '../repository/contratista.repository'
 const ID_ROL_ADMIN_GENERAL = 1
 const ID_ROL_ADMIN_COMPANY = 2
 
+/** Company checks of legacy dealer_edit > Modules & function access (plans/plan-checks-expenses-tint). */
+export type CompanyModule = 'expenses' | 'windowTintClosing'
+
+const COMPANY_MODULE_COLUMN: Record<CompanyModule, 'hasExpenses' | 'hasWindowTintClosing'> = {
+  expenses: 'hasExpenses',
+  windowTintClosing: 'hasWindowTintClosing',
+}
+
 @Injectable()
 export class ContratistaService extends GlobalBaseService<Contratista, ContratistaQueryDto> {
   constructor(
@@ -75,6 +83,23 @@ export class ContratistaService extends GlobalBaseService<Contratista, Contratis
     await this.requireCompany(ctx)
     await this.repository.update(ctx.idDealerProvider, { v0LogoImg: null })
     return this.getBranding(ctx)
+  }
+
+  /**
+   * Does the company of the session have this module checked? Read from the DB on every request, so a
+   * change in legacy counts right away. The company is the session's (`ctx.idDealerProvider`), the same
+   * as legacy `Usuario::getCompany()`.
+   */
+  async hasCompanyModule(idDealerProvider: number, module: CompanyModule): Promise<boolean> {
+    const company = await this.repository.findOne({ where: { id: idDealerProvider } })
+    return Number(company?.[COMPANY_MODULE_COLUMN[module]] ?? 0) === 1
+  }
+
+  /** 403 when the company doesn't have the module, whatever the user's permissions. */
+  async assertCompanyModule(ctx: SrsContext, module: CompanyModule): Promise<void> {
+    if (!(await this.hasCompanyModule(ctx.idDealerProvider, module))) {
+      throw new ForbiddenException('Forbidden')
+    }
   }
 
   private assertCanManageBranding(ctx: SrsContext) {

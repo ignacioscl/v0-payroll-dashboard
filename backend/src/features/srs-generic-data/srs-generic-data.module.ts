@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { SrsAuthModule } from 'src/srs/auth/srs-auth.module'
+import { SrsContratistaModule } from 'src/features/srs-contratista/srs-contratista.module'
 import { ExpenseCatalogController } from './controller/expense-catalog.controller'
 import { GenericData } from './entity/generic-data.entity'
 import { GenericDataRepository } from './repository/generic-data.repository'
@@ -10,7 +11,8 @@ import { GenericDataService } from './service/generic-data.service'
 
 /** GENERIC_DATA (legacy): CRUD + el catálogo de Expenses (compañías 34 / categorías 35). */
 @Module({
-  imports: [SrsAuthModule, TypeOrmModule.forFeature([GenericData])],
+  // SrsContratistaModule: CompanyModuleGuard del catálogo de Expenses (check «Expenses» de la empresa).
+  imports: [SrsAuthModule, SrsContratistaModule, TypeOrmModule.forFeature([GenericData])],
   controllers: [ExpenseCatalogController],
   providers: [GenericDataRepository, GenericDataService, ExpenseCatalogService],
   exports: [GenericDataService, ExpenseCatalogService],

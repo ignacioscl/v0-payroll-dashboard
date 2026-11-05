@@ -42,6 +42,7 @@ const LEXUS_PALM_BEACH = 301 // AutoNation Lexus of Palm Beach
 const NISSAN_MIAMI = 744 // AutoNation Nissan Miami
 const DELRAY_HYUNDAI = 625
 const DELRAY_GENESIS = 626
+const GC_PROVIDER = 188 // GC Installations: Expenses sí, Window Tint Closing no (migration 021)
 
 /**
  * Septiembre 2026 en esta copia. Income = el Closing de legacy (`plans/plan-monthly-closing/conciliacion/scripts/
@@ -263,6 +264,36 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
       info.eachRow((r) => fields.push(String(r.getCell(1).value)))
       expect(fields).toEqual(expect.arrayContaining(['Tint services', 'Tinters', 'Expense category', 'Pay periods']))
     }, 300000)
+  })
+
+  describe('Check «Window Tint Closing» de la empresa (plans/plan-checks-expenses-tint, migration 021)', () => {
+    const gcAdmin: SrsContext = { ...admin, idUsuario: 1, idDealerProvider: GC_PROVIDER }
+    let gcDealers: string
+
+    beforeAll(async () => {
+      const rows: { id: number }[] = await srs.query(
+        `SELECT c.id FROM CONTRATISTA c WHERE c.estado = 1 AND c.tipo_empresa = 1
+           AND EXISTS (SELECT 1 FROM DEALER_REL dr WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
+         ORDER BY c.id`,
+        [GC_PROVIDER],
+      )
+      gcDealers = rows.map((r) => r.id).join(',')
+    })
+
+    it('sin el check: 403 en el resumen, el dealer y el export de tint', async () => {
+      const tint = { month: '2026-09', idDealer: gcDealers, scope: 'tint' as const }
+      await expect(service.getSummary(gcAdmin, tint)).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(service.getDealer(gcAdmin, Number(gcDealers.split(',')[0]), tint)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      )
+      await expect(service.export(gcAdmin, tint, fakeResponse().res)).rejects.toBeInstanceOf(ForbiddenException)
+    })
+
+    it('sin el check: Monthly Closing (scope=all) sigue andando', async () => {
+      const mc = await service.getSummary(gcAdmin, { month: '2026-09', idDealer: gcDealers })
+      expect(mc.scope).toBe('all')
+      expect(mc.rows.length).toBeGreaterThan(0)
+    }, 120000)
   })
 
   describe('P6: aislamiento', () => {

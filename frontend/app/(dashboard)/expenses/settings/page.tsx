@@ -14,7 +14,7 @@ import { useTranslation } from '@/lib/i18n/locale-context'
 export default function ExpensesSettingsPage() {
   const { t } = useTranslation()
   const { user, loading, hasPermission } = useSrsMe()
-  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses)
   const [tab, setTab] = React.useState<'categories' | 'companies'>('categories')
 
   if (!loading && !canAccess) return <AccessDenied message={t('expenses.noAccess')} />

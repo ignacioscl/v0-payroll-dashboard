@@ -15,6 +15,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
+import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
 import { ApprovalDto, AttachmentLogDto, CreateExpenseDto, UpdateExpenseDto } from '../dto/expense.dto'
 import { ExpenseFacadeService } from '../service/expense-facade.service'
 
@@ -22,7 +23,8 @@ import { ExpenseFacadeService } from '../service/expense-facade.service'
  * Un gasto (o su grupo): detalle, alta, edición, aprobación, baja, restauración y log. Rutas con id numérico
  * (`':id(\\d+)'`), así `companies`, `summary`, `recurring`, `analytics` y `employees` nunca caen acá.
  */
-@UseGuards(SrsJwtGuard)
+@UseGuards(SrsJwtGuard, CompanyModuleGuard)
+@RequireCompanyModule('expenses')
 @Controller('/srs/expenses')
 @ApiTags('SRS Expenses')
 @ApiBearerAuth()

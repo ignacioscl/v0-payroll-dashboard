@@ -29,6 +29,14 @@ export class Contratista extends SrsEntityBase {
   @Column({ name: 'has_module_tv', type: 'tinyint', nullable: true })
   hasModuleTv?: number
 
+  /** 1=check «Expenses» (legacy dealer_edit > Modules & function access). Migration 021. */
+  @Column({ name: 'has_expenses', type: 'tinyint', default: 0 })
+  hasExpenses!: number
+
+  /** 1=check «Window Tint Closing» (legacy dealer_edit > Modules & function access). Migration 021. */
+  @Column({ name: 'has_window_tint_closing', type: 'tinyint', default: 0 })
+  hasWindowTintClosing!: number
+
   /** Legacy logo. Legacy keeps showing this one; v0 only reads it as a fallback. */
   @Column({ name: 'logo_img', type: 'varchar', length: 128, nullable: true })
   logoImg?: string | null

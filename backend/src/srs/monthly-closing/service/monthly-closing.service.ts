@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm'
 import type { Response } from 'express'
 
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
+import { ContratistaService } from 'src/features/srs-contratista/service/contratista.service'
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { ROL_ACCION_CLOSING, SrsPermissionRepository } from '../../auth/srs-permission.repository'
@@ -99,6 +100,7 @@ export class MonthlyClosingService {
     @Inject(PayrollSourceRepository) private readonly payrollSource: PayrollSourceRepository,
     @Inject(ExpenseReportRepository) private readonly expenses: ExpenseReportRepository,
     @Inject(UsuarioSrsService) private readonly usuarios: UsuarioSrsService,
+    @Inject(ContratistaService) private readonly contratistas: ContratistaService,
     @InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource,
   ) {}
 
@@ -204,6 +206,8 @@ export class MonthlyClosingService {
     }
     const scope: ClosingScope = query.scope ?? 'all'
     if (!CLOSING_SCOPES.includes(scope)) throw new BadRequestException({ message: 'Invalid scope', field: 'scope' })
+    // Window Tint Closing pide además el check de la empresa (plans/plan-checks-expenses-tint); scope=all no.
+    if (scope === 'tint') await this.contratistas.assertCompanyModule(ctx, 'windowTintClosing')
     const { firstDay, lastDay } = monthBounds(query.month)
     // includeZero fijo: el Closing trae las líneas de $0 (T1 de MC, v5); WO por fecha de alta.
     const filter = buildSrsKpiFilter(ctx, {

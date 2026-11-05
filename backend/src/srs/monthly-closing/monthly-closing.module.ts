@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common'
 
 import { SrsUsuarioModule } from 'src/features/srs-usuario/srs-usuario.module'
+import { SrsContratistaModule } from 'src/features/srs-contratista/srs-contratista.module'
 import { SrsAuthModule } from '../auth/srs-auth.module'
 import { SrsBillingModule } from '../billing/srs-billing.module'
 import { SrsExpensesModule } from '../expenses/srs-expenses.module'
@@ -23,6 +24,8 @@ import { MonthlyClosingService } from './service/monthly-closing.service'
     SrsExpensesModule,
     forwardRef(() => SrsUsuarioModule),
     SrsExportModule,
+    // Window Tint Closing: check de la empresa (ContratistaService.assertCompanyModule).
+    SrsContratistaModule,
   ],
   providers: [MonthlyClosingService],
   controllers: [MonthlyClosingController],

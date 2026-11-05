@@ -23,10 +23,20 @@ export const E2E_PASSWORD = env.E2E_PASSWORD ?? ''
 export const E2E_MISSING_USER = !E2E_USER || !E2E_PASSWORD
 export const E2E_MISSING_USER_REASON = 'Set E2E_USER and E2E_PASSWORD in frontend/.env.e2e.local'
 
-export async function login(page: Page) {
+/**
+ * Un usuario con permiso de Expenses y de Closing (o Admin) de una empresa SIN los checks «Expenses» y «Window Tint
+ * Closing» (p. ej. Mooi), para company-modules.spec.ts.
+ */
+export const E2E_USER_NO_MODULES = env.E2E_USER_NO_MODULES ?? ''
+export const E2E_PASSWORD_NO_MODULES = env.E2E_PASSWORD_NO_MODULES ?? ''
+export const E2E_MISSING_USER_NO_MODULES = !E2E_USER_NO_MODULES || !E2E_PASSWORD_NO_MODULES
+export const E2E_MISSING_USER_NO_MODULES_REASON =
+  'Set E2E_USER_NO_MODULES and E2E_PASSWORD_NO_MODULES in frontend/.env.e2e.local'
+
+export async function login(page: Page, user = E2E_USER, password = E2E_PASSWORD) {
   await page.goto('/login')
-  await page.locator('#email').fill(E2E_USER)
-  await page.locator('#password').fill(E2E_PASSWORD)
+  await page.locator('#email').fill(user)
+  await page.locator('#password').fill(password)
   await page.getByRole('button', { name: /sign in|log in|ingresar|entrar/i }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
 }
