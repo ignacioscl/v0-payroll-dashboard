@@ -19,6 +19,7 @@ import { BillingActionDialog, BillingOptionTile } from '@/components/billing/bil
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { PageHeading } from '@/components/layout/page-heading'
 import { IncomeDealerServices } from '@/components/reports/income-dealer-services'
+import { ChartEmptyState } from '@/components/shared/chart-empty-state'
 import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import {
   DataTable,
@@ -554,6 +555,15 @@ export default function IncomeByDealerPage() {
             <div className="flex h-[260px] items-center justify-center text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
             </div>
+          ) : !filtersHydrated || selectedDealers.length === 0 ? (
+            <ChartEmptyState height={260} message={t('dealer.selectInHeaderToLoad')} />
+          ) : !headerRange.fechaDesde ? (
+            <ChartEmptyState
+              height={260}
+              message={incomeYearMode ? t('incomeByDealer.selectYears') : t('filters.selectDates')}
+            />
+          ) : chartData.length === 0 ? (
+            <ChartEmptyState height={260} message={t('incomeByDealer.noData')} />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartData}>
