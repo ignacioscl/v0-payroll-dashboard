@@ -2,11 +2,13 @@ import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Put, Query, R
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
+import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
 import { CatalogQueryDto, CreateCatalogItemDto, UpdateCatalogItemDto } from '../dto/generic-data.dto'
 import { ExpenseCatalogService } from '../service/expense-catalog.service'
 
 /** Expenses › Settings: compañías (GENERIC_DATA 34) y categorías (35). Contrato en plans/plan-expenses-pro/AVANCE.md. */
-@UseGuards(SrsJwtGuard)
+@UseGuards(SrsJwtGuard, CompanyModuleGuard)
+@RequireCompanyModule('expenses')
 @Controller('/srs/expenses')
 @ApiTags('SRS Expenses - Catalog')
 @ApiBearerAuth()

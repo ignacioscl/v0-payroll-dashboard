@@ -28,7 +28,7 @@ export default function ExpensesAnalyticsPage() {
   const { t } = useTranslation()
   const { user, loading, hasPermission } = useSrsMe()
   const { dateRange, selectedDealers, filtersHydrated } = useFilters()
-  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses)
   const [tab, setTab] = React.useState<AnalyticsGroupBy>('category')
   const [status, setStatus] = React.useState<StatusFilter>('all')
 

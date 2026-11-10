@@ -39,6 +39,10 @@ export interface SrsMeUser {
   providerLogoImg?: string | null
   isCompanyTypeCompany: boolean
   isSystemAdmin: boolean
+  /** Check «Expenses» of the company (legacy dealer_edit > Modules & function access). */
+  hasExpenses?: boolean
+  /** Check «Window Tint Closing» of the company (legacy dealer_edit > Modules & function access). */
+  hasWindowTintClosing?: boolean
   navTemplate?: 1 | 2
   locale?: AppLocale
 }

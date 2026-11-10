@@ -2,6 +2,7 @@
 
 import type { PunchGroupedResponse } from '@/lib/ttk/punch-grouped-types'
 import { isSrsBusy, SrsBusyError } from '@/lib/srs-busy-error'
+import type { ClosingScope } from '@/lib/reports/monthly-closing-month'
 import {
   punchGroupedParamsToSearchParams,
   type PunchGroupedQueryParams,
@@ -515,3 +516,109 @@ export async function fetchDealerRankingExportStatus(
     errorCode?: string
   }>(res, `punch/dealer-ranking/export/status (${res.status})`)
 }
+
+/* -------------------------------------------------------------------------- */
+/* Monthly Closing y Window Tint Closing (`GET srs/reports/monthly-closing`)   */
+/* -------------------------------------------------------------------------- */
+
+export interface MonthlyClosingQueryParams {
+  /** `YYYY-MM`, validado con lib/reports/monthly-closing-month.ts antes de pedir. */
+  month: string
+  idDealer: string
+  includeRemovedDealers?: boolean
+  scope: ClosingScope
+}
+
+export interface ClosingPeriod {
+  desde: string
+  hasta: string
+  status: 'complete' | 'partial' | 'notCalculated'
+  calculatedThrough: string | null
+}
+
+export interface ClosingRow {
+  /** 0 = Without dealer. */
+  dealerId: number
+  dealer: string
+  removed: boolean
+  /** Window Tint Closing only. */
+  vehicles: number | null
+  income: number
+  payroll: number
+  expenses: number
+  profit: number
+  /** Profit ÷ Income, one decimal; null with Income $0. */
+  pct: number | null
+  /** Monthly Closing only. */
+  accident: number | null
+}
+
+export interface MonthlyClosingData {
+  scope: ClosingScope
+  month: string
+  rows: ClosingRow[]
+  total: ClosingRow
+  withoutDealer: ClosingRow | null
+  periods: ClosingPeriod[]
+}
+
+export interface ClosingIncomeLine {
+  nro: string
+  dateFrom: string
+  dateTo: string
+  department: string
+  service: string
+  qty: number
+  total: number
+}
+
+export interface ClosingPayrollLine {
+  periodDesde: string
+  periodHasta: string
+  employee: string
+  position: string
+  amount: number
+}
+
+export interface ClosingExpenseLine {
+  date: string
+  vendor: string
+  category: string
+  amount: number
+  notes: string
+}
+
+export interface MonthlyClosingDealerData {
+  dealerId: number
+  dealer: string
+  income: ClosingIncomeLine[]
+  payroll: ClosingPayrollLine[]
+  expenses: ClosingExpenseLine[]
+}
+
+function monthlyClosingQuery(params: MonthlyClosingQueryParams): string {
+  const qs = new URLSearchParams({ month: params.month, idDealer: params.idDealer, scope: params.scope })
+  if (params.includeRemovedDealers) qs.set('includeRemovedDealers', 'true')
+  return `?${qs.toString()}`
+}
+
+export async function fetchMonthlyClosing(params: MonthlyClosingQueryParams): Promise<MonthlyClosingData> {
+  const res = await fetch(`/api/srs-kpis/reports/monthly-closing${monthlyClosingQuery(params)}`, { cache: 'no-store' })
+  return readNestJson<MonthlyClosingData>(res, `reports/monthly-closing (${res.status})`)
+}
+
+/** Las tres listas de un dealer; `idDealer = 0` = Without dealer (solo Payroll). */
+export async function fetchMonthlyClosingDealer(
+  idDealer: number,
+  params: MonthlyClosingQueryParams,
+): Promise<MonthlyClosingDealerData> {
+  const res = await fetch(
+    `/api/srs-kpis/reports/monthly-closing/dealer/${idDealer}${monthlyClosingQuery(params)}`,
+    { cache: 'no-store' },
+  )
+  return readNestJson<MonthlyClosingDealerData>(res, `reports/monthly-closing/dealer (${res.status})`)
+}
+
+/** Excel armado por Nest: Report Info, Summary, (By service), Income, Payroll y Expenses. */
+export const monthlyClosingExportUrl = (params: MonthlyClosingQueryParams) =>
+  `/api/srs-kpis/reports/monthly-closing/export${monthlyClosingQuery(params)}`

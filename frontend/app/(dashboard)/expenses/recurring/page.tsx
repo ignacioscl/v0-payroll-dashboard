@@ -19,7 +19,7 @@ import type { RuleListResponse } from '@/lib/srs-expenses-api'
 export default function RecurringExpensesPage() {
   const { t } = useTranslation()
   const { user, loading, hasPermission } = useSrsMe()
-  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses)
   const canAdd = canAddExpenses(hasPermission, user?.isSystemAdmin)
   const [cards, setCards] = React.useState<RuleListResponse['cards'] | null>(null)
   const [ruleTarget, setRuleTarget] = React.useState<RecurringRuleTarget | null>(null)

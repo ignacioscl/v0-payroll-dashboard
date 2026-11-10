@@ -11,6 +11,8 @@ export interface Messages {
     businessKpis: string
     productionVsGoal: string
     incomeByDealer: string
+    monthlyClosing: string
+    windowTintClosing: string
     payrollReport: string
     reports: string
     billing: string
@@ -1178,6 +1180,7 @@ export interface Messages {
   employeeSearch: {
     select: string
     typeMinChars: string
+    filterByName: string
     startTyping: string
     enterMinChars: string
     searching: string
@@ -1652,6 +1655,53 @@ export interface Messages {
     selectYears: string
     exportYears: string
   }
+  monthlyClosing: {
+    title: string
+    subtitle: string
+    tintTitle: string
+    tintSubtitle: string
+    month: string
+    monthPlaceholder: string
+    monthNoResults: string
+    monthError: string
+    colIncome: string
+    colPayroll: string
+    colExpenses: string
+    colProfit: string
+    colPct: string
+    colAccident: string
+    colVehicles: string
+    total: string
+    withoutDealer: string
+    payPeriods: string
+    noPayPeriods: string
+    calculatedThrough: string
+    notCalculated: string
+    empty: string
+    tintEmpty: string
+    rowHint: string
+    tabIncome: string
+    tabPayroll: string
+    tabExpenses: string
+    emptyIncome: string
+    emptyPayroll: string
+    emptyExpenses: string
+    colInvoice: string
+    colDateFrom: string
+    colDateTo: string
+    colDepartment: string
+    colService: string
+    colQty: string
+    colTotal: string
+    colPayPeriod: string
+    colEmployee: string
+    colPosition: string
+    colAmount: string
+    colDate: string
+    colVendor: string
+    colCategory: string
+    colNotes: string
+  }
   reportRules: {
     billing: {
       title: string
@@ -1691,6 +1741,22 @@ export interface Messages {
       item2: string
       item3: string
       item4: string
+    }
+    monthlyClosing: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+    }
+    tintClosing: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+      item5: string
+      item6: string
+      item7: string
     }
   }
   mockPayrollReport: {
@@ -2137,6 +2203,7 @@ export interface Messages {
     changeDealerModeTitle: string
     yesChange: string
     enterDealerAmount: string
+    dealersWithoutAmount: string
     amountIsSum: string
     needs100: string
     manualOver100: string

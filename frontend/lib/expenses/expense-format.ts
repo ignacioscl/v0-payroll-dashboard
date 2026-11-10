@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 
 import { formatUsCalendarDate } from '@/lib/format-us-datetime'
+import { fromCents, isValidAmount, toCents } from '@/lib/expenses/expense-rules'
 import { fmtMoney } from '@/lib/kpi-money'
 import type { TranslateFn } from '@/lib/i18n/locale-context'
 import type { ExpenseGroupRow, ExpenseRow, ExpenseSingleRow, ExpenseStatus, RuleRow } from '@/lib/srs-expenses-api'
@@ -10,6 +11,14 @@ export function fmtAmount(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—'
   const n = Number(value)
   return Number.isFinite(n) ? fmtMoney(n) : String(value)
+}
+
+/**
+ * Al salir de un campo de monto: un monto válido queda con dos decimales (`75` → `75.00`), como los
+ * que reparte el sistema. Lo que no es válido queda como se escribió, para que el error se vea sobre eso.
+ */
+export function amountOnBlur(value: string): string {
+  return isValidAmount(value) ? fromCents(toCents(value.trim())) : value
 }
 
 /** `YYYY-MM-DD` → `MM/DD/YYYY` sin pasar por Date (sin zonas horarias). */

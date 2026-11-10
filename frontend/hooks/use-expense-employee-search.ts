@@ -9,9 +9,10 @@ import { fetchExpenseEmployees } from '@/lib/srs-expenses-api'
  * Empleados para Expenses, contra `GET /api/srs-kpis/expenses/employees?term&idDealer` (permisos de
  * Expenses, no la acción 67 de Time Tracking que exige `ttk-employees.php`). Con `idDealer` (csv):
  * asignados a esos dealers (Add/Edit); sin dealer: toda la empresa (filtros Assigned to / Created by).
- * Devuelve `TtkEmployeeOption` para reusar el `EmployeeCombobox` tal cual.
+ * Devuelve `TtkEmployeeOption` para reusar el `EmployeeCombobox` tal cual. `minChars` 0 (Add/Edit, con
+ * dealers): la lista entera de esos dealers sin tipear (mail de Juan «Temas», 04/11).
  */
-export function useExpenseEmployeeSearch(term: string, idDealer: string | null, enabled: boolean) {
+export function useExpenseEmployeeSearch(term: string, idDealer: string | null, enabled: boolean, minChars = 2) {
   const trimmed = term.trim()
   return useQuery<TtkEmployeeOption[]>({
     queryKey: ['expense-employees', idDealer ?? '', trimmed],
@@ -19,7 +20,7 @@ export function useExpenseEmployeeSearch(term: string, idDealer: string | null, 
       const res = await fetchExpenseEmployees(trimmed, idDealer)
       return (res.results ?? []).map((e) => ({ id: e.id, nombre: e.name }))
     },
-    enabled: enabled && trimmed.length >= 2,
+    enabled: enabled && trimmed.length >= minChars,
     staleTime: 30_000,
   })
 }

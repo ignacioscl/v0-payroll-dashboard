@@ -22,6 +22,7 @@ import {
 } from '@/lib/ttk/today-live-status'
 import { DEFAULT_ERROR_STATUS, type ErrorStatus } from '@/lib/ttk/error-status'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
+import { defaultClosingMonth } from '@/lib/reports/monthly-closing-month'
 
 interface FilterContextType {
   search: string
@@ -117,6 +118,12 @@ interface FilterContextType {
   /** Años marcados en el combo (cualquier combinación, también salteados). */
   incomeYears: number[]
   setIncomeYears: (value: number[]) => void
+  /**
+   * Monthly Closing y Window Tint Closing: el mes del combo del header (`YYYY-MM`), en vez del calendario.
+   * Por defecto el mes anterior de New York (el último cerrado); `''` si se borra (la pantalla pide elegir uno).
+   */
+  closingMonth: string
+  setClosingMonth: (value: string) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
   filtersHydrated: boolean
   clearFilters: () => void
@@ -164,6 +171,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
   const [incomeYearMode, setIncomeYearMode] = useState(false)
   const [incomeYears, setIncomeYears] = useState<number[]>([])
+  const [closingMonth, setClosingMonth] = useState<string>(() => defaultClosingMonth())
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const showDefaultDateRange = useCallback((value: DateRange | undefined) => {
@@ -273,6 +281,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setInvoiceDateTo(def.to)
     setInvoiceDateMode('range')
     setInvoiceIgnorePeriod(false)
+    setClosingMonth(defaultClosingMonth())
   }
 
   return (
@@ -322,6 +331,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setIncomeYearMode,
       incomeYears,
       setIncomeYears,
+      closingMonth,
+      setClosingMonth,
       filtersHydrated,
       clearFilters
     }}>

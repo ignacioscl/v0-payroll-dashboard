@@ -34,7 +34,9 @@ export function ExpenseEmployeeCombobox({
 }: ExpenseEmployeeComboboxProps) {
   const [term, setTerm] = React.useState('')
   const dealerSelected = !requireDealer || Boolean(idDealer && idDealer.length > 0)
-  const query = useExpenseEmployeeSearch(term, idDealer, !disabled && dealerSelected)
+  // Con dealers (Add/Edit) se ven todos sus empleados sin tipear; en los filtros (toda la empresa), 2 letras.
+  const minChars = requireDealer ? 0 : 2
+  const query = useExpenseEmployeeSearch(term, idDealer, !disabled && dealerSelected, minChars)
 
   return (
     <div data-field={dataField} className="min-w-0">
@@ -48,6 +50,7 @@ export function ExpenseEmployeeCombobox({
         disabled={disabled}
         placeholder={placeholder}
         dealerSelected={dealerSelected}
+        minSearchChars={minChars}
         compact={compact}
         className={className}
       />

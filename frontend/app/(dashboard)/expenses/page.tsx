@@ -50,7 +50,7 @@ function ExpensesListPage() {
     filtersHydrated,
   } = useFilters()
 
-  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccess = canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses)
   const canAdd = canAddExpenses(hasPermission, user?.isSystemAdmin)
   const canApprove = canApproveExpenses(hasPermission, user?.isSystemAdmin)
   const canEdit = canEditExpenses(hasPermission, user?.isSystemAdmin)

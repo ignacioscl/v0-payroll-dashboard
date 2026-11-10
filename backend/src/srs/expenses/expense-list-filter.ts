@@ -21,6 +21,12 @@ export interface ExpenseListFilter {
   to: string
   idCompany?: number
   idCategory?: number
+  /**
+   * Solo los gastos de la categoría de gastos con este nombre (minúsculas, sin espacios en las puntas). Lo pasa
+   * el Window Tint Closing con 'window tint film' (T4 de plans/plan-reporte-tint/PLAN.md); ninguna pantalla de
+   * Expenses lo usa. Por nombre y tipo 35, nunca por id (regla generic-data-no-hardcoded-ids).
+   */
+  categoryNameIs?: string
   idAuthor?: number
   idCreatedBy?: number
   status?: ExpenseStatusFilter

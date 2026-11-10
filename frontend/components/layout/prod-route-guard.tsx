@@ -6,13 +6,15 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import {
   canAccessBillingInvoices,
   canAccessBusinessKpis,
+  canAccessMonthlyClosing,
   canAccessPayrollDashboard,
   canAccessProductionReport,
+  canAccessWindowTintClosing,
 } from '@/lib/auth/payroll-access'
 import { canAccessDailyPunch, canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
 import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
-import { isDevEnvironment, isProdAllowedPath } from '@/lib/navigation'
+import { isCompanyModuleBlockedPath, isDevEnvironment, isProdAllowedPath } from '@/lib/navigation'
 import { AccessDenied } from './access-denied'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -30,7 +32,15 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
   const canAccessRoles = canViewRoles(hasPermission, user?.isSystemAdmin)
   const canAccessRoleTemplates = canManageRoleTemplates(hasPermission, user?.isSystemAdmin)
   const canAccessSettings = canAccessSystemConfig(hasPermission, user?.isSystemAdmin)
-  const canAccessExpensesModule = canAccessExpenses(hasPermission, user?.isSystemAdmin)
+  const canAccessExpensesModule = canAccessExpenses(
+    hasPermission,
+    user?.isSystemAdmin,
+    user?.hasExpenses,
+  )
+  const canAccessClosing = canAccessMonthlyClosing(user, hasPermission)
+  const canAccessTintClosing = canAccessWindowTintClosing(user, hasPermission)
+  const companyHasExpenses = Boolean(user?.hasExpenses)
+  const companyHasWindowTintClosing = Boolean(user?.hasWindowTintClosing)
   const hasAnyModule =
     canAccessTtk ||
     canAccessProdKpis ||
@@ -38,7 +48,9 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     canAccessRoles ||
     canAccessRoleTemplates ||
     canAccessSettings ||
-    canAccessExpensesModule
+    canAccessExpensesModule ||
+    canAccessClosing ||
+    canAccessTintClosing
   const isExternal = Boolean(user?.isCompanyTypeCompany)
   const homeFallback = isExternal ? '/issues' : '/'
 
@@ -48,6 +60,15 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     // Externals never land on Dashboard home (SSO / deep link / typed URL).
     if (isExternal && pathname === '/') {
       router.replace('/issues')
+      return
+    }
+
+    // Company module checks count in dev too; the dev bypass is for permissions only.
+    if (
+      isDevEnvironment() &&
+      isCompanyModuleBlockedPath(pathname, { companyHasExpenses, companyHasWindowTintClosing })
+    ) {
+      router.replace(homeFallback)
       return
     }
 
@@ -63,6 +84,8 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
         canAccessSettings,
         canAccessProductionGoal,
         canAccessExpensesModule,
+        canAccessClosing,
+        canAccessTintClosing,
       )
     ) {
       router.replace(homeFallback)
@@ -79,6 +102,10 @@ export function ProdRouteGuard({ children }: { children: React.ReactNode }) {
     canAccessRoleTemplates,
     canAccessSettings,
     canAccessExpensesModule,
+    canAccessClosing,
+    canAccessTintClosing,
+    companyHasExpenses,
+    companyHasWindowTintClosing,
     isExternal,
     homeFallback,
     router,

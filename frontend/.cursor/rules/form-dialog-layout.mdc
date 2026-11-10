@@ -28,6 +28,17 @@ hace nada. En desarrollo, `useFormWithFocus` lo avisa en la consola. Test: `lib/
 
 Se mira en el navegador en compu y a 375 px antes de entregar: que pase los tests no dice que se vea bien.
 
+## Montos que se escriben a mano: centavos al salir y un Total que siempre suma
+
+Todo campo de monto pasa por `amountOnBlur` (`lib/expenses/expense-format.ts`) al salir: `75` queda `75.00`, igual que
+los que reparte el sistema; lo inválido queda como se escribió para que el error se vea sobre eso. El Total de un
+reparto suma lo cargado aunque falte algún monto y dice cuántos faltan (`amountSplitTotal`): nunca «—», porque es lo que
+se mira para controlar que se cargó todo. Un formulario con dealers va con la sección Dealers primero y el empleado al
+lado del dealer, porque su lista sale de los dealers elegidos y se ve entera sin tipear.
+
+*(Juan, 04/11/2026: en Add Expense By amount, «75» y «140» quedaban sin centavos y el Total decía «—»; el empleado estaba
+arriba y no se podía elegir hasta elegir el dealer, abajo.)*
+
 ## Filtros de una lista: `FilterPanel`
 
 Los filtros van en el panel plegable «Filters» (`components/shared/filter-panel.tsx`), en tarjeta, con chips de lo activo y

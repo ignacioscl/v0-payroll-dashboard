@@ -7,6 +7,7 @@ import { StatementType } from '../../billing/entity/invoice-statement.srsentity'
 import { OPEN_WORKFLOW_STATUSES, WorkflowStatus } from '../entity/workflow.srsentity'
 import { ProductionKpiDto, ProductionWeekRowDto, DealerProductionRowDto, WoStatusSliceDto } from '../dto/production-kpi.dto'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
+import { countRequestedDealersInScope } from '../../shared/kpi/srs-kpi-dealer-scope'
 import {
   buildDealerFilterSql,
   buildDealerRestrictionClause,
@@ -384,24 +385,11 @@ export class ProductionKpiRepository {
    * How many of the requested dealers are related to the session provider (DEALER_REL) and, for
    * users with assigned dealers, pass RESTRICTION_DEALER_V2. The export names them in Report Info
    * with GET_DEALER_NAME_BY_PROVIDER, which does not look at the scope: if the count is short, an id
-   * from elsewhere came in the request (same check as the dealer-ranking export).
+   * from elsewhere came in the request (same check as the dealer-ranking export). The query lives in
+   * shared/kpi/srs-kpi-dealer-scope.ts, which Monthly Closing also calls.
    */
   async countRequestedDealersInScope(filter: SrsKpiFilter): Promise<number> {
-    const ids = [...new Set(filter.dealerIds)]
-    if (ids.length === 0) return 0
-    const placeholders = ids.map(() => '?').join(',')
-    const restriction = filter.skipDealerRestriction ? '' : 'AND RESTRICTION_DEALER_V2(?, dr.id_dealer_customer) = 1'
-    const params: number[] = [filter.idDealerProvider, ...ids]
-    if (!filter.skipDealerRestriction) params.push(filter.idUsuario)
-    const rows: { n: number | string }[] = await this.srs.query(
-      `SELECT COUNT(DISTINCT dr.id_dealer_customer) AS n
-       FROM DEALER_REL dr
-       WHERE dr.id_dealer_provider = ?
-         AND dr.id_dealer_customer IN (${placeholders})
-         ${restriction}`,
-      params,
-    )
-    return Number(rows[0]?.n ?? 0)
+    return countRequestedDealersInScope(this.srs, filter)
   }
 
   async getProductionByWeek(filter: SrsKpiFilter): Promise<ProductionWeekRowDto[]> {

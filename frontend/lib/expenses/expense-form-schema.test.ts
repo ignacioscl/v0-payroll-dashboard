@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  amountSplitTotal,
   carrySplitToMode,
   createExpenseFormSchema,
   currentSplitAmounts,
@@ -67,6 +68,39 @@ describe('createExpenseFormSchema, cambio de modo', () => {
       branches: { '755': { percentage: '44.00' }, '200': { percentage: '4' }, '199': { percentage: '10' } } as never,
     })
     expect(issues(values)).toEqual(['branchIds: sum 58.00'])
+  })
+})
+
+describe('amountSplitTotal: el Total de By amount suma lo cargado aunque falte algún dealer', () => {
+  // Mail de Juan (04/11): con un dealer sin monto el Total mostraba «—» y no podía controlar lo cargado.
+  it('suma los montos escritos a mano, con o sin centavos', () => {
+    const r = amountSplitTotal({
+      mode: 'amount',
+      totalAmount: '',
+      branchIds: ['1', '2', '3'],
+      branches: { '1': { percentage: '', amount: '150.00' }, '2': { percentage: '', amount: '75' }, '3': { percentage: '', amount: '140' } },
+    })
+    expect(r).toEqual({ total: '365.00', missing: 0 })
+  })
+
+  it('con dealers sin monto o con uno inválido: suma los demás y cuenta los que faltan', () => {
+    const r = amountSplitTotal({
+      mode: 'amount',
+      totalAmount: '',
+      branchIds: ['1', '2', '3', '4'],
+      branches: {
+        '1': { percentage: '', amount: '150.00' },
+        '2': { percentage: '', amount: '' },
+        '3': { percentage: '', amount: '1,200' },
+        '4': { percentage: '', amount: '85' },
+      },
+    })
+    expect(r).toEqual({ total: '235.00', missing: 2 })
+  })
+
+  it('sin ningún monto: total en cero y todos faltan', () => {
+    const r = amountSplitTotal({ mode: 'amount', totalAmount: '', branchIds: ['1', '2'], branches: {} })
+    expect(r).toEqual({ total: '0.00', missing: 2 })
   })
 })
 

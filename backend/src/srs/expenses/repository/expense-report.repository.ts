@@ -116,6 +116,11 @@ export class ExpenseReportRepository {
       sql += ' AND e.id_category = ?'
       params.push(filter.idCategory)
     }
+    if (filter.categoryNameIs) {
+      // gca ya viene unido con la empresa (fromSql); tipo 35 = categoría de gastos, como «Accident».
+      sql += ' AND gca.id_categoria = ? AND LOWER(TRIM(gca.name)) = ?'
+      params.push(EXPENSES_CATEGORY_CATEGORY, filter.categoryNameIs.trim().toLowerCase())
+    }
     if (filter.idAuthor) {
       sql += ' AND e.id_author = ?'
       params.push(filter.idAuthor)
@@ -505,7 +510,7 @@ export class ExpenseReportRepository {
    * los asignados a alguno de ellos; sin dealers, todos. Pro filtra `u.estado = 1`: un empleado dado de baja no
    * recibe gastos nuevos.
    */
-  async employees(idDealerProvider: number, term: string, dealerIds: number[], limit = 50): Promise<NamedRef[]> {
+  async employees(idDealerProvider: number, term: string, dealerIds: number[], limit = dealerIds.length ? 500 : 50): Promise<NamedRef[]> {
     const params: unknown[] = [idDealerProvider, `%${term}%`]
     let sql = `SELECT u.id_usuario AS id, u.nombre AS name FROM usuarios u
        WHERE u.estado = 1 AND u.is_empleado = 1 AND u.id_contratista_owner = ? AND u.nombre LIKE ?`

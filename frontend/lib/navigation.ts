@@ -22,6 +22,8 @@ import {
   PieChart,
   Repeat,
   Settings,
+  CalendarCheck,
+  CarFront,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
 
@@ -54,6 +56,8 @@ export const ALL_NAVIGATION: NavItemDef[] = [
       { nameKey: 'nav.businessKpis', href: '/reports/business-kpis', icon: Gauge },
       { nameKey: 'nav.productionVsGoal', href: '/reports/production-vs-goal', icon: Target },
       { nameKey: 'nav.incomeByDealer', href: '/reports/income-by-dealer', icon: Landmark },
+      { nameKey: 'nav.monthlyClosing', href: '/reports/monthly-closing', icon: CalendarCheck },
+      { nameKey: 'nav.windowTintClosing', href: '/reports/window-tint-closing', icon: CarFront },
     ],
   },
   {
@@ -97,6 +101,12 @@ export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 /** Production vs Goal and Income by Dealer: Admin General/Company or Production Report (47) only. */
 export const PROD_GOAL_HREFS = ['/reports/production-vs-goal', '/reports/income-by-dealer'] as const
 
+/** Monthly Closing: Admin General/Company or «Reports > Closing» (140). */
+export const MONTHLY_CLOSING_NAV_HREFS = ['/reports/monthly-closing'] as const
+
+/** Window Tint Closing: same permission as Monthly Closing plus the company's «Window Tint Closing» check. */
+export const TINT_CLOSING_NAV_HREFS = ['/reports/window-tint-closing'] as const
+
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
 
@@ -110,8 +120,9 @@ const ROLE_TEMPLATES_NAV_HREFS = ['/roles/templates'] as const
 export const SETTINGS_NAV_HREFS = ['/settings'] as const
 
 /**
- * Expenses — gated by ROL_ACCION 111 or system admin (`canAccessExpenses`). The sub-routes
- * (`/expenses/new`, `/expenses/[id]/edit`, `/expenses/recurring/[id]`) open by prefix.
+ * Expenses — gated by the company's «Expenses» check, then ROL_ACCION 111 or system admin
+ * (`canAccessExpenses`). The sub-routes (`/expenses/new`, `/expenses/[id]/edit`,
+ * `/expenses/recurring/[id]`) open by prefix.
  */
 export const EXPENSES_NAV_HREFS = [
   '/expenses',
@@ -124,6 +135,26 @@ export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
 }
 
+function matchesHrefs(pathname: string, hrefs: readonly string[]) {
+  return hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
+}
+
+/** Company module checks (legacy dealer_edit > Modules & function access), from `/me`. */
+export interface CompanyModules {
+  companyHasExpenses: boolean
+  companyHasWindowTintClosing: boolean
+}
+
+/**
+ * Routes of a module the company doesn't have. Applies in dev too: the dev bypass is for permissions
+ * only, the company checks always count.
+ */
+export function isCompanyModuleBlockedPath(pathname: string, modules: CompanyModules) {
+  if (!modules.companyHasExpenses && matchesHrefs(pathname, EXPENSES_NAV_HREFS)) return true
+  if (!modules.companyHasWindowTintClosing && matchesHrefs(pathname, TINT_CLOSING_NAV_HREFS)) return true
+  return false
+}
+
 export function isProdAllowedPath(
   pathname: string,
   canAccessProdKpis = false,
@@ -134,14 +165,17 @@ export function isProdAllowedPath(
   canAccessSystemConfig = false,
   canAccessProductionGoal = false,
   canAccessExpenses = false,
+  canAccessMonthlyClosing = false,
+  canAccessWindowTintClosing = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
-  const matches = (hrefs: readonly string[]) =>
-    hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))
+  const matches = (hrefs: readonly string[]) => matchesHrefs(pathname, hrefs)
   if (canAccessExpenses && matches(EXPENSES_NAV_HREFS)) return true
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessProductionGoal && matches(PROD_GOAL_HREFS)) return true
+  if (canAccessMonthlyClosing && matches(MONTHLY_CLOSING_NAV_HREFS)) return true
+  if (canAccessWindowTintClosing && matches(TINT_CLOSING_NAV_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
   if (canManageRoleTemplates && matches(ROLE_TEMPLATES_NAV_HREFS)) return true
   if (canAccessSystemConfig && matches(SETTINGS_NAV_HREFS)) return true
@@ -175,8 +209,14 @@ export function getVisibleNavigation(options: {
   canManageRoleTemplates?: boolean
   /** External dealer company (type === 1): hide Dashboard nav item. */
   isCompanyTypeCompany?: boolean
-  /** Expenses group (111 or admin). */
+  /** Expenses group (company check, then 111 or admin). */
   canAccessExpenses?: boolean
+  /** Monthly Closing (140 or admin). */
+  canAccessMonthlyClosing?: boolean
+  /** Window Tint Closing (Monthly Closing + company check). */
+  canAccessWindowTintClosing?: boolean
+  /** Company checks: in dev the menu shows everything except the modules the company doesn't have. */
+  companyModules: CompanyModules
   t: (key: MessageKey) => string
 }): NavItem[] {
   const {
@@ -189,6 +229,9 @@ export function getVisibleNavigation(options: {
     canManageRoleTemplates = false,
     isCompanyTypeCompany = false,
     canAccessExpenses = false,
+    canAccessMonthlyClosing = false,
+    canAccessWindowTintClosing = false,
+    companyModules,
     t,
   } = options
 
@@ -196,7 +239,16 @@ export function getVisibleNavigation(options: {
     isCompanyTypeCompany ? items.filter((item) => item.href !== '/') : items
 
   if (isDev) {
-    return withoutDashboard(ALL_NAVIGATION.map((item) => localizeNavItem(item, t)))
+    const visible = (href: string) => !isCompanyModuleBlockedPath(href, companyModules)
+    return withoutDashboard(
+      ALL_NAVIGATION.filter((item) => visible(item.href))
+        .map((item) =>
+          item.children
+            ? { ...item, children: item.children.filter((child) => visible(child.href)) }
+            : item,
+        )
+        .map((item) => localizeNavItem(item, t)),
+    )
   }
 
   if (
@@ -205,7 +257,9 @@ export function getVisibleNavigation(options: {
     !canAccessBillingInvoices &&
     !canViewRoles &&
     !canManageRoleTemplates &&
-    !canAccessExpenses
+    !canAccessExpenses &&
+    !canAccessMonthlyClosing &&
+    !canAccessWindowTintClosing
   ) {
     return []
   }
@@ -215,6 +269,8 @@ export function getVisibleNavigation(options: {
     ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
     ...(canAccessProductionGoal ? PROD_GOAL_HREFS : []),
+    ...(canAccessMonthlyClosing ? MONTHLY_CLOSING_NAV_HREFS : []),
+    ...(canAccessWindowTintClosing ? TINT_CLOSING_NAV_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
     ...(canViewRoles ? ['/roles'] : []),
     ...(canManageRoleTemplates ? ROLE_TEMPLATES_NAV_HREFS : []),

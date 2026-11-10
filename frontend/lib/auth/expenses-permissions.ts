@@ -11,8 +11,17 @@ export const ROL_ACCION_EXPENSES_EDIT = 118
 
 type HasPermission = (id: number) => boolean
 
-/** Expenses menu and its four screens: 111 or Admin General/Company (legacy navigation_panel.html). */
-export function canAccessExpenses(hasPermission: HasPermission, isSystemAdmin?: boolean): boolean {
+/**
+ * Expenses menu and its four screens: the company needs the «Expenses» check (legacy dealer_edit >
+ * Modules & function access, `me.hasExpenses`), then 111 or Admin General/Company (legacy
+ * navigation_panel.html). Without the check nobody sees it, whatever the permissions.
+ */
+export function canAccessExpenses(
+  hasPermission: HasPermission,
+  isSystemAdmin: boolean | undefined,
+  companyHasExpenses: boolean | undefined,
+): boolean {
+  if (!companyHasExpenses) return false
   return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_EXPENSES_APPROVE)
 }
 

@@ -32,6 +32,13 @@ export const ROL_ACCION_TTK_PAYROLL = 93
  */
 export const ROL_ACCION_PRODUCTION_REPORT = 47
 
+/**
+ * Reports > Closing / Inc. Pay. Status (legacy show-rol-action-140, el Closing Report): Monthly Closing y
+ * Window Tint Closing (plans/plan-monthly-closing T0, plans/plan-reporte-tint D6). Quien lo tiene ve el
+ * payroll de cada empleado en el detalle.
+ */
+export const ROL_ACCION_CLOSING = 140
+
 /** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 

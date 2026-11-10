@@ -3,6 +3,11 @@
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
 /** Same gate as legacy production.php / ProductionReportService. */
 export const ROL_ACCION_PRODUCTION_REPORT = 47
+/**
+ * «Reports > Closing / Inc. Pay. Status» (legacy closing_main.php): Monthly Closing y Window Tint Closing
+ * (plans/plan-monthly-closing T0). Mismo número en BE/srs/auth/srs-permission.repository.ts.
+ */
+export const ROL_ACCION_CLOSING = 140
 /** Time Tracking > Payroll (legacy show-rol-action-93, Payroll Excel Report): montos de payroll. */
 export const ROL_ACCION_TTK_PAYROLL = 93
 /** Same gate as legacy Time Tracking menu (show-rol-action-65 / Daily Punch). */

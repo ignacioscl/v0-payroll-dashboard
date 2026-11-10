@@ -23,7 +23,9 @@ import { RolTemplateController } from './controller/rol-template.controller'
     SrsAuthModule,
     forwardRef(() => SrsRolModule),
     SrsRolAccionModule,
-    SrsUsuarioModule,
+    // forwardRef como en srs-rol y srs-usuario: sin él, quien carga srs-usuario primero (Monthly Closing) lo recibe
+    // undefined por el ciclo srs-usuario → srs-rol → rol-template → srs-usuario.
+    forwardRef(() => SrsUsuarioModule),
     SrsContratistaModule,
     TypeOrmModule.forFeature([RolTemplate, RolAccionRelTemplate, RolActivityLog]),
   ],

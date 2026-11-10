@@ -49,7 +49,9 @@ import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import {
   canAccessBusinessKpis,
   canAccessBillingInvoices,
+  canAccessMonthlyClosing,
   canAccessProductionReport,
+  canAccessWindowTintClosing,
 } from '@/lib/auth/payroll-access'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
 import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
@@ -117,7 +119,13 @@ function SidebarInner({
     canViewRoles: canViewRoles(hasPermission, user?.isSystemAdmin),
     canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
     isCompanyTypeCompany: Boolean(user?.isCompanyTypeCompany),
-    canAccessExpenses: canAccessExpenses(hasPermission, user?.isSystemAdmin),
+    canAccessExpenses: canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses),
+    canAccessMonthlyClosing: canAccessMonthlyClosing(user, hasPermission),
+    canAccessWindowTintClosing: canAccessWindowTintClosing(user, hasPermission),
+    companyModules: {
+      companyHasExpenses: Boolean(user?.hasExpenses),
+      companyHasWindowTintClosing: Boolean(user?.hasWindowTintClosing),
+    },
     t,
   })
 
