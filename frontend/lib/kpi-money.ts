@@ -48,6 +48,13 @@ export function fmtMoney(n: number): string {
   return MONEY_FORMAT.format(dollars(n))
 }
 
+const QTY_FORMAT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
+
+/** Quantities: 6,043; up to two decimals when not whole (hours on a generic invoice: 1.5). */
+export function fmtQty(n: number): string {
+  return QTY_FORMAT.format(n)
+}
+
 /** Chart axes: abbreviated over 1000 ($12.3k); below, the full amount with cents ($850.40). */
 export function fmtMoneyAxis(n: number): string {
   return Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmtMoney(n)

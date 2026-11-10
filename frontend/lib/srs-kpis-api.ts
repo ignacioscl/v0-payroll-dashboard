@@ -181,6 +181,8 @@ export interface KpiQueryParams {
   /** «Include removed dealers»: only sent when the switch is on (the backend honours it only for admins). */
   includeRemovedDealers?: boolean
   historyMonths?: CollectionsHistoryMonths
+  /** Income by Dealer by service: also the list of vehicles (only sent when true). */
+  withVehicles?: boolean
 }
 
 export function buildKpiQuery(params: KpiQueryParams): string {
@@ -200,6 +202,9 @@ export function buildKpiQuery(params: KpiQueryParams): string {
   }
   if (params.historyMonths !== undefined) {
     qs.set('historyMonths', String(params.historyMonths))
+  }
+  if (params.withVehicles) {
+    qs.set('withVehicles', 'true')
   }
   return `?${qs.toString()}`
 }
@@ -260,6 +265,65 @@ export interface IncomeByDealer {
 
 export const fetchIncomeByDealer = (params: KpiQueryParams) =>
   getKpi<IncomeByDealer>('billing/income-by-dealer', params)
+
+/**
+ * Income by Dealer by service (`GET kpis/billing/income-by-dealer/services`,
+ * plans/plan-income-by-dealer-por-servicio T2/T3). Asked one dealer and one year at a time.
+ */
+export interface IncomeServicesDealer {
+  dealerId: number
+  dealer: string
+  income: number
+  wo: {
+    qty: number
+    /** Different vehicles (VIN) of the dealer, not the sum of the services. */
+    vehicles: number
+    income: number
+    services: { service: string; qty: number; vehicles: number; income: number }[]
+  }
+  /** qty null: punches billed in a generic (fixed qty 1, it would count punches). */
+  generic: { income: number; lines: { description: string; qty: number | null; income: number }[] }
+  ttk: { income: number; lines: { employee: string; income: number }[] }
+}
+
+export interface IncomeVehicleRow {
+  dealerId: number
+  dealer: string
+  vin: string
+  make: string
+  model: string
+  carYear: number | null
+  services: { service: string; qty: number }[]
+  qty: number
+  income: number
+}
+
+export interface IncomeServicesYear {
+  year: number
+  fechaDesde: string
+  fechaHasta: string
+  partial: boolean
+  woQty: number
+  vehicles: number
+  woIncome: number
+  otherIncome: number
+  income: number
+  dealers: IncomeServicesDealer[]
+  vehiclesList?: IncomeVehicleRow[]
+}
+
+export interface IncomeServicesByDealer {
+  years: IncomeServicesYear[]
+}
+
+/** One request at a time: each one runs 4 queries on a pool of 5 shared by every company (§8 of the plan). */
+let incomeServicesQueue: Promise<unknown> = Promise.resolve()
+
+export function fetchIncomeByDealerServices(params: KpiQueryParams): Promise<IncomeServicesByDealer> {
+  const run = incomeServicesQueue.then(() => getKpi<IncomeServicesByDealer>('billing/income-by-dealer/services', params))
+  incomeServicesQueue = run.catch(() => undefined)
+  return run
+}
 
 /**
  * «Include removed dealers» is shown only when this is true: the company of the session has a

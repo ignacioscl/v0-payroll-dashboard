@@ -4,6 +4,8 @@ import { BillingKpiRepository } from '../repository/billing-kpi.repository'
 import {
   BillingKpiDto,
   IncomeByDealerDto,
+  IncomeByDealerServicesQueryDto,
+  IncomeServicesByDealerDto,
   RemovedDealersAvailableDto,
   RemovedDealersAvailableQueryDto,
 } from '../dto/billing-kpi.dto'
@@ -71,6 +73,25 @@ export class BillingKpiService {
     const years = await this.repository.getIncomeByDealer(filter, splitRangeByYear(filter.fechaDesde, filter.fechaHasta))
     const grandCents = years.reduce((acc, y) => acc + Math.round(y.total * 100), 0)
     return { years, grandTotal: grandCents / 100 }
+  }
+
+  /**
+   * Income by Dealer by service (plans/plan-income-by-dealer-por-servicio T2): same permission, filter and
+   * years as getIncomeByDealer. The screen asks one dealer and one year per request.
+   */
+  async getIncomeServicesByDealer(
+    ctx: SrsContext,
+    query: IncomeByDealerServicesQueryDto,
+  ): Promise<IncomeServicesByDealerDto> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    const filter = buildSrsKpiFilter(ctx, query)
+    const range = splitRangeByYear(filter.fechaDesde, filter.fechaHasta)
+    // Every dealer of a big company in one request takes minutes and holds the shared pool (§8): one and one.
+    if (filter.dealerIds.length !== 1 || range.length !== 1) {
+      throw new BadRequestException('Ask one dealer and one calendar year per request')
+    }
+    const years = await this.repository.getIncomeServicesByDealer(filter, range, query.withVehicles === true)
+    return { years }
   }
 
   /**

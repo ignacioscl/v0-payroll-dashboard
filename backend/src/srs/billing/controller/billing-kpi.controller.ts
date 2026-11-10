@@ -10,6 +10,8 @@ import {
   BillingPeriodCollectionKpiDto,
   BillingWeekRowDto,
   IncomeByDealerDto,
+  IncomeByDealerServicesQueryDto,
+  IncomeServicesByDealerDto,
   RemovedDealersAvailableDto,
   RemovedDealersAvailableQueryDto,
   UnbilledAgingBucketDto,
@@ -66,6 +68,15 @@ export class BillingKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<IncomeByDealerDto> {
     return this.service.getIncomeByDealer(request.srsContext, query)
+  }
+
+  @Get('/income-by-dealer/services')
+  @ApiOkResponse({ type: IncomeServicesByDealerDto })
+  async getIncomeServicesByDealer(
+    @Req() request: any,
+    @Query() query: IncomeByDealerServicesQueryDto,
+  ): Promise<IncomeServicesByDealerDto> {
+    return this.service.getIncomeServicesByDealer(request.srsContext, query)
   }
 
   @Get('/removed-dealers-available')

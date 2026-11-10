@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import type { ColumnDef } from '@tanstack/react-table'
-import { CalendarRange, FileSpreadsheet, Landmark, Loader2 } from 'lucide-react'
+import { CalendarRange, ChevronDown, ChevronRight, FileSpreadsheet, Landmark, Loader2, Rows3, Table2 } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -15,8 +15,11 @@ import {
   YAxis,
 } from 'recharts'
 import { toast } from 'sonner'
+import { BillingActionDialog, BillingOptionTile } from '@/components/billing/billing-action-dialog'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { PageHeading } from '@/components/layout/page-heading'
+import { IncomeDealerServices } from '@/components/reports/income-dealer-services'
+import { ChartEmptyState } from '@/components/shared/chart-empty-state'
 import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import {
   DataTable,
@@ -29,6 +32,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
@@ -37,8 +41,11 @@ import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
 import { fmtMoney, fmtMoneyAxis } from '@/lib/kpi-money'
 import { exportIncomeByDealerXlsx } from '@/lib/reports/income-by-dealer-export'
+import { collectIncomeServices, exportIncomeServicesXlsx } from '@/lib/reports/income-by-dealer-services-export'
 import {
   fetchIncomeByDealer,
+  fetchIncomeByDealerServices,
+  type IncomeByDealer,
   type IncomeByDealerRow,
   type IncomeByDealerYear,
   type KpiQueryParams,
@@ -46,6 +53,9 @@ import {
 import { isSrsBusyError } from '@/lib/srs-busy-error'
 import { TOAST_DURATION_MS } from '@/lib/toast-config'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
+import { cn } from '@/lib/utils'
+
+type ExportKind = 'income' | 'services'
 
 function formatUsDate(date: Date): string {
   return format(date, 'MM/dd/yyyy')
@@ -90,6 +100,11 @@ export default function IncomeByDealerPage() {
   const { dateRange, selectedDealers, filtersHydrated, incomeYearMode, incomeYears } = useFilters()
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportKind, setExportKind] = useState<ExportKind>('income')
+  const isMobile = useIsMobile()
+  // Names wrap on mobile, never cut with «…» (rule of tables on mobile); one line on desktop.
+  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -150,6 +165,17 @@ export default function IncomeByDealerPage() {
     queryKey: ['srs-kpi', 'income-by-dealer', kpiParams],
     queryFn: () => fetchIncomeByDealer(kpiParams!),
     enabled: Boolean(kpiParams),
+    // Only «Filter by completion date» or «Include removed dealers» changed: keep the tables (and the open rows) while
+    // it reloads (M1 of plans/plan-income-by-dealer-por-servicio). Other dates or dealers: nothing kept, as before.
+    placeholderData: (prev: IncomeByDealer | undefined, prevQuery) => {
+      const before = prevQuery?.queryKey[2] as KpiQueryParams | null | undefined
+      if (!prev || !before || !kpiParams) return undefined
+      return before.fechaDesde === kpiParams.fechaDesde &&
+        before.fechaHasta === kpiParams.fechaHasta &&
+        before.idDealer === kpiParams.idDealer
+        ? prev
+        : undefined
+    },
   })
   const data = useMemo(() => {
     const raw = income.data
@@ -171,15 +197,32 @@ export default function IncomeByDealerPage() {
         accessorKey: 'dealer',
         size: 280,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealer.label')} />,
-        cell: ({ row }) =>
-          removedIds.has(row.original.dealerId) ? (
+        // The arrow opens the services of the dealer (plans/plan-income-by-dealer-por-servicio §5.2), as in Expenses.
+        cell: ({ row }) => {
+          const expanded = row.getIsExpanded()
+          return (
             <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium">{row.original.dealer}</span>
-              <RemovedDealerBadge />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  row.toggleExpanded()
+                }}
+                aria-expanded={expanded}
+                aria-label={expanded ? t('incomeByDealer.hideServices') : t('incomeByDealer.showServices')}
+                className={cn('flex min-w-0 cursor-pointer items-center gap-1 text-left font-medium', wrap)}
+              >
+                {expanded ? (
+                  <ChevronDown className="size-3.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="size-3.5 shrink-0" />
+                )}
+                <span className={wrap}>{row.original.dealer}</span>
+              </button>
+              {removedIds.has(row.original.dealerId) ? <RemovedDealerBadge /> : null}
             </span>
-          ) : (
-            <span className="block truncate font-medium">{row.original.dealer}</span>
-          ),
+          )
+        },
         meta: {
           label: t('dealer.label'),
           exportValue: (row) =>
@@ -203,7 +246,7 @@ export default function IncomeByDealerPage() {
         } satisfies DataTableColumnMeta<IncomeByDealerRow>,
       },
     ],
-    [t, removedIds],
+    [t, removedIds, wrap],
   )
 
   const busyMessage = income.isError
@@ -218,6 +261,11 @@ export default function IncomeByDealerPage() {
     if (!data) return
     setExporting(true)
     try {
+      if (exportKind === 'services') {
+        await handleExportServices(data)
+        setExportOpen(false)
+        return
+      }
       const allDealers =
         dealers.length > 0 && dealers.every((d) => selectedDealers.includes(d.id))
       const dealerNames = allDealers
@@ -276,6 +324,7 @@ export default function IncomeByDealerPage() {
         ],
       })
       toast.success(t('common.exportSuccess', { count: data.years.length }), { duration: TOAST_DURATION_MS })
+      setExportOpen(false)
     } catch (e) {
       toast.error(t('common.exportFailed'), { duration: TOAST_DURATION_MS })
       // eslint-disable-next-line no-console
@@ -283,6 +332,95 @@ export default function IncomeByDealerPage() {
     } finally {
       setExporting(false)
     }
+  }
+
+  /**
+   * «By dealer and service» (plans/plan-income-by-dealer-por-servicio §5.3 and T4): one dealer and one year per request,
+   * each dealer checked to the cent against its row before the file is built.
+   */
+  const handleExportServices = async (screen: IncomeByDealer) => {
+    const allDealers = dealers.length > 0 && dealers.every((d) => selectedDealers.includes(d.id))
+    const dealerNames = allDealers
+      ? t('dealer.all')
+      : dealers
+          .filter((d) => selectedDealers.includes(d.id))
+          .map((d) => d.label)
+          .join(', ')
+    const yes = t('incomeByDealer.yes')
+    const no = t('incomeByDealer.no')
+    const removedNames = [
+      ...new Set(screen.years.flatMap((y) => y.dealers.filter((d) => removedIds.has(d.dealerId)).map((d) => d.dealer))),
+    ]
+    const years = await collectIncomeServices(screen, { filterDateDone }, fetchIncomeByDealerServices)
+    const title = t('incomeByDealer.servicesTitle')
+    await exportIncomeServicesXlsx({
+      years,
+      removedIds,
+      removedNames,
+      generatedBy: user?.nombre ?? '',
+      labels: {
+        fileName: 'income-by-dealer-and-service',
+        reportInfoSheet: 'Report Info',
+        summarySheet: t('incomeByDealer.summarySheet'),
+        vehiclesSheet: t('incomeByDealer.colVehicles'),
+        title,
+        field: t('incomeByDealer.exportField'),
+        value: t('incomeByDealer.exportValue'),
+        generated: t('incomeByDealer.exportGenerated'),
+        dealer: t('dealer.label'),
+        total: t('incomeByDealer.total'),
+        grandTotal: t('incomeByDealer.grandTotal'),
+        removedSuffix: t('businessKpis.removedDealerSuffix'),
+        includesRemovedDealers: t('businessKpis.includesRemovedDealers'),
+        sectionWo: t('incomeByDealer.sectionWo'),
+        sectionGeneric: t('incomeByDealer.sectionGeneric'),
+        sectionTtk: t('incomeByDealer.sectionTtk'),
+        service: t('incomeByDealer.colService'),
+        description: t('incomeByDealer.colDescription'),
+        employee: t('incomeByDealer.colEmployee'),
+        qty: t('incomeByDealer.colQty'),
+        vehicles: t('incomeByDealer.colVehicles'),
+        income: t('incomeByDealer.colIncome'),
+        totalWo: t('incomeByDealer.totalWo'),
+        totalGeneric: t('incomeByDealer.totalGeneric'),
+        totalTtk: t('incomeByDealer.totalTtk'),
+        totalDealer: (dealer) => t('incomeByDealer.totalDealer', { dealer }),
+        woQty: t('incomeByDealer.colWoQty'),
+        woIncome: t('incomeByDealer.colWoIncome'),
+        otherIncome: t('incomeByDealer.colOtherIncome'),
+        period: t('incomeByDealer.colPeriod'),
+        vin: t('incomeByDealer.colVin'),
+        make: t('incomeByDealer.colMake'),
+        model: t('incomeByDealer.colModel'),
+        carYear: t('incomeByDealer.colYear'),
+        services: t('incomeByDealer.colServices'),
+        yearLabel: (y) => yearLabel(y, t),
+        yearRange,
+      },
+      reportInfo: [
+        { field: t('incomeByDealer.exportGeneratedBy'), value: user?.nombre ?? '' },
+        { field: t('incomeByDealer.exportScreen'), value: `${t('nav.reports')} › ${t('incomeByDealer.title')}` },
+        incomeYearMode
+          ? { field: t('incomeByDealer.exportYears'), value: headerRangeLabel ?? '' }
+          : { field: t('incomeByDealer.exportDates'), value: headerRangeLabel ?? '' },
+        { field: t('dealer.labelPlural'), value: dealerNames },
+        { field: t('businessKpis.filterDateDone'), value: filterDateDone ? yes : no },
+        ...(includeRemovedDealers
+          ? [
+              {
+                field: t('businessKpis.includeRemovedDealers'),
+                value: removedNames.length ? `${yes} — ${removedNames.join(', ')}` : yes,
+              },
+            ]
+          : []),
+        { field: t('incomeByDealer.sectionWo'), value: t('incomeByDealer.infoWorkOrders') },
+        { field: t('incomeByDealer.colWoQty'), value: t('incomeByDealer.infoWoQty') },
+        { field: t('incomeByDealer.colVehicles'), value: t('incomeByDealer.infoVehicles') },
+        { field: t('incomeByDealer.sectionGeneric'), value: t('incomeByDealer.infoGeneric') },
+        { field: t('incomeByDealer.sectionTtk'), value: t('incomeByDealer.infoTtk') },
+      ],
+    })
+    toast.success(t('common.exportSuccess', { count: screen.years.length }), { duration: TOAST_DURATION_MS })
   }
 
   return (
@@ -331,7 +469,7 @@ export default function IncomeByDealerPage() {
           size="sm"
           className="ml-auto gap-1.5"
           disabled={!data || exporting || income.isFetching}
-          onClick={() => void handleExport()}
+          onClick={() => setExportOpen(true)}
         >
           {exporting ? (
             <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
@@ -341,6 +479,42 @@ export default function IncomeByDealerPage() {
           {exporting ? t('common.exporting') : t('common.export')}
         </Button>
       </div>
+
+      <BillingActionDialog
+        open={exportOpen}
+        onOpenChange={(o) => {
+          if (!exporting) setExportOpen(o)
+        }}
+        tone="emerald"
+        icon={FileSpreadsheet}
+        title={t('common.export')}
+        cancelLabel={t('common.cancel')}
+        confirmLabel={t('common.export')}
+        confirmIcon={FileSpreadsheet}
+        onConfirm={() => void handleExport()}
+        pending={exporting}
+        pendingLabel={t('common.exporting')}
+        confirmDisabled={!data || income.isFetching}
+      >
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          <BillingOptionTile
+            selected={exportKind === 'income'}
+            onSelect={() => setExportKind('income')}
+            title={t('incomeByDealer.exportIncomeTitle')}
+            description={t('incomeByDealer.exportIncomeDescription')}
+            icon={Table2}
+            disabled={exporting}
+          />
+          <BillingOptionTile
+            selected={exportKind === 'services'}
+            onSelect={() => setExportKind('services')}
+            title={t('incomeByDealer.exportServicesTitle')}
+            description={t('incomeByDealer.exportServicesDescription')}
+            icon={Rows3}
+            disabled={exporting}
+          />
+        </div>
+      </BillingActionDialog>
 
       {busyMessage && !income.isLoading ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -381,6 +555,15 @@ export default function IncomeByDealerPage() {
             <div className="flex h-[260px] items-center justify-center text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
             </div>
+          ) : !filtersHydrated || selectedDealers.length === 0 ? (
+            <ChartEmptyState height={260} message={t('dealer.selectInHeaderToLoad')} />
+          ) : !headerRange.fechaDesde ? (
+            <ChartEmptyState
+              height={260}
+              message={incomeYearMode ? t('incomeByDealer.selectYears') : t('filters.selectDates')}
+            />
+          ) : chartData.length === 0 ? (
+            <ChartEmptyState height={260} message={t('incomeByDealer.noData')} />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartData}>
@@ -414,6 +597,16 @@ export default function IncomeByDealerPage() {
             enableExport={false}
             recordsCount={y.dealers.length}
             recordsCountLabel={t('dealer.labelPlural')}
+            renderSubComponent={(row) => (
+              <IncomeDealerServices
+                dealerId={row.original.dealerId}
+                fechaDesde={y.fechaDesde}
+                fechaHasta={y.fechaHasta}
+                filterDateDone={filterDateDone}
+                wrap={wrap}
+              />
+            )}
+            subComponentLayout="full"
             toolbarLeading={
               <div className="flex min-w-0 flex-col">
                 <span className="text-base font-semibold">{yearLabel(y, t)}</span>

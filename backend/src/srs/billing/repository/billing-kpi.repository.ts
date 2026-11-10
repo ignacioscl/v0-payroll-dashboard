@@ -11,10 +11,12 @@ import {
   ClosingLineDto,
   IncomeByDealerRowDto,
   IncomeByDealerYearDto,
+  IncomeServicesYearDto,
   RemovedDealerDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
+import { billableLines, groupIncomeServices, type IncomeCar } from '../income-services-math'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
@@ -39,6 +41,9 @@ import {
   woBilledLinesSql,
   woPartialOverlapCountSql,
 } from '../../shared/kpi/srs-kpi-billed-lines'
+
+/** Cars looked up per query in Income by Dealer by service. */
+const CAR_BATCH = 5000
 
 /** Ventana hacia atrás para WOs Done sin facturar (aging / por dealer). */
 export const UNBILLED_LOOKBACK_MONTHS = 6
@@ -65,6 +70,7 @@ function toClosingLine(r: Record<string, unknown>): ClosingLineDto {
     qty: Number(r.qty ?? 1),
     // Exact value: the caller rounds once per line for the screen and adds cents per dealer.
     amount: money(r.amount),
+    ...(r.idCar != null ? { idCar: Number(r.idCar) } : {}),
   }
 }
 
@@ -405,16 +411,19 @@ export class BillingKpiRepository {
    * Every line of the Closing in the range (T1 of plans/plan-monthly-closing/PLAN.md): the same
    * four parts and WHERE as incomeByDealerForRange, one row per line, so the lines of a dealer add
    * up to its Income. WO not invoiced is one row per WO service that is on no active invoice.
+   * With withCar the two WO parts also bring the car of the WO (idCar), for Income by Dealer by
+   * service (plans/plan-income-by-dealer-por-servicio T1); without it the SQL is unchanged.
    */
-  async incomeLinesForRange(filter: SrsKpiFilter): Promise<ClosingLineDto[]> {
+  async incomeLinesForRange(filter: SrsKpiFilter, opts: { withCar?: boolean } = {}): Promise<ClosingLineDto[]> {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, filterDateDone, skipDealerRestriction } =
       filter
+    const withCar = opts.withCar === true
     const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
     const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
     const periodCol = woPeriodColumn(filterDateDone)
     const { wo, ttk, gen } = billedBaseOpts(filter)
     const byLine = { groupBy: 'closingLine' as const, productionValue: true }
-    const woQ = woBilledLinesSql({ ...wo, ...byLine })
+    const woQ = woBilledLinesSql({ ...wo, ...byLine, ...(withCar ? { withCar: true } : {}) })
     const ttkQ = ttkBilledLinesSql({ ...ttk, ...byLine })
     const genQ = genericBilledLinesSql({ ...gen, ...byLine })
 
@@ -423,7 +432,7 @@ export class BillingKpiRepository {
         `SELECT c.id AS dealerId, 'woUnbilled' AS kind, i.full_nro AS nro,
                 ${periodCol} AS dateFrom, ${periodCol} AS dateTo, d.nombre AS department,
                 isv.nombre AS service, IFNULL(isr.qty, 1) AS qty,
-                isr.price * IFNULL(isr.qty, 1) AS amount
+                isr.price * IFNULL(isr.qty, 1) AS amount${withCar ? ', i.id_car AS idCar' : ''}
          FROM INVOICE i
          ${inv.join}
          JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
@@ -443,6 +452,67 @@ export class BillingKpiRepository {
     ])
 
     return [...woRows, ...unbilledRows, ...ttkRows, ...genRows].map(toClosingLine)
+  }
+
+  /**
+   * Income by Dealer by service (T2 of plans/plan-income-by-dealer-por-servicio/PLAN.md): the lines of
+   * incomeLinesForRange with the car of each WO, grouped by dealer → service, with Qty and different VINs.
+   * The lines of a dealer add up to its Income by Dealer row, to the cent. The years run one after the
+   * other, like getIncomeByDealer (the SRS pool is small).
+   */
+  async getIncomeServicesByDealer(
+    filter: SrsKpiFilter,
+    years: { year: number; fechaDesde: string; fechaHasta: string; partial: boolean }[],
+    withVehicles: boolean,
+  ): Promise<IncomeServicesYearDto[]> {
+    const perYear: { meta: (typeof years)[number]; lines: ClosingLineDto[] }[] = []
+    for (const y of years) {
+      const lines = await this.incomeLinesForRange({ ...filter, fechaDesde: y.fechaDesde, fechaHasta: y.fechaHasta }, { withCar: true })
+      perYear.push({ meta: y, lines: billableLines(lines) })
+    }
+    const all = perYear.flatMap((p) => p.lines)
+    const carIds = [...new Set(all.map((l) => l.idCar).filter((id): id is number => id != null))]
+    const cars = await this.carsByIds(carIds, withVehicles)
+    const names = await this.dealerNames(filter.idDealerProvider, [...new Set(all.map((l) => l.dealerId))])
+    return perYear.map(({ meta, lines }) => ({
+      year: meta.year,
+      fechaDesde: meta.fechaDesde,
+      fechaHasta: meta.fechaHasta,
+      partial: meta.partial,
+      ...groupIncomeServices(lines, cars, names, withVehicles),
+    }))
+  }
+
+  /**
+   * The cars of the WO lines (ids that came out of the provider-scoped lines): VIN as UPPER(TRIM()), and make,
+   * model and year only for the list of vehicles. In batches of 5,000 ids.
+   */
+  private async carsByIds(ids: number[], withDetail: boolean): Promise<Map<number, IncomeCar>> {
+    const cars = new Map<number, IncomeCar>()
+    const detailCols = withDetail ? ', mk.nombre AS make, md.nombre AS model, car.year AS carYear' : ''
+    const detailJoins = withDetail
+      ? `LEFT JOIN datos_parametricos mk ON mk.id_dato_parametrico = car.id_make
+         LEFT JOIN datos_parametricos md ON md.id_dato_parametrico = car.id_model`
+      : ''
+    for (let i = 0; i < ids.length; i += CAR_BATCH) {
+      const batch = ids.slice(i, i + CAR_BATCH)
+      const rows = await this.srs.query(
+        `SELECT car.id AS idCar, UPPER(TRIM(car.vin)) AS vin${detailCols}
+         FROM CAR car
+         ${detailJoins}
+         WHERE car.id IN (${batch.map(() => '?').join(',')})`,
+        batch,
+      )
+      for (const r of rows) {
+        cars.set(Number(r.idCar), {
+          vin: String(r.vin ?? ''),
+          make: String(r.make ?? ''),
+          model: String(r.model ?? ''),
+          year: r.carYear != null && r.carYear !== '' ? Number(r.carYear) : null,
+        })
+      }
+    }
+    return cars
   }
 
   /**

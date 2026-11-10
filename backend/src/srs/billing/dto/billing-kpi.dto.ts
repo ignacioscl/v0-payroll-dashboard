@@ -2,6 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator'
 
+import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
+
 export class BillingKpiQueryDto {
   @ApiProperty({ example: '2026-04-01' })
   @IsDateString()
@@ -127,6 +129,109 @@ export class ClosingLineDto {
   service!: string
   @ApiProperty({ example: 1 }) qty!: number
   @ApiProperty({ example: 75, description: 'Discount included, no tax; not rounded' }) amount!: number
+  @ApiPropertyOptional({ example: 812345, description: 'Car of the WO (wo / woUnbilled), only with withCar' })
+  idCar?: number
+}
+
+/** Income by Dealer by service (plans/plan-income-by-dealer-por-servicio T2). */
+export class IncomeByDealerServicesQueryDto extends SrsKpiQueryDto {
+  @ApiPropertyOptional({
+    description: 'Also return the list of vehicles (VIN, make, model, year) of each dealer. Default false.',
+    example: 'false',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    if (value === true || value === 'true' || value === '1' || value === 1) return true
+    if (value === false || value === 'false' || value === '0' || value === 0) return false
+    return undefined
+  })
+  withVehicles?: boolean
+}
+
+export class IncomeWoServiceDto {
+  @ApiProperty({ example: 'NewCarDetail' }) service!: string
+  @ApiProperty({ example: 120, description: 'Sum of the qty of the services' }) qty!: number
+  @ApiProperty({ example: 98, description: 'Different vehicles (VIN)' }) vehicles!: number
+  @ApiProperty({ example: 15400 }) income!: number
+}
+
+export class IncomeWoSectionDto {
+  @ApiProperty({ example: 6043 }) qty!: number
+  @ApiProperty({ example: 4712, description: 'Different vehicles (VIN) of the dealer, not the sum of the services' })
+  vehicles!: number
+  @ApiProperty({ example: 484770 }) income!: number
+  @ApiProperty({ type: [IncomeWoServiceDto], description: 'Income desc, then name' }) services!: IncomeWoServiceDto[]
+}
+
+export class IncomeGenericLineDto {
+  @ApiProperty({ example: 'Detail hours' }) description!: string
+  @ApiPropertyOptional({ example: 1.5, description: 'Qty written on the invoice; null for punches billed in a generic' })
+  qty!: number | null
+  @ApiProperty({ example: 300 }) income!: number
+}
+
+export class IncomeGenericSectionDto {
+  @ApiProperty({ example: 300 }) income!: number
+  @ApiProperty({ type: [IncomeGenericLineDto] }) lines!: IncomeGenericLineDto[]
+}
+
+export class IncomeTtkLineDto {
+  @ApiProperty({ example: 'John Doe' }) employee!: string
+  @ApiProperty({ example: 1200 }) income!: number
+}
+
+export class IncomeTtkSectionDto {
+  @ApiProperty({ example: 1200 }) income!: number
+  @ApiProperty({ type: [IncomeTtkLineDto] }) lines!: IncomeTtkLineDto[]
+}
+
+export class IncomeServicesDealerDto {
+  @ApiProperty({ example: 196 }) dealerId!: number
+  @ApiProperty({ example: 'BMW of Pembroke Pines' }) dealer!: string
+  @ApiProperty({ example: 484770, description: 'Same Income as the row of Income by Dealer, to the cent' })
+  income!: number
+  @ApiProperty({ type: IncomeWoSectionDto }) wo!: IncomeWoSectionDto
+  @ApiProperty({ type: IncomeGenericSectionDto }) generic!: IncomeGenericSectionDto
+  @ApiProperty({ type: IncomeTtkSectionDto }) ttk!: IncomeTtkSectionDto
+}
+
+export class IncomeVehicleServiceDto {
+  @ApiProperty({ example: 'Cilajet' }) service!: string
+  @ApiProperty({ example: 2 }) qty!: number
+}
+
+export class IncomeVehicleRowDto {
+  @ApiProperty({ example: 196 }) dealerId!: number
+  @ApiProperty({ example: 'BMW of Pembroke Pines' }) dealer!: string
+  @ApiProperty({ example: 'WBA00000000000000' }) vin!: string
+  @ApiProperty({ example: 'BMW' }) make!: string
+  @ApiProperty({ example: 'X5' }) model!: string
+  @ApiPropertyOptional({ example: 2025 }) carYear!: number | null
+  @ApiProperty({ type: [IncomeVehicleServiceDto] }) services!: IncomeVehicleServiceDto[]
+  @ApiProperty({ example: 3 }) qty!: number
+  @ApiProperty({ example: 350 }) income!: number
+}
+
+export class IncomeServicesYearDto {
+  @ApiProperty({ example: 2025 }) year!: number
+  @ApiProperty({ example: '2025-01-01' }) fechaDesde!: string
+  @ApiProperty({ example: '2025-12-31' }) fechaHasta!: string
+  @ApiProperty({ example: false }) partial!: boolean
+  @ApiProperty({ example: 6043 }) woQty!: number
+  @ApiProperty({ example: 4712, description: 'Different vehicles (VIN) of the year, across the dealers' })
+  vehicles!: number
+  @ApiProperty({ example: 484770 }) woIncome!: number
+  @ApiProperty({ example: 0, description: 'Generic + TTK' }) otherIncome!: number
+  @ApiProperty({ example: 484770 }) income!: number
+  @ApiProperty({ type: [IncomeServicesDealerDto], description: 'Income desc, then name' })
+  dealers!: IncomeServicesDealerDto[]
+  @ApiPropertyOptional({ type: [IncomeVehicleRowDto], description: 'Only with withVehicles' })
+  vehiclesList?: IncomeVehicleRowDto[]
+}
+
+export class IncomeServicesByDealerDto {
+  @ApiProperty({ type: [IncomeServicesYearDto] }) years!: IncomeServicesYearDto[]
 }
 
 /** One calendar year of the header range, cropped to it. */
