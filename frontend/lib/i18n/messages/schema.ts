@@ -1654,6 +1654,39 @@ export interface Messages {
     yearsCount: string
     selectYears: string
     exportYears: string
+    // By service (plans/plan-income-by-dealer-por-servicio §5.4).
+    showServices: string
+    hideServices: string
+    sectionWo: string
+    sectionGeneric: string
+    sectionTtk: string
+    colService: string
+    colQty: string
+    colVehicles: string
+    colDescription: string
+    colEmployee: string
+    totalWo: string
+    totalGeneric: string
+    totalTtk: string
+    totalDealer: string
+    exportIncomeTitle: string
+    exportIncomeDescription: string
+    exportServicesTitle: string
+    exportServicesDescription: string
+    colWoQty: string
+    colWoIncome: string
+    colOtherIncome: string
+    colVin: string
+    colMake: string
+    colModel: string
+    colYear: string
+    colServices: string
+    infoWorkOrders: string
+    infoWoQty: string
+    infoVehicles: string
+    infoGeneric: string
+    infoTtk: string
+    servicesTitle: string
   }
   monthlyClosing: {
     title: string
@@ -1741,6 +1774,7 @@ export interface Messages {
       item2: string
       item3: string
       item4: string
+      item5: string
     }
     monthlyClosing: {
       title: string

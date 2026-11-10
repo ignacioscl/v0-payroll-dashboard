@@ -110,6 +110,12 @@ export interface BilledLinesOpts {
    */
   productionValue?: boolean
   /**
+   * With groupBy 'closingLine': the WO lines also return the car of the WO (i.id_car AS idCar), at the
+   * end of the SELECT. Income by Dealer by service counts vehicles with it; without it the SQL is the
+   * Monthly Closing's, unchanged.
+   */
+  withCar?: boolean
+  /**
    * With withPeriodSplit: also return invoicedProduction / collectedProduction (all lines) and
    * invoicedInRangeProduction / collectedInRangeProduction (whole invoices), valued like
    * productionValue, in the same pass as the billed columns.
@@ -240,6 +246,7 @@ function assertRowMoneyOpts(opts: BilledLinesOpts): void {
 
 /** closingLine is Income lines: production value, every line of the range, nothing else on top. */
 function assertClosingLineOpts(opts: BilledLinesOpts): void {
+  if (opts.withCar && opts.groupBy !== 'closingLine') throw new Error('withCar needs groupBy closingLine')
   if (opts.groupBy !== 'closingLine') return
   if (!opts.productionValue || !opts.range || opts.debtOnly || opts.idsOnly || opts.statementIdIn) {
     throw new Error('closingLine needs productionValue and a range, without debtOnly / idsOnly / statementIdIn')
@@ -488,7 +495,7 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
     // One row per WO service, like the WO part of the Closing (GeneralReportDao::getSqlClosingWo).
     selectSql = `SELECT c.id AS dealerId, 'wo' AS kind, i.full_nro AS nro,
       ${periodCol} AS dateFrom, ${periodCol} AS dateTo, d.nombre AS department,
-      isv.nombre AS service, IFNULL(isr.qty, 1) AS qty, ${productionAmt} AS amount`
+      isv.nombre AS service, IFNULL(isr.qty, 1) AS qty, ${productionAmt} AS amount${opts.withCar ? ', i.id_car AS idCar' : ''}`
   } else if (rowMode && opts.rowMoney) {
     selectSql = rowMoneySelectSql(
       `${production} * ${statementTaxFactorSql('s')}`,

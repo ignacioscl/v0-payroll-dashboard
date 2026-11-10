@@ -3,9 +3,9 @@
  * plans/plan-reporte-tint/PLAN.md T2/T5). Todo en centavos enteros.
  */
 import type { ClosingLineKind } from '../shared/kpi/srs-kpi-billed-lines'
+import { fromCents, toCents } from '../shared/kpi/srs-kpi-cents'
 
-export const toCents = (n: number): number => Math.round(n * 100)
-export const fromCents = (c: number): number => c / 100
+export { fromCents, toCents }
 
 /** Profit/Loss ÷ Income con un decimal; null con Income $0 (la pantalla muestra «—»). */
 export function profitPct(profitCents: number, incomeCents: number): number | null {

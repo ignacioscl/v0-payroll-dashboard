@@ -1710,6 +1710,41 @@ export const es: Messages = {
     yearsCount: '{count} años',
     selectYears: 'Elegí uno o más años en el encabezado.',
     exportYears: 'Años',
+    // Por servicio: textos de plans/plan-income-by-dealer-por-servicio §5.4, aprobados palabra por palabra.
+    showServices: 'Ver servicios',
+    hideServices: 'Ocultar servicios',
+    sectionWo: 'Work Orders',
+    sectionGeneric: 'Invoices genéricas',
+    sectionTtk: 'Invoices TTK',
+    colService: 'Servicio',
+    colQty: 'Cant.',
+    colVehicles: 'Vehículos',
+    colDescription: 'Descripción',
+    colEmployee: 'Empleado',
+    totalWo: 'Total Work Orders',
+    totalGeneric: 'Total invoices genéricas',
+    totalTtk: 'Total invoices TTK',
+    totalDealer: 'Total {dealer}',
+    exportIncomeTitle: 'Ingresos por sucursal',
+    exportIncomeDescription: 'Una fila por sucursal y año, como en pantalla.',
+    exportServicesTitle: 'Por sucursal y servicio',
+    exportServicesDescription:
+      'Cada sucursal con sus servicios, cantidades y vehículos, y la lista de vehículos. Tarda más.',
+    colWoQty: 'Cant. WO',
+    colWoIncome: 'Ingresos WO',
+    colOtherIncome: 'Ingresos Generic / TTK',
+    colVin: 'VIN',
+    colMake: 'Marca',
+    colModel: 'Modelo',
+    colYear: 'Año',
+    colServices: 'Servicios',
+    infoWorkOrders:
+      'Servicios de las Work Orders, facturados o todavía sin facturar, como en Ingresos por sucursal.',
+    infoWoQty: 'Cantidad de servicios de Work Orders.',
+    infoVehicles: 'Vehículos distintos (VIN). Un vehículo con dos servicios cuenta una vez.',
+    infoGeneric: 'Líneas de invoices genéricas: no tienen vehículo, y su cantidad es la escrita en la invoice.',
+    infoTtk: 'Invoices TTK, por empleado: no tienen vehículo.',
+    servicesTitle: 'Ingresos por sucursal y servicio',
   },
   // Los nombres de columna de PRO van en inglés en los dos idiomas (plans/plan-reporte-tint §5.4).
   monthlyClosing: {
@@ -1819,6 +1854,8 @@ export const es: Messages = {
         'Una invoice que cruza dos años cuenta en cada año solo sus días de ese año.',
       item4:
         'Los montos facturados incluyen el descuento de la invoice. No incluyen tax.',
+      item5:
+        'Cant. cuenta los servicios de las Work Orders y Vehículos cuenta vehículos distintos (VIN): un vehículo con dos servicios cuenta una vez. Los servicios en $0 no se cuentan en Cant. ni en Vehículos.',
     },
     monthlyClosing: {
       title: 'Qué cuenta cada número',

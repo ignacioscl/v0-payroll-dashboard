@@ -14,7 +14,8 @@ const ITEM_COUNT: Record<ReportRulesScreen, number> = {
   payroll: 2,
   productionVsGoal: 5,
   invoices: 2,
-  incomeByDealer: 4,
+  // item5 = Qty and Vehicles of the services (D4 of plans/plan-income-by-dealer-por-servicio).
+  incomeByDealer: 5,
   monthlyClosing: 3,
   // One line per column of Window Tint Closing (D5 of plans/plan-reporte-tint).
   tintClosing: 7,
