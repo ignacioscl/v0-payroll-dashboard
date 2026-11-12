@@ -13,6 +13,8 @@ export const THEME = {
   subtitleFg: 'FF546E7A',
   zebraBg: 'FFF5F8FC',
   border: 'FFD0D7DE',
+  /** Font of a row marked 'warn' (TableExportSheet.rowTone): the web's error color (--destructive). */
+  warnFg: 'FFEF4444',
 } as const
 
 export function thinBorder(): Partial<ExcelJS.Borders> {

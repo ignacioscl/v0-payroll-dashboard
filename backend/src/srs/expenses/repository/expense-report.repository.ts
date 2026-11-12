@@ -11,6 +11,7 @@ import {
 } from '../../shared/kpi/srs-kpi-dealer-filter'
 import type { ExpenseSortKey } from '../dto/expense-list-query.dto'
 import type { AnalyticsRow, ExpenseLogEntry, ExpenseRow, ExpenseSummaryResponse, NamedRef } from '../dto/expense-row.dto'
+import { ACCIDENT_EXPENSE_CATEGORY } from '../expense-closing-class'
 import type { ExpenseListFilter } from '../expense-list-filter'
 import { previousPeriod } from '../expense-period'
 import {
@@ -441,10 +442,10 @@ export class ExpenseReportRepository {
     const where = this.buildExpenseWhere(filter)
     const rows: { dealerId: unknown; dealer: unknown; total: unknown; accidentTotal: unknown }[] = await this.db.query(
       `SELECT c.id AS dealerId, GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer, SUM(e.amount) AS total,
-          SUM(CASE WHEN gca.id_categoria = ? AND LOWER(TRIM(gca.name)) = 'accident' THEN e.amount ELSE 0 END) AS accidentTotal
+          SUM(CASE WHEN gca.id_categoria = ? AND LOWER(TRIM(gca.name)) = ? THEN e.amount ELSE 0 END) AS accidentTotal
          ${from.sql} WHERE 1 ${where.sql}
          GROUP BY c.id ORDER BY dealer`,
-      [filter.idDealerProvider, EXPENSES_CATEGORY_CATEGORY, ...from.params, ...where.params],
+      [filter.idDealerProvider, EXPENSES_CATEGORY_CATEGORY, ACCIDENT_EXPENSE_CATEGORY, ...from.params, ...where.params],
     )
     return rows.map((r) => ({
       dealerId: Number(r.dealerId),

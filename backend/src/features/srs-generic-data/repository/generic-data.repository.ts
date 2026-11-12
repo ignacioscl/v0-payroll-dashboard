@@ -4,24 +4,20 @@ import { Repository } from 'typeorm'
 
 import { BaseRepository } from 'src/commons/repository/base.repository'
 import { PaginationDto } from 'src/commons/pagination/Pagination.dto'
+import { CatalogColumn, catalogInUseSql, expensesCountSql } from 'src/srs/expenses/expense-catalog-usage.sql'
 import { GenericDataQueryDto } from '../dto/generic-data.dto'
 import { EXPENSES_COMPANY_CATEGORY, GenericData } from '../entity/generic-data.entity'
 
-/** Una fila del catálogo con su conteo de gastos y, en compañías, su última categoría. */
+/** Una fila del catálogo con su conteo de gastos, si algo la usa y, en compañías, su última categoría. */
 export interface CatalogRow {
   item: GenericData
   expensesCount: number
+  inUse: boolean
   lastCategory: { id: number; name: string; active: boolean } | null
 }
 
-/**
- * Conteo de gastos activos que usan la fila: un gasto repartido cuenta una vez. `EXP_EXPENSE.id` y
- * `EXP_EXPENSE_GROUP.id` son secuencias distintas, por eso el prefijo (misma expresión `expenseIdentity` del
- * repositorio de reporte, srs/expenses/repository/expense-report.repository.ts).
- */
-const EXPENSES_COUNT_SQL = (column: 'id_company' | 'id_category') =>
-  `(SELECT COUNT(DISTINCT IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group)))
-      FROM EXP_EXPENSE e WHERE e.${column} = g.id AND e.estado = 1)`
+const columnOf = (idCategoria: number): CatalogColumn =>
+  idCategoria === EXPENSES_COMPANY_CATEGORY ? 'id_company' : 'id_category'
 
 @Injectable()
 export class GenericDataRepository extends BaseRepository<GenericData, GenericDataQueryDto> {
@@ -68,6 +64,46 @@ export class GenericDataRepository extends BaseRepository<GenericData, GenericDa
   }
 
   /**
+   * Para el alta (D3 de plan-expenses-settings): la activa más vieja con ese nombre o, si no hay, la inactiva más
+   * vieja (sin mayúsculas ni espacios de borde).
+   */
+  findByNameActiveFirst(name: string, idCategoria: number, idDealerProvider: number): Promise<GenericData | null> {
+    return this.createQueryBuilder('g')
+      .where('g.idCategoria = :cat', { cat: idCategoria })
+      .andWhere('g.idDealerProvider = :prov', { prov: idDealerProvider })
+      .andWhere('LOWER(TRIM(g.name)) = LOWER(TRIM(:name))', { name })
+      .orderBy('g.estado', 'DESC')
+      .addOrderBy('g.id', 'ASC')
+      .getOne()
+  }
+
+  /** Borra la fila de la empresa y la categoría paramétrica pedida; devuelve cuántas borró (0 o 1). */
+  async deleteOwned(id: number, idCategoria: number, idDealerProvider: number): Promise<number> {
+    const result = await this.delete({ id, idCategoria, idDealerProvider })
+    return Number(result.affected ?? 0)
+  }
+
+  /** Las filas de la empresa y la categoría paramétrica `idCategoria` que tienen a `fromId` de `id_parent`. */
+  childrenOf(fromId: number, idCategoria: number, idDealerProvider: number): Promise<GenericData[]> {
+    return this.find({ where: { idParent: fromId, idCategoria, idDealerProvider }, order: { id: 'ASC' } })
+  }
+
+  /** `id_parent` de `fromId` a `toId`, solo en filas de la empresa y la categoría paramétrica pedida. */
+  async reassignParent(fromId: number, toId: number, idCategoria: number, idDealerProvider: number): Promise<number> {
+    const result = await this.update({ idParent: fromId, idCategoria, idDealerProvider }, { idParent: toId })
+    return Number(result.affected ?? 0)
+  }
+
+  /** Si algo apunta a la fila (gastos, reglas o una fila hija), con el mismo criterio del listado. */
+  async inUseOf(id: number, idCategoria: number): Promise<boolean> {
+    const raw = await this.createQueryBuilder('g')
+      .select(catalogInUseSql(columnOf(idCategoria)), 'inUse')
+      .where('g.id = :id', { id })
+      .getRawOne<{ inUse: unknown }>()
+    return Number(raw?.inUse ?? 0) === 1
+  }
+
+  /**
    * Catálogo de la empresa (34 compañías / 35 categorías) con el conteo de gastos y la última categoría de cada
    * compañía (`id_parent`, D4). `page` es base 0 acá (el controller resta 1).
    */
@@ -75,15 +111,24 @@ export class GenericDataRepository extends BaseRepository<GenericData, GenericDa
     idCategoria: number
     idDealerProvider: number
     activeOnly: boolean
+    /** Solo las inactivas (switch «Show inactive» de Settings). */
+    inactiveOnly?: boolean
+    /** Solo estas filas (switch «Possible duplicates»); siempre dentro de la empresa y la categoría paramétrica. */
+    ids?: number[]
     term?: string
     page: number
-    pageSize: number
+    /** null = todas, sin paginar (el modo duplicados pagina en memoria). */
+    pageSize: number | null
   }): Promise<{ rows: CatalogRow[]; total: number }> {
+    if (input.ids && input.ids.length === 0) return { rows: [], total: 0 }
     const isCompany = input.idCategoria === EXPENSES_COMPANY_CATEGORY
+    const column = columnOf(input.idCategoria)
     const base = this.createQueryBuilder('g')
       .where('g.idCategoria = :cat', { cat: input.idCategoria })
       .andWhere('g.idDealerProvider = :prov', { prov: input.idDealerProvider })
     if (input.activeOnly) base.andWhere('g.estado = 1')
+    else if (input.inactiveOnly) base.andWhere('g.estado = 0')
+    if (input.ids) base.andWhere('g.id IN (:...ids)', { ids: input.ids })
     const term = input.term?.trim()
     if (term) base.andWhere('g.name LIKE :term', { term: `%${term}%` })
 
@@ -91,11 +136,11 @@ export class GenericDataRepository extends BaseRepository<GenericData, GenericDa
 
     const query = base
       .clone()
-      .addSelect(EXPENSES_COUNT_SQL(isCompany ? 'id_company' : 'id_category'), 'expensesCount')
+      .addSelect(expensesCountSql(column), 'expensesCount')
+      .addSelect(catalogInUseSql(column), 'inUse')
       .orderBy('g.name', 'ASC')
       .addOrderBy('g.id', 'ASC')
-      .offset(input.page * input.pageSize)
-      .limit(input.pageSize)
+    if (input.pageSize != null) query.offset(input.page * input.pageSize).limit(input.pageSize)
     if (isCompany) {
       query
         .leftJoin(GenericData, 'p', 'p.id = g.idParent')
@@ -110,6 +155,7 @@ export class GenericDataRepository extends BaseRepository<GenericData, GenericDa
       return {
         item,
         expensesCount: Number(r.expensesCount ?? 0),
+        inUse: Number(r.inUse ?? 0) === 1,
         lastCategory:
           isCompany && lastId > 0
             ? { id: lastId, name: String(r.lastCategoryName ?? ''), active: Number(r.lastCategoryEstado) === 1 }
@@ -119,14 +165,21 @@ export class GenericDataRepository extends BaseRepository<GenericData, GenericDa
     return { rows, total }
   }
 
+  /** id y nombre de todas las filas de la empresa y la categoría paramétrica (para armar los posibles duplicados). */
+  catalogNames(idCategoria: number, idDealerProvider: number): Promise<Pick<GenericData, 'id' | 'name'>[]> {
+    return this.createQueryBuilder('g')
+      .select(['g.id', 'g.name'])
+      .where('g.idCategoria = :cat', { cat: idCategoria })
+      .andWhere('g.idDealerProvider = :prov', { prov: idDealerProvider })
+      .getMany()
+  }
+
   /** Conteo de gastos activos de una fila (para devolver un ítem solo). */
   async expensesCountOf(id: number, idCategoria: number): Promise<number> {
-    const column = idCategoria === EXPENSES_COMPANY_CATEGORY ? 'id_company' : 'id_category'
-    const rows: { c: unknown }[] = await this.manager.query(
-      `SELECT COUNT(DISTINCT IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group))) AS c
-         FROM EXP_EXPENSE e WHERE e.${column} = ? AND e.estado = 1`,
-      [id],
-    )
-    return Number(rows[0]?.c ?? 0)
+    const raw = await this.createQueryBuilder('g')
+      .select(expensesCountSql(columnOf(idCategoria)), 'c')
+      .where('g.id = :id', { id })
+      .getRawOne<{ c: unknown }>()
+    return Number(raw?.c ?? 0)
   }
 }

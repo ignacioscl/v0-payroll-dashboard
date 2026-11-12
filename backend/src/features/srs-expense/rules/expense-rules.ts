@@ -42,6 +42,10 @@ export const MSG_CHOOSE_START_DATE = 'Choose a start date.'
 export const MSG_CHOOSE_WEEK_DAY = 'Choose the day of the week.'
 export const MSG_END_BEFORE_START = 'End date must be on or after the start date.'
 export const MSG_NAME_EXISTS = 'This name already exists.'
+/** Settings: borrar o unificar una compañía o categoría (plan-expenses-settings, §6, textos aprobados). */
+export const MSG_CATALOG_IN_USE = 'It has expenses or recurring rules. Deactivate it or merge it instead.'
+export const MSG_MERGE_OTHER_COMPANY = 'Choose another active company.'
+export const MSG_MERGE_OTHER_CATEGORY = 'Choose another active category.'
 export const MSG_BRANCH_OUT_OF_SCOPE = "You don't have access to this dealer."
 export const MSG_SOME_BRANCHES_OUTSIDE = "You don't have access to some of these dealers."
 export const MSG_RECEIPT_APPROVED = "The receipt is approved and can't be edited."

@@ -12,6 +12,7 @@ import { BillingKpiRepository } from '../../billing/repository/billing-kpi.repos
 import type { ClosingLineDto } from '../../billing/dto/billing-kpi.dto'
 import { PayrollSnapshotKpiRepository } from '../../payroll/repository/payroll-snapshot-kpi.repository'
 import { PayrollSourceRepository } from '../../payroll/snapshot/payroll-source.repository'
+import { PIECEWORK_TYPE_IDS } from '../../payroll/snapshot/payment-type-ids'
 import { periodsEndingInMonth } from '../../payroll/snapshot/payroll-month-periods'
 import type { PayrollPeriod } from '../../payroll/snapshot/payroll-snapshot.types'
 import { ExpenseReportRepository } from '../../expenses/repository/expense-report.repository'
@@ -41,7 +42,10 @@ import {
   TINT_ROLE_FRAGMENT,
   canonicalPayrollCents,
   fromCents,
-  isTintIncomeLine,
+  groupByService,
+  isNonTintWarning,
+  isTintClosingLine,
+  isTintService,
   largestRemainderCents,
   payrollKey,
   profitPct,
@@ -58,7 +62,10 @@ export interface ClosingContext {
   filter: SrsKpiFilter
   expenseFilter: ExpenseListFilter
   periods: PayrollPeriod[]
-  /** Window Tint Closing: los tinteros; null = todos los empleados. */
+  /**
+   * Window Tint Closing: los tinteros (tintersOf); null = todos los empleados. Acotan el Payroll y las WO del
+   * Income (las asignadas a uno de ellos).
+   */
   employeeIds: number[] | null
   showWithoutDealer: boolean
 }
@@ -74,6 +81,10 @@ export interface PayrollEmployeeLine {
 
 export interface IncomeLine extends ClosingLineDto {
   cents: number
+  /** Window Tint Closing: «tint» en el nombre del servicio (suma Vehicles); null en el Monthly Closing. */
+  tint: boolean | null
+  /** Window Tint Closing: va en rojo (isNonTintWarning: sin «tint» y con importe); null en el Monthly Closing. */
+  warn: boolean | null
 }
 
 export interface ExpenseLine {
@@ -117,7 +128,14 @@ export class MonthlyClosingService {
     if (idDealer === 0) {
       if (!cc.showWithoutDealer) throw new ForbiddenException('Forbidden')
       const payroll = await this.payrollLines(cc, 'none')
-      return { dealerId: 0, dealer: 'Without dealer', income: [], payroll: payroll.map(toPayrollDto), expenses: [] }
+      return {
+        dealerId: 0,
+        dealer: 'Without dealer',
+        income: [],
+        byService: cc.scope === 'tint' ? [] : null,
+        payroll: payroll.map(toPayrollDto),
+        expenses: [],
+      }
     }
     await this.assertDealerInScope(cc.filter, idDealer)
     const [income, payroll, expenses, names] = await Promise.all([
@@ -137,7 +155,20 @@ export class MonthlyClosingService {
         service: l.service,
         qty: l.qty,
         total: fromCents(l.cents),
+        tint: l.tint,
+        warn: l.warn,
       })),
+      byService:
+        cc.scope === 'tint'
+          ? groupByService(income).map((r) => ({
+              department: r.department,
+              service: r.service,
+              vehicles: r.vehicles,
+              amount: fromCents(r.cents),
+              tint: r.tint,
+              warn: r.warn,
+            }))
+          : null,
       payroll: payroll.map(toPayrollDto),
       expenses: expenses.map((e) => ({
         date: e.date,
@@ -220,9 +251,7 @@ export class MonthlyClosingService {
     })
     const [periods, employeeIds] = await Promise.all([
       periodsEndingInMonth(this.payrollSource, ctx.idDealerProvider, firstDay, lastDay),
-      scope === 'tint'
-        ? this.usuarios.idsWithRoleNameLike(ctx.idDealerProvider, TINT_ROLE_FRAGMENT)
-        : Promise.resolve(null),
+      scope === 'tint' ? this.tintersOf(ctx.idDealerProvider) : Promise.resolve(null),
     ])
     return {
       scope,
@@ -247,6 +276,16 @@ export class MonthlyClosingService {
     }
   }
 
+  /**
+   * Regla única de «tintero» (plans/plan-window-tint-closing-tint-y-servicios T1): empleado de la empresa con un rol
+   * que tiene «tint» en el nombre (srs-usuario) y Piecework o Piecework by % en su ficha (payroll). La usan el
+   * Income (WO asignadas) y el Payroll.
+   */
+  private async tintersOf(idDealerProvider: number): Promise<number[]> {
+    const withRole = await this.usuarios.idsWithRoleNameLike(idDealerProvider, TINT_ROLE_FRAGMENT)
+    return this.payroll.employeeIdsWithPaymentTypes(withRole, PIECEWORK_TYPE_IDS)
+  }
+
   /** Un dealer se abre solo si es de la empresa y, para un usuario restringido, RESTRICTION_DEALER_V2 lo deja ver. */
   private async assertDealerInScope(filter: SrsKpiFilter, idDealer: number): Promise<void> {
     await this.assertDealersInScope({ ...filter, dealerIds: [idDealer] })
@@ -269,12 +308,12 @@ export class MonthlyClosingService {
       this.payroll.periodCoverage(cc.filter.idDealerProvider, periodDesdes),
     ])
 
-    type Acc = { income: number; payroll: number; expenses: number; accident: number; vehicles: number }
+    type Acc = { income: number; payroll: number; expenses: number; accident: number; vehicles: number; nonTint: boolean }
     const acc = new Map<number, Acc>()
     const at = (id: number): Acc => {
       let a = acc.get(id)
       if (!a) {
-        a = { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0 }
+        a = { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0, nonTint: false }
         acc.set(id, a)
       }
       return a
@@ -284,7 +323,9 @@ export class MonthlyClosingService {
       for (const l of tintLines) {
         const a = at(l.dealerId)
         a.income += l.cents
-        a.vehicles += l.qty
+        // Vehicles: solo los servicios de tint (un PDI en la misma WO no es otro auto).
+        if (l.tint) a.vehicles += l.qty
+        if (l.warn) a.nonTint = true
       }
     }
     let withoutDealerCents = 0
@@ -323,6 +364,7 @@ export class MonthlyClosingService {
         profit: fromCents(profit),
         pct: profitPct(profit, a.income),
         accident: tint ? null : fromCents(a.accident),
+        nonTint: tint ? a.nonTint : null,
       }
     }
     const rows = ids
@@ -337,16 +379,25 @@ export class MonthlyClosingService {
           expenses: t.expenses + a.expenses,
           accident: t.accident + a.accident,
           vehicles: t.vehicles + a.vehicles,
+          nonTint: t.nonTint || a.nonTint,
         }
       },
-      { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0 },
+      { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0, nonTint: false },
     )
     const withoutDealer =
       cc.showWithoutDealer && withoutDealerCents !== 0
         ? {
-            ...toRow(0, 'Without dealer', { income: 0, payroll: withoutDealerCents, expenses: 0, accident: 0, vehicles: 0 }),
+            ...toRow(0, 'Without dealer', {
+              income: 0,
+              payroll: withoutDealerCents,
+              expenses: 0,
+              accident: 0,
+              vehicles: 0,
+              nonTint: false,
+            }),
             vehicles: null,
             accident: null,
+            nonTint: null,
           }
         : null
 
@@ -358,12 +409,24 @@ export class MonthlyClosingService {
     }
   }
 
-  /** Líneas del Closing del filtro; en el alcance tint, solo las de tint (isTintIncomeLine). */
+  /**
+   * Líneas del Closing del filtro. En el alcance tint: las WO asignadas a un tintero (todos sus servicios) y lo que
+   * deja isTintClosingLine; cada línea lleva si su servicio dice «tint».
+   */
   async incomeLines(cc: ClosingContext): Promise<IncomeLine[]> {
-    const lines = await this.billing.incomeLinesForRange(cc.filter)
+    const tint = cc.scope === 'tint'
+    const lines = await this.billing.incomeLinesForRange(cc.filter, tint ? { assignedTo: cc.employeeIds ?? [] } : {})
     return lines
-      .filter((l) => cc.scope !== 'tint' || isTintIncomeLine(l))
-      .map((l) => ({ ...l, cents: toCents(l.amount) }))
+      .filter((l) => !tint || isTintClosingLine(l))
+      .map((l) => {
+        const cents = toCents(l.amount)
+        return {
+          ...l,
+          cents,
+          tint: tint ? isTintService(l.service) : null,
+          warn: tint ? isNonTintWarning({ service: l.service, cents }) : null,
+        }
+      })
       .sort(
         (a, b) =>
           a.dealerId - b.dealerId ||

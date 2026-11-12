@@ -39,8 +39,6 @@ const DEALER_SEEN = 408
 const DEALER_NOT_SEEN = 86
 const OTHER_COMPANY_DEALER = 186 // dealer de GC Installations, no de Auto Wax (expense-integration.spec.ts)
 const LEXUS_PALM_BEACH = 301 // AutoNation Lexus of Palm Beach
-const NISSAN_MIAMI = 744 // AutoNation Nissan Miami
-const DELRAY_HYUNDAI = 625
 const DELRAY_GENESIS = 626
 const GC_PROVIDER = 188 // GC Installations: Expenses sí, Window Tint Closing no (migration 021)
 
@@ -209,45 +207,33 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
     }, 300000)
   })
 
+  // Income, Vehicles y Payroll del Window Tint Closing con la regla del tintero (plans/plan-window-tint-closing-tint-y-
+  // servicios): window-tint-closing-tinteros-integration.spec.ts, contra la copia del 07/11. Acá queda lo que no cambió.
   describe('Window Tint Closing', () => {
-    it('agosto 2026: Income $74,184.00 en 889 líneas, Vehicles 889, Payroll $5,110.00, Expenses $0', async () => {
-      const tint = await service.getSummary(admin, q('2026-08', 'tint'))
-      expect(tint.scope).toBe('tint')
-      expect(tint.total.income).toBe(74184)
-      expect(tint.total.vehicles).toBe(889)
-      expect(tint.total.payroll).toBe(5110)
-      expect(tint.total.expenses).toBe(0)
-      expect(tint.rows.every((r) => r.accident === null && r.vehicles !== null)).toBe(true)
-      const byId = new Map(tint.rows.map((r) => [r.dealerId, r]))
-      expect(byId.get(NISSAN_MIAMI)?.payroll).toBe(970)
-      expect(byId.get(DELRAY_GENESIS)?.payroll).toBe(1535)
-      expect(byId.get(DELRAY_HYUNDAI)?.payroll).toBe(2605)
-    }, 120000)
-
-    it('septiembre 2026: Payroll $7,700.00 y Expenses $3,079.92', async () => {
+    it('septiembre 2026: Expenses $3,079.92', async () => {
       const tint = await service.getSummary(admin, q('2026-09', 'tint'))
-      expect(tint.total.payroll).toBe(7700)
+      expect(tint.scope).toBe('tint')
       expect(tint.total.expenses).toBe(3079.92)
+      expect(tint.rows.every((r) => r.accident === null && r.vehicles !== null)).toBe(true)
     }, 120000)
 
-    it('ninguna línea TTK ni ponchada de generic; el detalle suma su fila', async () => {
+    it('ninguna línea TTK; el detalle suma su fila', async () => {
       const tint = await service.getSummary(admin, q('2026-08', 'tint'))
       const row = tint.rows.find((r) => r.dealerId === DELRAY_GENESIS)!
       const d = await service.getDealer(admin, row.dealerId, q('2026-08', 'tint'))
-      expect(d.income.every((l) => /tint/i.test(l.service))).toBe(true)
       expect(d.income.some((l) => l.department === 'TTK')).toBe(false)
       expect(sumCents(d.income.map((l) => l.total))).toBe(toCents(row.income))
       expect(sumCents(d.payroll.map((l) => l.amount))).toBe(toCents(row.payroll))
     }, 120000)
 
     it('Excel: seis hojas, By service suma el Income y las notas son las del cartel', async () => {
+      const tint = await service.getSummary(admin, q('2026-08', 'tint'))
       const { res, buffer, headers } = fakeResponse()
       await service.export(admin, q('2026-08', 'tint'), res)
       expect(headers['Content-Disposition']).toContain('Window Tint Closing 08-2026_')
       const wb = await loadBook(buffer())
       expect(wb.worksheets.map((w) => w.name)).toEqual(['Report Info', 'Summary', 'By service', 'Income', 'Payroll', 'Expenses'])
-      expect(sheetColumnCents(wb, 'By service', 'Amount')).toBe(7418400)
-      expect(sheetColumnCents(wb, 'By service', 'Vehicles')).toBe(88900)
+      expect(sheetColumnCents(wb, 'By service', 'Amount')).toBe(toCents(tint.total.income))
       const summaryHeader = wb.getWorksheet('Summary')!.getRow(2)
       const notes = [1, 2, 3, 4, 5, 6, 7].map((i) => summaryHeader.getCell(i).note)
       expect(notes).toEqual([

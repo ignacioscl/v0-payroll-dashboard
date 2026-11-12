@@ -4,8 +4,8 @@ import * as React from 'react'
 
 import { SearchableCombobox } from '@/components/shared/searchable-combobox'
 import { useExpenseCatalogSearch } from '@/hooks/use-expenses-catalog'
-import { useTranslation } from '@/lib/i18n/locale-context'
-import type { CatalogKind } from '@/lib/srs-expenses-api'
+import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
+import type { CatalogItem, CatalogKind } from '@/lib/srs-expenses-api'
 
 import type { CatalogChoiceValue } from '@/lib/expenses/expense-form-schema'
 
@@ -24,6 +24,23 @@ interface CatalogComboboxProps {
   className?: string
   /** `data-field` for the first-invalid-field focus. */
   dataField?: string
+  /** Deja solo las opciones que cumplen (Merge de Settings: sin la propia y, en categorías, misma clase). */
+  filterItem?: (item: CatalogItem) => boolean
+  /**
+   * Merge de Settings: cada opción dice cuántos gastos tiene, como la columna Expenses, para distinguir dos con el
+   * mismo nombre («las dos se llaman igual!!», Ignacio, 11/11/2026).
+   */
+  showExpensesCount?: boolean
+}
+
+/** «Office Depot (28 expense(s))» / «Office Depot (11 expense(s), inactive)»: el nombre con lo que lo distingue. */
+export function catalogNameWithCount(
+  t: TranslateFn,
+  name: string,
+  n: number,
+  active: boolean,
+): string {
+  return t(active ? 'expensesCatalog.nameWithCount' : 'expensesCatalog.nameWithCountInactive', { name, n })
 }
 
 /**
@@ -40,13 +57,24 @@ export function CatalogCombobox({
   placeholder,
   className,
   dataField,
+  filterItem,
+  showExpensesCount,
 }: CatalogComboboxProps) {
   const { t } = useTranslation()
   const [term, setTerm] = React.useState('')
   const query = useExpenseCatalogSearch(kind, term, !disabled)
   const items = React.useMemo<CatalogChoice[]>(
-    () => (query.data ?? []).map((c) => ({ id: c.id, name: c.name, active: c.active, lastCategory: c.lastCategory ?? null })),
-    [query.data],
+    () =>
+      (query.data ?? [])
+        .filter((c) => (filterItem ? filterItem(c) : true))
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          active: c.active,
+          lastCategory: c.lastCategory ?? null,
+          expensesCount: c.expensesCount,
+        })),
+    [query.data, filterItem],
   )
 
   return (
@@ -62,7 +90,11 @@ export function CatalogCombobox({
         compact={compact}
         getItemKey={(c) => (c.id != null ? c.id : `new:${c.name}`)}
         getItemLabel={(c) =>
-          c.active === false ? `${c.name} ${t('expenses.inactiveSuffix')}` : c.name
+          showExpensesCount && c.expensesCount != null
+            ? catalogNameWithCount(t, c.name, c.expensesCount, c.active !== false)
+            : c.active === false
+              ? `${c.name} ${t('expenses.inactiveSuffix')}`
+              : c.name
         }
         placeholder={placeholder ?? (kind === 'companies' ? t('expenses.selectCompany') : t('expenses.selectCategory'))}
         createCustomItem={allowCreate ? (name) => ({ id: null, name: name.trim() }) : undefined}

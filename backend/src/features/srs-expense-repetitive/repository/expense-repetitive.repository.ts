@@ -85,4 +85,15 @@ export class ExpenseRepetitiveRepository extends BaseRepository<ExpenseRepetitiv
   listAllActive(idDealerProvider: number): Promise<ExpenseRepetitive[]> {
     return this.find({ where: { idDealerProvider, status: 1 }, order: { id: 'DESC' } })
   }
+
+  /** Las reglas de la empresa (cualquier status) que usan una compañía o categoría del catálogo. */
+  findByCatalog(field: 'idCompany' | 'idCategory', idCatalog: number, idDealerProvider: number): Promise<ExpenseRepetitive[]> {
+    return this.find({ where: { [field]: idCatalog, idDealerProvider }, order: { id: 'ASC' } })
+  }
+
+  /** Pasa las reglas de la empresa de una compañía o categoría a otra; devuelve cuántas cambió. */
+  async reassignCatalog(field: 'idCompany' | 'idCategory', fromId: number, toId: number, idDealerProvider: number): Promise<number> {
+    const result = await this.update({ [field]: fromId, idDealerProvider }, { [field]: toId })
+    return Number(result.affected ?? 0)
+  }
 }

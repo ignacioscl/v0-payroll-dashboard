@@ -28,6 +28,8 @@ export type UseDataTableQueryResult<TData> = {
   total: number
   pageCount: number
   hasMore?: boolean
+  /** Lo que el adapter devuelve en `meta` (datos de la respuesta que no son filas). */
+  meta?: Record<string, unknown>
   isLoading: boolean
   isFetching: boolean
   error: string | null
@@ -83,6 +85,7 @@ export function useDataTableQuery<TData, TRaw>(
     total: data?.total ?? 0,
     pageCount: data?.pageCount ?? 1,
     hasMore: data?.hasMore,
+    meta: data?.meta,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error instanceof Error ? query.error.message : null,

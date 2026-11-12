@@ -6,11 +6,12 @@
  */
 export const TINT_CLOSING_COLUMN_NOTES = {
   dealer: 'Dealer: each dealer on its own, as it is in SRS.',
-  vehicles: 'Vehicles: how many window tint services the dealer had in the month (each service on a WO counts its Qty; one service = one vehicle).',
+  vehicles:
+    'Vehicles: how many window tint services («tint» in the name) the dealer had in the month on work orders assigned to tinters (each service counts its Qty; one service = one vehicle).',
   income:
-    'Income: the Closing Report lines of the month whose service has «tint» in its name: Work Orders by creation date, invoiced or not, and lines of Generic invoices. With the invoice discount, without tax. TTK invoices do not count.',
+    'Income: every service of the month\'s work orders assigned to a tinter (an employee with a role that has «tint» in its name and Piecework as payment type), by creation date, invoiced or not. With the invoice discount, without tax. Services without «tint» in their name and an amount other than $0 are shown in red. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.',
   payroll:
-    'Payroll: what SRS pays at the dealer to employees with a role that has «tint» in its name (for example, Tinter), in the pay periods that end in the month. What is paid outside SRS does not count.',
+    'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count.',
   expenses:
     "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
   profit: 'Profit/Loss: Income − Payroll − Expenses.',

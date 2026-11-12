@@ -7,8 +7,11 @@ import { MonthlyClosingQueryDto } from './dto/monthly-closing.dto'
 import { currentNyMonth, isValidClosingMonth, monthBounds } from './dto/monthly-closing-month'
 import {
   canonicalPayrollCents,
+  TINT_GENERIC_FREE_COUNTS,
   groupByService,
-  isTintIncomeLine,
+  isNonTintWarning,
+  isTintClosingLine,
+  isTintService,
   largestRemainderCents,
   profitPct,
 } from './monthly-closing-math'
@@ -117,25 +120,44 @@ describe('Monthly Closing — cuentas (P5)', () => {
   })
 })
 
-describe('Window Tint Closing — línea de tint y By service', () => {
-  it('WO, WO sin facturar y línea libre de Generic con «tint»; nunca TTK ni ponchadas', () => {
-    expect(isTintIncomeLine({ kind: 'wo', service: 'Window Tint Full' })).toBe(true)
-    expect(isTintIncomeLine({ kind: 'woUnbilled', service: 'TINT front' })).toBe(true)
-    expect(isTintIncomeLine({ kind: 'genericFree', service: 'Tinting flat' })).toBe(true)
-    expect(isTintIncomeLine({ kind: 'wo', service: 'Detail' })).toBe(false)
-    expect(isTintIncomeLine({ kind: 'ttk', service: 'Peluche Window Tinting LLC' })).toBe(false)
-    expect(isTintIncomeLine({ kind: 'genericPunch', service: 'Peluche Window Tinting LLC' })).toBe(false)
+describe('Window Tint Closing — qué línea entra, servicio de tint y By service', () => {
+  it('servicio de tint: «tint» en el nombre, sin importar mayúsculas', () => {
+    expect(isTintService('Window Tint - Full Car')).toBe(true)
+    expect(isTintService('TINT front')).toBe(true)
+    expect(isTintService('PDI')).toBe(false)
   })
 
-  it('By service agrupa por dealer, departamento y servicio', () => {
+  it('WO de un tintero entra entera, diga «tint» o no; Generic libre solo con «tint»; nunca TTK ni ponchadas', () => {
+    expect(isTintClosingLine({ kind: 'wo', service: 'Window Tint Full' })).toBe(true)
+    expect(isTintClosingLine({ kind: 'wo', service: 'PDI' })).toBe(true)
+    expect(isTintClosingLine({ kind: 'woUnbilled', service: 'Detail' })).toBe(true)
+    expect(isTintClosingLine({ kind: 'genericFree', service: 'Tinting flat' })).toBe(TINT_GENERIC_FREE_COUNTS)
+    expect(isTintClosingLine({ kind: 'genericFree', service: 'Detail' })).toBe(false)
+    expect(isTintClosingLine({ kind: 'ttk', service: 'Peluche Window Tinting LLC' })).toBe(false)
+    expect(isTintClosingLine({ kind: 'genericPunch', service: 'Peluche Window Tinting LLC' })).toBe(false)
+  })
+
+  it('By service agrupa por dealer, departamento y servicio; un servicio sin «tint» conserva su Qty y va marcado', () => {
     const lines = [
+      { dealerId: 1, department: 'Used', service: 'Tint', qty: 1, cents: 7000 },
       { dealerId: 1, department: 'New', service: 'Tint', qty: 1, cents: 8000 },
       { dealerId: 1, department: 'New', service: 'Tint', qty: 2, cents: 16000 },
-      { dealerId: 1, department: 'Used', service: 'Tint', qty: 1, cents: 7000 },
+      { dealerId: 1, department: 'New', service: 'PDI', qty: 113, cents: 621500 },
     ]
     expect(groupByService(lines)).toEqual([
-      { dealerId: 1, department: 'New', service: 'Tint', vehicles: 3, cents: 24000 },
-      { dealerId: 1, department: 'Used', service: 'Tint', vehicles: 1, cents: 7000 },
+      { dealerId: 1, department: 'New', service: 'PDI', vehicles: 113, cents: 621500, tint: false, warn: true },
+      { dealerId: 1, department: 'New', service: 'Tint', vehicles: 3, cents: 24000, tint: true, warn: false },
+      { dealerId: 1, department: 'Used', service: 'Tint', vehicles: 1, cents: 7000, tint: true, warn: false },
+    ])
+  })
+
+  it('en rojo: sin «tint» y con importe; un servicio en $0 no se marca (11/11/2026)', () => {
+    expect(isNonTintWarning({ service: 'PDI', cents: 5500 })).toBe(true)
+    expect(isNonTintWarning({ service: 'Others', cents: 0 })).toBe(false)
+    expect(isNonTintWarning({ service: 'Window Tint - 2 Doors', cents: 8000 })).toBe(false)
+    expect(isNonTintWarning({ service: 'Credit', cents: -1000 })).toBe(true)
+    expect(groupByService([{ dealerId: 1, department: 'Sales', service: 'Others', qty: 2, cents: 0 }])).toEqual([
+      { dealerId: 1, department: 'Sales', service: 'Others', vehicles: 2, cents: 0, tint: false, warn: false },
     ])
   })
 })

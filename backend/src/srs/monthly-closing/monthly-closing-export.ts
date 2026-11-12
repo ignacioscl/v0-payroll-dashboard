@@ -8,7 +8,7 @@ import {
   type TableExportSheet,
 } from '../shared/export/table-export-xlsx'
 import type { ClosingPeriodDto, ClosingRowDto, ClosingScope, MonthlyClosingDto } from './dto/monthly-closing.dto'
-import { fromCents, groupByService } from './monthly-closing-math'
+import { type ByServiceRow, fromCents, groupByService } from './monthly-closing-math'
 import { TINT_CLOSING_COLUMN_NOTES } from './tint-closing-column-notes'
 
 /**
@@ -79,6 +79,10 @@ export interface ClosingWorkbookInput {
     service: string
     qty: number
     cents: number
+    /** Window Tint Closing: «tint» en el servicio; null en el Monthly Closing. */
+    tint: boolean | null
+    /** Window Tint Closing: fila en rojo (isNonTintWarning); null en el Monthly Closing. */
+    warn: boolean | null
   }[]
   payroll: readonly {
     idDealer: number | null
@@ -121,8 +125,15 @@ export function buildClosingReportInfo(input: ClosingWorkbookInput): ReportInfoR
     { field: 'Pay periods', value: input.periods.map(closingPeriodLabel).join(', ') || '—' },
     ...(input.scope === 'tint'
       ? [
-          { field: 'Tint services', value: 'service name contains «tint»' },
-          { field: 'Tinters', value: 'role name contains «tint»' },
+          {
+            field: 'Tint services',
+            value: 'All services of work orders assigned to tinters; services without «tint» in their name are marked',
+          },
+          { field: 'Tinters', value: 'Role name contains «tint» and Piecework payment type' },
+          {
+            field: 'Rows in red',
+            value: 'Services without «tint» in their name and an amount other than $0, from work orders assigned to tinters',
+          },
           { field: 'Expense category', value: 'Window Tint Film' },
         ]
       : []),
@@ -186,7 +197,7 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
   type Income = ClosingWorkbookInput['income'][number]
   type Payroll = ClosingWorkbookInput['payroll'][number]
   type Expense = ClosingWorkbookInput['expenses'][number]
-  type ByService = ReturnType<typeof groupByService>[number]
+  type ByService = ByServiceRow
 
   const sheets: TableExportSheet<unknown>[] = [
     {
@@ -207,12 +218,13 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
         { header: 'Vehicles', width: 12, kind: 'int', value: (r) => r.vehicles, note: TINT_CLOSING_COLUMN_NOTES.vehicles },
         { header: 'Amount', width: 16, kind: 'money', value: (r) => fromCents(r.cents), note: TINT_CLOSING_COLUMN_NOTES.income },
       ],
-      rows: byDealerName(groupByService([...input.income]), (r) => r.dealerId).sort(
+      rows: byDealerName(groupByService(input.income), (r) => r.dealerId).sort(
         (a, b) =>
           dealer(a.dealerId).localeCompare(dealer(b.dealerId)) ||
           a.department.localeCompare(b.department) ||
           a.service.localeCompare(b.service),
       ),
+      rowTone: (r) => (r.warn ? 'warn' : undefined),
     }
     sheets.push(byService as TableExportSheet<unknown>)
   }
@@ -232,6 +244,7 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
       { header: 'Total', width: 14, kind: 'money', value: (r) => fromCents(r.cents) },
     ],
     rows: byDealerName(input.income, (r) => r.dealerId),
+    ...(input.scope === 'tint' ? { rowTone: (r: Income) => (r.warn ? ('warn' as const) : undefined) } : {}),
   }
   const payroll: TableExportSheet<Payroll> = {
     name: 'Payroll',

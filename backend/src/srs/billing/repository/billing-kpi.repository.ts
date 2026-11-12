@@ -38,6 +38,7 @@ import {
   genericBilledLinesSql,
   roundMoney,
   ttkBilledLinesSql,
+  woAssignedToSql,
   woBilledLinesSql,
   woPartialOverlapCountSql,
 } from '../../shared/kpi/srs-kpi-billed-lines'
@@ -413,22 +414,37 @@ export class BillingKpiRepository {
    * up to its Income. WO not invoiced is one row per WO service that is on no active invoice.
    * With withCar the two WO parts also bring the car of the WO (idCar), for Income by Dealer by
    * service (plans/plan-income-by-dealer-por-servicio T1); without it the SQL is unchanged.
+   * With assignedTo the two WO parts keep only the WO assigned to one of those employees (Window Tint
+   * Closing, plans/plan-window-tint-closing-tint-y-servicios T2); an empty list brings no WO line. TTK and
+   * Generic lines are not touched by it.
    */
-  async incomeLinesForRange(filter: SrsKpiFilter, opts: { withCar?: boolean } = {}): Promise<ClosingLineDto[]> {
+  async incomeLinesForRange(
+    filter: SrsKpiFilter,
+    opts: { withCar?: boolean; assignedTo?: readonly number[] } = {},
+  ): Promise<ClosingLineDto[]> {
     const { idDealerProvider, idUsuario, dealerIds, fechaDesde, fechaHasta, includeZero, filterDateDone, skipDealerRestriction } =
       filter
     const withCar = opts.withCar === true
+    const skipWo = opts.assignedTo !== undefined && opts.assignedTo.length === 0
+    const assigned = woAssignedToSql('i', opts.assignedTo)
     const woZero = applyZeroFilter(includeZero, woHasPositiveTotalSql('i'))
     const inv = buildDealerFilterSql('invoice', idUsuario, dealerIds, skipDealerRestriction, removedDealersProvider(filter))
     const periodCol = woPeriodColumn(filterDateDone)
     const { wo, ttk, gen } = billedBaseOpts(filter)
     const byLine = { groupBy: 'closingLine' as const, productionValue: true }
-    const woQ = woBilledLinesSql({ ...wo, ...byLine, ...(withCar ? { withCar: true } : {}) })
+    const woQ = woBilledLinesSql({
+      ...wo,
+      ...byLine,
+      ...(withCar ? { withCar: true } : {}),
+      ...(opts.assignedTo && !skipWo ? { assignedTo: opts.assignedTo } : {}),
+    })
     const ttkQ = ttkBilledLinesSql({ ...ttk, ...byLine })
     const genQ = genericBilledLinesSql({ ...gen, ...byLine })
 
     const [unbilledRows, woRows, ttkRows, genRows] = await Promise.all([
-      this.srs.query(
+      skipWo
+        ? Promise.resolve([])
+        : this.srs.query(
         `SELECT c.id AS dealerId, 'woUnbilled' AS kind, i.full_nro AS nro,
                 ${periodCol} AS dateFrom, ${periodCol} AS dateTo, d.nombre AS department,
                 isv.nombre AS service, IFNULL(isr.qty, 1) AS qty,
@@ -443,10 +459,10 @@ export class BillingKpiRepository {
            ${woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)}
            AND ${periodCol} >= ? AND ${periodCol} < DATE_ADD(?, INTERVAL 1 DAY)
            AND WO_IS_FULL_INVOICED(i.id) = 0${woZero}
-           AND ${woServiceNotInvoicedSql()}`,
-        [idDealerProvider, ...inv.params, fechaDesde, fechaHasta],
+           AND ${woServiceNotInvoicedSql()}${assigned.sql}`,
+        [idDealerProvider, ...inv.params, fechaDesde, fechaHasta, ...assigned.params],
       ),
-      this.srs.query(woQ.sql, woQ.params),
+      skipWo ? Promise.resolve([]) : this.srs.query(woQ.sql, woQ.params),
       this.srs.query(ttkQ.sql, ttkQ.params),
       this.srs.query(genQ.sql, genQ.params),
     ])

@@ -28,6 +28,14 @@ export class ExpenseRepetitiveService extends GlobalBaseService<ExpenseRepetitiv
     return this.repository.listAllActive(idDealerProvider)
   }
 
+  findByCatalog(field: 'idCompany' | 'idCategory', idCatalog: number, idDealerProvider: number) {
+    return this.repository.findByCatalog(field, idCatalog, idDealerProvider)
+  }
+
+  reassignCatalog(field: 'idCompany' | 'idCategory', fromId: number, toId: number, idDealerProvider: number) {
+    return this.repository.reassignCatalog(field, fromId, toId, idDealerProvider)
+  }
+
   /** `updateAmount` legacy. */
   async updateAmount(id: number, amount: string | null): Promise<void> {
     await this.repository.update(id, { amount })
