@@ -1765,11 +1765,18 @@ export const en: Messages = {
     tintEmpty: 'No window tint data for this month.',
     rowHint: 'Click a dealer to see its income, payroll and expenses.',
     tabIncome: 'Income',
+    tabByService: 'By service',
     tabPayroll: 'Payroll',
     tabExpenses: 'Expenses',
     emptyIncome: 'No income in this month.',
+    emptyByService: 'No services in this month.',
     emptyPayroll: 'No payroll in this month.',
     emptyExpenses: 'No expenses in this month.',
+    nonTintDealersNote:
+      'Dealers in red include services without «tint» in their name, from work orders assigned to tinters. Click the dealer to see them.',
+    nonTintRowsNote: 'Rows in red are services without «tint» in their name, from work orders assigned to tinters.',
+    nonTintIconLabel: 'Includes services without «tint» in their name',
+    redFirst: 'Rows in red first',
     colInvoice: '#Invoice',
     colDateFrom: 'Date From',
     colDateTo: 'Date To',
@@ -1861,11 +1868,12 @@ export const en: Messages = {
     tintClosing: {
       title: 'What each column counts',
       item1: 'Dealer: each dealer on its own, as it is in SRS.',
-      item2: 'Vehicles: how many window tint services the dealer had in the month (each service on a WO counts its Qty; one service = one vehicle).',
+      item2:
+        'Vehicles: how many window tint services («tint» in the name) the dealer had in the month on work orders assigned to tinters (each service counts its Qty; one service = one vehicle).',
       item3:
-        'Income: the Closing Report lines of the month whose service has «tint» in its name: Work Orders by creation date, invoiced or not, and lines of Generic invoices. With the invoice discount, without tax. TTK invoices do not count.',
+        "Income: every service of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name and Piecework as payment type), by creation date, invoiced or not. With the invoice discount, without tax. Services without «tint» in their name and an amount other than $0 are shown in red. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
       item4:
-        'Payroll: what SRS pays at the dealer to employees with a role that has «tint» in its name (for example, Tinter), in the pay periods that end in the month. What is paid outside SRS does not count.',
+        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count.',
       item5:
         "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
       item6: 'Profit/Loss: Income − Payroll − Expenses.',
@@ -2351,6 +2359,40 @@ export const en: Messages = {
     toastRuleSaved: 'Rule saved.',
     toastSettingsSaved: 'Settings saved.',
     toastRuleDeleted: 'Rule deleted.',
+  },
+  expensesCatalog: {
+    showInactive: 'Show inactive',
+    emptyInactiveCategories: 'No inactive categories.',
+    emptyInactiveCompanies: 'No inactive companies.',
+    showDuplicates: 'Possible duplicates',
+    duplicatesHelp:
+      'Names that are the same apart from upper case, spaces, punctuation, accents or a leading «The». Merge each one into the one you keep.',
+    duplicatesGroups: '{n} group(s) with a similar name',
+    emptyDuplicates: 'No possible duplicates.',
+    inactiveTag: 'Inactive',
+    mergeInto: 'Merge into…',
+    deleteDisabledHint:
+      'It has expenses or recurring rules (deleted ones count too). Deactivate it or merge it into another one.',
+    deleteTitle: 'Delete "{name}"?',
+    deleteHint: "It has no expenses or recurring rules. This can't be undone.",
+    yesDelete: 'Yes, delete it',
+    mergeTitle: 'Merge "{name}" into…',
+    mergeHelp:
+      'Use it when the same one was loaded twice. Choose the one to keep: every expense and recurring rule of "{name}" moves to it, with the same amount and dealers, and "{name}" is deleted. Each expense records the change in its Expense log.',
+    keep: 'Keep',
+    selectCompany: 'Select a company',
+    selectCategory: 'Select a category',
+    mergeSummary: '{n} expense(s) ({d} deleted) and {r} recurring rule(s) will move to "{target}".',
+    mergeSummaryCompanies: '{c} companies will get "{target}" as last category.',
+    mergeSummaryDeleted: '"{name}" will be deleted.',
+    nameWithCount: '{name} ({n} expense(s))',
+    nameWithCountInactive: '{name} ({n} expense(s), inactive)',
+    merge: 'Merge',
+    mergeConfirmTitle: 'Merge "{name}" into "{target}"?',
+    mergeConfirmHint: 'Expenses keep their amount and dealers and will show "{target}". This can\'t be undone.',
+    yesMerge: 'Yes, merge',
+    toastDeleted: 'Deleted.',
+    toastMerged: 'Merged: {n} expense(s) moved.',
   },
 }
 

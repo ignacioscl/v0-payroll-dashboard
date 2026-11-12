@@ -1714,11 +1714,21 @@ export interface Messages {
     tintEmpty: string
     rowHint: string
     tabIncome: string
+    tabByService: string
     tabPayroll: string
     tabExpenses: string
     emptyIncome: string
+    emptyByService: string
     emptyPayroll: string
     emptyExpenses: string
+    /** Window Tint Closing: nota debajo de la tabla cuando algún dealer va en rojo. */
+    nonTintDealersNote: string
+    /** Window Tint Closing: nota debajo de Income y By service del modal. */
+    nonTintRowsNote: string
+    /** Texto accesible del ícono de la fila en rojo. */
+    nonTintIconLabel: string
+    /** Window Tint Closing: el switch de Income y By service del modal que pone primero las filas en rojo. */
+    redFirst: string
     colInvoice: string
     colDateFrom: string
     colDateTo: string
@@ -2286,5 +2296,38 @@ export interface Messages {
     toastRuleSaved: string
     toastSettingsSaved: string
     toastRuleDeleted: string
+  }
+  /** Expenses › Settings: ver inactivas, borrar y unificar (plans/plan-expenses-settings/PLAN.md §6, textos aprobados). */
+  expensesCatalog: {
+    showInactive: string
+    emptyInactiveCategories: string
+    emptyInactiveCompanies: string
+    showDuplicates: string
+    duplicatesHelp: string
+    duplicatesGroups: string
+    emptyDuplicates: string
+    inactiveTag: string
+    mergeInto: string
+    deleteDisabledHint: string
+    deleteTitle: string
+    deleteHint: string
+    yesDelete: string
+    mergeTitle: string
+    /** Ayuda fija del diálogo «Merge into…»: qué hace, antes de elegir nada. */
+    mergeHelp: string
+    keep: string
+    selectCompany: string
+    selectCategory: string
+    mergeSummary: string
+    mergeSummaryCompanies: string
+    mergeSummaryDeleted: string
+    nameWithCount: string
+    nameWithCountInactive: string
+    merge: string
+    mergeConfirmTitle: string
+    mergeConfirmHint: string
+    yesMerge: string
+    toastDeleted: string
+    toastMerged: string
   }
 }

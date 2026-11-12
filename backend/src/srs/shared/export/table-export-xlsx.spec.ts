@@ -2,6 +2,7 @@
 import ExcelJS from 'exceljs'
 
 import { buildMultiSheetExportWorkbook, buildTableExportWorkbook, type TableExportColumn } from './table-export-xlsx'
+import { THEME } from './xlsx-theme'
 
 type Row = { name: string; amount: number }
 const rows: Row[] = [{ name: 'A', amount: 1.5 }]
@@ -52,6 +53,33 @@ describe('table-export-xlsx', () => {
         return [ws.name, out]
       })
     expect(values(one)).toEqual(values(many))
+  })
+
+  it('rowTone: la fila «warn» sale con la fuente de error; sin rowTone, ninguna fila cambia (P6 del tint)', async () => {
+    const base = {
+      reportInfoSheet: 'Report Info',
+      reportInfoHeader: { field: 'Field', value: 'Value' },
+      reportInfo: [],
+    }
+    const two: Row[] = [
+      { name: 'Tint', amount: 1 },
+      { name: 'PDI', amount: 2 },
+    ]
+    const toned = await roundTrip(
+      buildMultiSheetExportWorkbook({
+        ...base,
+        sheets: [{ name: 'Data', stamp: 's', columns, rows: two, rowTone: (r: Row) => (r.name === 'PDI' ? 'warn' : undefined) }],
+      }),
+    )
+    const ws = toned.getWorksheet('Data')!
+    expect(ws.getRow(3).getCell(1).font?.color?.argb).toBeUndefined()
+    expect(ws.getRow(4).getCell(1).font?.color?.argb).toBe(THEME.warnFg)
+    expect(ws.getRow(4).getCell(2).font?.color?.argb).toBe(THEME.warnFg)
+    expect(ws.getRow(4).getCell(2).numFmt).toBe('#,##0.00')
+
+    const plain = await roundTrip(buildMultiSheetExportWorkbook({ ...base, sheets: [{ name: 'Data', stamp: 's', columns, rows: two }] }))
+    const pws = plain.getWorksheet('Data')!
+    expect([3, 4].map((n) => pws.getRow(n).getCell(1).font?.color?.argb)).toEqual([undefined, undefined])
   })
 
   it('varias hojas en orden, después de Report Info', () => {

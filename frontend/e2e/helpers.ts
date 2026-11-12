@@ -46,7 +46,14 @@ export async function noHorizontalScroll(page: Page) {
   expect(ok, 'page must not scroll horizontally').toBe(true)
 }
 
+/**
+ * Deja el menú lateral abierto y con los nombres a la vista. En celular abre la hamburguesa. En compu, si el menú
+ * arrancó achicado (solo íconos), lo agranda con la flecha, que no tiene texto accesible. Sin esto, «Reports» y los
+ * links por nombre no se encuentran (11/11/2026: monthly-closing.spec.ts se colgaba en compu).
+ */
 export async function openMobileMenuIfNeeded(page: Page) {
   const burger = page.getByRole('button', { name: /open menu|abrir men/i })
   if (await burger.isVisible().catch(() => false)) await burger.click()
+  const expand = page.locator('aside').getByRole('button').filter({ has: page.locator('svg.lucide-chevron-right') })
+  if (await expand.first().isVisible().catch(() => false)) await expand.first().click()
 }

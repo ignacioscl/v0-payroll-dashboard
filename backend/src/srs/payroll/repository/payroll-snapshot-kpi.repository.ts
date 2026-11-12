@@ -337,6 +337,23 @@ export class PayrollSnapshotKpiRepository {
   }
 
   /**
+   * De `ids`, los que tienen alguno de `typeIds` en su ficha (USUARIO_PAYROLL_REL), sin estado ni fechas: la
+   * condición del Piece Work Report de legacy (ReportPieceWorkDao.php:76). Window Tint Closing la usa para los
+   * tinteros (plans/plan-window-tint-closing-tint-y-servicios T1); los ids ya vienen acotados a la empresa.
+   */
+  async employeeIdsWithPaymentTypes(ids: readonly number[], typeIds: readonly number[]): Promise<number[]> {
+    if (!ids.length || !typeIds.length) return []
+    const rows = await this.srs.query(
+      `SELECT DISTINCT l.id_usuario AS idUsuario
+       FROM USUARIO_PAYROLL_REL l
+       WHERE l.id_usuario IN (${ids.map(() => '?').join(',')})
+         AND l.id_payment_type IN (${typeIds.map(() => '?').join(',')})`,
+      [...ids, ...typeIds],
+    )
+    return rows.map((r: any) => num(r.idUsuario)).sort((a: number, b: number) => a - b)
+  }
+
+  /**
    * Monthly Closing (T2 de plans/plan-monthly-closing/PLAN.md): montos sin redondear por (dealer,
    * período, tipo, concepto) de los períodos pedidos (`periodo_desde IN`, usa `idx_psd_periodo`). El
    * service redondea como legacy: por dealer, período y columna. `includeWithoutDealer` suma las

@@ -116,6 +116,12 @@ export interface BilledLinesOpts {
    */
   withCar?: boolean
   /**
+   * With groupBy 'closingLine': only the WO assigned (INVOICE_EMPLOYEE_REL) to one of these employees.
+   * Window Tint Closing passes its tinters (plans/plan-window-tint-closing-tint-y-servicios T2); without it
+   * the SQL is unchanged. Must not be empty (the caller skips the query instead).
+   */
+  assignedTo?: readonly number[]
+  /**
    * With withPeriodSplit: also return invoicedProduction / collectedProduction (all lines) and
    * invoicedInRangeProduction / collectedInRangeProduction (whole invoices), valued like
    * productionValue, in the same pass as the billed columns.
@@ -247,6 +253,9 @@ function assertRowMoneyOpts(opts: BilledLinesOpts): void {
 /** closingLine is Income lines: production value, every line of the range, nothing else on top. */
 function assertClosingLineOpts(opts: BilledLinesOpts): void {
   if (opts.withCar && opts.groupBy !== 'closingLine') throw new Error('withCar needs groupBy closingLine')
+  if (opts.assignedTo && (opts.groupBy !== 'closingLine' || opts.assignedTo.length === 0)) {
+    throw new Error('assignedTo needs groupBy closingLine and at least one employee')
+  }
   if (opts.groupBy !== 'closingLine') return
   if (!opts.productionValue || !opts.range || opts.debtOnly || opts.idsOnly || opts.statementIdIn) {
     throw new Error('closingLine needs productionValue and a range, without debtOnly / idsOnly / statementIdIn')
@@ -290,6 +299,23 @@ function bucketGroup(groupBy: BilledGroupBy | undefined): string {
   return groupBy === 'month' || groupBy === 'week' || groupBy === 'statement' || groupBy === 'dealer'
     ? ' GROUP BY 1'
     : ''
+}
+
+/**
+ * The WO `invoiceAlias` is assigned to one of `employeeIds` (INVOICE_EMPLOYEE_REL, per WO). A subquery that
+ * returns one row at most, so a WO with two tinters is not counted twice. It is a scalar subquery and not
+ * EXISTS on purpose: MariaDB turns EXISTS / IN into a semi-join that starts from every WO of those employees
+ * (all dates) and the unbilled part went from 7 s to 25 s (October 2026, Auto Wax). As a scalar it runs per WO
+ * of the range, on fk_invoice_empl_rel_invoice. Empty list → no clause (the caller does not run the query).
+ */
+export function woAssignedToSql(invoiceAlias: string, employeeIds?: readonly number[]): { sql: string; params: number[] } {
+  if (!employeeIds || employeeIds.length === 0) return { sql: '', params: [] }
+  return {
+    sql: ` AND (SELECT 1 FROM INVOICE_EMPLOYEE_REL ier
+              WHERE ier.id_invoice = ${invoiceAlias}.id AND ier.id_usuario IN (${employeeIds.map(() => '?').join(',')})
+              LIMIT 1) IS NOT NULL`,
+    params: [...employeeIds],
+  }
 }
 
 function rangeParams(range?: DateRange | null): string[] {
@@ -448,6 +474,7 @@ export function woBilledLinesSql(opts: BilledLinesOpts): BilledLinesSql {
   const rowMode = groupBy === 'row'
   const filterDateDone = opts.filterDateDone ?? false
   const periodCol = woPeriodColumn(filterDateDone)
+  const assigned = woAssignedToSql('i', opts.assignedTo)
   const params: unknown[] = []
 
   if (!idsOnly && groupBy === 'week') {
@@ -533,10 +560,10 @@ WHERE w.rn = 1${statementIdInSql(opts, 'w.stmt_id')}
   AND i.id_dealer_provider = ?
   ${opts.dealer.and}
   ${woStatusFilterSql(filterDateDone, WorkflowStatus.DONE)}
-  ${dateRangeSql(periodCol, opts.range)}
+  ${dateRangeSql(periodCol, opts.range)}${assigned.sql}
   ${unpaid ? 'AND w.paid = 0' : ''}${lineZero}${idsOnly ? '' : bucketGroup(groupBy)}`
 
-  params.push(opts.idDealerProvider, ...opts.dealer.params, ...rangeParams(opts.range))
+  params.push(opts.idDealerProvider, ...opts.dealer.params, ...rangeParams(opts.range), ...assigned.params)
   return { sql, params }
 }
 

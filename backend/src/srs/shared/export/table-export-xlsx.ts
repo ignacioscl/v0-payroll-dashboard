@@ -26,6 +26,11 @@ export type TableExportSheet<T> = {
   stamp: string
   columns: readonly TableExportColumn<T>[]
   rows: readonly T[]
+  /**
+   * Optional: 'warn' writes that row in the error color (THEME.warnFg), like the rows in red on the screen
+   * (plans/plan-window-tint-closing-tint-y-servicios T5, D3). Without it every row is as before.
+   */
+  rowTone?: (row: T) => 'warn' | undefined
 }
 
 export type TableExportWorkbookOptions<T> = {
@@ -103,9 +108,12 @@ function writeDataSheet<T>(workbook: ExcelJS.Workbook, opts: TableExportSheet<T>
   opts.rows.forEach((row, index) => {
     const excelRow = sheet.addRow(opts.columns.map((c) => c.value(row)))
     styleDataRow(excelRow, colCount, index % 2 === 1)
+    const warn = opts.rowTone?.(row) === 'warn'
     opts.columns.forEach((c, i) => {
+      const cell = excelRow.getCell(i + 1)
       const fmt = NUM_FMT[c.kind]
-      if (fmt) excelRow.getCell(i + 1).numFmt = fmt
+      if (fmt) cell.numFmt = fmt
+      if (warn) cell.font = { color: { argb: THEME.warnFg } }
     })
   })
 }
