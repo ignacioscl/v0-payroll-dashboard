@@ -187,8 +187,35 @@ export interface CatalogItem {
   name: string
   active: boolean
   expensesCount: number
+  /** Nada la usa (tampoco gastos borrados, reglas ni compañías que la tengan de última): se puede borrar. */
+  deletable: boolean
   /** Solo en compañías (D4): la última categoría con la que se cargó un gasto. */
   lastCategory?: { id: number; name: string; active: boolean } | null
+  /** Solo en categorías: Merge solo une categorías con la misma clase (los cierres leen tint y Accident por nombre). */
+  closingClass?: 'tint' | 'accident' | null
+  /** Solo con `duplicatesOnly`: número de grupo (0, 1, 2…) para alternar el fondo (plan-expenses-posibles-duplicados). */
+  duplicateGroup?: number
+}
+
+/** Página del listado de Settings; `groups` solo con `duplicatesOnly`. */
+export type CatalogPage = Paginated<CatalogItem> & { groups?: number }
+
+/** Respuesta del alta: `existing` si ya había una con ese nombre; `reactivated` si estaba inactiva y se reactivó. */
+export type CatalogCreateResult = CatalogItem & { existing: boolean; reactivated: boolean }
+
+/** Lo que pasa a la elegida al unificar (solo lo de la empresa). */
+export interface CatalogUsage {
+  expenses: number
+  deletedExpenses: number
+  rules: number
+  companies: number
+}
+
+export interface CatalogMergeResult {
+  target: CatalogItem
+  expensesMoved: number
+  rulesMoved: number
+  companiesUpdated: number
 }
 
 export interface CatalogListParams {
@@ -196,6 +223,10 @@ export interface CatalogListParams {
   page: number
   pageSize?: number
   activeOnly?: boolean
+  /** Solo inactivas (Settings, «Show inactive»). */
+  inactiveOnly?: boolean
+  /** Solo los nombres parecidos, activas e inactivas (Settings, «Possible duplicates»). */
+  duplicatesOnly?: boolean
 }
 
 // Recurrentes
@@ -440,21 +471,39 @@ export function fetchExpenseEmployees(term: string, idDealer: string | null): Pr
 }
 
 // Catálogo
-export function fetchCatalog(kind: CatalogKind, params: CatalogListParams): Promise<Paginated<CatalogItem>> {
+export function fetchCatalog(kind: CatalogKind, params: CatalogListParams): Promise<CatalogPage> {
   return requestJson(
     `${EXPENSES_BASE_URL}/${kind}${qs({
       term: params.term,
       page: params.page,
       pageSize: params.pageSize,
       activeOnly: params.activeOnly ? 1 : undefined,
+      inactiveOnly: params.inactiveOnly ? 1 : undefined,
+      duplicatesOnly: params.duplicatesOnly ? 1 : undefined,
     })}`,
     { method: 'GET' },
     'Failed to load catalog',
   )
 }
 
-export function createCatalogItem(kind: CatalogKind, name: string): Promise<CatalogItem & { existing: boolean }> {
+export function createCatalogItem(kind: CatalogKind, name: string): Promise<CatalogCreateResult> {
   return requestJson(`${EXPENSES_BASE_URL}/${kind}`, { method: 'POST', body: JSON.stringify({ name }) }, 'Failed to save')
+}
+
+export function deleteCatalogItem(kind: CatalogKind, id: number): Promise<void> {
+  return requestJson(`${EXPENSES_BASE_URL}/${kind}/${id}`, { method: 'DELETE' }, 'Failed to delete')
+}
+
+export function fetchCatalogUsage(kind: CatalogKind, id: number): Promise<CatalogUsage> {
+  return requestJson(`${EXPENSES_BASE_URL}/${kind}/${id}/usage`, { method: 'GET' }, 'Failed to load')
+}
+
+export function mergeCatalogItem(kind: CatalogKind, id: number, targetId: number): Promise<CatalogMergeResult> {
+  return requestJson(
+    `${EXPENSES_BASE_URL}/${kind}/${id}/merge`,
+    { method: 'POST', body: JSON.stringify({ targetId }) },
+    'Failed to save',
+  )
 }
 
 export function updateCatalogItem(

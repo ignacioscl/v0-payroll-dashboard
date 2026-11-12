@@ -29,6 +29,8 @@ export interface DataTableQueryResult<TData> {
   total: number
   pageCount: number
   hasMore?: boolean
+  /** Datos de la respuesta que no son filas (p. ej. `groups` de Expenses › Settings, «Possible duplicates»). */
+  meta?: Record<string, unknown>
 }
 
 export interface DataTableServerAdapter<TData, TRaw = unknown> {

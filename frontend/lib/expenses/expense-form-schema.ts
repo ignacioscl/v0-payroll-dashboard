@@ -35,6 +35,8 @@ export interface CatalogChoiceValue {
   name: string
   active?: boolean
   lastCategory?: { id: number; name: string; active: boolean } | null
+  /** Gastos que la usan (columna Expenses de Settings); solo lo trae el combo del Merge. */
+  expensesCount?: number
 }
 
 export interface BranchInputValue {

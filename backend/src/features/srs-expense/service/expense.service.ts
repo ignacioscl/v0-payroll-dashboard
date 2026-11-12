@@ -27,4 +27,16 @@ export class ExpenseService extends GlobalBaseService<Expense, ExpenseQueryDto> 
   findOwnedByIds(ids: number[], idDetailer: number) {
     return this.repository.findOwnedByIds(ids, idDetailer)
   }
+
+  catalogUsage(field: 'idCompany' | 'idCategory', idCatalog: number, idDetailer: number) {
+    return this.repository.catalogUsage(field, idCatalog, idDetailer)
+  }
+
+  findByCatalog(field: 'idCompany' | 'idCategory', idCatalog: number, idDetailer: number) {
+    return this.repository.findByCatalog(field, idCatalog, idDetailer)
+  }
+
+  reassignCatalog(field: 'idCompany' | 'idCategory', fromId: number, toId: number, idDetailer: number) {
+    return this.repository.reassignCatalog(field, fromId, toId, idDetailer)
+  }
 }

@@ -54,7 +54,8 @@ export function SettingsItemDialog({
         await updateMut.mutateAsync({ id: item.id, name: values.name })
       } else {
         const created = await createMut.mutateAsync(values.name)
-        if (created.existing) {
+        // Ya había una activa con ese nombre: error. Si solo había una inactiva, el servidor la reactivó: éxito (D3).
+        if (created.existing && !created.reactivated) {
           form.setError('name', { type: 'server', message: t('expenses.errNameExists') })
           return
         }

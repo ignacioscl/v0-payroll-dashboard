@@ -43,4 +43,35 @@ export class ExpenseRepository extends BaseRepository<Expense, ExpenseQueryDto> 
     if (!ids.length) return Promise.resolve([])
     return this.find({ where: { id: In(ids), idDetailer }, order: { id: 'ASC' } })
   }
+
+  /**
+   * Gastos de la empresa que usan una compañía o categoría del catálogo: vivos y no vivos, contados como la columna
+   * «Expenses» de Settings (un gasto repartido cuenta una vez). Siempre acotado por `id_detailer`.
+   */
+  async catalogUsage(field: 'idCompany' | 'idCategory', idCatalog: number, idDetailer: number): Promise<{ live: number; notLive: number }> {
+    const raw = await this.createQueryBuilder('e')
+      .select(
+        "COUNT(DISTINCT CASE WHEN e.estado = 1 THEN IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group)) END)",
+        'live',
+      )
+      .addSelect(
+        "COUNT(DISTINCT CASE WHEN e.estado <> 1 THEN IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group)) END)",
+        'notLive',
+      )
+      .where(`e.${field} = :idCatalog`, { idCatalog })
+      .andWhere('e.idDetailer = :idDetailer', { idDetailer })
+      .getRawOne<{ live: unknown; notLive: unknown }>()
+    return { live: Number(raw?.live ?? 0), notLive: Number(raw?.notLive ?? 0) }
+  }
+
+  /** Las filas de la empresa (cualquier estado) que usan la compañía o categoría. */
+  findByCatalog(field: 'idCompany' | 'idCategory', idCatalog: number, idDetailer: number): Promise<Expense[]> {
+    return this.find({ where: { [field]: idCatalog, idDetailer }, order: { id: 'ASC' } })
+  }
+
+  /** Pasa las filas de la empresa de una compañía o categoría a otra; devuelve cuántas cambió. */
+  async reassignCatalog(field: 'idCompany' | 'idCategory', fromId: number, toId: number, idDetailer: number): Promise<number> {
+    const result = await this.update({ [field]: fromId, idDetailer }, { [field]: toId })
+    return Number(result.affected ?? 0)
+  }
 }

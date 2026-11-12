@@ -24,11 +24,35 @@ export class GenericDataService extends GlobalBaseService<GenericData, GenericDa
     return this.repository.findActiveByName(name, idCategoria, idDealerProvider, excludeId)
   }
 
+  findByNameActiveFirst(name: string, idCategoria: number, idDealerProvider: number) {
+    return this.repository.findByNameActiveFirst(name, idCategoria, idDealerProvider)
+  }
+
   listCatalog(input: Parameters<GenericDataRepository['listCatalog']>[0]) {
     return this.repository.listCatalog(input)
   }
 
+  catalogNames(idCategoria: number, idDealerProvider: number) {
+    return this.repository.catalogNames(idCategoria, idDealerProvider)
+  }
+
   expensesCountOf(id: number, idCategoria: number) {
     return this.repository.expensesCountOf(id, idCategoria)
+  }
+
+  inUseOf(id: number, idCategoria: number) {
+    return this.repository.inUseOf(id, idCategoria)
+  }
+
+  deleteOwned(id: number, idCategoria: number, idDealerProvider: number) {
+    return this.repository.deleteOwned(id, idCategoria, idDealerProvider)
+  }
+
+  childrenOf(fromId: number, idCategoria: number, idDealerProvider: number) {
+    return this.repository.childrenOf(fromId, idCategoria, idDealerProvider)
+  }
+
+  reassignParent(fromId: number, toId: number, idCategoria: number, idDealerProvider: number) {
+    return this.repository.reassignParent(fromId, toId, idCategoria, idDealerProvider)
   }
 }
