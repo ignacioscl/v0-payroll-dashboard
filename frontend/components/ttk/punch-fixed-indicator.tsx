@@ -43,7 +43,7 @@ export function PunchFixedIndicator({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex shrink-0 cursor-pointer rounded-sm text-emerald-600 transition-colors hover:bg-emerald-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-emerald-400"
+          className="inline-flex shrink-0 cursor-pointer rounded-sm text-emerald-600 transition-colors hover:bg-emerald-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`${t('punch.corrected')} — ${t('punch.correctedBy')} ${who}, ${t('punch.correctedWhen')} ${when}`}
         >
           <CheckCircle2 className="h-3.5 w-3.5" />

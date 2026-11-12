@@ -225,10 +225,6 @@ export default function IncomeByDealerPage() {
         },
         meta: {
           label: t('dealer.label'),
-          exportValue: (row) =>
-            removedIds.has(row.dealerId)
-              ? `${row.dealer} ${t('businessKpis.removedDealerSuffix')}`
-              : row.dealer,
         } satisfies DataTableColumnMeta<IncomeByDealerRow>,
       },
       {
@@ -241,8 +237,6 @@ export default function IncomeByDealerPage() {
         meta: {
           label: t('incomeByDealer.colIncome'),
           numeric: true,
-          money: true,
-          exportValue: (row) => row.income,
         } satisfies DataTableColumnMeta<IncomeByDealerRow>,
       },
     ],
@@ -594,7 +588,6 @@ export default function IncomeByDealerPage() {
             defaultPageSize={25}
             includeAllPageSize
             enableGlobalFilter={false}
-            enableExport={false}
             recordsCount={y.dealers.length}
             recordsCountLabel={t('dealer.labelPlural')}
             renderSubComponent={(row) => (

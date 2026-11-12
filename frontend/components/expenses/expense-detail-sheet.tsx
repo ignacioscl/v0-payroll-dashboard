@@ -85,7 +85,7 @@ export function ExpenseDetailSheet({
                   : t('expenses.branch')}
               </div>
               {row.kind === 'group' && row.readOnly ? (
-                <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{t('expenses.partialTooltip')}</p>
+                <p className="mb-2 text-xs text-amber-700">{t('expenses.partialTooltip')}</p>
               ) : null}
               <ul className="divide-y divide-border rounded-md border border-border">
                 {rows.map((r) => (

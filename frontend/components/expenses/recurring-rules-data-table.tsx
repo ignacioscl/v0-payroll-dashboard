@@ -93,7 +93,7 @@ export function RecurringRulesDataTable({
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.ruleDescription')} />,
         cell: ({ row }) => {
           const warnings = row.original.warnings ?? []
-          const icon = <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          const icon = <AlertTriangle className="size-3.5 shrink-0 text-amber-600" />
           return (
             <div className="flex min-w-0 flex-col gap-1">
               <span className="flex min-w-0 items-center gap-1.5">
@@ -116,7 +116,7 @@ export function RecurringRulesDataTable({
               {/* En celular no hay hover: el aviso va escrito debajo, como las notas en Expenses List. */}
               {warnings.length && isMobile
                 ? warnings.map((w) => (
-                    <span key={w} className="flex items-start gap-1 whitespace-normal break-words text-xs text-amber-700 dark:text-amber-400">
+                    <span key={w} className="flex items-start gap-1 whitespace-normal break-words text-xs text-amber-700">
                       {icon}
                       {w}
                     </span>
@@ -152,7 +152,7 @@ export function RecurringRulesDataTable({
         size: 120,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.ruleAmount')} />,
         cell: ({ row }) => <span className="tabular-nums">{fmtAmount(row.original.amount)}</span>,
-        meta: { label: t('expenses.ruleAmount'), numeric: true, money: true } satisfies DataTableColumnMeta<RuleRow>,
+        meta: { label: t('expenses.ruleAmount'), numeric: true } satisfies DataTableColumnMeta<RuleRow>,
       },
       {
         accessorKey: 'splitType',
@@ -350,7 +350,6 @@ export function RecurringRulesDataTable({
           setPageIndex(0)
         }}
         manualFiltering
-        enableExport={false}
         density="compact"
         headerVariant="colored"
         emptyState={

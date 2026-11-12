@@ -10,7 +10,6 @@ export { DataTableColumnFilter } from './data-table-column-filter'
 export { DataTablePagination } from './data-table-pagination'
 export { DataTableToolbar } from './data-table-toolbar'
 export { DataTableViewOptions } from './data-table-view-options'
-export { DataTableExport } from './data-table-export'
 
 /* Filter / sort helpers + types */
 export {

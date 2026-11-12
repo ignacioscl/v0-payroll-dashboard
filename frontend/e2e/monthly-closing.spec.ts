@@ -42,6 +42,15 @@ async function pickDealersAndMonth(page: Page, month: string) {
   if (mobile) await page.getByRole('button', { name: 'Apply' }).click()
 }
 
+/**
+ * Espera los datos del reporte: la línea de quincenas sale recién con la respuesta. Con All Dealers la consulta de lo
+ * facturado (srs-kpi-billed-lines.ts) tarda ~10-30 s contra la copia local de PROD, más que los 15 s de cada `expect`
+ * (tarea `monthly-closing-lento-local`, 12/11/2026). La fila de «cargando» también es un `tbody tr`: no sirve de señal.
+ */
+async function waitForClosingData(page: Page) {
+  await expect(page.locator('main').getByText(/^Pay periods: /)).toBeVisible({ timeout: 90_000 })
+}
+
 async function openReport(page: Page, menuLabel: string) {
   await login(page)
   await openMobileMenuIfNeeded(page)
@@ -92,6 +101,7 @@ test.describe.serial('Monthly Closing — full path', () => {
   test('table, help, dealer detail, Without dealer and Excel', async ({ page, isMobile }) => {
     await openReport(page, 'Monthly Closing')
     await pickDealersAndMonth(page, 'September 2026')
+    await waitForClosingData(page)
 
     const main = page.locator('main')
     await expect(main.getByText('September 2026', { exact: false }).first()).toBeVisible()
@@ -141,6 +151,7 @@ test.describe.serial('Monthly Closing — full path', () => {
   test('Window Tint Closing: dealers in red, the note, By service in the detail and the Excel', async ({ page, isMobile }) => {
     await openReport(page, 'Window Tint Closing')
     await pickDealersAndMonth(page, 'October 2026')
+    await waitForClosingData(page)
 
     const main = page.locator('main')
     await expect(main.getByRole('columnheader', { name: /Vehicles/i })).toBeVisible()

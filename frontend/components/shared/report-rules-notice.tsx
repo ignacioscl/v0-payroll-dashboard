@@ -37,7 +37,7 @@ export function ReportRulesNotice({ screen }: { screen: ReportRulesScreen }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex min-w-0 max-w-full cursor-pointer items-start gap-1.5 rounded text-left text-sm font-medium text-sky-700 transition-colors hover:text-sky-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-sky-300 dark:hover:text-sky-100"
+            className="inline-flex min-w-0 max-w-full cursor-pointer items-start gap-1.5 rounded text-left text-sm font-medium text-sky-700 transition-colors hover:text-sky-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span className="min-w-0">{title}</span>

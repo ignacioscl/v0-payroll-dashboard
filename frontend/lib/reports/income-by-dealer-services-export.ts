@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs'
+import type ExcelJS from 'exceljs'
 import {
   applyHeaderRow,
   applyTitleRow,
@@ -205,13 +205,21 @@ function sheetName(name: string): string {
   return name.replace(/[:\\/?*[\]]/g, ' ').slice(0, 31)
 }
 
-export function buildIncomeServicesWorkbook(input: IncomeServicesExportInput, generatedAt = new Date()): ExcelJS.Workbook {
+/**
+ * Arma el libro. Recibe `exceljs` ya cargado (`Excel`): la pantalla lo carga recién al exportar
+ * (plans/plan-buenas-practicas-v0, 1.6) y el test lo importa directo.
+ */
+export function buildIncomeServicesWorkbook(
+  Excel: typeof ExcelJS,
+  input: IncomeServicesExportInput,
+  generatedAt = new Date(),
+): ExcelJS.Workbook {
   const { years, labels, reportInfo, generatedBy, removedIds, removedNames = [] } = input
   const stamp = `${labels.generated} ${formatUsDateTimeForExport(generatedAt.toISOString())} · ${generatedBy} · ${labels.title}`
   const dealerName = (d: IncomeServicesDealer) =>
     removedIds?.has(d.dealerId) ? `${d.dealer} ${labels.removedSuffix}` : d.dealer
 
-  const workbook = new ExcelJS.Workbook()
+  const workbook = new Excel.Workbook()
   workbook.creator = 'SRS Payroll Dashboard'
   workbook.created = generatedAt
 
@@ -387,6 +395,7 @@ export function buildIncomeServicesWorkbook(input: IncomeServicesExportInput, ge
 }
 
 export async function exportIncomeServicesXlsx(input: IncomeServicesExportInput): Promise<void> {
-  const workbook = buildIncomeServicesWorkbook(input)
+  const Excel = (await import('exceljs')).default
+  const workbook = buildIncomeServicesWorkbook(Excel, input)
   await downloadExcelWorkbook(workbook, `${input.labels.fileName}-${todayUsForFilename()}.xlsx`)
 }

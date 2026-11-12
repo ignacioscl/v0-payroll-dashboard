@@ -1,7 +1,7 @@
 'use client'
 
 import { Bell, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -43,7 +43,7 @@ export function NotificationsPopover() {
           </div>
         </div>
 
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut', delay: 0.05 }}
@@ -58,7 +58,7 @@ export function NotificationsPopover() {
           <p className="mt-1.5 max-w-[220px] text-xs leading-relaxed text-muted-foreground">
             {t('layout.notificationsFuture')}
           </p>
-        </motion.div>
+        </m.div>
       </PopoverContent>
     </Popover>
   )

@@ -79,7 +79,7 @@ export function AnalyticsTable({
         size: 130,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.total')} />,
         cell: ({ row }) => <span className="font-medium tabular-nums">{fmtAmount(row.original.total)}</span>,
-        meta: { label: t('expenses.total'), numeric: true, money: true } satisfies DataTableColumnMeta<AnalyticsRow>,
+        meta: { label: t('expenses.total'), numeric: true } satisfies DataTableColumnMeta<AnalyticsRow>,
       },
       {
         id: 'pctOfTotal',
@@ -99,7 +99,7 @@ export function AnalyticsTable({
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.vsPrevious')} />,
         cell: ({ row }) => {
           const d = diff(row.original.total, row.original.prevTotal)
-          const tone = d.amount > 0 ? 'text-destructive' : d.amount < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
+          const tone = d.amount > 0 ? 'text-destructive' : d.amount < 0 ? 'text-emerald-700' : 'text-muted-foreground'
           return (
             <span className={cn('tabular-nums', tone)}>
               {d.amount > 0 ? '+' : ''}
@@ -137,7 +137,6 @@ export function AnalyticsTable({
       defaultPageSize={25}
       includeAllPageSize
       enableGlobalFilter={false}
-      enableExport={false}
       exportAction={
         <ServerXlsxExportButton
           url={params ? analyticsExportUrl(params) : null}

@@ -392,7 +392,6 @@ export function RoleTemplatesDataTable({
         }}
         manualFiltering
         // No Excel: it only took the visible page (decision B, plans/plan-report-info-exports-tablas).
-        enableExport={false}
         density="compact"
         headerVariant="colored"
         emptyState={

@@ -170,7 +170,7 @@ export function RoleActivitySheet({
                       title={t('roleTemplates.activityAdded')}
                       items={detail.added}
                       prefix="+"
-                      className="border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
+                      className="border-emerald-200 bg-emerald-50 text-emerald-950"
                     />
                     <ActivityList
                       title={t('roleTemplates.activityRemoved')}

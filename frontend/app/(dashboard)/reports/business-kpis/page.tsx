@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import {
@@ -34,11 +35,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/kpi-card'
-import { ProductionWeekChart } from '@/components/dashboard/production-week-chart'
-import { BillingWeekChart } from '@/components/dashboard/billing-week-chart'
-import { InvoiceCollectionMonthChart } from '@/components/dashboard/invoice-collection-month-chart'
-import { UnbilledAgingChart } from '@/components/dashboard/unbilled-aging-chart'
-import { PayrollByTypeChart } from '@/components/dashboard/payroll-by-type-chart'
+import { ChartCardSkeleton } from '@/components/dashboard/chart-card-skeleton'
 import { PieceworkDiffDialog } from '@/components/dashboard/piecework-diff-dialog'
 import { UnbilledByDealerTable } from '@/components/dashboard/unbilled-by-dealer-table'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
@@ -82,6 +79,29 @@ import {
 } from '@/lib/srs-kpis-api'
 import { diffShown, dollars, fmtMoney as fmtMoneyCents, fmtMoneyAxis, shownPending, sumShown } from '@/lib/kpi-money'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
+
+// Cada gráfico va en una solapa: recharts se baja recién al abrirla (plans/plan-buenas-practicas-v0, 1.6;
+// doc de Next `02-guides/lazy-loading.md`). Mientras, la tarjeta con su alto, para que no salte nada.
+const ProductionWeekChart = dynamic(
+  () => import('@/components/dashboard/production-week-chart').then((m) => m.ProductionWeekChart),
+  { ssr: false, loading: () => <ChartCardSkeleton height={280} /> },
+)
+const BillingWeekChart = dynamic(
+  () => import('@/components/dashboard/billing-week-chart').then((m) => m.BillingWeekChart),
+  { ssr: false, loading: () => <ChartCardSkeleton height={280} /> },
+)
+const UnbilledAgingChart = dynamic(
+  () => import('@/components/dashboard/unbilled-aging-chart').then((m) => m.UnbilledAgingChart),
+  { ssr: false, loading: () => <ChartCardSkeleton height={280} /> },
+)
+const InvoiceCollectionMonthChart = dynamic(
+  () => import('@/components/dashboard/invoice-collection-month-chart').then((m) => m.InvoiceCollectionMonthChart),
+  { ssr: false, loading: () => <ChartCardSkeleton height={300} /> },
+)
+const PayrollByTypeChart = dynamic(
+  () => import('@/components/dashboard/payroll-by-type-chart').then((m) => m.PayrollByTypeChart),
+  { ssr: false, loading: () => <ChartCardSkeleton height={280} /> },
+)
 
 const fmtMoney = (n: number | undefined) =>
   n === undefined ? '—' : fmtMoneyCents(n)
@@ -705,7 +725,7 @@ export default function BusinessKpisPage() {
                   </span>
                 </p>
                 {spendBeforeData && s ? (
-                  <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+                  <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-700">
                     <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
                     <span>{t('businessKpis.payrollNoDataBefore', { date: formatUsCalendarDate(s.dataFrom) })}</span>
                   </p>
@@ -774,7 +794,7 @@ export default function BusinessKpisPage() {
                       <>
                         <p>{t('mockKpis.pieceworkWorkOrders', { amount: fmtCents(s.pieceworkWorkOrders) })}</p>
                         {s.pieceworkHasDifference ? (
-                          <p className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                          <p className="flex items-center gap-1 text-amber-700">
                             <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
                             <span>
                               {t('mockKpis.pieceworkDifference', {
@@ -861,27 +881,27 @@ const kpiTabAccentStyles: Record<
   emerald: {
     icon: 'group-data-[state=active]:bg-emerald-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-emerald-500/35',
     ring: 'group-data-[state=active]:ring-emerald-500/25',
-    label: 'group-data-[state=active]:text-emerald-950 dark:group-data-[state=active]:text-emerald-50',
+    label: 'group-data-[state=active]:text-emerald-950',
   },
   sky: {
     icon: 'group-data-[state=active]:bg-accent group-data-[state=active]:text-white group-data-[state=active]:shadow-accent/35',
     ring: 'group-data-[state=active]:ring-accent/25',
-    label: 'group-data-[state=active]:text-accent dark:group-data-[state=active]:text-accent',
+    label: 'group-data-[state=active]:text-accent',
   },
   amber: {
     icon: 'group-data-[state=active]:bg-amber-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-amber-500/35',
     ring: 'group-data-[state=active]:ring-amber-500/25',
-    label: 'group-data-[state=active]:text-amber-950 dark:group-data-[state=active]:text-amber-50',
+    label: 'group-data-[state=active]:text-amber-950',
   },
   violet: {
     icon: 'group-data-[state=active]:bg-violet-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-violet-500/35',
     ring: 'group-data-[state=active]:ring-violet-500/25',
-    label: 'group-data-[state=active]:text-violet-950 dark:group-data-[state=active]:text-violet-50',
+    label: 'group-data-[state=active]:text-violet-950',
   },
   rose: {
     icon: 'group-data-[state=active]:bg-rose-500 group-data-[state=active]:text-white group-data-[state=active]:shadow-rose-500/35',
     ring: 'group-data-[state=active]:ring-rose-500/25',
-    label: 'group-data-[state=active]:text-rose-950 dark:group-data-[state=active]:text-rose-50',
+    label: 'group-data-[state=active]:text-rose-950',
   },
 }
 

@@ -12,7 +12,7 @@ export function PunchManualIndicator() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex shrink-0 cursor-pointer rounded-sm text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-accent"
+          className="inline-flex shrink-0 cursor-pointer rounded-sm text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={t('punch.manual')}
         >
           <Hand className="h-3.5 w-3.5" />

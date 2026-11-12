@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useSidebar } from '@/lib/sidebar-context'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft,
   ChevronRight,
@@ -193,7 +193,7 @@ function SidebarInner({
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-3">
         <AnimatePresence mode="wait">
           {!effectiveCollapsed ? (
-            <motion.div
+            <m.div
               key="expanded"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -202,9 +202,9 @@ function SidebarInner({
               className="flex items-center pl-1"
             >
               <Logo size="sidebar" />
-            </motion.div>
+            </m.div>
           ) : (
-            <motion.div
+            <m.div
               key="collapsed"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -213,7 +213,7 @@ function SidebarInner({
               className="mx-auto flex items-center justify-center"
             >
               <Logo size="compact" descriptor={false} />
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -272,7 +272,7 @@ function SidebarInner({
             )
 
             const activeBar = isActive ? (
-              <motion.div
+              <m.div
                 layoutId="activeIndicator"
                 className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-sm shadow-white/40"
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
@@ -293,7 +293,7 @@ function SidebarInner({
             const labelEl = (
               <AnimatePresence>
                 {!effectiveCollapsed && (
-                  <motion.span
+                  <m.span
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: 'auto' }}
                     exit={{ opacity: 0, width: 0 }}
@@ -301,7 +301,7 @@ function SidebarInner({
                     className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left"
                   >
                     {item.name}
-                  </motion.span>
+                  </m.span>
                 )}
               </AnimatePresence>
             )
@@ -395,7 +395,7 @@ function SidebarInner({
                 </button>
                 <AnimatePresence initial={false}>
                   {isGroupOpen ? (
-                    <motion.div
+                    <m.div
                       key="submenu"
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
@@ -425,7 +425,7 @@ function SidebarInner({
                           )
                         })}
                       </div>
-                    </motion.div>
+                    </m.div>
                   ) : null}
                 </AnimatePresence>
               </div>
@@ -514,7 +514,7 @@ function SidebarInner({
         </DropdownMenu>
 
         <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent aria-describedby={undefined} className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>{t('profile.title')}</DialogTitle>
             </DialogHeader>
@@ -553,18 +553,18 @@ export function Sidebar() {
   return (
     <TooltipProvider delayDuration={0}>
       {/* Desktop sidebar — hidden on mobile */}
-      <motion.aside
+      <m.aside
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
         className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
       >
         <SidebarInner />
-      </motion.aside>
+      </m.aside>
 
       {/* Mobile sidebar — Sheet overlay, no minimized state */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
+        <SheetContent aria-describedby={undefined}
           side="left"
           className="p-0 w-[260px] bg-sidebar bg-[image:var(--sidebar-gradient)] border-sidebar-border [&>button]:text-white/60 [&>button]:hover:text-white"
         >

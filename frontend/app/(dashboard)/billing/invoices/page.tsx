@@ -298,7 +298,7 @@ export default function InvoicesPage() {
           // Con el rango ignorado, imprimir fechas que no filtran es el mismo engaño
           // que el botón de arriba ya dejó de hacer.
           ignorePeriodEffective ? (
-            <span className="font-medium text-amber-700 dark:text-amber-300">
+            <span className="font-medium text-amber-700">
               {t('invoices.subtitleAllDates')}
             </span>
           ) : headerRangeLabel ? (

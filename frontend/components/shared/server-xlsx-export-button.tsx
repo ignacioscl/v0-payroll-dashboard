@@ -30,7 +30,7 @@ type ServerXlsxExportButtonProps = {
 
 /**
  * «Export» of a grid whose Excel is built by the backend (plans/plan-report-info-exports-tablas
- * §5.2): same look and toasts as `DataTableExport`, but the file comes from Nest with Report Info.
+ * §5.2): the file comes from Nest with Report Info. The tables have no browser-side Excel.
  */
 export function ServerXlsxExportButton({
   url,

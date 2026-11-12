@@ -19,14 +19,14 @@ export function ExpenseStatusBadge({ row, className }: { row: ExpenseRow; classN
     row.kind === 'group' && row.status === 'pending' && row.approvedCount > 0 && row.approvedCount < row.visibleRows
   if (mixed) {
     return (
-      <Badge variant="outline" className={cn('font-normal text-amber-700 dark:text-amber-400', className)}>
+      <Badge variant="outline" className={cn('font-normal text-amber-700', className)}>
         {t('expenses.statusPartial', { k: row.approvedCount, n: row.visibleRows })}
       </Badge>
     )
   }
   if (row.status === 'approved') {
     return (
-      <Badge variant="secondary" className={cn('font-normal text-emerald-700 dark:text-emerald-400', className)}>
+      <Badge variant="secondary" className={cn('font-normal text-emerald-700', className)}>
         {t('expenses.statusApproved')}
       </Badge>
     )

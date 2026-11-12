@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import {
   Mail,
   Lock,
@@ -98,7 +98,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
 
   return (
     <div className="relative flex min-h-screen flex-col lg:flex-row">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -117,26 +117,26 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
           </div>
 
           <div className="relative z-10 my-10 hidden flex-1 flex-col justify-center lg:flex">
-            <motion.h1
+            <m.h1
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.5 }}
               className="max-w-md text-3xl font-bold leading-tight tracking-tight xl:text-4xl"
             >
               {t('auth.heroTitle')}
-            </motion.h1>
-            <motion.p
+            </m.h1>
+            <m.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.5 }}
               className="mt-4 max-w-sm text-sm leading-relaxed text-white/75"
             >
               {t('auth.heroSubtitle')}
-            </motion.p>
+            </m.p>
 
             <ul className="mt-10 space-y-5">
               {FEATURE_KEYS.map((feature, i) => (
-                <motion.li
+                <m.li
                   key={feature.titleKey}
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -152,7 +152,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
                       {t(feature.descKey)}
                     </p>
                   </div>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
           </div>
@@ -160,10 +160,10 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
           <p className="relative z-10 hidden text-xs text-white/50 lg:block">
             &copy; {new Date().getFullYear()} {t('auth.suiteTitle')}
           </p>
-        </motion.div>
+        </m.div>
 
         <div className="flex flex-1 items-center justify-center bg-background px-6 py-12 lg:px-16">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.1 }}
@@ -218,7 +218,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
               </div>
 
               {error && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                 >
@@ -226,7 +226,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
                     <AlertCircle />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
-                </motion.div>
+                </m.div>
               )}
 
               <Button
@@ -257,7 +257,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
                 </a>
               </p>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </div>
   )

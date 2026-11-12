@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
-
 :root {
   /* SRS Suite Pro - navy chrome. Fixed product color, never per-tenant. */
   --navy-700: #26407f;
@@ -106,10 +104,6 @@
      Cyan, so it is not the colour of any invoice type (amber = Generic,
      violet = TTK, the tenant accent = WO). */
   --partial-row-bg: #e0f2fe;
-}
-
-.dark {
-  --partial-row-bg: #0b2b3f;
 }
 
 @theme inline {

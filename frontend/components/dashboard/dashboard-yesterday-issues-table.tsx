@@ -74,7 +74,6 @@ export function DashboardYesterdayIssuesTable() {
         ),
         meta: {
           label: t('common.employee'),
-          exportValue: (r) => r.usuario?.nombre ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -88,7 +87,6 @@ export function DashboardYesterdayIssuesTable() {
         ),
         meta: {
           label: t('dealer.label'),
-          exportValue: (r) => r.dealer?.razonSocial ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -98,7 +96,6 @@ export function DashboardYesterdayIssuesTable() {
         cell: ({ row }) => formatGmtDate(row.original.punchInGmt0) || '—',
         meta: {
           label: t('common.date'),
-          exportValue: (r) => formatGmtDate(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -112,7 +109,6 @@ export function DashboardYesterdayIssuesTable() {
         ),
         meta: {
           label: t('punch.issues'),
-          exportValue: (r) => issueLabel(r),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -131,7 +127,6 @@ export function DashboardYesterdayIssuesTable() {
           ),
         meta: {
           label: t('common.status'),
-          exportValue: (r) => (r.fixedAt ? t('common.corrected') : t('common.open')),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
     ],
@@ -232,7 +227,6 @@ export function DashboardYesterdayIssuesTable() {
         emptyState={emptyState}
         enableGlobalFilter={false}
         enableViewOptions={false}
-        enableExport={false}
         enableColumnResizing={false}
         manualSorting
         sorting={sorting}

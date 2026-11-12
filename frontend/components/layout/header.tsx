@@ -4,13 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Menu, SlidersHorizontal } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
 import { EmployeeSearchInput } from '@/components/filters/employee-search-input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useFilters } from '@/lib/filter-context'
 import { usePathname } from 'next/navigation'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
@@ -43,8 +36,6 @@ export function Header() {
     selectedDealers,
     setSelectedDealers,
     dealerIdAllowList,
-    selectedStatus,
-    setSelectedStatus,
     dateRange,
     setDateRange,
     invoiceDateFrom,
@@ -105,7 +96,6 @@ export function Header() {
     [setInvoiceDateFrom, setInvoiceDateTo, setInvoiceDateMode],
   )
 
-  const showStatusFilter = pathname === '/schedule'
   const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
   const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
   // Expenses has its own «Assigned to» / «Created by» combos (Nest endpoint): the punch employee
@@ -132,8 +122,7 @@ export function Header() {
         : dateRange?.from
           ? 1
           : 0
-      : 0) +
-    (showStatusFilter && selectedStatus && selectedStatus !== 'all' ? 1 : 0)
+      : 0)
 
   const invoiceRangeProps = {
     value: invoiceRange,
@@ -185,20 +174,6 @@ export function Header() {
             className="w-[200px] shrink-0"
           />
 
-          {showStatusFilter && (
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="h-9 w-[130px] shrink-0 border-border bg-background/50">
-                <SelectValue placeholder={t('filters.allStatus')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
-                <SelectItem value="pending">{t('filters.pending')}</SelectItem>
-                <SelectItem value="reviewed">{t('filters.reviewed')}</SelectItem>
-                <SelectItem value="justified">{t('filters.justified')}</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-
           {showDateFilter ? (
             isInvoicesPage ? (
               <DateRangePicker {...invoiceRangeProps} className="shrink-0" />
@@ -241,7 +216,7 @@ export function Header() {
 
       {/* Mobile filters sheet */}
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <SheetContent side="bottom" className="h-auto rounded-t-2xl pb-8">
+        <SheetContent aria-describedby={undefined} side="bottom" className="h-auto rounded-t-2xl pb-8">
           <SheetHeader className="pb-4">
             <SheetTitle>{t('punch.filterPanelTitle')}</SheetTitle>
           </SheetHeader>
@@ -266,24 +241,6 @@ export function Header() {
                 className="w-full"
               />
             </div>
-
-            {/* Status — only on schedule page */}
-            {showStatusFilter && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-muted-foreground">{t('common.status')}</span>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="h-10 w-full">
-                    <SelectValue placeholder={t('filters.allStatus')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
-                    <SelectItem value="pending">{t('filters.pending')}</SelectItem>
-                    <SelectItem value="reviewed">{t('filters.reviewed')}</SelectItem>
-                    <SelectItem value="justified">{t('filters.justified')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {/* Date range / invoice period — hidden on Roles */}
             {showDateFilter ? (

@@ -189,7 +189,6 @@ export function RolesDataTable({
               meta: {
                 label: t('roles.selectRole'),
                 pin: isMobile ? undefined : 'left',
-                exportable: false,
                 headerClassName: 'w-[40px] px-2',
                 cellClassName: 'px-2',
               } satisfies DataTableColumnMeta<RoleListRow>,
@@ -529,7 +528,6 @@ export function RolesDataTable({
         manualFiltering
         // No Excel: it only took the visible page and legacy has no list export (decision B,
         // plans/plan-report-info-exports-tablas).
-        enableExport={false}
         density="compact"
         headerVariant="colored"
         emptyState={

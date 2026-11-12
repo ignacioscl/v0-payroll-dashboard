@@ -65,9 +65,12 @@ export function focusFirstInvalidField(errors: FieldErrors, root: ParentNode = d
   const first = candidates.reduce((a, b) =>
     a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING ? b : a,
   )
-  first.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  // Después del scroll, así el foco no lo pisa (`preventScroll` mantiene el centrado).
+  // En el frame siguiente, con los mensajes de error ya pintados, y sin animación: un scroll suave que
+  // arranca antes de que aparezcan los mensajes termina corrido y deja el campo fuera de la pantalla
+  // (e2e de Expenses en celular, 12/11/2026).
   window.setTimeout(() => {
+    first.scrollIntoView({ block: 'center' })
+    // Después del scroll, así el foco no lo pisa (`preventScroll` mantiene el centrado).
     first.focus({ preventScroll: true })
     if (!first.matches(FOCUSABLE)) first.setAttribute('tabindex', '-1')
   }, 0)

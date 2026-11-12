@@ -80,7 +80,7 @@ export function InvoiceDiscountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {t('invoices.actionDiscountTitle')} — {row.fullNro || `#${row.id}`}

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Michroma } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { AppProviders } from '@/components/app-providers'
 import './globals.css'
 
@@ -44,7 +43,6 @@ export default function RootLayout({
     <html lang="en" className={`bg-background ${michroma.variable}`}>
       <body className="font-sans antialiased">
         <AppProviders>{children}</AppProviders>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

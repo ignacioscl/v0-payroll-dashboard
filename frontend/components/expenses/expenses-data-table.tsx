@@ -183,7 +183,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         size: 120,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colAmount')} />,
         cell: ({ row }) => <span className="font-medium tabular-nums">{fmtAmount(rowAmount(row.original))}</span>,
-        meta: { label: t('expenses.colAmount'), numeric: true, money: true, sortKey: 'amount' } satisfies DataTableColumnMeta<ExpenseRow>,
+        meta: { label: t('expenses.colAmount'), numeric: true,  sortKey: 'amount' } satisfies DataTableColumnMeta<ExpenseRow>,
       },
       {
         id: 'author',
@@ -491,7 +491,6 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         }}
         manualFiltering
         enableGlobalFilter={false}
-        enableExport={false}
         exportAction={
           <ServerXlsxExportButton
             url={filters ? expenseListExportUrl(filters) : null}
@@ -567,7 +566,7 @@ function GroupRows({ row, wrap }: { row: ExpenseRow; wrap: string }) {
   return (
     <div className="min-w-0 px-3 py-2">
       {row.readOnly ? (
-        <p className="mb-1.5 text-[11px] text-amber-700 dark:text-amber-400">{t('expenses.partialTooltip')}</p>
+        <p className="mb-1.5 text-[11px] text-amber-700">{t('expenses.partialTooltip')}</p>
       ) : null}
       <table className="w-full text-xs">
         <thead>

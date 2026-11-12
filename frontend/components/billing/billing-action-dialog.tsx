@@ -21,19 +21,19 @@ const TONE: Record<
 > = {
   sky: {
     wrap: 'bg-accent/12 ring-accent/20',
-    icon: 'text-accent dark:text-accent',
+    icon: 'text-accent',
   },
   emerald: {
     wrap: 'bg-emerald-500/12 ring-emerald-500/20',
-    icon: 'text-emerald-600 dark:text-emerald-400',
+    icon: 'text-emerald-600',
   },
   violet: {
     wrap: 'bg-violet-500/12 ring-violet-500/20',
-    icon: 'text-violet-600 dark:text-violet-400',
+    icon: 'text-violet-600',
   },
   amber: {
     wrap: 'bg-amber-500/12 ring-amber-500/20',
-    icon: 'text-amber-600 dark:text-amber-400',
+    icon: 'text-amber-600',
   },
   slate: {
     wrap: 'bg-muted ring-border/60',

@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { DataTableViewOptions } from './data-table-view-options'
-import { DataTableExport } from './data-table-export'
 import { DATA_TABLE_PAGE_SIZE_ALL } from './data-table-helpers'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import type {
@@ -37,11 +36,7 @@ interface DataTableToolbarProps<TData> {
   globalFilterPlaceholder?: string
 
   enableViewOptions?: boolean
-  enableExport?: boolean
-  exportFileName?: string
-  exportFormats?: Array<'xlsx' | 'csv'>
-  fetchAllRowsForExport?: () => Promise<TData[]>
-  /** The grid's own export button (built by Nest), drawn where DataTableExport goes. */
+  /** The grid's own export button (built by Nest), at the right end. */
   exportAction?: React.ReactNode
 
   pageSizeOptions?: number[]
@@ -75,10 +70,6 @@ export function DataTableToolbar<TData>({
   enableGlobalFilter = true,
   globalFilterPlaceholder = 'Search…',
   enableViewOptions = true,
-  enableExport = false,
-  exportFileName,
-  exportFormats,
-  fetchAllRowsForExport,
   exportAction,
   pageSizeOptions = [10, 25, 50, 100],
   includeAllPageSize = false,
@@ -310,15 +301,6 @@ export function DataTableToolbar<TData>({
         {enableViewOptions && <DataTableViewOptions table={table} />}
 
         {exportAction}
-
-        {enableExport && (
-          <DataTableExport
-            table={table}
-            fileName={exportFileName}
-            fetchAllRows={fetchAllRowsForExport}
-            formats={exportFormats}
-          />
-        )}
       </div>
     </div>
   )

@@ -3,17 +3,11 @@ export interface Messages {
   nav: {
     dashboard: string
     punchReport: string
-    scheduleViolations: string
-    overtime: string
-    trends: string
-    employeeRanking: string
-    costsByDealer: string
     businessKpis: string
     productionVsGoal: string
     incomeByDealer: string
     monthlyClosing: string
     windowTintClosing: string
-    payrollReport: string
     reports: string
     billing: string
     invoices: string
@@ -21,7 +15,6 @@ export interface Messages {
     rolesList: string
     roleTemplates: string
     components: string
-    dataTable: string
     expenses: string
     expensesList: string
     expensesAnalytics: string
@@ -719,7 +712,6 @@ export interface Messages {
     corrections: string
     records: string
     record: string
-    of: string
     noRecords: string
     noDataToDisplay: string
     required: string
@@ -736,7 +728,6 @@ export interface Messages {
     status: string
     date: string
     all: string
-    dev: string
     moreThan: string
     lessThan: string
     hoursShort: string
@@ -769,7 +760,6 @@ export interface Messages {
     active: string
     valuePlaceholder: string
     pickDate: string
-    pageOf: string
     showing: string
     kpiHelpAria: string
   }
@@ -1137,11 +1127,6 @@ export interface Messages {
     loginFailed: string
     preferClassic: string
     signInLegacy: string
-    selectDealer: string
-    selectDealerSubtitle: string
-    filterRoles: string
-    shownCount: string
-    noDealersMatch: string
   }
   access: {
     denied: string
@@ -1223,175 +1208,31 @@ export interface Messages {
     lunchIn: string
     exit: string
   }
-  mockSchedule: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    total: string
-    lateArrivals: string
-    earlyDepartures: string
-    extendedLunch: string
-    avgMinutes: string
-    showingOfRecords: string
-    assignedSchedule: string
-    violation: string
-    actualTime: string
-    difference: string
-    exportViolationType: string
-    exportExpectedTime: string
-    exportDifferenceMin: string
-  }
-  mockOvertime: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    totalHours: string
-    totalCost: string
-    employeesWithOt: string
-    top10Employees: string
-    dailyTrendLast7: string
-    hoursTooltip: string
-    byEmployee: string
-    byDealer: string
-    exportTotalHours: string
-    exportTotalCost: string
-    exportDaysWithOt: string
-    exportAvgHoursDay: string
-    tableTotalHours: string
-    tableTotalCost: string
-    tableDaysWithOt: string
-    tableAvgDay: string
-    tableEmployeesWithOt: string
-    tableAvgEmployee: string
-    showingOf: string
-  }
-  mockTrends: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    last14Days: string
-    periodTotal: string
-    vsPrevious: string
-    dailyAverage: string
-    issuesPerDay: string
-    worstDay: string
-    bestDay: string
-    issueEvolution: string
-    chartTotal: string
-    chartLateArrivals: string
-    chartMissingPunches: string
-    distributionByType: string
-    issuesByDayOfWeek: string
-    dealersMostIssues: string
-    chartTotalIssues: string
-    weekdayMon: string
-    weekdayTue: string
-    weekdayWed: string
-    weekdayThu: string
-    weekdayFri: string
-    weekdaySat: string
-  }
-  mockRanking: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    averageScore: string
-    perfectScore: string
-    criticalScore: string
-    totalIssues: string
-    top3MostPunctual: string
-    top3MostIssues: string
-    mostPunctual: string
-    mostIssues: string
-    searchEmployee: string
-    score: string
-    issues: string
-    daysWorked: string
-    overtime: string
-    progress: string
-    exportScore: string
-    exportIssues: string
-    exportDaysWorked: string
-    exportOvertimeHours: string
-    showingOf: string
-  }
   mockCosts: {
-    title: string
-    subtitle: string
-    exportTitle: string
     activeEmployees: string
-    totalDealers: string
-    totalOvertime: string
-    overtimeCost: string
-    estPayroll: string
-    avgPunctuality: string
-    top10ByOtCost: string
-    payrollDistribution: string
-    regularHours: string
-    overtime: string
-    costTooltip: string
-    hoursTooltip: string
-    searchDealer: string
-    dealerCount: string
-    tableEmployees: string
-    tableIssues: string
-    tableOvertime: string
-    otCost: string
-    punctuality: string
-    costPerEmployee: string
-    exportEmployees: string
-    exportOvertimeHours: string
-    exportOvertimeCost: string
-    exportPunctuality: string
-    showingOf: string
   }
   mockKpis: {
-    title: string
-    subtitle: string
-    vsPrev: string
-    ppVsPrev: string
-    daysVsPrevLowerBetter: string
-    periodLast4Weeks: string
-    periodLast12Weeks: string
     productionValue: string
     wosCompleted: string
-    invoiced: string
     dsoDaysToCollect: string
     punchErrorRate: string
     laborCostRevenue: string
-    tabProduction: string
     tabBilling: string
     tabCollections: string
     tabPunch: string
     tabPayroll: string
     avgCycleTime: string
     onTimeCompletion: string
-    openBacklog: string
-    pendingApproval: string
     inspectionFailRate: string
     createdToDone: string
     vsPromiseDate: string
-    olderThan7Days: string
-    avgHoursToApprove: string
-    failedOverInspected: string
     chartCompletedWosProduction: string
-    chartOpenWoPipeline: string
     chartProductionVsGoal: string
-    chartInvoicedVsProduction: string
     chartInvoicedByWeek: string
     chartNoTaxNote: string
     chartUnbilledAging: string
     unbilledLookbackNote: string
     chartUnbilledByDealer: string
-    chartArAging: string
-    chartCollectedVsInvoiced: string
-    chartSlowestPayers: string
-    chartErrorsByType: string
-    chartErrorRateByWeek: string
-    chartPunchOffenders: string
-    chartPayrollByType: string
-    chartPayrollVsProduction: string
-    chartLaborByDealer: string
     tableWosDone: string
     tableProductionValue: string
     tableGoal: string
@@ -1407,23 +1248,16 @@ export interface Messages {
     genericInvoiced: string
     billingInRangeOutside: string
     billingAllInRange: string
-    billingCoverage: string
     avgPerStatement: string
-    unbilledRevenue: string
-    avgBillingLag: string
     neverSent: string
-    invoicedOverProduction: string
     tableUnbilledWos: string
     tableUnbilledServices: string
     tableUnbilledValue: string
     tableOldestDays: string
     outstandingAr: string
-    dso: string
     collected: string
     collectionRate: string
     arOver60: string
-    cashGap: string
-    openStatements: string
     outstandingArSubtitle: string
     outstandingArOutsideChart: string
     outstandingArNoTax: string
@@ -1431,34 +1265,15 @@ export interface Messages {
     unpaidInPeriodStatements: string
     withTaxDiscount: string
     unpaidNotInvoiced: string
-    dsoVsPrevCheck: string
-    collectedOverInvoiced: string
-    ofTotalOutstanding: string
-    arPlusUnbilled: string
-    tableOutstanding: string
-    tableAvgDaysToPay: string
-    tableOldestOpen: string
-    tableOpenStatements: string
     missingPunchOut: string
     manualPunches: string
     adminCorrections: string
     correctionDelay: string
     deletedPunches: string
-    errorRateOfPunches: string
     missingBreakEndSuffix: string
-    createdByHand: string
-    fixedByAdmins: string
-    punchDateToFixed: string
-    fromAuditLog: string
-    tableMissingOut: string
-    tableManual: string
-    tableCorrected: string
-    tableTotalIssues: string
     totalPayroll: string
-    overtimeCost: string
     costPerWo: string
     revenuePerEmployee: string
-    pctOfPayroll: string
     overtimePayment: string
     overtimeHours: string
     hoursOver40: string
@@ -1469,27 +1284,10 @@ export interface Messages {
     pieceworkDifference: string
     activeEmployeesHourlyRate: string
     piecework: string
-    payrollOverProduction: string
-    payrollOverCompletedWos: string
-    avgRatePerHour: string
-    productionOverHeadcount: string
-    tableHours: string
-    tableOtHours: string
-    tableLaborCost: string
-    tableCostPerWo: string
-    tableLaborPct: string
     chartWosDone: string
     chartProductionDollar: string
     chartInvoicedDollar: string
-    chartCollectedDollar: string
-    chartOutstandingDollar: string
-    chartValueDollar: string
     chartWos: string
-    chartErrorRate: string
-    chartLaborPct: string
-    chartPayrollDollar: string
-    lineageTitle: string
-    lineageBody: string
     woStatus: {
       waiting: string
       inProcess: string
@@ -1803,78 +1601,6 @@ export interface Messages {
       item7: string
     }
   }
-  mockPayrollReport: {
-    title: string
-    subtitle: string
-    week: string
-    role: string
-    form: string
-    allRoles: string
-    allForms: string
-    colId: string
-    colForm: string
-    colEmployeeName: string
-    colRole: string
-    colDailyRate: string
-    colHourlyRate: string
-    colWorkedDaysHours: string
-    colSalary: string
-    colCommission: string
-    colHourlyDaily: string
-    colClosings: string
-    colClosingsDollar: string
-    colSunday: string
-    colSundayDollar: string
-    colProratedDay: string
-    colProratedDollar: string
-    colExtra: string
-    colExtraDollar: string
-    colShop: string
-    colShopDollar: string
-    colOther: string
-    colOtherDollar: string
-    colPiecework: string
-    colNetPay: string
-    colIssues: string
-    employeesCount: string
-    totalNetPay: string
-    punchIssuesCount: string
-    searchPlaceholder: string
-    emptyState: string
-  }
-  dataTableDemo: {
-    layoutTitle: string
-    layoutSubtitle: string
-    tabBasic: string
-    tabBasicDesc: string
-    tabFixedColumns: string
-    tabFixedColumnsDesc: string
-    tabFilters: string
-    tabFiltersDesc: string
-    howConfigured: string
-    colId: string
-    colEmployee: string
-    colDepartment: string
-    colPosition: string
-    colSalary: string
-    colHireDate: string
-    colStatus: string
-    colName: string
-    colEmail: string
-    statusActive: string
-    statusOnLeave: string
-    statusTerminated: string
-    searchPlaceholder: string
-    basicTitle: string
-    basicDescription: string
-    filtersHint: string
-    filtersTitle: string
-    filtersDescription: string
-    fixedPinHint: string
-    fixedTitle: string
-    fixedDescription: string
-    qBonus: string
-  }
   systemConfig: {
     title: string
     subtitle: string
@@ -1962,54 +1688,6 @@ export interface Messages {
     logoRemoved: string
     saveFailed: string
   }
-  mockEmployees: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    totalEmployees: string
-    active: string
-    inactive: string
-    avgIssues: string
-    searchPlaceholder: string
-    hireDate: string
-    schedule: string
-    employeeDetails: string
-    recentIssues: string
-    noRecentIssues: string
-    rate: string
-    showingEmployees: string
-    exportId: string
-    exportName: string
-    exportPosition: string
-    exportHireDate: string
-    exportOvertimeHours: string
-    exportStatus: string
-  }
-  mockDealers: {
-    title: string
-    subtitle: string
-    exportTitle: string
-    totalDealers: string
-    totalEmployees: string
-    totalIssues: string
-    avgPunctuality: string
-    searchPlaceholder: string
-    employeesCount: string
-    issuesLabel: string
-    selectDealer: string
-    assignedEmployees: string
-    moreEmployees: string
-    recentIssues: string
-    noRecentIssues: string
-    comparisonChart: string
-    dealersCount: string
-    exportEmployees: string
-    exportOvertimeHours: string
-    exportOvertimeCost: string
-    exportPunctuality: string
-    chartIssues: string
-    chartEmployees: string
-  }
   authError: {
     title: string
     body: string
@@ -2040,13 +1718,6 @@ export interface Messages {
     deleteItem: string
     clearSearch: string
     navigateHint: string
-  }
-  ttkTable: {
-    selectDealers: string
-    loadingFilters: string
-    selectDealerInHeader: string
-    noRecordsForFilters: string
-    roleDept: string
   }
   /** Expenses in Pro (plans/plan-expenses-pro/PLAN.md T9: the English texts are literal). */
   expenses: {

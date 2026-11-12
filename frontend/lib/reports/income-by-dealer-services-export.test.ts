@@ -2,6 +2,7 @@
  * «By dealer and service» del Export de Income by Dealer (plans/plan-income-by-dealer-por-servicio T4 y T6). Corre con
  * `pnpm vitest run`.
  */
+import ExcelJS from 'exceljs'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { IncomeByDealer, IncomeServicesByDealer, IncomeServicesDealer, KpiQueryParams } from '@/lib/srs-kpis-api'
@@ -133,7 +134,7 @@ describe('buildIncomeServicesWorkbook', () => {
 
   it('hojas Report Info, Summary, el año y Vehicles; Grand Total sin Qty ni Vehicles', async () => {
     const years = await collectIncomeServices(screen, { filterDateDone: false }, fakeFetch({ 10: 200.1, 20: 100 }))
-    const wb = buildIncomeServicesWorkbook({
+    const wb = buildIncomeServicesWorkbook(ExcelJS, {
       years,
       labels,
       reportInfo: [{ field: 'Vehicles', value: 'Different vehicles (VIN).' }],

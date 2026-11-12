@@ -241,7 +241,6 @@ export function DealersRankingDialog({
           tableScrollHeight="60vh"
           flexColumnId="dealerName"
           // El export es del servidor (Report Info + Dealers + Employees): va en el pie.
-          enableExport={false}
           enableGlobalFilter={false}
           enableViewOptions={false}
           // Sin permiso no se pasa: la fila no navega ni parece clickeable (DP1).

@@ -120,7 +120,7 @@ export function EmployeeThumbnailPickerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('employeeThumbnail.title', { name: employeeName })}</DialogTitle>
         </DialogHeader>

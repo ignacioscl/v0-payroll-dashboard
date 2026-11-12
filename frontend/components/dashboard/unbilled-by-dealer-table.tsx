@@ -48,7 +48,6 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         meta: {
           label: t('mockKpis.tableUnbilledWos'),
           numeric: true,
-          exportValue: (row) => row.wos,
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },
       {
@@ -60,7 +59,6 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         meta: {
           label: t('mockKpis.tableUnbilledServices'),
           numeric: true,
-          exportValue: (row) => row.services,
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },
       {
@@ -72,8 +70,6 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         meta: {
           label: t('mockKpis.tableUnbilledValue'),
           numeric: true,
-          money: true,
-          exportValue: (row) => row.value,
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },
       {
@@ -98,7 +94,6 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
         meta: {
           label: t('mockKpis.tableOldestDays'),
           numeric: true,
-          exportValue: (row) => row.oldestDays,
         } satisfies DataTableColumnMeta<UnbilledDealerRow>,
       },
     ],
@@ -122,7 +117,6 @@ export function UnbilledByDealerTable({ data, loading }: UnbilledByDealerTablePr
       recordsCountLabel={t('mockKpis.tableUnbilledWos')}
       // No Excel while its tab is hidden: it would go out without Report Info (decision C,
       // plans/plan-report-info-exports-tablas). When the tab comes back, it gets a Nest export.
-      enableExport={false}
       toolbarLeading={
         <div className="flex flex-col">
           <span className="text-base font-semibold">{t('mockKpis.chartUnbilledByDealer')}</span>

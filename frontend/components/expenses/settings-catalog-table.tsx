@@ -321,7 +321,6 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
             </span>
           ) : undefined
         }
-        enableExport={false}
         toolbarTrailing={
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">

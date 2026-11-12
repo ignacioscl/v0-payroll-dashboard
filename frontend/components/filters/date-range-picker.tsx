@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { format } from 'date-fns'
 import {
   ArrowLeftToLine,
@@ -118,6 +118,8 @@ export function DateRangePicker({
 
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  // El calendario va en el encabezado y en la hoja de filtros del celular: nada de ids fijos.
+  const ignoreSwitchId = useId()
   const [draft, setDraft] = useState<DateRange | undefined>(value)
   const [draftIgnored, setDraftIgnored] = useState(Boolean(ignored))
   const currentMode: InvoiceDateMode = openEnds && mode ? mode : 'range'
@@ -199,7 +201,7 @@ export function DateRangePicker({
         'gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors',
         // Ignorado: el mismo ámbar con el que ya se marcan los filtros trabados.
         effectiveIgnored &&
-          'border-amber-500/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200',
+          'border-amber-500/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15',
         frozen && 'cursor-not-allowed',
         className,
       )}
@@ -207,9 +209,9 @@ export function DateRangePicker({
       {mounted && effectiveIgnored ? (
         <>
           {frozen ? (
-            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <Lock className="h-4 w-4 text-amber-600" />
           ) : (
-            <CalendarOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <CalendarOff className="h-4 w-4 text-amber-600" />
           )}
           <span>{t('filters.dateRangeIgnored')}</span>
         </>
@@ -383,12 +385,12 @@ export function DateRangePicker({
               >
                 <div className="flex items-center gap-2.5">
                   <Switch
-                    id="date-range-ignore"
+                    id={ignoreSwitchId}
                     checked={draftIgnored}
                     onCheckedChange={setDraftIgnored}
                   />
                   <Label
-                    htmlFor="date-range-ignore"
+                    htmlFor={ignoreSwitchId}
                     className="cursor-pointer text-sm font-normal"
                   >
                     {t('filters.ignoreDateRange')}
