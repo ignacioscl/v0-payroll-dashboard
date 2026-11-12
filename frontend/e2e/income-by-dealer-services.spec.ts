@@ -19,6 +19,7 @@ import {
   login,
   noHorizontalScroll,
   openMobileMenuIfNeeded,
+  pickDatePreset,
 } from './helpers'
 
 test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
@@ -34,7 +35,9 @@ async function filtersScope(page: Page): Promise<{ scope: Locator; apply: () => 
   return {
     scope: mobile ? page.getByRole('dialog') : page.locator('header'),
     apply: async () => {
-      if (mobile) await page.getByRole('button', { name: 'Apply' }).click()
+      if (!mobile) return
+      await page.getByRole('dialog').getByRole('button', { name: 'Apply', exact: true }).click()
+      await expect(page.getByRole('dialog')).toBeHidden()
     },
   }
 }
@@ -73,13 +76,12 @@ async function mobileTableRules(page: Page, isMobile: boolean) {
       }).length,
   )
   expect(pinned, 'no pinned column on a phone').toBe(0)
-  const cut = await page.evaluate(
-    () =>
-      [...document.querySelectorAll('main tbody td span, main [data-testid="income-dealer-services"] td')].filter(
-        (s) => (s as HTMLElement).scrollWidth > (s as HTMLElement).clientWidth + 1,
-      ).length,
+  const cut = await page.evaluate(() =>
+    [...document.querySelectorAll('main tbody td span, main [data-testid="income-dealer-services"] td')]
+      .filter((s) => (s as HTMLElement).scrollWidth > (s as HTMLElement).clientWidth + 1)
+      .map((s) => `${(s as HTMLElement).innerText.slice(0, 60)} [${(s as HTMLElement).className.slice(0, 80)}]`),
   )
-  expect(cut, 'names are not cut with «…» on a phone').toBe(0)
+  expect(cut, 'names are not cut with «…» on a phone').toEqual([])
   await noHorizontalScroll(page)
 }
 
@@ -107,9 +109,7 @@ test.describe.serial('Income by Dealer by service — full path', () => {
       const yearMode = scope.getByRole('switch', { name: 'By year' })
       if ((await yearMode.getAttribute('aria-checked')) === 'true') await yearMode.click()
       await pickOneDealer(page, scope, DEALER)
-      await scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4}|Select dates/ }).first().click()
-      await page.getByRole('button', { name: 'Last Month' }).click()
-      await page.getByRole('button', { name: 'Apply' }).first().click()
+      await pickDatePreset(page, scope, 'Last Month')
       await apply()
     }
 
@@ -162,10 +162,14 @@ test.describe.serial('Income by Dealer by service — full path', () => {
       const { scope, apply } = await filtersScope(page)
       await scope.getByRole('switch', { name: 'By year' }).click()
       const years = scope.getByRole('combobox').filter({ hasText: /years|20\d\d|Select years/i }).last()
-      await years.click()
-      await page.locator('[cmdk-input]').last().fill('2026')
-      await page.getByRole('option', { name: '2026', exact: true }).click()
-      await page.keyboard.press('Escape')
+      // Al prender «By year» ya se marcan los años del rango (Last Month → 2026): tocar 2026 otra vez lo destildaba.
+      if ((await years.innerText()).trim() !== '2026') {
+        await years.click()
+        await page.locator('[cmdk-input]').last().fill('2026')
+        await page.getByRole('option', { name: '2026', exact: true }).click()
+        await page.keyboard.press('Escape')
+      }
+      await expect(years).toHaveText('2026')
       await apply()
     }
     const yearRow = dealerRow(main)

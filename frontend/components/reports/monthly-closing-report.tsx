@@ -116,7 +116,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         ) : (
           fmtMoney(row.original[key])
         ),
-      meta: { label: title, numeric: true, money: true } satisfies DataTableColumnMeta<ClosingRow>,
+      meta: { label: title, numeric: true } satisfies DataTableColumnMeta<ClosingRow>,
     })
     const list: ColumnDef<ClosingRow>[] = [
       {
@@ -179,7 +179,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         size: 150,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('monthlyClosing.colProfit')} />,
         cell: ({ row }) => profitCell(row.original.profit),
-        meta: { label: t('monthlyClosing.colProfit'), numeric: true, money: true } satisfies DataTableColumnMeta<ClosingRow>,
+        meta: { label: t('monthlyClosing.colProfit'), numeric: true } satisfies DataTableColumnMeta<ClosingRow>,
       },
       {
         accessorKey: 'pct',
@@ -197,7 +197,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('monthlyClosing.colAccident')} />,
         cell: ({ row }) =>
           row.original.accident ? fmtMoney(row.original.accident) : <span className="text-muted-foreground">—</span>,
-        meta: { label: t('monthlyClosing.colAccident'), numeric: true, money: true } satisfies DataTableColumnMeta<ClosingRow>,
+        meta: { label: t('monthlyClosing.colAccident'), numeric: true } satisfies DataTableColumnMeta<ClosingRow>,
       })
     }
     return list
@@ -300,7 +300,6 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           includeAllPageSize
           enableGlobalFilter={false}
           // El Excel lo arma Nest con Report Info (D5): Summary, (By service), Income, Payroll y Expenses.
-          enableExport={false}
           exportAction={
             <ServerXlsxExportButton
               url={params ? monthlyClosingExportUrl(params) : null}

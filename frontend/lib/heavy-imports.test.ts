@@ -2,7 +2,7 @@
  * Lo pesado se carga al usarse (plans/plan-buenas-practicas-v0, etapa 1, 1.6; doc de Next
  * `02-guides/lazy-loading.md`; https://motion.dev/docs/react-reduce-bundle-size).
  *
- * Falla si un archivo de la app importa estático y con valor `xlsx` o `exceljs` (van con `await import()` al exportar);
+ * Falla si un archivo de la app importa estático y con valor `exceljs` (va con `await import()` al exportar);
  * si importa `recharts` fuera de la lista cerrada; si importa estático un gráfico que solo se carga por `next/dynamic`;
  * o si importa de `framer-motion` algo que no sea `m`, `LazyMotion`, `AnimatePresence` o las funciones (`domMax`).
  */
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { listSourceFiles, parseImports, readSource, resolveLocal, type ImportRef } from './testing/import-graph'
 
 /** Se cargan solo con `import()`. */
-const ON_DEMAND_PACKAGES = ['xlsx', 'exceljs']
+const ON_DEMAND_PACKAGES = ['exceljs']
 
 /**
  * Los únicos que importan recharts. En el inicio e Income by Dealer el gráfico es lo principal de la pantalla y se ve al
@@ -61,7 +61,7 @@ export function heavyImportProblems(file: string, refs: ImportRef[]): string[] {
     if (ref.typeOnly || ref.dynamic) continue
     const pkg = ref.specifier
     if (ON_DEMAND_PACKAGES.includes(pkg)) {
-      // `import { type A, type B } from 'xlsx'` no trae la librería; cualquier otra forma sí.
+      // `import { type A, type B } from 'exceljs'` no trae la librería; cualquier otra forma sí.
       const clause = ref.clause.trim()
       const inlineTypesOnly =
         /^\{[\s\S]*\}$/.test(clause) &&
@@ -87,7 +87,7 @@ export function heavyImportProblems(file: string, refs: ImportRef[]): string[] {
 const APP_DIRS = ['app/', 'components/', 'lib/', 'hooks/']
 
 describe('imports pesados', () => {
-  it('xlsx, exceljs, recharts, los gráficos de Business KPIs y framer-motion se cargan como corresponde', () => {
+  it('exceljs, recharts, los gráficos de Business KPIs y framer-motion se cargan como corresponde', () => {
     const problems: string[] = []
     for (const file of listSourceFiles()) {
       if (!APP_DIRS.some((d) => file.startsWith(d)) || file.endsWith('.css')) continue
@@ -101,13 +101,13 @@ describe('imports pesados', () => {
 describe('el detector', () => {
   const check = (file: string, code: string) => heavyImportProblems(file, parseImports(code))
 
-  it('marca xlsx y exceljs estáticos y deja pasar import type e import()', () => {
-    expect(check('lib/a.ts', "import * as XLSX from 'xlsx'")).toHaveLength(1)
+  it('marca exceljs estático y deja pasar import type e import()', () => {
+    expect(check('lib/a.ts', "import * as XLSX from 'exceljs'")).toHaveLength(1)
     expect(check('lib/a.ts', "import ExcelJS from 'exceljs'")).toHaveLength(1)
-    expect(check('lib/a.ts', "import { utils } from 'xlsx'")).toHaveLength(1)
+    expect(check('lib/a.ts', "import { utils } from 'exceljs'")).toHaveLength(1)
     expect(check('lib/a.ts', "import type ExcelJS from 'exceljs'")).toEqual([])
-    expect(check('lib/a.ts', "import type { WorkSheet } from 'xlsx'")).toEqual([])
-    expect(check('lib/a.ts', "const XLSX = await import('xlsx')")).toEqual([])
+    expect(check('lib/a.ts', "import type { WorkSheet } from 'exceljs'")).toEqual([])
+    expect(check('lib/a.ts', "const XLSX = await import('exceljs')")).toEqual([])
   })
 
   it('recharts solo en la lista', () => {

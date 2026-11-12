@@ -154,7 +154,6 @@ export function PieceworkDiffDialog({ open, onOpenChange, params }: PieceworkDif
             includeAllPageSize
             tableScrollHeight="calc(90dvh - 19rem)"
             flexColumnId="reason"
-            enableExport={false}
             enableGlobalFilter={false}
             enableViewOptions={false}
           />

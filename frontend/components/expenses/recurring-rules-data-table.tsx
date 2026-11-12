@@ -152,7 +152,7 @@ export function RecurringRulesDataTable({
         size: 120,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.ruleAmount')} />,
         cell: ({ row }) => <span className="tabular-nums">{fmtAmount(row.original.amount)}</span>,
-        meta: { label: t('expenses.ruleAmount'), numeric: true, money: true } satisfies DataTableColumnMeta<RuleRow>,
+        meta: { label: t('expenses.ruleAmount'), numeric: true } satisfies DataTableColumnMeta<RuleRow>,
       },
       {
         accessorKey: 'splitType',
@@ -350,7 +350,6 @@ export function RecurringRulesDataTable({
           setPageIndex(0)
         }}
         manualFiltering
-        enableExport={false}
         density="compact"
         headerVariant="colored"
         emptyState={

@@ -105,7 +105,6 @@ export type IssuesDataTableProps = {
   snapshotAt?: string
   tableId?: string
   defaultPageSize?: number
-  exportFileName?: string
   queryKeySuffix?: string
   /**
    * Max-height of the scroll container. Enables sticky header.
@@ -238,7 +237,6 @@ export function IssuesDataTable({
   snapshotAt,
   tableId = 'issues-punches',
   defaultPageSize = 25,
-  exportFileName = 'punch-issues',
   queryKeySuffix = 'issues',
   tableScrollHeight,
   punchMinHoursRaw: punchMinHoursRawProp,
@@ -547,7 +545,6 @@ export function IssuesDataTable({
           label: t('common.employee'),
           pin: 'left',
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.employee,
-          exportValue: (r) => r.usuario?.nombre ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -564,7 +561,6 @@ export function IssuesDataTable({
         cell: ({ row }) => roleLabel(row.original) || '—',
         meta: {
           label: t('punch.roleDept'),
-          exportValue: (r) => roleLabel(r),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -577,7 +573,6 @@ export function IssuesDataTable({
         meta: {
           label: t('common.date'),
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.date,
-          exportValue: (r) => formatUsDateForExport(r.punchInGmt0),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -597,10 +592,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchIn,
           label: t('punch.punchIn'),
           mono: true,
-          exportValue: (r) => {
-            const t = formatUsTimeForExport(r.punchInGmt0)
-            return t ? t + formatMethodForExport(punchInMethod(r)) : ''
-          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -620,10 +611,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakStart,
           label: t('punch.breakStart'),
           mono: true,
-          exportValue: (r) => {
-            const t = formatUsTimeForExport(r.breakStartGmt0)
-            return t ? t + formatMethodForExport(breakStartMethod(r)) : ''
-          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -643,10 +630,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.breakEnd,
           label: t('punch.breakEnd'),
           mono: true,
-          exportValue: (r) => {
-            const t = formatUsTimeForExport(r.breakEndGmt0)
-            return t ? t + formatMethodForExport(breakEndMethod(r)) : ''
-          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -666,10 +649,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.punchOut,
           label: t('punch.punchOut'),
           mono: true,
-          exportValue: (r) => {
-            const t = formatUsTimeForExport(r.punchOutGmt0)
-            return t ? t + formatMethodForExport(punchOutMethod(r)) : ''
-          },
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -683,7 +662,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeWork,
           label: t('punch.timeWork'),
           mono: true,
-          exportValue: (r) => formatTimeWorkBreak(r, 'work', groupedHoursFormat),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
       {
@@ -697,7 +675,6 @@ export function IssuesDataTable({
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.timeBreak,
           label: t('punch.timeBreak'),
           mono: true,
-          exportValue: (r) => formatTimeWorkBreak(r, 'break', groupedHoursFormat),
         } satisfies DataTableColumnMeta<TtkListRow>,
       },
     ]
@@ -737,7 +714,6 @@ export function IssuesDataTable({
         meta: {
           sortKey: PUNCH_LIST_SORT_BY_COLUMN_ID.paymentType,
           label: t('punch.paymentType'),
-          exportValue: (r) => r.objPaymentType?.name ?? '',
         } satisfies DataTableColumnMeta<TtkListRow>,
       })
     }
@@ -1039,13 +1015,11 @@ export function IssuesDataTable({
             ) : undefined
           }
           enableViewOptions={enableToolbarControls}
-          enableExport={false}
           toolbarTrailing={
             enableExport ? (
               <PunchListExportButton params={listParams} enabled={queryEnabled} />
             ) : undefined
           }
-          exportFileName={exportFileName}
           manualSorting
           sorting={sorting}
           onSortingChange={setSorting}

@@ -73,7 +73,8 @@ function ServicesTable({ d, wrap }: { d: IncomeServicesDealer; wrap: string }) {
           <col />
           <col className="w-14 sm:w-32" />
           <col className="w-16 sm:w-32" />
-          <col className="w-24 sm:w-40" />
+          {/* Income: en celular entra «$1,040,784.32» del total del dealer por año (texto sm en negrita). */}
+          <col className="w-28 sm:w-40" />
         </colgroup>
         <tbody>
           {d.wo.services.length > 0 ? (

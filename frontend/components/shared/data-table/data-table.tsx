@@ -59,12 +59,8 @@ export interface PaginatedDataTableResponse<T> {
 
 /** Column meta hook for the table machinery. */
 export interface DataTableColumnMeta<TData> {
-  /** Human-readable label (overrides string header for view options / export). */
+  /** Human-readable label (overrides string header for view options). */
   label?: string
-  /** Custom value getter used when exporting (defaults to the accessor). */
-  exportValue?: (row: TData) => unknown
-  /** Set to false to exclude this column from XLSX/CSV export. */
-  exportable?: boolean
   /** Tailwind class applied to the header cell. */
   headerClassName?: string
   /** Tailwind class applied to every body cell of this column. */
@@ -73,8 +69,6 @@ export interface DataTableColumnMeta<TData> {
   mono?: boolean
   /** Convenience flag — applies `text-right` to header + body cell. */
   numeric?: boolean
-  /** Money column: the Excel export writes its cells with `#,##0.00`. */
-  money?: boolean
   /** Pin this column to the left/right edge. Reflected as a sticky CSS. */
   pin?: 'left' | 'right'
   /**
@@ -465,16 +459,10 @@ export interface DataTableProps<TData, TValue = unknown> {
   // ---------- Toolbar ----------
   enableViewOptions?: boolean
   /**
-   * The browser-side Excel of the grid. Off by default: every export carries Report Info
-   * (rule xls-export-report-info) and it is built in Nest (D5), so a PRO grid uses `exportAction`
-   * with a button that downloads the file from the backend (plans/plan-report-info-exports-tablas §8).
+   * Export button of the grid (right end of the toolbar). Every export carries Report Info (rule
+   * xls-export-report-info) and is built in Nest (D5): the button downloads the file from the backend
+   * (plans/plan-report-info-exports-tablas §8). The table has no browser-side Excel.
    */
-  enableExport?: boolean
-  exportFileName?: string
-  /** Formats offered in the toolbar export menu. Default both. */
-  exportFormats?: Array<'xlsx' | 'csv'>
-  fetchAllRowsForExport?: () => Promise<TData[]>
-  /** Export button of the grid, drawn where the DataTable export goes (right end of the toolbar). */
   exportAction?: React.ReactNode
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
@@ -561,10 +549,6 @@ export function DataTable<TData, TValue = unknown>({
   infiniteScroll,
   footer,
   enableViewOptions = true,
-  enableExport = false,
-  exportFileName,
-  exportFormats,
-  fetchAllRowsForExport,
   exportAction,
   toolbarLeading,
   toolbarTrailing,
@@ -1122,10 +1106,6 @@ export function DataTable<TData, TValue = unknown>({
         enableGlobalFilter={enableGlobalFilter}
         globalFilterPlaceholder={globalFilterPlaceholder}
         enableViewOptions={enableViewOptions}
-        enableExport={enableExport}
-        exportFileName={exportFileName}
-        exportFormats={exportFormats}
-        fetchAllRowsForExport={fetchAllRowsForExport}
         exportAction={exportAction}
         pageSizeOptions={pageSizeOptions}
         includeAllPageSize={includeAllPageSize}

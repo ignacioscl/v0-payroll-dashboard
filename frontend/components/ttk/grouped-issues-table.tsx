@@ -143,7 +143,6 @@ function GroupedPunchDetail({
         showToolbarFilters={false}
         tableId={`grouped-detail-${employeeId}`}
         defaultPageSize={10}
-        exportFileName={`punch-detail-${employeeId}`}
         queryKeySuffix={`grouped-${employeeId}`}
         tableScrollHeight={false}
         enableExport={false}
@@ -632,7 +631,6 @@ export function GroupedIssuesDataTable({
         meta: {
           label: t('common.employee'),
           sortKey: 'nombreEmployee',
-          exportValue: (r) => r.nombreEmployee,
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
@@ -650,7 +648,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.totalHours'),
           sortKey: 'hoursNumber',
           mono: true,
-          exportValue: (r) => String(r.hoursNumber),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
@@ -668,7 +665,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.timeBreak'),
           sortKey: 'breakNumber',
           mono: true,
-          exportValue: (r) => String(r.breakNumber),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
@@ -735,17 +731,6 @@ export function GroupedIssuesDataTable({
           label: groupColumnLabel,
           // Invariante de D-11: header = celda = export. La celda muestra el
           // numero, asi que el export lo lleva tambien.
-          exportValue: (r) => {
-            const count = isCorrectedMode ? r.fixedCount : r.errorCount
-            const suffix = count > 0 ? ` (${count})` : ''
-            if (isCorrectedMode) {
-              const types = (r.correctedTypes ?? []).map((type) =>
-                errorTypeLabel(t, type as FlagTypeCode),
-              )
-              return types.length === 0 ? t('punch.exportNo') : types.join(', ') + suffix
-            }
-            return r.hasError ? t('punch.exportYes') + suffix : t('punch.exportNo')
-          },
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       // P7 — set 1: Punches / Errors / Fixed. *Fixed* y no *Corrected* porque en
@@ -772,7 +757,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.punchCount'),
           sortKey: 'punchCount',
           mono: true,
-          exportValue: (r) => String(r.punchCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
@@ -793,7 +777,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.errorCount'),
           sortKey: 'errorCount',
           mono: true,
-          exportValue: (r) => String(r.errorCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
       {
@@ -814,7 +797,6 @@ export function GroupedIssuesDataTable({
           label: t('punch.fixedCount'),
           sortKey: 'fixedCount',
           mono: true,
-          exportValue: (r) => String(r.fixedCount),
         } satisfies DataTableColumnMeta<PunchGroupedRow>,
       },
     ],
@@ -908,10 +890,6 @@ export function GroupedIssuesDataTable({
       meta: {
         label,
         mono: true,
-        exportValue: (r) => {
-          const h = paymentTypeHours(r, label)
-          return h != null ? String(h) : ''
-        },
       } satisfies DataTableColumnMeta<PunchGroupedRow>,
     }))
     return [...columns, ...paymentCols]
@@ -976,7 +954,6 @@ export function GroupedIssuesDataTable({
         enableGlobalFilter={false}
         manualFiltering
         recordsCountNote={isCorrectedMode ? <CorrectedRecordsNote /> : null}
-        enableExport={false}
         enableRowSelection
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}

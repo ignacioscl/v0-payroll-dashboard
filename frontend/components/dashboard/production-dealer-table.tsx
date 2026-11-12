@@ -90,10 +90,6 @@ export function ProductionDealerTable({
           label: t('dealer.label'),
           // No fixed columns on a phone: they cover the others (rule data-table).
           pin: isMobile ? undefined : 'left',
-          exportValue: (row) =>
-            removedIds?.has(row.dealerId)
-              ? `${row.dealer} ${t('businessKpis.removedDealerSuffix')}`
-              : row.dealer,
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {
@@ -105,7 +101,6 @@ export function ProductionDealerTable({
         meta: {
           label: t('mockKpis.tableWosDone'),
           numeric: true,
-          exportValue: (row) => row.wos,
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {
@@ -117,8 +112,6 @@ export function ProductionDealerTable({
         meta: {
           label: t('mockKpis.tableProductionValue'),
           numeric: true,
-          money: true,
-          exportValue: (row) => row.value,
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {
@@ -135,8 +128,6 @@ export function ProductionDealerTable({
         meta: {
           label: t('mockKpis.tableGoal'),
           numeric: true,
-          money: true,
-          exportValue: (row) => (row.goal > 0 ? row.goal : null),
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {
@@ -153,7 +144,6 @@ export function ProductionDealerTable({
         meta: {
           label: t('mockKpis.tableAttainmentPct'),
           numeric: true,
-          exportValue: (row) => (row.goal > 0 ? row.attainmentPct : null),
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
     ],
@@ -174,7 +164,6 @@ export function ProductionDealerTable({
       includeAllPageSize
       enableGlobalFilter={false}
       // The Excel comes from Nest with Report Info (D5), not from the DataTable exporter.
-      enableExport={false}
       exportAction={
         <ServerXlsxExportButton
           url={exportParams ? productionByDealerExportUrl(exportParams) : null}

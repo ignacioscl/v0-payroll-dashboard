@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { Label } from '@/components/ui/label'
@@ -67,6 +67,8 @@ function YearMultiSelect({ className }: { className?: string }) {
  */
 export function IncomeYearFilter({ className }: { className?: string }) {
   const { t } = useTranslation()
+  // Va en el encabezado y en la hoja de filtros del celular a la vez: un id fijo dejaba sin nombre al de la hoja.
+  const switchId = useId()
   const { dateRange, setDateRange, incomeYearMode, setIncomeYearMode, incomeYears, setIncomeYears } =
     useFilters()
 
@@ -80,8 +82,8 @@ export function IncomeYearFilter({ className }: { className?: string }) {
   return (
     <div className={cn('flex min-w-0 flex-wrap items-center gap-2', className)}>
       <div className="flex shrink-0 items-center gap-2">
-        <Switch id="income-year-mode" checked={incomeYearMode} onCheckedChange={onModeChange} />
-        <Label htmlFor="income-year-mode" className="cursor-pointer text-sm font-normal">
+        <Switch id={switchId} checked={incomeYearMode} onCheckedChange={onModeChange} />
+        <Label htmlFor={switchId} className="cursor-pointer text-sm font-normal">
           {t('incomeByDealer.byYear')}
         </Label>
       </div>

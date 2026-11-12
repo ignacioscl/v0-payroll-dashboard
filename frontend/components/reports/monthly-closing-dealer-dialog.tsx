@@ -87,7 +87,7 @@ function moneyColumn<T>(key: keyof T & string, title: string): ColumnDef<T> {
     size: 130,
     header: ({ column }) => <DataTableColumnHeader column={column} title={title} />,
     cell: ({ row }) => fmtMoney(Number(row.original[key] ?? 0)),
-    meta: { label: title, numeric: true, money: true } satisfies DataTableColumnMeta<T>,
+    meta: { label: title, numeric: true } satisfies DataTableColumnMeta<T>,
   }
 }
 
@@ -215,7 +215,6 @@ export function MonthlyClosingDealerDialog({ dealer, onClose, params }: MonthlyC
     defaultPageSize: DATA_TABLE_PAGE_SIZE_ALL,
     includeAllPageSize: true,
     tableScrollHeight: '50vh',
-    enableExport: false,
     enableGlobalFilter: false,
     enableViewOptions: false,
   } as const

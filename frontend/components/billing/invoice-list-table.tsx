@@ -842,7 +842,6 @@ export function InvoiceListTable({
               meta: {
                 label: t('invoices.bulkSelectRow'),
                 pin: 'left',
-                exportable: false,
                 headerClassName: 'w-[40px] px-2',
                 cellClassName: 'px-2',
               } satisfies DataTableColumnMeta<InvoiceRow>,
@@ -925,7 +924,6 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colInvoice'),
           pin: 'left',
-          exportValue: (r) => rowDisplayNro(r),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -948,7 +946,6 @@ export function InvoiceListTable({
         },
         meta: {
           label: t('invoices.colType'),
-          exportValue: (r) => typeMeta(r.statementType, t).label,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -968,7 +965,6 @@ export function InvoiceListTable({
         ),
         meta: {
           label: t('invoices.colPeriod'),
-          exportValue: (r) => fmtPeriod(r.fechaDesde, r.fechaHasta),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -995,7 +991,6 @@ export function InvoiceListTable({
         ),
         meta: {
           label: t('invoices.colAuthor'),
-          exportValue: (r) => authorDisplay(r, t),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1026,7 +1021,6 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colDetail'),
           cellClassName: 'whitespace-normal',
-          exportValue: (r) => rowServicesText(r, t),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1062,7 +1056,6 @@ export function InvoiceListTable({
         },
         meta: {
           label: t('invoices.colPo'),
-          exportValue: (r) => r.po ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1098,7 +1091,6 @@ export function InvoiceListTable({
         },
         meta: {
           label: t('invoices.colRo'),
-          exportValue: (r) => r.ro ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1124,8 +1116,6 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colSubtotal'),
           numeric: true,
-          money: true,
-          exportValue: (r) => r.subtotal,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1172,9 +1162,7 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colDiscount'),
           numeric: true,
-          money: true,
           // Con el signo de la pantalla: −$2,421.06 en la grilla es −2421.06 en el Excel.
-          exportValue: (r) => discountExportValue(r.discountAmount),
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1200,8 +1188,6 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colTotal'),
           numeric: true,
-          money: true,
-          exportValue: (r) => r.total,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       ...(includePartial
@@ -1231,8 +1217,6 @@ export function InvoiceListTable({
               meta: {
                 label: t('invoices.colPartialInvoiced'),
                 numeric: true,
-                money: true,
-                exportValue: (r: InvoiceRow) => r.partialInvoiced ?? 0,
               } satisfies DataTableColumnMeta<InvoiceRow>,
             } as ColumnDef<InvoiceRow>,
           ]
@@ -1266,7 +1250,6 @@ export function InvoiceListTable({
         },
         meta: {
           label: t('invoices.colPaid'),
-          exportValue: (r) => paidMeta(r, t).label,
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1286,7 +1269,6 @@ export function InvoiceListTable({
         ),
         meta: {
           label: t('invoices.colCheckNumber'),
-          exportValue: (r) => r.checkNumber ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {
@@ -1307,8 +1289,6 @@ export function InvoiceListTable({
         meta: {
           label: t('invoices.colCheckAmount'),
           numeric: true,
-          money: true,
-          exportValue: (r) => r.amount ?? '',
         } satisfies DataTableColumnMeta<InvoiceRow>,
       },
       {

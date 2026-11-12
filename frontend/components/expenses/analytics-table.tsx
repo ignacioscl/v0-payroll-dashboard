@@ -79,7 +79,7 @@ export function AnalyticsTable({
         size: 130,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.total')} />,
         cell: ({ row }) => <span className="font-medium tabular-nums">{fmtAmount(row.original.total)}</span>,
-        meta: { label: t('expenses.total'), numeric: true, money: true } satisfies DataTableColumnMeta<AnalyticsRow>,
+        meta: { label: t('expenses.total'), numeric: true } satisfies DataTableColumnMeta<AnalyticsRow>,
       },
       {
         id: 'pctOfTotal',
@@ -137,7 +137,6 @@ export function AnalyticsTable({
       defaultPageSize={25}
       includeAllPageSize
       enableGlobalFilter={false}
-      enableExport={false}
       exportAction={
         <ServerXlsxExportButton
           url={params ? analyticsExportUrl(params) : null}

@@ -270,7 +270,6 @@ export function JobsMonitor({ jobNames }: { jobNames?: string[] }) {
             flexColumnId="jobName"
             onRowClick={(r) => setOpenRunId(r.id)}
             enableViewOptions={false}
-            enableExport={false}
           />
         </CardContent>
       </Card>

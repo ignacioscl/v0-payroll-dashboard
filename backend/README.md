@@ -102,14 +102,8 @@ DB_PASSWORD=password_seguro_prod
 DB_DATABASE=db_prod
 DB_LOGGING=false
 
-# JWT con secretos de producción
+# Mismo valor que JWT_AUTH de config.php (el token lo emite el PHP)
 JWT_SECRET=secreto_jwt_super_seguro_para_produccion
-TOKEN_EXPIRES_IN=1h
-REFRESH_EXPIRES_IN=7d
-
-# Admin inicial
-INIT_ADMIN=admin@tudominio.com
-INIT_ADMIN_PASSWORD=password_admin_seguro
 
 # Sentry para producción
 SENTRY_DSN=tu_sentry_dsn_prod

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { format } from 'date-fns'
 import {
   ArrowLeftToLine,
@@ -118,6 +118,8 @@ export function DateRangePicker({
 
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  // El calendario va en el encabezado y en la hoja de filtros del celular: nada de ids fijos.
+  const ignoreSwitchId = useId()
   const [draft, setDraft] = useState<DateRange | undefined>(value)
   const [draftIgnored, setDraftIgnored] = useState(Boolean(ignored))
   const currentMode: InvoiceDateMode = openEnds && mode ? mode : 'range'
@@ -383,12 +385,12 @@ export function DateRangePicker({
               >
                 <div className="flex items-center gap-2.5">
                   <Switch
-                    id="date-range-ignore"
+                    id={ignoreSwitchId}
                     checked={draftIgnored}
                     onCheckedChange={setDraftIgnored}
                   />
                   <Label
-                    htmlFor="date-range-ignore"
+                    htmlFor={ignoreSwitchId}
                     className="cursor-pointer text-sm font-normal"
                   >
                     {t('filters.ignoreDateRange')}

@@ -4,7 +4,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 function loadEnv(): Record<string, string> {
   const file = resolve(__dirname, '../.env.e2e.local')
@@ -56,4 +56,19 @@ export async function openMobileMenuIfNeeded(page: Page) {
   if (await burger.isVisible().catch(() => false)) await burger.click()
   const expand = page.locator('aside').getByRole('button').filter({ has: page.locator('svg.lucide-chevron-right') })
   if (await expand.first().isVisible().catch(() => false)) await expand.first().click()
+}
+
+/**
+ * Elige un atajo del calendario del encabezado («Last Month», «Last 30 days»…). `scope` es el encabezado (compu) o la
+ * hoja de filtros (celular). En compu el atajo aplica y cierra solo; si el calendario sigue abierto (celular), se
+ * confirma con su propio Apply. Antes los e2e apretaban siempre ese Apply y en compu esperaban un botón que ya no está.
+ */
+export async function pickDatePreset(page: Page, scope: Locator, preset: string) {
+  await scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4}|Select dates/ }).first().click()
+  await page.getByRole('button', { name: preset, exact: true }).click()
+  const picker = page.locator('[data-slot="popover-content"]')
+  await picker.waitFor({ state: 'detached', timeout: 3_000 }).catch(async () => {
+    await picker.getByRole('button', { name: 'Apply', exact: true }).click()
+    await expect(picker).toHaveCount(0)
+  })
 }

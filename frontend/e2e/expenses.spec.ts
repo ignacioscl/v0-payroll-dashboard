@@ -12,13 +12,14 @@
  * Expense la precarga. Al final borra lo creado: el grupo se borra, se restaura desde «Show deleted»
  * (Restore de la fila de grupo) y se vuelve a borrar. Sin scroll horizontal de la página en 375.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
   E2E_MISSING_USER,
   E2E_MISSING_USER_REASON,
   login,
   noHorizontalScroll,
   openMobileMenuIfNeeded,
+  pickDatePreset,
 } from './helpers'
 
 /** «Show deleted» vive en el panel de filtros, que arranca cerrado. */
@@ -47,8 +48,12 @@ async function pickCombobox(page: Page, fieldName: string, text: string, create 
   }
 }
 
-async function pickDealers(page: Page, count: number): Promise<string[]> {
-  await page.locator('[data-field="branchIds"] button[role="combobox"]').click()
+/**
+ * Marca los primeros `count` dealers del combo. Por defecto, el de «Multiple dealers» del alta de gasto; en una regla
+ * recurrente el combo no es un campo del form (recurring-dealers-table.tsx) y se pasa el suyo.
+ */
+async function pickDealers(page: Page, count: number, trigger?: Locator): Promise<string[]> {
+  await (trigger ?? page.locator('[data-field="branchIds"] button[role="combobox"]')).click()
   const items = page.locator('[cmdk-item]')
   const names: string[] = []
   for (let i = 0; i < count; i++) {
@@ -58,6 +63,26 @@ async function pickDealers(page: Page, count: number): Promise<string[]> {
   }
   await page.keyboard.press('Escape')
   return names
+}
+
+/** All Dealers y «Last 30 days» en el encabezado (compu) o en la hoja de filtros (celular). */
+async function pickAllDealersAndLast30Days(page: Page) {
+  const openFilters = page.getByRole('button', { name: 'Open filters' })
+  const mobile = await openFilters.isVisible()
+  if (mobile) await openFilters.click()
+  const scope = mobile ? page.getByRole('dialog') : page.locator('header')
+  const dealers = scope.getByRole('combobox').filter({ hasText: /Dealers/ })
+  await expect(dealers).toBeVisible()
+  if (!(await dealers.innerText()).includes('All Dealers')) {
+    await dealers.click()
+    await page.getByRole('button', { name: /^All Dealers$/ }).click()
+    await page.keyboard.press('Escape')
+  }
+  await pickDatePreset(page, scope, 'Last 30 days')
+  if (mobile) {
+    await page.getByRole('dialog').getByRole('button', { name: 'Apply', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+  }
 }
 
 test.describe.serial('Expenses — full path (F7)', () => {
@@ -110,11 +135,7 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await expect(focused).toBeVisible()
     const inField = await focused.evaluate((el) => Boolean(el.closest('[data-field="company"]')))
     expect(inField).toBe(true)
-    const inView = await focused.evaluate((el) => {
-      const r = el.getBoundingClientRect()
-      return r.top >= 0 && r.bottom <= window.innerHeight
-    })
-    expect(inView).toBe(true)
+    await expect(focused).toBeInViewport({ ratio: 1 })
 
     await pickCombobox(page, 'company', COMPANY, true)
     await pickCombobox(page, 'category', CATEGORY, true)
@@ -138,7 +159,8 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Rule saved.')).toBeVisible()
 
-    await pickDealers(page, 3)
+    // Un combobox no toma el nombre de su texto: se busca por lo que muestra.
+    await pickDealers(page, 3, page.getByRole('combobox').filter({ hasText: 'Select dealers…' }))
     await page.getByRole('button', { name: 'Add dealers' }).click()
     const rows = page.locator('tr[data-assign]')
     await expect(rows).toHaveCount(3)
@@ -221,7 +243,7 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await login(page)
     await page.goto('/expenses/recurring')
     await page.getByRole('row').filter({ hasText: RULE }).first().getByRole('button', { name: 'Actions' }).click()
-    await page.getByRole('menuitem', { name: 'Add expense from this rule' }).click()
+    await page.getByRole('menuitem', { name: 'Generate expense from this recurring expense' }).click()
     await expect(page.getByRole('heading', { name: 'Add Expense' })).toBeVisible()
     // Preloaded from the rule: By percentage selected, 3 dealers, company and category.
     await expect(page.getByRole('button', { name: /By percentage/ })).toHaveAttribute('aria-pressed', 'true')
@@ -243,9 +265,19 @@ test.describe.serial('Expenses — full path (F7)', () => {
   test('Analytics shows the same Total as the list, and a row filters the list', async ({ page }) => {
     await login(page)
     await page.goto('/expenses')
+    // Analytics lee los dealers y las fechas del encabezado: All Dealers y «Last 30 days», que incluye hoy (la fecha
+    // de los gastos que crea este archivo). Sin eso el test dependía de lo que hubiera quedado en la cookie y del día.
+    // Las fechas no se guardan: de acá en adelante se navega por el menú, sin recargar.
+    await pickAllDealersAndLast30Days(page)
     const listTotal = (await page.getByText('Total Expenses').locator('..').locator('..').innerText()).trim()
-    await page.goto('/expenses/analytics')
+    await openMobileMenuIfNeeded(page)
+    const analyticsLink = page.getByRole('link', { name: 'Analytics', exact: true })
+    if (!(await analyticsLink.isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: 'Expenses', exact: true }).click()
+    }
+    await analyticsLink.click()
     await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
+    await expect(page.getByRole('row').filter({ hasText: CATEGORY }).first()).toBeVisible()
     const analyticsTotal = (await page.getByText('Total Expenses').locator('..').locator('..').innerText()).trim()
     const money = (s: string) => /\$[\d,]+\.\d{2}/.exec(s)?.[0]
     expect(money(analyticsTotal)).toBe(money(listTotal))
