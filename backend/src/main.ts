@@ -14,9 +14,6 @@ import { LoggerSystem } from './commons/logs/logger.system'
 import { DataError, IdetailError } from './commons/errors/data.error'
 import { ValidationError } from 'class-validator'
 import { I18nErrorFilter } from './commons/filter/i18n.error.filter'
-import { JwtService } from '@nestjs/jwt'
-import { CompanyInterceptor } from './commons/interceptor/company.interceptor'
-// AuditContextInterceptor se registra en app.module.ts como APP_INTERCEPTOR
 
 async function bootstrap() {
   initializeTransactionalContext()
@@ -77,7 +74,6 @@ async function bootstrap() {
   )
   const reflector = app.get(Reflector)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector), new PaginationInterceptor())
-  app.useGlobalInterceptors(new CompanyInterceptor(app.get(JwtService), app.get(ConfigService)))
   const config = new DocumentBuilder()
     .setTitle('SRS Suite API')
     .setDescription('API')

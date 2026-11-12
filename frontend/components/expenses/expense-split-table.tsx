@@ -120,7 +120,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
               <td
                 className={cn(
                   'px-3 py-2 text-right tabular-nums',
-                  mode === 'percent' && preview.pctSum !== null && (pctOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'),
+                  mode === 'percent' && preview.pctSum !== null && (pctOk ? 'text-emerald-700' : 'text-destructive'),
                 )}
               >
                 {mode === 'percent'
@@ -129,7 +129,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                     : '—'
                   : fmtAmount(preview.total)}
                 {preview.missing ? (
-                  <div className="text-[11px] font-normal text-amber-700 dark:text-amber-400">
+                  <div className="text-[11px] font-normal text-amber-700">
                     {t('expenses.dealersWithoutAmount', { count: preview.missing })}
                   </div>
                 ) : null}

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import * as XLSX from 'xlsx'
+import type { CellObject, WorkSheet } from 'xlsx'
 import type { Table } from '@tanstack/react-table'
 import { FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -52,9 +52,13 @@ function exportLabel<TData>(column: ReturnType<Table<TData>['getAllLeafColumns']
   )
 }
 
+/** `xlsx` se carga al exportar, no con la tabla (plans/plan-buenas-practicas-v0, 1.6). */
+type XlsxUtils = typeof import('xlsx')['utils']
+
 /** Money columns (`meta.money`): numeric cells get `#,##0.00` so Excel shows cents and thousands. */
 function applyMoneyFormat<TData>(
-  ws: XLSX.WorkSheet,
+  utils: XlsxUtils,
+  ws: WorkSheet,
   table: Table<TData>,
   exportAllColumns: boolean,
   headers: string[],
@@ -65,11 +69,11 @@ function applyMoneyFormat<TData>(
       .map((column) => exportLabel(column)),
   )
   if (moneyLabels.size === 0 || !ws['!ref']) return
-  const range = XLSX.utils.decode_range(ws['!ref'])
+  const range = utils.decode_range(ws['!ref'])
   headers.forEach((header, c) => {
     if (!moneyLabels.has(header)) return
     for (let r = range.s.r + 1; r <= range.e.r; r++) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined
+      const cell = ws[utils.encode_cell({ r, c })] as CellObject | undefined
       if (cell && cell.t === 'n') cell.z = '#,##0.00'
     }
   })
@@ -128,6 +132,7 @@ export function DataTableExport<TData>({
     try {
       const rows = await getRows()
       const records = rows.map((row) => rowToRecord(table, row, exportAllColumns))
+      const XLSX = await import('xlsx')
 
       const ws = XLSX.utils.json_to_sheet(records)
       const wb = XLSX.utils.book_new()
@@ -135,7 +140,7 @@ export function DataTableExport<TData>({
 
       if (records.length > 0) {
         const headers = Object.keys(records[0]!)
-        applyMoneyFormat(ws, table, exportAllColumns, headers)
+        applyMoneyFormat(XLSX.utils, ws, table, exportAllColumns, headers)
         ws['!cols'] = headers.map((h) => ({
           wch: Math.min(
             40,

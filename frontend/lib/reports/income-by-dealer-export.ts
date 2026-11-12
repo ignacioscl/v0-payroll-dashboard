@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs'
+import type ExcelJS from 'exceljs'
 import {
   applyHeaderRow,
   applyTitleRow,
@@ -52,6 +52,11 @@ export type IncomeByDealerExportInput = {
   removedNames?: string[]
 }
 
+/** `exceljs` se carga al exportar, no con la pantalla (plans/plan-buenas-practicas-v0, 1.6). */
+async function loadExcel(): Promise<typeof ExcelJS> {
+  return (await import('exceljs')).default
+}
+
 function moneyCell(cell: ExcelJS.Cell, value: number, bold = false) {
   cell.value = value
   cell.numFmt = MONEY_FMT
@@ -82,7 +87,8 @@ export async function exportIncomeByDealerXlsx(input: IncomeByDealerExportInput)
   const generatedAt = new Date()
   const stamp = `${labels.generated} ${formatUsDateTimeForExport(generatedAt.toISOString())} · ${generatedBy} · ${labels.title}`
 
-  const workbook = new ExcelJS.Workbook()
+  const Excel = await loadExcel()
+  const workbook = new Excel.Workbook()
   workbook.creator = 'SRS Payroll Dashboard'
   workbook.created = generatedAt
 

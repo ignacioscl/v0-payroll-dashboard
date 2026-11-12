@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Check, ChevronDown, HelpCircle, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -189,7 +189,7 @@ export function KPICard({
   const isInteractive = typeof onClick === 'function'
 
   const inlineValueSpan = (
-    <motion.span
+    <m.span
       key={String(displayedValue)}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -199,7 +199,7 @@ export function KPICard({
       )}
     >
       {displayedValue}
-    </motion.span>
+    </m.span>
   )
   // Con `valueFull` el número abreviado ($745.9k) se abre al monto completo con un click, igual que
   // en la tarjeta grande.
@@ -288,7 +288,7 @@ export function KPICard({
   )
 
   const card = (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -413,16 +413,16 @@ export function KPICard({
                   'font-bold text-foreground tracking-tight tabular-nums',
                 )}
               >
-                <motion.span
+                <m.span
                   key={String(displayedValue)}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                 >
                   {displayedValue}
-                </motion.span>
+                </m.span>
               </button>
             ) : (
-              <motion.span
+              <m.span
                 key={String(value)}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -434,7 +434,7 @@ export function KPICard({
                 )}
               >
                 {value}
-              </motion.span>
+              </m.span>
             )}
             {excluded && !inactive ? (
               <span className="ml-2 inline-flex flex-col leading-tight">
@@ -531,7 +531,7 @@ export function KPICard({
           </svg>
         </div>
       )}
-    </motion.div>
+    </m.div>
   )
 
   if (!hint) return card

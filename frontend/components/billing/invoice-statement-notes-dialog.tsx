@@ -87,7 +87,7 @@ export function InvoiceStatementNotesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="flex max-h-[85vh] flex-col sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {t('invoices.actionNotesTitle')} — {invoiceLabel}

@@ -1,6 +1,6 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, Entity } from 'typeorm'
 
-import { EntityBase } from '../../../commons/entity/entity-base'
+import { EntityBase } from 'src/commons/entity/entity-base'
 
 @Entity()
 export class Template extends EntityBase {

@@ -2,17 +2,11 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   AlertCircle,
-  CalendarX,
-  Timer,
-  TrendingUp,
-  Trophy,
-  DollarSign,
   Gauge,
   Blocks,
   FileBarChart,
   Target,
   Landmark,
-  Table as TableIcon,
   Wallet,
   ReceiptText,
   Shield,
@@ -42,12 +36,6 @@ export interface NavItem extends NavItemDef {
 export const ALL_NAVIGATION: NavItemDef[] = [
   { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
   { nameKey: 'nav.punchReport', href: '/issues', icon: AlertCircle },
-  { nameKey: 'nav.scheduleViolations', href: '/schedule', icon: CalendarX },
-  { nameKey: 'nav.overtime', href: '/overtime', icon: Timer },
-  { nameKey: 'nav.trends', href: '/trends', icon: TrendingUp },
-  { nameKey: 'nav.employeeRanking', href: '/ranking', icon: Trophy },
-  { nameKey: 'nav.costsByDealer', href: '/costs', icon: DollarSign },
-  { nameKey: 'nav.businessKpis', href: '/kpis', icon: Gauge },
   {
     nameKey: 'nav.reports',
     href: '/reports/business-kpis',
@@ -87,7 +75,6 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     ],
   },
   { nameKey: 'nav.components', href: '/components', icon: Blocks },
-  { nameKey: 'nav.dataTable', href: '/datatable-demo', icon: TableIcon },
 ]
 
 export const PROD_NAV_HREFS = ['/', '/issues'] as const

@@ -67,7 +67,7 @@ export function InvoiceEmailQueueFields({
         className={cn(
           'rounded-md border px-3 py-2 text-xs',
           hasActiveQueue
-            ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300'
+            ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-800'
             : 'border-border/70 bg-muted/30 text-muted-foreground',
         )}
       >

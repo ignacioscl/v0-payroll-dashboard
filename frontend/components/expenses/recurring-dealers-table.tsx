@@ -250,7 +250,7 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
                   <td className="whitespace-normal break-words px-3 py-1.5">
                     {a.dealer.name}
                     {missingFixed && !error ? (
-                      <div className="text-[11px] text-amber-700 dark:text-amber-400">{t('expenses.enterDealerAmount')}</div>
+                      <div className="text-[11px] text-amber-700">{t('expenses.enterDealerAmount')}</div>
                     ) : null}
                   </td>
                   {!isFixed ? (
@@ -331,7 +331,7 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
               <td
                 className={cn(
                   'px-3 py-2 text-right tabular-nums',
-                  !isFixed && pctTotal !== null && (pctTotal === 10000 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'),
+                  !isFixed && pctTotal !== null && (pctTotal === 10000 ? 'text-emerald-700' : 'text-destructive'),
                 )}
               >
                 {isFixed ? fmtAmount(fromCents(fixedTotal)) : pctTotal === null ? '—' : `${fromCents(pctTotal)}%`}

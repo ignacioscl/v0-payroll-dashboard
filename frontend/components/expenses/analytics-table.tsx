@@ -99,7 +99,7 @@ export function AnalyticsTable({
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.vsPrevious')} />,
         cell: ({ row }) => {
           const d = diff(row.original.total, row.original.prevTotal)
-          const tone = d.amount > 0 ? 'text-destructive' : d.amount < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
+          const tone = d.amount > 0 ? 'text-destructive' : d.amount < 0 ? 'text-emerald-700' : 'text-muted-foreground'
           return (
             <span className={cn('tabular-nums', tone)}>
               {d.amount > 0 ? '+' : ''}

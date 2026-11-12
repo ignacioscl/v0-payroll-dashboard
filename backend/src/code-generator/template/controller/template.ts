@@ -26,19 +26,16 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 
-import { Roles } from '../../../commons/decorator/role.decorator'
-import { RoleEnum } from '../../../commons/enum/role.enum'
-import { JwtAuthGuard } from '../../../features/auth/guard/jwt.guard'
-import { RolesGuard } from '../../../features/auth/guard/role.guard'
+import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
+import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
+import { DataErrorDto } from 'src/commons/errors/data.error.dto'
 import { TemplateService } from '../service/template'
 import { TemplateDto, TemplatePaginationDto, TemplateQueryDto, UpdateTemplateDto } from '../dto/template'
 import { Template } from '../entity/template'
-import { RequestWithUser } from '../../../features/auth/types/request.user.type'
-import { DataErrorDto } from 'src/commons/errors/data.error.dto'
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleEnum.ADMIN)
-@Controller('/api-documentos/template')
+/** Auth de PRO: el JWT de PHP lo valida SrsJwtGuard, que deja el usuario en request.srsContext. */
+@UseGuards(SrsJwtGuard)
+@Controller('/srs/template')
 @ApiTags('Template')
 @ApiBearerAuth()
 export class TemplateController {
@@ -50,10 +47,10 @@ export class TemplateController {
 
   @Get('/')
   @ApiOkResponse({ type: TemplatePaginationDto })
-  async findAll(@Req() request: RequestWithUser, @Query() query: TemplateQueryDto) {
+  async findAll(@Req() request: { srsContext: SrsContext }, @Query() query: TemplateQueryDto) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { user } = request
-    // If necessary, have the session Template
+    const { srsContext } = request
+    // Si hace falta, filtrar por srsContext.idDealerProvider (empresa del usuario)
     return await this.getService().fetch(query)
   }
 
@@ -77,9 +74,9 @@ export class TemplateController {
   @ApiNoContentResponse({ description: 'Template deleted' })
   @ApiNotFoundResponse({ description: 'The Template you want to delete does not exist' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Req() request: RequestWithUser, @Param('id', ParseIntPipe) id: number) {
+  async delete(@Req() request: { srsContext: SrsContext }, @Param('id', ParseIntPipe) id: number) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { user } = request
+    const { srsContext } = request
     await this.getService().delete(id)
   }
 

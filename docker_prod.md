@@ -431,7 +431,7 @@ docker compose down
 | ----------------- | ------------------------------------- | ------------------------------------------------- |
 | Env frontend      | `frontend/.env.local`                 | `/home/srssui5/payroll-dashboard.env` (Archivo A) |
 | Env backend       | `backend/.env`                        | `/home/srssui5/srs-backend.env` (Archivo B)       |
-| Next              | `npm run dev` :3000                   | contenedor :3010                                  |
+| Next              | `pnpm dev` :3000                      | contenedor :3010                                  |
 | Nest              | `npm run start` :3020                 | contenedor :3020                                  |
 | `BACKEND_API_URL` | `http://localhost:3020`               | `http://srs-backend:3020`                         |
 | Face              | `http://localhost:3008` (o tu PM2)    | `http://172.20.0.1:3002`                          |

@@ -100,7 +100,7 @@ export function AssignTemplateDialog({ open, onOpenChange, role }: AssignTemplat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="flex max-h-[90vh] flex-col sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('roles.assignTemplate')}</DialogTitle>
         </DialogHeader>
@@ -144,7 +144,7 @@ export function AssignTemplateDialog({ open, onOpenChange, role }: AssignTemplat
               </p>
             ) : (
               <div className="space-y-3">
-                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                   {t('roles.assignTemplateWarning', {
                     name: data.templateNombre,
                     newName: data.nombreAfter ?? '',
@@ -177,7 +177,7 @@ export function AssignTemplateDialog({ open, onOpenChange, role }: AssignTemplat
                       title={t('roles.assignTemplateAdded')}
                       items={data.added}
                       prefix="+"
-                      className="border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
+                      className="border-emerald-200 bg-emerald-50 text-emerald-950"
                     />
                     <ChangeList
                       title={t('roles.assignTemplateRemoved')}

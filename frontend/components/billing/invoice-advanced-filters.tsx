@@ -51,7 +51,7 @@ function FilterLane({
 }) {
   return (
     <section className="space-y-3 border-l-2 border-accent/30 pl-3.5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent/80 dark:text-accent/80">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent/80">
         {title}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>

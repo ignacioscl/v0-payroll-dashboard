@@ -274,7 +274,7 @@ export function RoleTemplateRolesSheet({
       </Sheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent
+        <DialogContent aria-describedby={undefined}
           className={
             isInternal
               ? 'sm:max-w-md'

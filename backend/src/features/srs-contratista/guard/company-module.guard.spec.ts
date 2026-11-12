@@ -119,8 +119,9 @@ describe('Todo controller de /srs/expenses tiene el check «Expenses»', () => {
     }
   }
 
-  it('encuentra los cuatro de hoy', () => {
+  it('encuentra los cinco de hoy', () => {
     expect(expenseControllers.map((c) => c.name).sort()).toEqual([
+      'ExpenseCatalogAdminController',
       'ExpenseCatalogController',
       'ExpenseController',
       'ExpenseReportController',

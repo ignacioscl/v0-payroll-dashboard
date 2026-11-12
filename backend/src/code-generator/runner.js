@@ -1,206 +1,124 @@
 /* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-var-requires */
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/**
+ * `npm run create-feature <nombre> [prop:string|number|boolean ...]`
+ *
+ * Arma `src/features/<nombre>/` con la estructura de la regla `nest-feature-one-resource.mdc` (module, entity,
+ * repository, service, dto, controller) a partir de `template/`, y lo suma a `app.module.ts` en las marcas
+ * `//ImportTemplateModule` y `//TemplateModule`. El controlador sale con `SrsJwtGuard` en `/srs/<nombre>`
+ * (regla `typeorm-crud-no-raw-sql.mdc`).
+ *
+ * Lo prueba `code-generator.spec.ts`: genera a una carpeta temporal y compila lo generado con el compilador de
+ * TypeScript; falla si el molde importa algo que no existe.
+ */
 const fs = require('fs-extra')
 const path = require('path')
 const upperCamelCase = require('uppercamelcase')
 
-const imports = `import { ApiProperty } from '@nestjs/swagger'
-import { typeImport } from 'class-validator'
-`
+const TEMPLATE_DIR = path.join(__dirname, 'template')
+const SRC_DIR = path.join(__dirname, '..')
+const TYPES = ['entity', 'repository', 'dto', 'service', 'controller', 'module']
+const IMPORT_MARK = '//ImportTemplateModule'
+const MODULE_MARK = '//TemplateModule'
 
-const booleanPropertyDummy = `@ApiProperty({
-    description: 'Property dummyBoolean',
-    type: Boolean,
-  })
-  @IsBoolean()
-  @Column()
-  dummyBoolean: boolean
-
-  //propP@ram`
-
-const stringPropertyDummy = `@ApiProperty({
-    description: 'Property dummyString',
-    type: String,
-  })
-  @IsString()
-  @Column()
-  dummyString: string
-
-  //propP@ram`
-
-const numberPropertyDummy = `@ApiProperty({
-    description: 'Property dummyNumber',
-    type: Number,
-  })
-  @IsNumber()
-  @Column()
-  dummyNumber: number
-
-  //propP@ram`
-
-const replaceAll = (string, search, replace) => {
-  return string.split(search).join(replace)
+const PROPERTY_BY_TYPE = {
+  string: { validator: 'IsString', tsType: 'string', swaggerType: 'String' },
+  number: { validator: 'IsNumber', tsType: 'number', swaggerType: 'Number' },
+  boolean: { validator: 'IsBoolean', tsType: 'boolean', swaggerType: 'Boolean' },
 }
 
-const makeUpEntity = (fileStr, properties) => {
-  var entityFile = imports + fileStr
-  if (!properties.length) {
-    // eslint-disable-next-line no-param-reassign
-    properties = ['dummy:string']
+const replaceAll = (string, search, replace) => string.split(search).join(replace)
+
+const parseProperty = (property) => {
+  const [name, type] = property.split(':')
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name ?? '') || !PROPERTY_BY_TYPE[type]) {
+    throw new Error(`Propiedad inválida «${property}»: se escribe nombre:string|number|boolean`)
   }
-  properties?.forEach(property => {
-    const propAndType = property.split(':')
-    let prop
-    if (propAndType[1] === 'string') {
-      entityFile = replaceAll(entityFile, 'typeImport', `IsString, typeImport`)
-      prop = replaceAll(stringPropertyDummy, 'dummyString', propAndType[0])
-    } else if (propAndType[1] === 'number') {
-      entityFile = replaceAll(entityFile, 'typeImport', `IsNumber, typeImport`)
-      prop = replaceAll(numberPropertyDummy, 'dummyNumber', propAndType[0])
-    } else if (propAndType[1] === 'boolean') {
-      entityFile = replaceAll(entityFile, 'typeImport', `IsBoolean, typeImport`)
-      prop = replaceAll(booleanPropertyDummy, 'dummyBoolean', propAndType[0])
-    }
+  return [name, type]
+}
 
-    if (prop) entityFile = replaceAll(entityFile, `//propP@ram`, prop)
+/** Propiedades `nombre:tipo` del entity (sin ninguna, una `dummy:string` para que el feature compile). */
+const makeUpEntity = (fileStr, properties) => {
+  const props = properties.length ? properties : ['dummy:string']
+  const validators = new Set()
+  const columns = props.map((property) => {
+    const [name, type] = parseProperty(property)
+    const spec = PROPERTY_BY_TYPE[type]
+    validators.add(spec.validator)
+    return `  @ApiProperty({
+    description: 'Property ${name}',
+    type: ${spec.swaggerType},
   })
-
-  entityFile = replaceAll(entityFile, `, typeImport`, '')
-  entityFile = replaceAll(
-    entityFile,
-    `\n
-  //propP@ram`,
-    '',
-  )
-  entityFile = replaceAll(entityFile, `import { Entity } from 'typeorm'`, `import { Column, Entity } from 'typeorm'`)
-
-  return entityFile
-}
-
-//Copy folder
-const copyFolder = featureFolder => {
-  console.log(`${__dirname}`)
-  const srcDir = `${__dirname}/template`
-
-  console.log(srcDir)
-  console.log(featureFolder)
-
-  fs.copySync(srcDir, featureFolder, { overwrite: false }, err => {
-    if (err) throw err
-    console.log('source.txt was copied to destination.txt')
+  @${spec.validator}()
+  @Column()
+  ${name}: ${spec.tsType}`
   })
+  const imports = `import { ApiProperty } from '@nestjs/swagger'\nimport { ${[...validators].sort().join(', ')} } from 'class-validator'\n`
+  return imports + fileStr.replace('  //propP@ram', columns.join('\n\n'))
 }
 
-//Change entity file name and contents
-const makeUpController = (fileStr, featureName) => {
-  response = replaceAll(fileStr, `@Controller('/template')`, `@Controller('/${featureName}')`)
-  return response
-}
+/** `../entity/template` → `../entity/<nombre>.entity`, igual con dto, service, controller y repository. */
+const makeUpImports = (fileStr, featureName) =>
+  fileStr.replace(/\b(entity|dto|service|controller|repository)\/template(['"])/g, `$1/${featureName}.$1$2`)
 
-const makeUpImports = (fileStr, featureName) => {
-  var response = replaceAll(fileStr, 'entity/template', `entity/${featureName}.entity`)
-  response = replaceAll(response, 'dto/template/template', `dto/${featureName}/${featureName}.dto`)
-  response = replaceAll(response, 'service/template', `service/${featureName}.service`)
-  response = replaceAll(response, 'controller/template', `controller/${featureName}.controller`)
-  return replaceAll(response, 'repository/template', `repository/${featureName}.repository`)
-  return response
-}
-
-//Change repository file name and contents
-const makeUpFileDto = async (featureName, type = 'dto') => {
-  const newName = `${destDirCommons}/${featureName}.${type}.ts`
-
-  const actualName = `${destDirCommons}/../template/template.ts`
-  console.log('actualName', actualName)
-
-  const newDir = path.dirname(newName)
-  await fs.mkdir(newDir, { recursive: true })
-  await fs.copyFile(actualName, newName)
-
-  fs.readFile(newName, 'utf8', function (err, data) {
-    if (err) {
-      return console.log(err)
-    }
-    const className = upperCamelCase(featureName)
-    var fileStr = replaceAll(data, 'Template', className)
-
-    fileStr = makeUpImports(fileStr, featureName)
-
-    fs.writeFile(newName, fileStr, 'utf8', function (err) {
-      if (err) return console.log(err)
-    })
-  })
-}
-
-//Change repository file name and contents
-const makeUpFile = async (featureName, type, parameters) => {
+const makeUpFile = (destDir, featureName, type, properties) => {
+  const actualName = type === 'module' ? path.join(destDir, 'template.module.ts') : path.join(destDir, type, 'template.ts')
   const newName =
-    type !== 'module' ? `${destDir}/${type}/${featureName}.${type}.ts` : `${destDir}/${featureName}.${type}.ts`
+    type === 'module' ? path.join(destDir, `${featureName}.module.ts`) : path.join(destDir, type, `${featureName}.${type}.ts`)
+  fs.renameSync(actualName, newName)
 
-  const actualName = type !== 'module' ? `${destDir}/${type}/template.ts` : `${destDir}/template.module.ts`
-  await fs.rename(actualName, newName)
-
-  fs.readFile(newName, 'utf8', function (err, data) {
-    if (err) {
-      return console.log(err)
-    }
-    const className = upperCamelCase(featureName)
-    var fileStr = replaceAll(data, 'Template', className)
-
-    fileStr = makeUpImports(fileStr, featureName)
-
-    if (type === 'entity') fileStr = makeUpEntity(fileStr, parameters)
-    else if (type === 'controller') fileStr = makeUpController(fileStr, featureName)
-
-    fs.writeFile(newName, fileStr, 'utf8', function (err) {
-      if (err) return console.log(err)
-    })
-  })
+  let fileStr = replaceAll(fs.readFileSync(newName, 'utf8'), 'Template', upperCamelCase(featureName))
+  fileStr = makeUpImports(fileStr, featureName)
+  if (type === 'entity') fileStr = makeUpEntity(fileStr, properties)
+  else if (type === 'controller') fileStr = replaceAll(fileStr, `'/srs/template'`, `'/srs/${featureName}'`)
+  fs.writeFileSync(newName, fileStr, 'utf8')
 }
 
-const addToAppModule = featureModule => {
-  const appModuleFile = isWindows
-    ? `${__dirname}\\app.module.ts`.replace('\\code-generator', '')
-    : `${__dirname}/app.module.ts`.replace('/code-generator', '')
-  fs.readFile(appModuleFile, 'utf8', function (err, data) {
-    if (err) {
-      return console.log(err)
-    }
-    const className = upperCamelCase(`${featureModule}Module`)
-    var fileStr = replaceAll(data, '//TemplateModule', `${className},\n    //TemplateModule`)
-    fileStr = replaceAll(
-      fileStr,
-      '//ImportTemplateModule',
-      `import { ${className} } from './features/${featureModule}/${featureModule}.module'\n//ImportTemplateModule`,
-    )
-
-    fs.writeFile(appModuleFile, fileStr, 'utf8', function (err) {
-      if (err) return console.log(err)
-    })
-  })
+const addToAppModule = (appModuleFile, featureName) => {
+  const data = fs.readFileSync(appModuleFile, 'utf8')
+  if (!data.includes(IMPORT_MARK) || !data.includes(MODULE_MARK)) {
+    throw new Error(`${appModuleFile} no tiene las marcas ${IMPORT_MARK} y ${MODULE_MARK}`)
+  }
+  const className = upperCamelCase(`${featureName}Module`)
+  let fileStr = replaceAll(data, MODULE_MARK, `${className},\n    ${MODULE_MARK}`)
+  fileStr = replaceAll(
+    fileStr,
+    IMPORT_MARK,
+    `import { ${className} } from './features/${featureName}/${featureName}.module'\n${IMPORT_MARK}`,
+  )
+  fs.writeFileSync(appModuleFile, fileStr, 'utf8')
 }
 
-const parameters = process.argv.slice(2)
-const feature = parameters[0]
+/**
+ * Genera el feature. `featuresDir` y `appModuleFile` existen para que el test escriba en una carpeta temporal;
+ * con `appModuleFile: null` no toca ningún app.module.
+ */
+const generateFeature = ({
+  feature,
+  properties = [],
+  featuresDir = path.join(SRC_DIR, 'features'),
+  appModuleFile = path.join(SRC_DIR, 'app.module.ts'),
+}) => {
+  if (!/^[a-z][a-z0-9.-]*$/.test(feature ?? '')) {
+    throw new Error(`Nombre inválido «${feature}»: minúsculas, números, «-» o «.» (ej. srs-foo)`)
+  }
+  properties.forEach(parseProperty) // antes de copiar nada: un error no deja un feature a medias
+  const destDir = path.join(featuresDir, feature)
+  if (fs.existsSync(destDir)) throw new Error(`Ya existe ${destDir}`)
+  fs.copySync(TEMPLATE_DIR, destDir)
+  for (const type of TYPES) makeUpFile(destDir, feature, type, properties)
+  if (appModuleFile) addToAppModule(appModuleFile, feature)
+  return destDir
+}
 
-const properties = parameters.slice(1)
-const isWindows = process.platform === 'win32'
+module.exports = { generateFeature }
 
-const destDir = isWindows
-  ? `${__dirname}\\features\\${feature}`.replace('\\code-generator', '')
-  : `${__dirname}/features/${feature}`.replace('/code-generator', '')
-
-const destDirCommons = isWindows
-  ? `${__dirname}\\..\\..\\api-commons\\dto\\${feature}`.replace('\\code-generator', '')
-  : `${__dirname}/../../api-commons/dto/${feature}`.replace('/code-generator', '')
-console.log(destDirCommons)
-
-copyFolder(destDir)
-makeUpFile(feature, 'entity', properties)
-makeUpFile(feature, 'repository')
-makeUpFile(feature, 'dto')
-makeUpFile(feature, 'service')
-makeUpFile(feature, 'controller')
-makeUpFile(feature, 'module')
-addToAppModule(feature)
+if (require.main === module) {
+  const [feature, ...properties] = process.argv.slice(2)
+  try {
+    console.log(`Feature creado en ${generateFeature({ feature, properties })}`)
+  } catch (e) {
+    console.error(e.message)
+    process.exit(1)
+  }
+}

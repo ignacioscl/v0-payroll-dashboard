@@ -567,7 +567,7 @@ function GroupRows({ row, wrap }: { row: ExpenseRow; wrap: string }) {
   return (
     <div className="min-w-0 px-3 py-2">
       {row.readOnly ? (
-        <p className="mb-1.5 text-[11px] text-amber-700 dark:text-amber-400">{t('expenses.partialTooltip')}</p>
+        <p className="mb-1.5 text-[11px] text-amber-700">{t('expenses.partialTooltip')}</p>
       ) : null}
       <table className="w-full text-xs">
         <thead>

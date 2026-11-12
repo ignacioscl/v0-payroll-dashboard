@@ -57,7 +57,7 @@ function FilterChipBadge({ chip, clearLabel }: { chip: FilterChip; clearLabel: s
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1',
         'text-[11px] font-medium',
         chip.locked
-          ? 'border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200'
+          ? 'border-amber-500/40 bg-amber-500/10 text-amber-900'
           : 'border-border bg-background text-foreground',
         chip.onRemove && 'pr-1.5',
       )}
@@ -546,7 +546,7 @@ export function InvoiceFilterDeck({
             'hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
           )}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent dark:text-accent">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
             <Filter className="h-3.5 w-3.5" />
           </div>
           <span className="text-sm font-semibold text-foreground">{t('invoices.filterPanelTitle')}</span>
@@ -554,7 +554,7 @@ export function InvoiceFilterDeck({
           <span className="flex-1" />
 
           {chips.length > 0 ? (
-            <span className="rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent dark:text-accent">
+            <span className="rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
               {t('invoices.filtersActive', { count: chips.length })}
             </span>
           ) : null}
@@ -772,7 +772,7 @@ export function InvoiceFilterDeck({
             </div>
 
             {searchLock ? (
-              <p className="text-[11px] text-amber-800 dark:text-amber-200">
+              <p className="text-[11px] text-amber-800">
                 {t('invoices.filterSearchLockHint')}
               </p>
             ) : null}

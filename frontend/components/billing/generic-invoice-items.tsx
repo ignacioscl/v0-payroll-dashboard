@@ -389,7 +389,7 @@ export function GenericInvoiceItems({
                             {[item.rolName, item.dptoName].filter(Boolean).join(' / ') || '—'}
                           </div>
                           {unbilled > 0 ? (
-                            <p className="mt-1 text-xs font-normal text-amber-700 dark:text-amber-400">
+                            <p className="mt-1 text-xs font-normal text-amber-700">
                               {t('invoices.generic.hoursUnbilledBanner', {
                                 hours: fmtNum(unbilled),
                               })}

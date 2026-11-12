@@ -70,8 +70,6 @@ interface FilterContextType {
   resetErrorTypes: () => void
   /** False mientras `/me` no resolvió: ninguna query afectada se habilita. */
   errorTypesReady: boolean
-  selectedStatus: string
-  setSelectedStatus: (value: string) => void
   /** Dashboard live headcount filter: on_lunch | working | out */
   selectedTodayLiveStatus: TodayLiveStatusFilter
   setSelectedTodayLiveStatus: (value: TodayLiveStatusFilter) => void
@@ -159,7 +157,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   // que entrar al día siguiente viendo corregidos creyendo que ve pendientes.
   const [errorStatusState, setErrorStatus] = useState<ErrorStatus>(DEFAULT_ERROR_STATUS)
   const [excludedErrorTypesState, setExcludedErrorTypesState] = useState<number[]>([])
-  const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedTodayLiveStatus, setSelectedTodayLiveStatus] =
     useState<TodayLiveStatusFilter>(TODAY_LIVE_STATUS_ALL)
   const [dateRange, setDateRangeState] = useState<DateRange | undefined>(undefined)
@@ -273,7 +270,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSelectedType('all')
     setErrorStatus(DEFAULT_ERROR_STATUS)
     setExcludedErrorTypesState([])
-    setSelectedStatus('all')
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     const def = getDefaultDateRange()
     resetDateRange()
@@ -308,8 +304,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       toggleErrorType,
       resetErrorTypes,
       errorTypesReady,
-      selectedStatus,
-      setSelectedStatus,
       selectedTodayLiveStatus,
       setSelectedTodayLiveStatus,
       dateRange,

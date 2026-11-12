@@ -57,7 +57,7 @@ export function AccessLevelDialog({ open, onOpenChange, role }: AccessLevelDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
             {t('roles.accessLevelTitle', { name: role?.nombre ?? '' })}

@@ -45,10 +45,10 @@ function statusLabel(status: JobRunStatus, t: TranslateFn): string {
 }
 
 const STATUS_BADGE: Record<JobRunStatus, string> = {
-  ok: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  ok: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
   failed: 'border-destructive/30 bg-destructive/10 text-destructive',
   skipped: 'border-border bg-muted text-muted-foreground',
-  running: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  running: 'border-sky-500/30 bg-sky-500/10 text-sky-700',
 }
 
 function StatusBadge({ status }: { status: JobRunStatus }) {
@@ -69,7 +69,7 @@ function DailyStatusStrip({ status }: { status: JobDailyStatus }) {
   const view = {
     ok: {
       icon: CircleCheck,
-      cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
+      cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900',
       title: t('systemConfig.jobsDailyOk'),
       meta: last ? t('systemConfig.jobsDailyOkMeta', { when, duration, count: last.itemsChanged }) : '',
     },
@@ -81,7 +81,7 @@ function DailyStatusStrip({ status }: { status: JobDailyStatus }) {
     },
     missing: {
       icon: TriangleAlert,
-      cls: 'border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-100',
+      cls: 'border-amber-500/30 bg-amber-500/10 text-amber-900',
       title: t('systemConfig.jobsDailyMissing'),
       meta: last ? t('systemConfig.jobsDailyMissingMeta', { when }) : '',
     },
@@ -276,7 +276,7 @@ export function JobsMonitor({ jobNames }: { jobNames?: string[] }) {
       </Card>
 
       <Dialog open={openRunId !== null} onOpenChange={(o) => !o && setOpenRunId(null)}>
-        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
+        <DialogContent aria-describedby={undefined} className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {t('systemConfig.jobsRunLabel')} #{openRunId}
@@ -333,7 +333,7 @@ export function JobsMonitor({ jobNames }: { jobNames?: string[] }) {
                           className={cn(
                             'font-medium',
                             l.level === 'error' && 'text-destructive',
-                            l.level === 'warn' && 'text-amber-700 dark:text-amber-400',
+                            l.level === 'warn' && 'text-amber-700',
                           )}
                         >
                           {l.level}

@@ -199,7 +199,7 @@ export function DateRangePicker({
         'gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors',
         // Ignorado: el mismo ámbar con el que ya se marcan los filtros trabados.
         effectiveIgnored &&
-          'border-amber-500/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200',
+          'border-amber-500/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15',
         frozen && 'cursor-not-allowed',
         className,
       )}
@@ -207,9 +207,9 @@ export function DateRangePicker({
       {mounted && effectiveIgnored ? (
         <>
           {frozen ? (
-            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <Lock className="h-4 w-4 text-amber-600" />
           ) : (
-            <CalendarOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <CalendarOff className="h-4 w-4 text-amber-600" />
           )}
           <span>{t('filters.dateRangeIgnored')}</span>
         </>

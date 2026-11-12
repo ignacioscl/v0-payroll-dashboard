@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import {
   AlertTriangle,
   ArrowRight,
@@ -513,21 +513,21 @@ export default function DashboardPage() {
     : null
 
   return (
-    <motion.div className="space-y-8" variants={container} initial="hidden" animate="show">
-      <motion.div variants={item}>
+    <m.div className="space-y-8" variants={container} initial="hidden" animate="show">
+      <m.div variants={item}>
         <PageHeading
           title={t('dashboard.title')}
           subtitle={t('dashboard.subtitle')}
           icon={<LayoutDashboard />}
           variant="default"
         />
-      </motion.div>
+      </m.div>
 
-      <motion.div variants={item}>
+      <m.div variants={item}>
         <TodayStatusSection />
-      </motion.div>
+      </m.div>
 
-      <motion.div variants={item} className="space-y-6 border-t border-border pt-8">
+      <m.div variants={item} className="space-y-6 border-t border-border pt-8">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
             {reportPeriodText ?? '…'}
@@ -829,7 +829,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {topDealers.map((dealerItem, index) => (
-                  <motion.div
+                  <m.div
                     key={dealerItem.idDealer}
                     className="flex items-center justify-between rounded-xl bg-muted/30 p-3 transition-colors hover:bg-muted/50"
                     initial={{ opacity: 0, x: -20 }}
@@ -866,7 +866,7 @@ export default function DashboardPage() {
                         {isCorrected ? t('common.corrections') : t('common.errors')}
                       </span>
                     </div>
-                  </motion.div>
+                  </m.div>
                 ))}
               </div>
             )}
@@ -922,7 +922,7 @@ export default function DashboardPage() {
         onDealerClick={openDealerInPunchReport}
         exportParams={rankingParams}
       />
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }

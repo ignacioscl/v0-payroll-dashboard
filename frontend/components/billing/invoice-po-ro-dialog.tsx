@@ -70,7 +70,7 @@ export function InvoicePoRoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {t('invoices.actionPoRoTitle')} — {row.fullNro || `#${row.id}`}

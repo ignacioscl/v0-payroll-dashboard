@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs'
 import { fetchPunchGrouped, fetchPunchList } from '@/lib/srs-kpis-api'
 import type { PunchGroupedQueryParams } from '@/lib/ttk/punch-grouped-filters'
 import type { PunchGroupedRow } from '@/lib/ttk/punch-grouped-types'
@@ -387,7 +386,9 @@ export async function exportPunchGroupedXlsx(input: PunchGroupedExportInput): Pr
     buildGroupedDataRow(r, paymentTypeLabels, labels, isCorrectedMode),
   )
 
-  const workbook = new ExcelJS.Workbook()
+  // `exceljs` se carga al exportar, no con Punch Report (plans/plan-buenas-practicas-v0, 1.6).
+  const { default: Excel } = await import('exceljs')
+  const workbook = new Excel.Workbook()
   workbook.creator = 'SRS Payroll Dashboard'
   workbook.created = new Date()
 

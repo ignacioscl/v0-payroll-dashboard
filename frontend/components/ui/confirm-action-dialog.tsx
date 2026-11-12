@@ -37,17 +37,17 @@ const TONE_CONFIG: Record<
   warning: {
     icon: AlertTriangle,
     iconWrap: 'bg-amber-500/15 ring-amber-500/25',
-    iconColor: 'text-amber-600 dark:text-amber-400',
+    iconColor: 'text-amber-600',
   },
   success: {
     icon: CheckCircle2,
     iconWrap: 'bg-emerald-500/15 ring-emerald-500/25',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    iconColor: 'text-emerald-600',
   },
   info: {
     icon: Info,
     iconWrap: 'bg-accent/15 ring-accent/25',
-    iconColor: 'text-accent dark:text-accent',
+    iconColor: 'text-accent',
   },
 }
 

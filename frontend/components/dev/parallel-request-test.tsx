@@ -123,7 +123,7 @@ export function ParallelRequestTest() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-amber-600 dark:text-amber-500">
+      <p className="text-sm text-amber-600">
         Prueba temporal — borrar cuando terminen de medir paralelismo vs PHP session lock.
       </p>
 

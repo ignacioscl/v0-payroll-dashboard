@@ -1,20 +1,21 @@
 # Payroll dashboard (Next.js) — production image
 # PHP / face / otros servicios corren en el host con PM2; este contenedor solo expone v0.
+# Un solo gestor de paquetes: pnpm, la versión fija de `packageManager` en package.json (corepack la baja).
 
 FROM node:22-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-# --legacy-peer-deps: npm 10 se cae («reading 'edgesOut'») con los peers opcionales de vitest/vite; el lock se
-# genera con el mismo flag (npm install --package-lock-only --legacy-peer-deps).
-RUN npm ci --legacy-peer-deps
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npm run build
+RUN pnpm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

@@ -68,9 +68,9 @@ function StatCell({
         <p
           className={cn(
             'mt-1 truncate text-lg font-semibold tabular-nums sm:text-xl',
-            highlight === 'total' && 'text-accent dark:text-accent',
-            highlight === 'discount' && 'text-amber-600 dark:text-amber-400',
-            highlight === 'partial' && 'text-sky-700 dark:text-sky-300',
+            highlight === 'total' && 'text-accent',
+            highlight === 'discount' && 'text-amber-600',
+            highlight === 'partial' && 'text-sky-700',
             highlight === 'deleted' && 'text-muted-foreground',
           )}
         >

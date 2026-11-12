@@ -117,7 +117,7 @@ function typeTokenOf(statementType: number): TypeToken {
 
 function typeMeta(statementType: number, t: TranslateFn): { label: string; className: string } {
   const woClass =
-    'border-accent/30 bg-accent/10 text-accent dark:text-accent'
+    'border-accent/30 bg-accent/10 text-accent'
   switch (statementType) {
     case 1:
       return { label: t('invoices.typeIndividual'), className: woClass }
@@ -130,12 +130,12 @@ function typeMeta(statementType: number, t: TranslateFn): { label: string; class
     case 5:
       return {
         label: t('invoices.typeTtk'),
-        className: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+        className: 'border-violet-500/30 bg-violet-500/10 text-violet-700',
       }
     case 6:
       return {
         label: t('invoices.typeGeneric'),
-        className: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        className: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
       }
     default:
       return { label: t('invoices.typeWo'), className: woClass }
@@ -146,7 +146,7 @@ function paidMeta(row: InvoiceRow, t: TranslateFn): { label: string; className: 
   if (row.isBilled === 1) {
     return {
       label: t('invoices.statusPaid'),
-      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
     }
   }
   return {
@@ -640,7 +640,7 @@ function TotalsBar({
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsDiscount')}
           </span>
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+          <span className="text-xs font-medium text-amber-600">
             {isLoading || discount == null
               ? '—'
               : discount === 0
@@ -653,7 +653,7 @@ function TotalsBar({
             <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
               {t('invoices.totalsPartialInvoiced')}
             </span>
-            <span className="text-xs font-medium text-sky-700 dark:text-sky-300">
+            <span className="text-xs font-medium text-sky-700">
               {money(partialInvoiced)}
             </span>
           </div>
@@ -662,7 +662,7 @@ function TotalsBar({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('invoices.totalsTotal')}
           </span>
-          <span className="text-base font-bold text-accent dark:text-accent">
+          <span className="text-base font-bold text-accent">
             {money(grandTotal)}
           </span>
         </div>
@@ -1145,7 +1145,7 @@ export function InvoiceListTable({
           const cell = (
             <span
               className={cn(
-                'text-amber-600 dark:text-amber-400',
+                'text-amber-600',
                 row.original.estado === 0 && 'text-muted-foreground line-through',
               )}
             >
@@ -1221,7 +1221,7 @@ export function InvoiceListTable({
               cell: ({ row }: { row: Row<InvoiceRow> }) => (
                 <span
                   className={cn(
-                    'font-semibold text-sky-700 dark:text-sky-300',
+                    'font-semibold text-sky-700',
                     row.original.estado === 0 && 'text-muted-foreground line-through',
                   )}
                 >

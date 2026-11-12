@@ -163,7 +163,7 @@ export function InvoiceRowActions({
               {showNotesSignal ? (
                 <SignalButton
                   label={t('invoices.actionNotesTitle')}
-                  className="text-amber-700 dark:text-amber-400"
+                  className="text-amber-700"
                   onClick={() => setNotesOpen(true)}
                 >
                   <StickyNote className="size-3.5 shrink-0" strokeWidth={1.75} />
@@ -196,7 +196,7 @@ export function InvoiceRowActions({
               {showDiscountSignal ? (
                 <SignalButton
                   label={t('invoices.actionDiscountTitle')}
-                  className="text-emerald-700 dark:text-emerald-400"
+                  className="text-emerald-700"
                   onClick={() => setDiscountOpen(true)}
                 >
                   <DollarSign className="size-3.5 shrink-0" strokeWidth={1.75} />
@@ -226,7 +226,7 @@ export function InvoiceRowActions({
               {showNotes ? (
                 <DropdownMenuItem
                   className={cn(
-                    notesCount > 0 && 'text-amber-700 focus:text-amber-800 dark:text-amber-400',
+                    notesCount > 0 && 'text-amber-700 focus:text-amber-800',
                   )}
                   onClick={() => setNotesOpen(true)}
                 >
@@ -278,7 +278,7 @@ export function InvoiceRowActions({
               {showDiscount ? (
                 <DropdownMenuItem
                   className={cn(
-                    discountSet && 'text-emerald-700 focus:text-emerald-800 dark:text-emerald-400',
+                    discountSet && 'text-emerald-700 focus:text-emerald-800',
                   )}
                   onClick={() => setDiscountOpen(true)}
                 >

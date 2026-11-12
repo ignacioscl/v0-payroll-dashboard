@@ -76,7 +76,7 @@ export function GenericTtkDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-3xl">
+      <DialogContent aria-describedby={undefined} className="flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-3xl">
         <DialogHeader className="px-1 pb-3">
           <DialogTitle className="text-[17px] font-semibold tracking-[-0.015em]">
             {t('invoices.generic.ttkTitle')}
