@@ -81,6 +81,8 @@ export interface UpdateRoleTemplatePayload {
 export interface CreateRolesFromTemplatePayload {
   /** Required for external (tipo 2) templates. */
   idDealers?: number[]
+  /** Internal: the role is named «<template> - <suffix>»; empty = the template name. */
+  suffix?: string
 }
 
 export interface CreateRolesFromTemplateResult {
@@ -91,6 +93,17 @@ export interface CreateRolesFromTemplateResult {
 const BASE_URL = '/api/srs-kpis/role-templates'
 
 /** Nest's default `HttpException` body is `{ statusCode, message, error }`; `message` can be a string or array. */
+/** Error de un pedido a Nest con su status: la pantalla pone en el campo los rechazos que son del campo (409). */
+export class NestRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = 'NestRequestError'
+  }
+}
+
 async function parseNestErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
     const body = (await res.json()) as { message?: string | string[] }
@@ -113,7 +126,7 @@ async function requestJson<T>(
     headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
   })
   if (!res.ok) {
-    throw new Error(await parseNestErrorMessage(res, fallbackErrorMessage))
+    throw new NestRequestError(await parseNestErrorMessage(res, fallbackErrorMessage), res.status)
   }
   return res.json() as Promise<T>
 }
@@ -260,13 +273,15 @@ export async function fetchAssignTemplatePreview(
   )
 }
 
+/** `suffix`: en un rol interno el nombre queda «<template> - <suffix>» (obligatorio). */
 export async function assignTemplateToRole(
   id: number,
   idRol: number,
+  suffix?: string,
 ): Promise<{ idTemplate: number; idRol: number }> {
   return requestJson(
     `${BASE_URL}/${id}/assign/${idRol}`,
-    { method: 'POST' },
+    { method: 'POST', body: JSON.stringify(suffix !== undefined ? { suffix } : {}) },
     'Failed to assign template',
   )
 }

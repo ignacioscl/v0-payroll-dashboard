@@ -23,6 +23,8 @@ export function createRoleFormSchema(
       idDepartment: z.string().optional(),
       role: z.string().trim().min(1, messages.nameRequired),
       ponderation: z.string().optional(),
+      /** Rol padre (un solo nivel); null = sin padre. */
+      parent: z.object({ id: z.number(), nombre: z.string() }).nullable().optional(),
     })
     .superRefine((data, refineCtx) => {
       if (!ctx.isEdit) {
@@ -68,6 +70,7 @@ export const emptyRoleFormValues: RoleFormValues = {
   idDepartment: '',
   role: '',
   ponderation: '',
+  parent: null,
 }
 
 export function roleFormValuesFromRow(
@@ -77,6 +80,8 @@ export function roleFormValuesFromRow(
     idDepartment?: number | null
     nombre: string
     ponderacion: number | null
+    idRolParent?: number | null
+    parentNombre?: string | null
   } | null,
 ): RoleFormValues {
   if (!role) return { ...emptyRoleFormValues }
@@ -86,5 +91,9 @@ export function roleFormValuesFromRow(
     idDepartment: role.idDepartment != null ? String(role.idDepartment) : '',
     role: role.nombre ?? '',
     ponderation: role.ponderacion != null ? String(role.ponderacion) : '',
+    parent:
+      role.idRolParent != null && role.idRolParent > 0
+        ? { id: role.idRolParent, nombre: role.parentNombre ?? `#${role.idRolParent}` }
+        : null,
   }
 }

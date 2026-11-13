@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common'
 import { Transactional } from 'typeorm-transactional'
 
@@ -16,6 +17,7 @@ import { RolAccionService } from 'src/features/srs-rol-accion/service/rol-accion
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
 import { ContratistaService } from 'src/features/srs-contratista/service/contratista.service'
 import {
+  AssignTemplateToRoleDto,
   CreateRolesFromTemplateDto,
   CreateRolTemplateDto,
   RolTemplateQueryDto,
@@ -394,6 +396,13 @@ export class RoleTemplateFacadeService {
       if (await this.roles.hasInternalChild(id)) {
         throw new BadRequestException('An internal role based on this template already exists.')
       }
+      // «<template> - <lo que escribió>» (vacío = el del template), único entre los internos del detailer
+      // (Ignacio, 13/11); misma regla que PHP RolesAdminService::saveRole.
+      const suffix = (body.suffix ?? '').trim()
+      const nombre = suffix ? `${tpl.nombre} - ${suffix}`.slice(0, 64) : tpl.nombre
+      if (await this.roles.existsInternalName(owner, nombre)) {
+        throw new ConflictException('A role with this name already exists')
+      }
       const created = await this.roles.create({
         idDepartment: null,
         idDealer: null,
@@ -402,7 +411,7 @@ export class RoleTemplateFacadeService {
         idCompaniaOwner: owner,
         idTemplate: id,
         tipo: 1,
-        nombre: tpl.nombre,
+        nombre,
         ponderacion,
         estado: 1,
       } as Partial<Rol>)
@@ -558,10 +567,21 @@ export class RoleTemplateFacadeService {
   }
 
   @Transactional()
-  async assignToRole(ctx: SrsContext, id: number, idRol: number) {
+  async assignToRole(ctx: SrsContext, id: number, idRol: number, body: AssignTemplateToRoleDto = {}) {
     const plan = await this.buildAssignPlan(ctx, id, idRol)
     // El preview pudo quedar viejo: el control se repite al confirmar.
     if (plan.blocked) throw new BadRequestException(ASSIGN_BLOCKED_MESSAGES[plan.blocked])
+
+    // Interno: «<template> - <lo que escribió>», obligatorio y sin repetir entre los internos del detailer
+    // (Ignacio, 13/11; misma regla que PHP RolesAdminService::saveRole).
+    if (Number(plan.tpl.tipo) === 1) {
+      const suffix = (body.suffix ?? '').trim()
+      if (!suffix) throw new BadRequestException('Name is required')
+      plan.nombreAfter = `${plan.tpl.nombre} - ${suffix}`.slice(0, 64)
+      if (await this.roles.existsInternalName(this.requireOwner(ctx), plan.nombreAfter, idRol)) {
+        throw new ConflictException('A role with this name already exists')
+      }
+    }
 
     await this.roles.assignTemplate(idRol, {
       idTemplate: id,

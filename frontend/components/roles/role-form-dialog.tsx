@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { RoleParentCombobox } from '@/components/roles/role-parent-combobox'
 import {
   RoleTemplateFilterCombobox,
   type RoleTemplateFilterOption,
@@ -37,8 +38,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useRoleDepartments } from '@/hooks/use-role-lookups'
-import { useSaveRole } from '@/hooks/use-role-mutations'
+import { useSaveRole, useSetParentBulk } from '@/hooks/use-role-mutations'
 import { useCreateRolesFromTemplate } from '@/hooks/use-role-template-roles'
+import { NestRequestError } from '@/lib/srs-role-templates-api'
 import { canManageRoleTemplates } from '@/lib/auth/roles-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -48,8 +50,14 @@ import {
   roleFormValuesFromRow,
   type RoleFormValues,
 } from '@/lib/roles/role-form-schema'
-import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
+import { getSrsErrorMessage, SrsFailError } from '@/lib/srs/parse-srs-response'
 import type { RoleListRow } from '@/lib/roles/roles-types'
+
+/** Lo que va después de «<template> - » en el nombre de un rol de template («» si se llama igual que el template). */
+function templateNameSuffix(name: string, templateNombre: string) {
+  const prefix = `${templateNombre} - `
+  return name.startsWith(prefix) ? name.slice(prefix.length) : ''
+}
 
 export type RoleFormDialogProps = {
   open: boolean
@@ -72,13 +80,20 @@ export function RoleFormDialog({
   const isEdit = role != null && role.id > 0
   /** Rol de template: solo el nombre (el PHP ignora departamento y nivel para estos roles). */
   const templateNameOnly = isEdit && Boolean(role?.idTemplate && role.idTemplate > 0)
+  /** Un solo nivel: un rol con hijos no puede tener padre (el PHP también lo rechaza). */
+  const parentLocked = isEdit && Boolean(role?.hasChildren)
   const save = useSaveRole()
   const createFromTemplate = useCreateRolesFromTemplate()
+  const setParentBulk = useSetParentBulk()
   const { dealers } = useSrsDealers()
 
   const [fromTemplate, setFromTemplate] = React.useState(false)
   const [template, setTemplate] = React.useState<RoleTemplateFilterOption | null>(null)
   const [templateError, setTemplateError] = React.useState<string | null>(null)
+  // Interno desde template: el nombre queda «<template> - <lo que escribe>» (vacío = el del template).
+  const [templateSuffix, setTemplateSuffix] = React.useState('')
+  const [templateNameError, setTemplateNameError] = React.useState<string | null>(null)
+  const templateSuffixRef = React.useRef<HTMLInputElement>(null)
 
   const schema = React.useMemo(
     () =>
@@ -109,13 +124,12 @@ export function RoleFormDialog({
     setFromTemplate(false)
     setTemplate(null)
     setTemplateError(null)
+    setTemplateSuffix('')
+    setTemplateNameError(null)
   }, [open, role, form])
 
-  const showDealer =
-    !isEdit &&
-    (fromTemplate
-      ? template?.tipo === 2
-      : isCompanyTypeCompany || type === '2' || type === '1')
+  // Un rol interno es siempre para todos los dealers (Ignacio, 13/11): el dealer solo se elige en los externos.
+  const showDealer = !isEdit && (fromTemplate ? template?.tipo === 2 : type === '2')
 
   const dealerIdForDpto = React.useMemo(() => {
     if (isCompanyTypeCompany) {
@@ -140,7 +154,7 @@ export function RoleFormDialog({
     open && !fromTemplate && dealerIdForDpto != null,
   )
 
-  const busy = save.isPending || createFromTemplate.isPending
+  const busy = save.isPending || createFromTemplate.isPending || setParentBulk.isPending
 
   const createFromSelectedTemplate = async (values: RoleFormValues) => {
     if (!template || template.id < 1) {
@@ -154,17 +168,47 @@ export function RoleFormDialog({
         return
       }
     }
+    let created: { createdIds: number[] }
     try {
-      await createFromTemplate.mutateAsync({
+      created = await createFromTemplate.mutateAsync({
         id: template.id,
         payload:
-          template.tipo === 2 ? { idDealers: [Number(values.idDealer)] } : {},
+          template.tipo === 2
+            ? { idDealers: [Number(values.idDealer)] }
+            : { suffix: templateSuffix.trim() },
       })
-      toast.success(t('roles.saveSuccess'))
-      onOpenChange(false)
     } catch (err) {
+      // 409 = ya hay un interno con ese nombre: el error va en el campo del nombre, con el foco ahí.
+      if (template.tipo === 1 && err instanceof NestRequestError && err.status === 409) {
+        setTemplateNameError(t('roles.nameTakenAddSuffix'))
+        templateSuffixRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        templateSuffixRef.current?.focus()
+        return
+      }
       toast.error(getSrsErrorMessage(err, t('roles.saveError')))
+      return
     }
+    // El padre lo graba el PHP (`set_parent`), que es donde está la regla de un solo nivel.
+    if (values.parent?.id && created.createdIds.length > 0) {
+      try {
+        const res = await setParentBulk.mutateAsync({
+          action: 'set_parent',
+          ids_rol: created.createdIds,
+          id_rol_parent: values.parent.id,
+        })
+        if (res.skipped.length > 0) {
+          toast.error(`${t('roles.saveSuccess')} — ${t('roles.parentRole')}: ${res.skipped[0].reason}`)
+          onOpenChange(false)
+          return
+        }
+      } catch (err) {
+        toast.error(`${t('roles.saveSuccess')} — ${getSrsErrorMessage(err, t('roles.saveError'))}`)
+        onOpenChange(false)
+        return
+      }
+    }
+    toast.success(t('roles.saveSuccess'))
+    onOpenChange(false)
   }
 
   const onSubmit = async (values: RoleFormValues) => {
@@ -172,16 +216,30 @@ export function RoleFormDialog({
       await save.mutateAsync({
         id_rol: isEdit ? role!.id : undefined,
         type: isEdit ? undefined : Number(values.type),
-        id_dealer: values.idDealer ? Number(values.idDealer) : null,
+        id_dealer: values.type === '2' && values.idDealer ? Number(values.idDealer) : null,
         id_department: values.idDepartment ? Number(values.idDepartment) : null,
         role: values.role.trim(),
         ponderation: values.ponderation?.trim()
           ? Number(values.ponderation)
           : null,
+        ...(parentLocked ? {} : { id_rol_parent: values.parent?.id ?? null }),
       })
       toast.success(t('roles.saveSuccess'))
       onOpenChange(false)
     } catch (err) {
+      // 422 = rechazo del rol padre: el error va en el campo y la pantalla lo lleva a la vista.
+      if (err instanceof SrsFailError && err.code === '422') {
+        form.setError('parent', { message: err.message })
+        const field = document.getElementById('role-parent')
+        field?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        field?.querySelector<HTMLElement>('button')?.focus()
+        return
+      }
+      // 409 = ya hay un rol interno con ese nombre: el error va en Name, con el foco ahí.
+      if (err instanceof SrsFailError && err.code === '409') {
+        form.setError('role', { message: t('roles.nameTaken') }, { shouldFocus: true })
+        return
+      }
       toast.error(getSrsErrorMessage(err, t('roles.saveError')))
     }
   }
@@ -245,6 +303,8 @@ export function RoleFormDialog({
                       onChange={(next) => {
                         setTemplate(next)
                         setTemplateError(null)
+                        setTemplateSuffix('')
+                        setTemplateNameError(null)
                         form.setValue('idDealer', '')
                         form.clearErrors('idDealer')
                       }}
@@ -260,6 +320,32 @@ export function RoleFormDialog({
                           ? t('roles.typeInternal')
                           : t('roles.typeExternal')}
                       </p>
+                    ) : null}
+                    {template?.tipo === 1 ? (
+                      <div className="space-y-1.5 pt-1">
+                        <Label
+                          htmlFor="role-template-suffix"
+                          className={templateNameError ? 'text-destructive' : undefined}
+                        >
+                          {t('roles.colName')}
+                        </Label>
+                        <Input
+                          id="role-template-suffix"
+                          ref={templateSuffixRef}
+                          leadingText={`${template.nombre} - `}
+                          value={templateSuffix}
+                          maxLength={Math.max(1, 64 - template.nombre.length - 3)}
+                          aria-invalid={templateNameError ? true : undefined}
+                          disabled={busy}
+                          onChange={(e) => {
+                            setTemplateSuffix(e.target.value)
+                            setTemplateNameError(null)
+                          }}
+                        />
+                        {templateNameError ? (
+                          <p className="text-sm text-destructive">{templateNameError}</p>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -396,8 +482,38 @@ export function RoleFormDialog({
                     <FormItem>
                       <FormLabel htmlFor="role-name">{t('roles.colName')}</FormLabel>
                       <FormControl>
-                        <Input id="role-name" {...field} />
+                        {templateNameOnly && role?.templateNombre ? (
+                          // Rol de template: «<template> - » queda fijo en gris; solo se edita lo de después
+                          // (vacío = el nombre del template). Ignacio, 13/11. El PHP lo controla igual.
+                          <Input
+                            id="role-name"
+                            ref={field.ref}
+                            name={field.name}
+                            onBlur={field.onBlur}
+                            leadingText={`${role.templateNombre} - `}
+                            value={templateNameSuffix(field.value, role.templateNombre)}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value === ''
+                                  ? role.templateNombre!
+                                  : `${role.templateNombre} - ${e.target.value}`,
+                              )
+                            }
+                          />
+                        ) : (
+                          <Input id="role-name" {...field} />
+                        )}
                       </FormControl>
+                      {templateNameOnly &&
+                      role?.templateNombre &&
+                      role.nombre !== role.templateNombre &&
+                      !role.nombre.startsWith(`${role.templateNombre} - `) &&
+                      field.value === role.nombre ? (
+                        // Rol viejo con otro nombre: se guarda igual si no se toca; si se escribe, toma el del template.
+                        <p className="text-xs text-muted-foreground">
+                          {t('roles.templateNameLegacy', { name: role.nombre })}
+                        </p>
+                      ) : null}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -419,6 +535,36 @@ export function RoleFormDialog({
                   />
                 ) : null}
               </>
+            ) : null}
+
+            {/* Rol padre: también al crear desde un template (Ignacio, 13/11). */}
+            {!fromTemplate || template ? (
+              <FormField
+                control={form.control}
+                name="parent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="role-parent">{t('roles.parentRole')}</FormLabel>
+                    <RoleParentCombobox
+                      id="role-parent"
+                      value={field.value ?? null}
+                      onChange={(next) => {
+                        field.onChange(next)
+                        form.clearErrors('parent')
+                      }}
+                      excludeRoleId={isEdit ? role!.id : null}
+                      enabled={open}
+                      disabled={busy || parentLocked}
+                    />
+                    {parentLocked ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('roles.parentRoleHasChildren')}
+                      </p>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             ) : null}
 
             <DialogFooter>

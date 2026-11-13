@@ -84,6 +84,7 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
     template?: Record<string, unknown>
     role?: Record<string, unknown> | null
     hasInternalChild?: boolean
+    internalNameTaken?: boolean
     existingDealerIds?: number[]
     scopedDealers?: Record<string, unknown>[]
     rolePermIds?: number[]
@@ -106,6 +107,8 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
       hasInternalChild: jest.fn().mockResolvedValue(opts.hasInternalChild ?? false),
       findExistingDealerIds: jest.fn().mockResolvedValue(opts.existingDealerIds ?? []),
       assignTemplate: jest.fn().mockResolvedValue(undefined),
+      existsInternalName: jest.fn().mockResolvedValue(opts.internalNameTaken ?? false),
+      create: jest.fn().mockResolvedValue({ idRol: 300, nombre: 'Service advisor' }),
     }
     const rolePerms = {
       listAccionIds: jest.fn().mockResolvedValue(opts.rolePermIds ?? [5, 9]),
@@ -125,6 +128,7 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
     }
     const dealers = {
       findScopedByIds: jest.fn().mockResolvedValue(opts.scopedDealers ?? [{ id: 30, razonSocial: 'Honda' }]),
+      findById: jest.fn().mockResolvedValue({ id: 10, idEmpresa: 4 }),
     }
     const facade = new RoleTemplateFacadeService(
       templates as any,
@@ -142,11 +146,15 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
   it('links an internal role: template name, level and permissions, with both logs', async () => {
     const { facade, roles, rolePerms, activityLog } = buildFacade()
 
-    await expect(facade.assignToRole(ctx, 50, 200)).resolves.toEqual({ idTemplate: 50, idRol: 200 })
+    await expect(facade.assignToRole(ctx, 50, 200, { suffix: ' North ' })).resolves.toEqual({
+      idTemplate: 50,
+      idRol: 200,
+    })
 
+    expect(roles.existsInternalName).toHaveBeenCalledWith(10, 'Service advisor - North', 200)
     expect(roles.assignTemplate).toHaveBeenCalledWith(200, {
       idTemplate: 50,
-      nombre: 'Service advisor',
+      nombre: 'Service advisor - North',
       ponderacion: 5,
     })
     expect(rolePerms.replaceForRole).toHaveBeenCalledWith(200, [5, 12])
@@ -155,14 +163,14 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
       idAuthor: 7,
       action: 'assign_template',
       summary:
-        'Assigned template “Service advisor”; name “Old advisor” → “Service advisor”; access level 3 → 5',
+        'Assigned template “Service advisor”; name “Old advisor” → “Service advisor - North”; access level 3 → 5',
       detail: {
         idTemplate: 50,
         templateNombre: 'Service advisor',
         added: [{ id: 12, nombre: 'New permission' }],
         removed: [{ id: 9, nombre: 'Old permission' }],
         before: { nombre: 'Old advisor', ponderacion: 3 },
-        after: { nombre: 'Service advisor', ponderacion: 5 },
+        after: { nombre: 'Service advisor - North', ponderacion: 5 },
       },
     })
     expect(activityLog.appendForTemplate).toHaveBeenCalledWith(
@@ -191,11 +199,11 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
 
   it('logs only the assignment when nothing else changes', async () => {
     const { facade, activityLog } = buildFacade({
-      role: { idRol: 200, nombre: 'Service advisor', tipo: 1, idDealer: null, ponderacion: 5 },
+      role: { idRol: 200, nombre: 'Service advisor - North', tipo: 1, idDealer: null, ponderacion: 5 },
       rolePermIds: [5, 12],
     })
 
-    await facade.assignToRole(ctx, 50, 200)
+    await facade.assignToRole(ctx, 50, 200, { suffix: 'North' })
 
     expect(activityLog.appendForRole).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,9 +219,26 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
     await expect(facade.assignPreview(ctx, 50, 200)).resolves.toEqual(
       expect.objectContaining({ blocked: null, nombreAfter: 'Service advisor' }),
     )
-    await facade.assignToRole(ctx, 50, 200)
+    await facade.assignToRole(ctx, 50, 200, { suffix: 'South' })
     expect(roles.hasInternalChild).not.toHaveBeenCalled()
     expect(roles.assignTemplate).toHaveBeenCalledWith(200, expect.objectContaining({ idTemplate: 50 }))
+  })
+
+  // «<template> - <lo que escribió>» sin repetir (plans/plan-roles-padre-ttk-mi-area, agregado del 13/11).
+  it('internal: without a suffix nothing is assigned', async () => {
+    const { facade, roles } = buildFacade()
+
+    await expect(facade.assignToRole(ctx, 50, 200, { suffix: '  ' })).rejects.toThrow('Name is required')
+    expect(roles.assignTemplate).not.toHaveBeenCalled()
+  })
+
+  it('internal: a name taken by another internal role is rejected', async () => {
+    const { facade, roles } = buildFacade({ internalNameTaken: true })
+
+    await expect(facade.assignToRole(ctx, 50, 200, { suffix: 'North' })).rejects.toThrow(
+      'A role with this name already exists',
+    )
+    expect(roles.assignTemplate).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -272,5 +297,31 @@ describe('RoleTemplateFacadeService.assignToRole', () => {
     await expect(facade.assignPreview(ctx, 50, 200)).rejects.toThrow('Forbidden')
     await expect(facade.assignToRole(ctx, 50, 200)).rejects.toThrow('Forbidden')
     expect(roles.assignTemplate).not.toHaveBeenCalled()
+  })
+
+  // Nombre único entre los internos del detailer (plans/plan-roles-padre-ttk-mi-area, agregado del 13/11).
+  it('createRoles: an internal template whose name is taken by another internal role creates nothing', async () => {
+    const { facade, roles } = buildFacade({ internalNameTaken: true })
+
+    await expect(facade.createRoles(ctx, 50, {} as any)).rejects.toThrow('A role with this name already exists')
+    expect(roles.existsInternalName).toHaveBeenCalledWith(10, 'Service advisor')
+    expect(roles.create).not.toHaveBeenCalled()
+  })
+
+  it('createRoles: an internal template with a free name creates the role for all dealers', async () => {
+    const { facade, roles } = buildFacade()
+
+    await expect(facade.createRoles(ctx, 50, {} as any)).resolves.toEqual({ idTemplate: 50, createdIds: [300] })
+    expect(roles.create).toHaveBeenCalledWith(
+      expect.objectContaining({ idDealer: null, tipo: 1, nombre: 'Service advisor' }),
+    )
+  })
+
+  it('createRoles: an internal template with a suffix is named «template - suffix»', async () => {
+    const { facade, roles } = buildFacade()
+
+    await facade.createRoles(ctx, 50, { suffix: ' North ' } as any)
+    expect(roles.existsInternalName).toHaveBeenCalledWith(10, 'Service advisor - North')
+    expect(roles.create).toHaveBeenCalledWith(expect.objectContaining({ nombre: 'Service advisor - North' }))
   })
 })

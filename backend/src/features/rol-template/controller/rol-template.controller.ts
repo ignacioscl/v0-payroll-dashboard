@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
 import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import {
+  AssignTemplateToRoleDto,
   CreateRolesFromTemplateDto,
   CreateRolTemplateDto,
   RolTemplateQueryDto,
@@ -109,8 +110,9 @@ export class RolTemplateController {
     @Req() request: any,
     @Param('id', ParseIntPipe) id: number,
     @Param('idRol', ParseIntPipe) idRol: number,
+    @Body() body: AssignTemplateToRoleDto,
   ) {
-    return this.service.assignToRole(request.srsContext, id, idRol)
+    return this.service.assignToRole(request.srsContext, id, idRol, body ?? {})
   }
 
   @Delete(':id/roles/:idRol')

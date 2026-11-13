@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   useAssignTemplatePreview,
@@ -24,7 +25,7 @@ import {
 import { useTranslation } from '@/lib/i18n/locale-context'
 import type { MessageKey } from '@/lib/i18n/messages'
 import type { RoleListRow } from '@/lib/roles/roles-types'
-import type { AssignTemplateBlocked } from '@/lib/srs-role-templates-api'
+import { NestRequestError, type AssignTemplateBlocked } from '@/lib/srs-role-templates-api'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 
 export type AssignTemplateDialogProps = {
@@ -72,25 +73,54 @@ function ChangeList({
 export function AssignTemplateDialog({ open, onOpenChange, role }: AssignTemplateDialogProps) {
   const { t } = useTranslation()
   const [template, setTemplate] = React.useState<RoleTemplateFilterOption | null>(null)
+  const [suffix, setSuffix] = React.useState('')
+  const [nameError, setNameError] = React.useState<string | null>(null)
+  const suffixRef = React.useRef<HTMLInputElement>(null)
   const assign = useAssignTemplateToRole()
 
   React.useEffect(() => {
-    if (open) setTemplate(null)
+    if (open) {
+      setTemplate(null)
+      setSuffix('')
+      setNameError(null)
+    }
   }, [open, role])
 
   const tipo = role?.tipo === 1 || role?.tipo === 2 ? role.tipo : undefined
+  // Interno: el nombre queda «<template> - <lo que escribe>» (Ignacio, 13/11), sin repetir entre los internos.
+  const isInternal = role?.tipo === 1
   const preview = useAssignTemplatePreview(template?.id ?? null, role?.id ?? null, open)
   const data = preview.data
   const blocked = data?.blocked ?? null
   const canConfirm = Boolean(template && data && !blocked && !preview.isFetching)
+  const namePrefix = data ? `${data.templateNombre} - ` : ''
+  const newName = isInternal ? `${namePrefix}${suffix.trim()}` : (data?.nombreAfter ?? '')
+
+  const showNameError = (message: string) => {
+    setNameError(message)
+    suffixRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    suffixRef.current?.focus()
+  }
 
   const onConfirm = async () => {
     if (!template || !role) return
+    if (isInternal && !suffix.trim()) {
+      showNameError(t('roles.nameRequired'))
+      return
+    }
     try {
-      await assign.mutateAsync({ id: template.id, idRol: role.id })
+      await assign.mutateAsync({
+        id: template.id,
+        idRol: role.id,
+        ...(isInternal ? { suffix: suffix.trim() } : {}),
+      })
       toast.success(t('roles.assignTemplateSuccess'))
       onOpenChange(false)
     } catch (err) {
+      if (isInternal && err instanceof NestRequestError && err.status === 409) {
+        showNameError(t('roles.nameTaken'))
+        return
+      }
       toast.error(getSrsErrorMessage(err, t('roles.assignTemplateError')))
     }
   }
@@ -147,14 +177,36 @@ export function AssignTemplateDialog({ open, onOpenChange, role }: AssignTemplat
                 <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                   {t('roles.assignTemplateWarning', {
                     name: data.templateNombre,
-                    newName: data.nombreAfter ?? '',
+                    newName,
                   })}
                 </p>
+
+                {isInternal ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="assign-template-suffix" className={nameError ? 'text-destructive' : undefined}>
+                      {t('roles.assignTemplateName')}
+                    </Label>
+                    <Input
+                      id="assign-template-suffix"
+                      ref={suffixRef}
+                      leadingText={namePrefix}
+                      value={suffix}
+                      maxLength={Math.max(1, 64 - namePrefix.length)}
+                      aria-invalid={nameError ? true : undefined}
+                      disabled={assign.isPending}
+                      onChange={(e) => {
+                        setSuffix(e.target.value)
+                        setNameError(null)
+                      }}
+                    />
+                    {nameError ? <p className="text-sm text-destructive">{nameError}</p> : null}
+                  </div>
+                ) : null}
 
                 <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-3">
                   <dt className="text-muted-foreground">{t('roles.assignTemplateName')}</dt>
                   <dd className="min-w-0 break-words">
-                    {data.nombreBefore} → <span className="font-medium">{data.nombreAfter}</span>
+                    {data.nombreBefore} → <span className="font-medium">{newName}</span>
                   </dd>
                   {levelChanges ? (
                     <>

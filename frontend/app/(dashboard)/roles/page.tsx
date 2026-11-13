@@ -9,6 +9,10 @@ import { AccessLevelDialog } from '@/components/roles/access-level-dialog'
 import { AssignTemplateDialog } from '@/components/roles/assign-template-dialog'
 import { RoleActivityPanel } from '@/components/roles/role-activity-panel'
 import { RoleFormDialog } from '@/components/roles/role-form-dialog'
+import {
+  RoleParentCombobox,
+  type RoleParentOption,
+} from '@/components/roles/role-parent-combobox'
 import { RolePermissionsSheet } from '@/components/roles/role-permissions-sheet'
 import { RoleServicesSheet } from '@/components/roles/role-services-sheet'
 import {
@@ -50,6 +54,7 @@ export default function RolesPage() {
 
   const [typeFilter, setTypeFilter] = useState('')
   const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
+  const [parentFilter, setParentFilter] = useState<RoleParentOption | null>(null)
   const [showInactive, setShowInactive] = useState(false)
   const [includeNoDealer, setIncludeNoDealer] = useState(false)
   const { selectedDealers } = useFilters()
@@ -158,6 +163,19 @@ export default function RolesPage() {
             value={templateFilter}
             onChange={setTemplateFilter}
             enabled={!loading && canView}
+            withPresenceOptions
+          />
+        </div>
+
+        <div className="w-[280px] space-y-1.5">
+          <Label>{t('roles.parentRole')}</Label>
+          <RoleParentCombobox
+            value={parentFilter}
+            onChange={setParentFilter}
+            enabled={!loading && canView}
+            placeholder={t('roles.parentRoleFilterAll')}
+            compact
+            withPresenceOptions
           />
         </div>
 
@@ -189,6 +207,7 @@ export default function RolesPage() {
       <RolesDataTable
         typeFilter={typeFilter}
         idTemplate={templateFilter?.id ?? null}
+        idRolParent={parentFilter?.id ?? null}
         showInactive={showInactive}
         includeNoDealer={includeNoDealer}
         enabled={!loading && canView}
