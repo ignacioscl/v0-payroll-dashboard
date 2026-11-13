@@ -22,6 +22,8 @@ type RoleParentComboboxProps = {
   onChange: (value: RoleParentOption | null) => void
   /** Rol que se edita: no aparece como opción. */
   excludeRoleId?: number | null
+  /** «Set parent role» en masa: los roles tildados no aparecen como opción (no pueden ser su propio padre). */
+  excludeRoleIds?: number[]
   enabled?: boolean
   disabled?: boolean
   /** Texto con nada elegido (default «No parent»; el filtro usa «Any parent role»). */
@@ -41,6 +43,7 @@ export function RoleParentCombobox({
   value,
   onChange,
   excludeRoleId,
+  excludeRoleIds,
   enabled = true,
   disabled = false,
   placeholder,
@@ -75,6 +78,13 @@ export function RoleParentCombobox({
     enabled: enabled && !disabled,
   })
 
+  const options = React.useMemo(() => {
+    const rows = query.data ?? []
+    if (!excludeRoleIds?.length) return rows
+    const excluded = new Set(excludeRoleIds)
+    return rows.filter((r) => !excluded.has(r.id))
+  }, [query.data, excludeRoleIds])
+
   return (
     <div id={id}>
       <SearchableCombobox<RoleParentOption>
@@ -87,9 +97,9 @@ export function RoleParentCombobox({
             ? [
                 { id: ROLE_FILTER_WITH, nombre: t('roles.filterWithParent') },
                 { id: ROLE_FILTER_WITHOUT, nombre: t('roles.filterWithoutParent') },
-                ...(query.data ?? []),
+                ...options,
               ]
-            : (query.data ?? [])
+            : options
         }
         isLoading={query.isFetching}
         getItemKey={(item) => item.id}

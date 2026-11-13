@@ -38,6 +38,7 @@ export function SetParentRoleDialog({ open, onOpenChange, roles, onDone }: SetPa
   const [parent, setParent] = React.useState<RoleParentOption | null>(null)
   const [result, setResult] = React.useState<SetParentBulkResult | null>(null)
   const [appliedCount, setAppliedCount] = React.useState(0)
+  const selectedIds = React.useMemo(() => roles.map((r) => r.id), [roles])
 
   React.useEffect(() => {
     if (open) {
@@ -101,6 +102,7 @@ export function SetParentRoleDialog({ open, onOpenChange, roles, onDone }: SetPa
               id="set-parent-role"
               value={parent}
               onChange={setParent}
+              excludeRoleIds={selectedIds}
               enabled={open}
               disabled={mutation.isPending}
             />
