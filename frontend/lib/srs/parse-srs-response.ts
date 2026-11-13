@@ -36,11 +36,21 @@ function parseEnvelope<T>(raw: unknown): SrsEnvelope<T> {
   throw new Error('Invalid response from server')
 }
 
+/** Error de un envelope SRS; `code` es el código de la excepción del PHP (p. ej. '422' = error de un campo). */
+export class SrsFailError extends Error {
+  readonly code: string | undefined
+  constructor(message: string, code?: string) {
+    super(message)
+    this.name = 'SrsFailError'
+    this.code = code
+  }
+}
+
 /** Throws when the SRS envelope reports failure (works for ErrorManager responses). */
 export function throwIfSrsFail(raw: unknown, fallbackMessage: string): void {
   const envelope = parseEnvelope(raw)
   if (envelope.status === 'fail' || envelope.error?.message?.trim()) {
-    throw new Error(envelope.error?.message?.trim() || fallbackMessage)
+    throw new SrsFailError(envelope.error?.message?.trim() || fallbackMessage, envelope.error?.code)
   }
 }
 

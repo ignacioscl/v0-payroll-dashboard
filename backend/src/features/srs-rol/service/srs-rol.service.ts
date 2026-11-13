@@ -43,6 +43,10 @@ export class SrsRolService extends GlobalBaseService<Rol, SrsRolQueryDto> {
     return this.repository.hasInternalChild(idTemplate)
   }
 
+  existsInternalName(idCompaniaOwner: number, nombre: string, excludeIdRol = 0) {
+    return this.repository.existsInternalName(idCompaniaOwner, nombre, excludeIdRol)
+  }
+
   findExistingDealerIds(idTemplate: number, idDealers: number[]) {
     return this.repository.findExistingDealerIds(idTemplate, idDealers)
   }

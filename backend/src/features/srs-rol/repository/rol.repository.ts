@@ -68,6 +68,20 @@ export class RolRepository extends BaseRepository<Rol, SrsRolQueryDto> {
     return this.exist({ where: { idTemplate, tipo: 1, estado: Not(ROL_ESTADO_ELIMINADO) } })
   }
 
+  /**
+   * ¿Ya hay un rol interno con ese nombre en el detailer? Sin mayúsculas ni espacios de más; los borrados no cuentan.
+   * Pareja de PHP: RolDao::existsInternalName (plans/plan-roles-padre-ttk-mi-area, 13/11).
+   */
+  existsInternalName(idCompaniaOwner: number, nombre: string, excludeIdRol = 0) {
+    return this.createQueryBuilder('r')
+      .where('r.idCompaniaOwner = :owner', { owner: idCompaniaOwner })
+      .andWhere('r.idRol <> :exclude', { exclude: excludeIdRol })
+      .andWhere('r.tipo = 1')
+      .andWhere('r.estado <> :deleted', { deleted: ROL_ESTADO_ELIMINADO })
+      .andWhere('LOWER(TRIM(r.nombre)) = LOWER(TRIM(:nombre))', { nombre })
+      .getExists()
+  }
+
   async findExistingDealerIds(idTemplate: number, idDealers: number[]): Promise<number[]> {
     if (!idDealers.length) return []
     const rows = await this.find({

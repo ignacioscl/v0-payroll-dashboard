@@ -3,8 +3,31 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSrsApiRequest } from '@/lib/hooks/use-srs-api-request'
 import { assertSrsSuccess } from '@/lib/srs/parse-srs-response'
-import type { RoleActionPayload, RoleListRow, RoleSavePayload } from '@/lib/roles/roles-types'
+import type {
+  RoleActionPayload,
+  RoleListRow,
+  RoleSavePayload,
+  SetParentBulkPayload,
+  SetParentBulkResult,
+} from '@/lib/roles/roles-types'
 import { SrsPhpPath } from '@/types/enum-url'
+
+/** Rol padre a varios roles a la vez (los tildados). Los que no cumplen la regla vuelven en `skipped`. */
+export function useSetParentBulk() {
+  const queryClient = useQueryClient()
+  const api = useSrsApiRequest<SetParentBulkPayload, undefined, unknown>(SrsPhpPath.ROLES_ACTIONS)
+
+  return useMutation({
+    mutationFn: async (payload: SetParentBulkPayload) => {
+      const raw = await api.post(payload)
+      return assertSrsSuccess<SetParentBulkResult>(raw, 'Failed to set parent role')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles-list'] })
+      queryClient.invalidateQueries({ queryKey: ['role-activity'] })
+    },
+  })
+}
 
 export function useSaveRole() {
   const queryClient = useQueryClient()

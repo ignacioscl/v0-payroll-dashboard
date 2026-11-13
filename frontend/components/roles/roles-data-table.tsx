@@ -8,6 +8,7 @@ import {
   History,
   Layers,
   MoreHorizontal,
+  Network,
   Pencil,
   Shield,
   Trash2,
@@ -27,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { AssignAllServicesDialog } from '@/components/roles/assign-all-services-dialog'
+import { SetParentRoleDialog } from '@/components/roles/set-parent-role-dialog'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 import {
   DropdownMenu,
@@ -47,8 +49,7 @@ import { useRoleAction } from '@/hooks/use-role-mutations'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { useFilters } from '@/lib/filter-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
-import { cn } from '@/lib/utils'
-import type { RoleListRow } from '@/lib/roles/roles-types'
+import { roleFilterParams, type RoleListRow } from '@/lib/roles/roles-types'
 
 const rolesAdapter = createPaginatedAdapter<RoleListRow>()
 
@@ -56,6 +57,8 @@ export type RolesDataTableProps = {
   typeFilter: string
   /** When set, list only roles created from this ROL_TEMPLATE. */
   idTemplate?: number | null
+  /** When set, list only the child roles of this role. */
+  idRolParent?: number | null
   showInactive: boolean
   /** With a dealer selected in the header: also list internal roles without dealer. */
   includeNoDealer: boolean
@@ -76,6 +79,7 @@ export type RolesDataTableProps = {
 export function RolesDataTable({
   typeFilter,
   idTemplate = null,
+  idRolParent = null,
   showInactive,
   includeNoDealer,
   enabled,
@@ -121,15 +125,16 @@ export function RolesDataTable({
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
   const [assignOpen, setAssignOpen] = React.useState(false)
+  const [setParentOpen, setSetParentOpen] = React.useState(false)
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer])
 
   // Selection is per visible page, like legacy (getRolesChecked on the DataTable page).
   React.useEffect(() => {
     setRowSelection({})
-  }, [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer, pageIndex, pageSize])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer, pageIndex, pageSize])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -197,13 +202,15 @@ export function RolesDataTable({
         : []),
       {
         accessorKey: 'nombre',
+        // Columna fija en la compu: con el ancho por defecto (150) cortaba «Assistant Manager - …». Más ancha y,
+        // si igual no entra, el nombre sigue en otra línea en vez de cortarse.
+        size: 280,
+        minSize: 200,
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t('roles.colName')} />
         ),
         cell: ({ row }) => (
-          <div className={cn('min-w-0 font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
-            {row.original.nombre}
-          </div>
+          <div className="min-w-0 whitespace-normal break-words font-medium">{row.original.nombre}</div>
         ),
         meta: {
           label: t('roles.colName'),
@@ -224,6 +231,20 @@ export function RolesDataTable({
           <span className="block min-w-0 truncate">{String(getValue())}</span>
         ),
         meta: { label: t('roles.basedOnFilter') } satisfies DataTableColumnMeta<RoleListRow>,
+      },
+      {
+        // Rol padre (un solo nivel) o «—».
+        id: 'parentNombre',
+        accessorFn: (r) =>
+          r.idRolParent && r.idRolParent > 0 ? (r.parentNombre ?? String(r.idRolParent)) : '—',
+        enableSorting: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('roles.parentRole')} />
+        ),
+        cell: ({ getValue }) => (
+          <span className="block min-w-0 truncate">{String(getValue())}</span>
+        ),
+        meta: { label: t('roles.parentRole') } satisfies DataTableColumnMeta<RoleListRow>,
       },
       {
         accessorKey: 'departmentNombre',
@@ -447,14 +468,15 @@ export function RolesDataTable({
       type: typeFilter || undefined,
       show_inactive: showInactive ? 1 : 0,
       ...(dealerKey ? { id_dealer: dealerKey, include_no_dealer: includeNoDealer ? 1 : 0 } : {}),
-      ...(idTemplate && idTemplate > 0 ? { id_template: idTemplate } : {}),
+      ...roleFilterParams(idTemplate, 'id_template', 'has_template'),
+      ...roleFilterParams(idRolParent, 'id_rol_parent', 'has_parent'),
     }),
-    [typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer],
+    [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: rolesAdapter,
-    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate, includeNoDealer],
+    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer],
     queryFn: fetchRoles,
     enabled,
     pageIndex,
@@ -468,6 +490,10 @@ export function RolesDataTable({
 
   const selectedExternalIds = React.useMemo(
     () => rows.filter((r) => rowSelection[String(r.id)] && r.tipo === 2).map((r) => r.id),
+    [rows, rowSelection],
+  )
+  const selectedRoles = React.useMemo(
+    () => rows.filter((r) => rowSelection[String(r.id)]),
     [rows, rowSelection],
   )
 
@@ -489,17 +515,31 @@ export function RolesDataTable({
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         recordsCountNote={
-          canEdit && selectedExternalIds.length > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="ml-2 h-7 gap-1.5 text-xs"
-              onClick={() => setAssignOpen(true)}
-            >
-              <ClipboardList className="size-3.5" />
-              {t('roles.assignAllServices')} ({selectedExternalIds.length})
-            </Button>
+          canEdit && selectedRoles.length > 0 ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ml-2 h-7 gap-1.5 text-xs"
+                onClick={() => setSetParentOpen(true)}
+              >
+                <Network className="size-3.5" />
+                {t('roles.setParentRole')} ({selectedRoles.length})
+              </Button>
+              {selectedExternalIds.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="ml-2 h-7 gap-1.5 text-xs"
+                  onClick={() => setAssignOpen(true)}
+                >
+                  <ClipboardList className="size-3.5" />
+                  {t('roles.assignAllServices')} ({selectedExternalIds.length})
+                </Button>
+              ) : null}
+            </>
           ) : null
         }
         onRowClick={onOpenPermissions}
@@ -547,6 +587,13 @@ export function RolesDataTable({
         open={assignOpen}
         onOpenChange={setAssignOpen}
         roleIds={selectedExternalIds}
+        onDone={() => setRowSelection({})}
+      />
+
+      <SetParentRoleDialog
+        open={setParentOpen}
+        onOpenChange={setSetParentOpen}
+        roles={selectedRoles}
         onDone={() => setRowSelection({})}
       />
 

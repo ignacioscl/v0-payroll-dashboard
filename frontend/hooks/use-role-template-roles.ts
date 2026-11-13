@@ -60,8 +60,12 @@ export function useAssignTemplatePreview(
 
 export function useAssignTemplateToRole() {
   const queryClient = useQueryClient()
-  return useMutation<{ idTemplate: number; idRol: number }, Error, { id: number; idRol: number }>({
-    mutationFn: ({ id, idRol }) => assignTemplateToRole(id, idRol),
+  return useMutation<
+    { idTemplate: number; idRol: number },
+    Error,
+    { id: number; idRol: number; suffix?: string }
+  >({
+    mutationFn: ({ id, idRol, suffix }) => assignTemplateToRole(id, idRol, suffix),
     onSuccess: (_data, vars) => invalidateRoles(queryClient, vars.id),
   })
 }

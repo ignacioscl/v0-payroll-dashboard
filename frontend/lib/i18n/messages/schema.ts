@@ -107,6 +107,27 @@ export interface Messages {
     basedOnFilterSearch: string
     basedOnFilterEmpty: string
     basedOnFilterLoading: string
+    parentRole: string
+    parentRoleNone: string
+    parentRoleSearch: string
+    parentRoleEmpty: string
+    parentRoleLoading: string
+    parentRoleHasChildren: string
+    nameTaken: string
+    nameTakenAddSuffix: string
+    templateNameLegacy: string
+    filterWithTemplate: string
+    filterWithoutTemplate: string
+    filterWithParent: string
+    filterWithoutParent: string
+    parentRoleFilterAll: string
+    setParentRole: string
+    setParentDesc: string
+    setParentNoneHint: string
+    setParentApply: string
+    setParentSuccess: string
+    setParentSkipped: string
+    setParentClose: string
     templateReadOnlyHint: string
     addFromTemplateHint: string
     basedOnTemplate: string

@@ -117,6 +117,18 @@ export class SetRolTemplatePermissionsDto {
   idsRolAccion!: number[]
 }
 
+/**
+ * Asignar un template a un rol interno: el nombre queda «<template> - <suffix>» (Ignacio, 13/11), así un template
+ * interno se asigna a varios roles sin repetir nombre. En externos no se usa: el nombre lleva el dealer.
+ */
+export class AssignTemplateToRoleDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  suffix?: string
+}
+
 export class CreateRolesFromTemplateDto {
   @ApiPropertyOptional({ type: [Number] })
   @IsOptional()
@@ -124,4 +136,11 @@ export class CreateRolesFromTemplateDto {
   @IsInt({ each: true })
   @Type(() => Number)
   idDealers?: number[]
+
+  /** Interno: el nombre queda «<template> - <suffix>»; vacío = el nombre del template (Ignacio, 13/11). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  suffix?: string
 }
