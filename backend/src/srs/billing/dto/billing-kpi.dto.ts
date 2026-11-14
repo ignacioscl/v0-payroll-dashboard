@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator'
+import { IsDateString, IsDefined, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
@@ -181,9 +181,20 @@ export class IncomeTtkLineDto {
   @ApiProperty({ example: 1200 }) income!: number
 }
 
+/** One TTK invoice of a dealer, with its employees (plans/plan-income-by-dealer-ttk-y-autos T2). */
+export class IncomeTtkInvoiceDto {
+  @ApiProperty({ example: 'MBP22166' }) nro!: string
+  @ApiProperty({ example: '2026-10-05' }) dateFrom!: string
+  @ApiProperty({ example: '2026-10-11' }) dateTo!: string
+  @ApiProperty({ example: 5591.7, description: 'Its punches inside the range, as the employees add up' }) income!: number
+  @ApiProperty({ type: [IncomeTtkLineDto], description: 'Income desc, then name' }) employees!: IncomeTtkLineDto[]
+}
+
 export class IncomeTtkSectionDto {
   @ApiProperty({ example: 1200 }) income!: number
-  @ApiProperty({ type: [IncomeTtkLineDto] }) lines!: IncomeTtkLineDto[]
+  @ApiProperty({ type: [IncomeTtkLineDto], description: 'By employee; the Export reads this' }) lines!: IncomeTtkLineDto[]
+  @ApiProperty({ type: [IncomeTtkInvoiceDto], description: 'By invoice: period, oldest first, then number' })
+  invoices!: IncomeTtkInvoiceDto[]
 }
 
 export class IncomeServicesDealerDto {
@@ -232,6 +243,39 @@ export class IncomeServicesYearDto {
 
 export class IncomeServicesByDealerDto {
   @ApiProperty({ type: [IncomeServicesYearDto] }) years!: IncomeServicesYearDto[]
+}
+
+/** The vehicles of one service of one dealer in one year (plans/plan-income-by-dealer-ttk-y-autos T3). */
+export class IncomeServiceVehiclesQueryDto extends SrsKpiQueryDto {
+  @ApiProperty({ example: 'Full Detail', description: 'Name of the service, as the row shows it (may be empty)' })
+  @IsDefined()
+  @IsString()
+  @MaxLength(255)
+  service!: string
+}
+
+export class IncomeServiceVehicleDto {
+  @ApiProperty({ example: 'WBA00000000000000' }) vin!: string
+  @ApiProperty({ example: 'BMW' }) make!: string
+  @ApiProperty({ example: 'X5' }) model!: string
+  @ApiPropertyOptional({ example: 2025 }) carYear!: number | null
+  @ApiProperty({ example: ['MBP22106'], description: 'WO numbers of the vehicle with this service' }) wos!: string[]
+  @ApiProperty({ example: 1 }) qty!: number
+  @ApiProperty({ example: 99 }) income!: number
+}
+
+export class IncomeServiceVehiclesBodyDto {
+  @ApiProperty({ example: 'Full Detail' }) service!: string
+  @ApiProperty({ example: 76 }) qty!: number
+  @ApiProperty({ example: 76, description: 'Rows = different VIN = Vehicles of the row' }) vehicles!: number
+  @ApiProperty({ example: 7524 }) income!: number
+  @ApiProperty({ type: [IncomeServiceVehicleDto], description: 'Income desc, then VIN' }) rows!: IncomeServiceVehicleDto[]
+}
+
+export class IncomeServiceVehiclesDto extends IncomeServiceVehiclesBodyDto {
+  @ApiProperty({ example: 2026 }) year!: number
+  @ApiProperty({ example: '2026-10-01' }) fechaDesde!: string
+  @ApiProperty({ example: '2026-10-31' }) fechaHasta!: string
 }
 
 /** One calendar year of the header range, cropped to it. */

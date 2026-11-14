@@ -183,6 +183,8 @@ export interface KpiQueryParams {
   historyMonths?: CollectionsHistoryMonths
   /** Income by Dealer by service: also the list of vehicles (only sent when true). */
   withVehicles?: boolean
+  /** The vehicles of one service: its name, sent whenever it comes, also empty (a service with no name). */
+  service?: string
 }
 
 export function buildKpiQuery(params: KpiQueryParams): string {
@@ -205,6 +207,9 @@ export function buildKpiQuery(params: KpiQueryParams): string {
   }
   if (params.withVehicles) {
     qs.set('withVehicles', 'true')
+  }
+  if (params.service !== undefined) {
+    qs.set('service', params.service)
   }
   return `?${qs.toString()}`
 }
@@ -283,7 +288,21 @@ export interface IncomeServicesDealer {
   }
   /** qty null: punches billed in a generic (fixed qty 1, it would count punches). */
   generic: { income: number; lines: { description: string; qty: number | null; income: number }[] }
-  ttk: { income: number; lines: { employee: string; income: number }[] }
+  ttk: {
+    income: number
+    /** By employee (the Export reads this). */
+    lines: { employee: string; income: number }[]
+    /** By invoice, with its employees (plans/plan-income-by-dealer-ttk-y-autos T2). Optional: the Export builds without it. */
+    invoices?: IncomeTtkInvoice[]
+  }
+}
+
+export interface IncomeTtkInvoice {
+  nro: string
+  dateFrom: string
+  dateTo: string
+  income: number
+  employees: { employee: string; income: number }[]
 }
 
 export interface IncomeVehicleRow {
@@ -321,6 +340,37 @@ let incomeServicesQueue: Promise<unknown> = Promise.resolve()
 
 export function fetchIncomeByDealerServices(params: KpiQueryParams): Promise<IncomeServicesByDealer> {
   const run = incomeServicesQueue.then(() => getKpi<IncomeServicesByDealer>('billing/income-by-dealer/services', params))
+  incomeServicesQueue = run.catch(() => undefined)
+  return run
+}
+
+/** The vehicles of one service of one dealer in one year (plans/plan-income-by-dealer-ttk-y-autos T3). */
+export interface IncomeServiceVehicle {
+  vin: string
+  make: string
+  model: string
+  carYear: number | null
+  wos: string[]
+  qty: number
+  income: number
+}
+
+export interface IncomeServiceVehicles {
+  year: number
+  fechaDesde: string
+  fechaHasta: string
+  service: string
+  qty: number
+  vehicles: number
+  income: number
+  rows: IncomeServiceVehicle[]
+}
+
+/** Same queue as the services of a row: one request at a time. `service` is required (may be ''). */
+export function fetchIncomeServiceVehicles(params: KpiQueryParams & { service: string }): Promise<IncomeServiceVehicles> {
+  const run = incomeServicesQueue.then(() =>
+    getKpi<IncomeServiceVehicles>('billing/income-by-dealer/services/vehicles', params),
+  )
   incomeServicesQueue = run.catch(() => undefined)
   return run
 }

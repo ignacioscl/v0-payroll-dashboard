@@ -1506,6 +1506,20 @@ export interface Messages {
     infoGeneric: string
     infoTtk: string
     servicesTitle: string
+    // TTK by invoice and vehicles of a service (plans/plan-income-by-dealer-ttk-y-autos §5.3).
+    showEmployees: string
+    hideEmployees: string
+    showVehiclesOf: string
+    showVehicles: string
+    hideVehicles: string
+    viewInWindow: string
+    showingVehicles: string
+    viewAll: string
+    woNumbers: string
+    vehiclesTitle: string
+    vehiclesNumbers: string
+    vehiclesSearch: string
+    vehiclesEmpty: string
   }
   monthlyClosing: {
     title: string

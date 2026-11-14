@@ -1556,6 +1556,20 @@ export const en: Messages = {
     infoGeneric: 'Lines of generic invoices: they have no vehicle, and their Qty is the one written on the invoice.',
     infoTtk: 'Time tracking invoices, by employee: they have no vehicle.',
     servicesTitle: 'Income by Dealer and Service',
+    // TTK by invoice and vehicles of a service: texts of plans/plan-income-by-dealer-ttk-y-autos §5.3 (D5 and D6, 11/12).
+    showEmployees: 'Show employees',
+    hideEmployees: 'Hide employees',
+    showVehiclesOf: 'Show the vehicles of {service}',
+    showVehicles: 'Show vehicles',
+    hideVehicles: 'Hide vehicles',
+    viewInWindow: 'View in a window',
+    showingVehicles: 'Showing {shown} of {total} vehicles',
+    viewAll: 'View all',
+    woNumbers: 'WO # {numbers}',
+    vehiclesTitle: '{service} — {dealer}',
+    vehiclesNumbers: 'Qty {qty} · Vehicles {vehicles} · Income {income}',
+    vehiclesSearch: 'Search VIN or WO…',
+    vehiclesEmpty: 'No vehicles for this service.',
   },
   // Texts of plans/plan-monthly-closing §5.4.6 and plans/plan-reporte-tint §5.4, approved word by word.
   monthlyClosing: {

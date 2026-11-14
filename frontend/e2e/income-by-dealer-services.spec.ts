@@ -78,6 +78,8 @@ async function mobileTableRules(page: Page, isMobile: boolean) {
   expect(pinned, 'no pinned column on a phone').toBe(0)
   const cut = await page.evaluate(() =>
     [...document.querySelectorAll('main tbody td span, main [data-testid="income-dealer-services"] td')]
+      // El texto de lectores de pantalla (`sr-only`) mide 1 px a propósito: no es un nombre cortado.
+      .filter((s) => !s.closest('.sr-only'))
       .filter((s) => (s as HTMLElement).scrollWidth > (s as HTMLElement).clientWidth + 1)
       .map((s) => `${(s as HTMLElement).innerText.slice(0, 60)} [${(s as HTMLElement).className.slice(0, 80)}]`),
   )
@@ -115,7 +117,8 @@ test.describe.serial('Income by Dealer by service — full path', () => {
 
     // 2. La tabla carga; la flecha abre el dealer con Work Orders y «Total ‹dealer›» = Income de la fila.
     const row = dealerRow(main)
-    await expect(row).toBeVisible()
+    // La primera carga de la corrida, en frío contra la base local, pasa de 15 s: el mismo margen que las demás cargas.
+    await expect(row).toBeVisible({ timeout: 60_000 })
     const firstOpen = page.waitForResponse(SERVICES_URL)
     await row.getByRole('button', { name: 'Show services' }).click()
     expect((await firstOpen).ok()).toBe(true)
@@ -207,5 +210,89 @@ test.describe.serial('Income by Dealer by service — full path', () => {
 
     // 7. Celular: nada fijo, nada cortado, sin scroll de costado.
     await mobileTableRules(page, isMobile)
+  })
+
+  /**
+   * TTK por factura y los autos de un servicio (plans/plan-income-by-dealer-ttk-y-autos T7): la factura se abre con sus
+   * empleados y suman su Income; el servicio se abre en la fila con sus autos; el clic derecho (compu) o el botón al
+   * pie de los autos (celular) abre «View in a window», con tantos renglones como su Vehicles y el pie igual a su Income.
+   */
+  test('TTK by invoice and the vehicles of a service', async ({ page, isMobile }) => {
+    const money = (s: string) => Math.round(Number(s.replace(/[^\d.-]/g, '')) * 100)
+    await openReport(page)
+    const main = page.locator('main')
+    {
+      const { scope, apply } = await filtersScope(page)
+      const yearMode = scope.getByRole('switch', { name: 'By year' })
+      if ((await yearMode.getAttribute('aria-checked')) === 'true') await yearMode.click()
+      await pickOneDealer(page, scope, DEALER)
+      await pickDatePreset(page, scope, 'Last Month')
+      await apply()
+    }
+    const row = dealerRow(main)
+    await expect(row).toBeVisible({ timeout: 60_000 })
+    await row.getByRole('button', { name: 'Show services' }).click()
+    const services = main.getByTestId('income-dealer-services')
+    await expect(services.getByText('Work Orders', { exact: true })).toBeVisible({ timeout: 60_000 })
+
+    // (a) TTK: la columna dice «Invoice»; una factura abierta muestra empleados que suman su Income.
+    const invoice = services.getByTestId('income-ttk-invoice').first()
+    if (await invoice.isVisible().catch(() => false)) {
+      await expect(services.getByRole('columnheader', { name: 'Invoice' })).toBeVisible()
+      const invoiceIncome = money(await invoice.locator('td').last().innerText())
+      await invoice.getByRole('button', { name: /Show employees/ }).click()
+      const employees = services.getByTestId('income-ttk-employee')
+      await expect(employees.first()).toBeVisible()
+      const sum = (await employees.evaluateAll((trs) => trs.map((tr) => (tr.lastElementChild as HTMLElement).innerText)))
+        .map(money)
+        .reduce((a, c) => a + c, 0)
+      expect(sum).toBe(invoiceIncome)
+      await invoice.getByRole('button', { name: /Hide employees/ }).click()
+      await expect(employees).toHaveCount(0)
+    }
+
+    // (b) Clic en el primer servicio: se abre en la fila con sus autos (hasta 50).
+    const serviceRow = services.getByTestId('income-service-row').first()
+    const [, qtyText, vehiclesText, incomeText] = await serviceRow.locator('td').allInnerTexts()
+    const vehicles = Number(vehiclesText.replace(/[^\d]/g, ''))
+    await serviceRow.locator('td').nth(1).click()
+    const inRow = services.getByTestId('income-service-vehicle')
+    await expect(inRow.first()).toBeVisible({ timeout: 60_000 })
+    expect(await inRow.count()).toBe(Math.min(vehicles, 50))
+    if (vehicles > 50) await expect(services.getByText(`Showing 50 of ${vehicles} vehicles`)).toBeVisible()
+    await mobileTableRules(page, isMobile)
+    await serviceRow.locator('td').nth(1).click()
+    await expect(inRow).toHaveCount(0)
+
+    // Compu: clic derecho → «View in a window». Celular (sin «⋯», no entra al lado del nombre): el botón al pie de los
+    // autos de la fila abierta.
+    if (isMobile) {
+      await expect(serviceRow.getByRole('button', { name: 'Actions' })).toHaveCount(0)
+      await serviceRow.locator('td').nth(1).click()
+      await services.getByRole('button', { name: vehicles > 50 ? 'View all' : 'View in a window', exact: true }).click()
+    } else {
+      await serviceRow.click({ button: 'right' })
+      await page.getByRole('menuitem', { name: 'View in a window' }).click()
+    }
+    const dlg = page.getByTestId('income-service-vehicles-dialog')
+    await expect(dlg).toBeVisible()
+    await expect(dlg.getByText(`Qty ${qtyText.trim()} · Vehicles ${vehiclesText.trim()} · Income ${incomeText.trim()}`)).toBeVisible()
+    // Tantos autos como Vehicles (el contador de la tabla); el pie es el Income del servicio.
+    await expect(dlg.locator('tbody tr').first()).toBeVisible({ timeout: 60_000 })
+    await expect(dlg.getByText(new RegExp(`^\\s*${vehicles}\\s*records?\\s*$`))).toBeVisible()
+    const footer = dlg.getByText('Total', { exact: true }).locator('..')
+    expect(money(await footer.innerText())).toBe(money(incomeText))
+    // Busca el primer VIN y la X lo borra.
+    const firstVin = (await dlg.locator('tbody tr').first().locator('td').first().innerText()).trim()
+    const search = dlg.getByPlaceholder('Search VIN or WO…')
+    await search.fill(firstVin)
+    await expect(dlg.locator('tbody tr')).toHaveCount(1)
+    await dlg.getByRole('button', { name: 'Clear search', exact: true }).click()
+    await expect(search).toHaveValue('')
+    if (isMobile) await noHorizontalScroll(page)
+    // La «X» de arriba y el botón «Close» del pie se llaman igual: se usa el del pie.
+    await dlg.getByRole('button', { name: 'Close' }).first().click()
+    await expect(dlg).toBeHidden()
+    await expect(services).toBeVisible()
   })
 })

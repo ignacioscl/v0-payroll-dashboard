@@ -12,11 +12,12 @@ import {
   IncomeByDealerRowDto,
   IncomeByDealerYearDto,
   IncomeServicesYearDto,
+  IncomeServiceVehiclesDto,
   RemovedDealerDto,
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
-import { billableLines, groupIncomeServices, type IncomeCar } from '../income-services-math'
+import { billableLines, groupIncomeServices, groupServiceVehicles, serviceName, type IncomeCar } from '../income-services-math'
 import { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import {
   buildDealerFilterSql,
@@ -497,6 +498,29 @@ export class BillingKpiRepository {
       partial: meta.partial,
       ...groupIncomeServices(lines, cars, names, withVehicles),
     }))
+  }
+
+  /**
+   * The vehicles of one service of one dealer in one year (plans/plan-income-by-dealer-ttk-y-autos T3): the same lines as
+   * the open row (incomeLinesForRange with withCar, billableLines), only the WO lines of that service, grouped by VIN.
+   * The cars come only from ids of those provider-scoped lines.
+   */
+  async getIncomeServiceVehicles(
+    filter: SrsKpiFilter,
+    year: { year: number; fechaDesde: string; fechaHasta: string },
+    service: string,
+  ): Promise<IncomeServiceVehiclesDto> {
+    const lines = billableLines(
+      await this.incomeLinesForRange({ ...filter, fechaDesde: year.fechaDesde, fechaHasta: year.fechaHasta }, { withCar: true }),
+    ).filter((l) => (l.kind === 'wo' || l.kind === 'woUnbilled') && serviceName(l.service) === serviceName(service))
+    const carIds = [...new Set(lines.map((l) => l.idCar).filter((id): id is number => id != null))]
+    const cars = await this.carsByIds(carIds, true)
+    return {
+      year: year.year,
+      fechaDesde: year.fechaDesde,
+      fechaHasta: year.fechaHasta,
+      ...groupServiceVehicles(lines, cars, service),
+    }
   }
 
   /**

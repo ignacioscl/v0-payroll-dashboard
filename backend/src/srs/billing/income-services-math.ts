@@ -6,7 +6,12 @@
  */
 import type { ClosingLineKind } from '../shared/kpi/srs-kpi-billed-lines'
 import { fromCents, toCents } from '../shared/kpi/srs-kpi-cents'
-import type { IncomeServicesDealerDto, IncomeServicesYearDto, IncomeVehicleRowDto } from './dto/billing-kpi.dto'
+import type {
+  IncomeServicesDealerDto,
+  IncomeServicesYearDto,
+  IncomeServiceVehiclesBodyDto,
+  IncomeVehicleRowDto,
+} from './dto/billing-kpi.dto'
 
 export interface IncomeServiceLine {
   dealerId: number
@@ -15,6 +20,11 @@ export interface IncomeServiceLine {
   qty: number
   amount: number
   idCar?: number
+  /** Number of the TTK invoice (or of the WO, in WO lines). Comes in ClosingLineDto. */
+  nro?: string
+  /** Period of the TTK invoice (YYYY-MM-DD). */
+  dateFrom?: string
+  dateTo?: string
 }
 
 export interface IncomeCar {
@@ -39,6 +49,7 @@ export function billableLines<L extends { amount: number }>(lines: L[]): L[] {
 type Sum = { cents: number; qtyHundredths: number }
 type WoSum = Sum & { vins: Set<string> }
 type VehicleSum = Sum & { idCar: number; services: Map<string, number> }
+type TtkInvoiceAcc = { nro: string; dateFrom: string; dateTo: string; cents: number; employees: Map<string, number> }
 type DealerAcc = {
   dealerId: number
   cents: number
@@ -48,10 +59,15 @@ type DealerAcc = {
   gen: Map<string, Sum & { description: string; punch: boolean }>
   ttkCents: number
   ttk: Map<string, number>
+  /** TTK by invoice (plans/plan-income-by-dealer-ttk-y-autos §5.1). The number does not repeat inside a dealer. */
+  ttkInvoices: Map<string, TtkInvoiceAcc>
   vehicles: Map<string, VehicleSum>
 }
 
-const byIncomeThenName = <T>(cents: (x: T) => number, name: (x: T) => string) => (a: T, b: T) =>
+/** The name a line is grouped and searched by: the same the screen gets after TrimResponseInterceptor. */
+export const serviceName = (s: string): string => s.trim()
+
+const byIncomeThenName =<T>(cents: (x: T) => number, name: (x: T) => string) => (a: T, b: T) =>
   cents(b) - cents(a) || name(a).localeCompare(name(b))
 
 export function groupIncomeServices(
@@ -66,7 +82,10 @@ export function groupIncomeServices(
   let woCents = 0
   let otherCents = 0
 
-  for (const l of billableLines(lines)) {
+  for (const raw of billableLines(lines)) {
+    // The API trims every string it answers (TrimResponseInterceptor): «Others» and «Others » are one name on screen,
+    // so they are one row here too, and the vehicles of that row are asked by the trimmed name.
+    const l = { ...raw, service: serviceName(raw.service) }
     const cents = toCents(l.amount)
     const qtyHundredths = toCents(l.qty)
     let d = dealers.get(l.dealerId)
@@ -80,6 +99,7 @@ export function groupIncomeServices(
         gen: new Map(),
         ttkCents: 0,
         ttk: new Map(),
+        ttkInvoices: new Map(),
         vehicles: new Map(),
       }
       dealers.set(l.dealerId, d)
@@ -121,6 +141,14 @@ export function groupIncomeServices(
     if (l.kind === 'ttk') {
       d.ttkCents += cents
       d.ttk.set(l.service, (d.ttk.get(l.service) ?? 0) + cents)
+      const nro = l.nro ?? ''
+      let inv = d.ttkInvoices.get(nro)
+      if (!inv) {
+        inv = { nro, dateFrom: l.dateFrom ?? '', dateTo: l.dateTo ?? '', cents: 0, employees: new Map() }
+        d.ttkInvoices.set(nro, inv)
+      }
+      inv.cents += cents
+      inv.employees.set(l.service, (inv.employees.get(l.service) ?? 0) + cents)
       continue
     }
     // genericFree / genericPunch. Las ponchadas vienen con Qty fija 1: contarían ponchadas, no lo escrito en la invoice.
@@ -167,6 +195,18 @@ export function groupIncomeServices(
       lines: [...d.ttk]
         .sort(byIncomeThenName(([, c]) => c, ([n]) => n))
         .map(([employee, c]) => ({ employee, income: fromCents(c) })),
+      // D3: by period, oldest first, then by number. Employees inside: income desc, then name (as today).
+      invoices: [...d.ttkInvoices.values()]
+        .sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.nro.localeCompare(b.nro))
+        .map((inv) => ({
+          nro: inv.nro,
+          dateFrom: inv.dateFrom,
+          dateTo: inv.dateTo,
+          income: fromCents(inv.cents),
+          employees: [...inv.employees]
+            .sort(byIncomeThenName(([, c]) => c, ([n]) => n))
+            .map(([employee, c]) => ({ employee, income: fromCents(c) })),
+        })),
     },
   }))
 
@@ -200,4 +240,52 @@ export function groupIncomeServices(
     body.vehiclesList = list
   }
   return body
+}
+
+/**
+ * The vehicles of one service of one dealer (plans/plan-income-by-dealer-ttk-y-autos §5.2 and T3): one row per VIN with
+ * the WO lines of that service, the same lines and the same VIN key as groupIncomeServices, so rows = its Vehicles and
+ * the sums of Qty and Income = its Qty and Income, to the cent. Income desc, then VIN.
+ */
+export function groupServiceVehicles(
+  lines: IncomeServiceLine[],
+  cars: Map<number, IncomeCar>,
+  service: string,
+): IncomeServiceVehiclesBodyDto {
+  const byVin = new Map<string, Sum & { idCar: number; wos: Set<string> }>()
+  let cents = 0
+  let qtyHundredths = 0
+  service = serviceName(service)
+  for (const l of billableLines(lines)) {
+    if (!isWoLine(l.kind) || serviceName(l.service) !== service) continue
+    const lc = toCents(l.amount)
+    const lq = toCents(l.qty)
+    cents += lc
+    qtyHundredths += lq
+    const vin = l.idCar != null ? cars.get(l.idCar)?.vin || null : null
+    if (!vin) continue
+    let v = byVin.get(vin)
+    if (!v) {
+      v = { idCar: l.idCar!, cents: 0, qtyHundredths: 0, wos: new Set() }
+      byVin.set(vin, v)
+    }
+    v.cents += lc
+    v.qtyHundredths += lq
+    if (l.nro) v.wos.add(l.nro)
+  }
+  const rows = [...byVin]
+    .sort((a, b) => b[1].cents - a[1].cents || a[0].localeCompare(b[0]))
+    .map(([vin, v]) => {
+      const c = cars.get(v.idCar)
+      return {
+        vin,
+        make: c?.make ?? '',
+        model: c?.model ?? '',
+        carYear: c?.year ?? null,
+        wos: [...v.wos].sort(),
+        qty: fromCents(v.qtyHundredths),
+        income: fromCents(v.cents),
+      }
+    })
+  return { service, qty: fromCents(qtyHundredths), vehicles: rows.length, income: fromCents(cents), rows }
 }
