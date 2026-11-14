@@ -10,11 +10,9 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import {
   AssignTemplateToRoleDto,
   CreateRolesFromTemplateDto,
@@ -24,8 +22,6 @@ import {
   UpdateRolTemplateDto,
 } from '../dto/rol-template.dto'
 import { RoleTemplateFacadeService } from '../service/role-template-facade.service'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/role-templates')
 @ApiTags('SRS Role Templates')
 @ApiBearerAuth()

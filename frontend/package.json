@@ -12,8 +12,11 @@
     "pm2:reload": "pm2 reload payroll-dashboard",
     "pm2:logs": "pm2 logs payroll-dashboard",
     "lint": "eslint .",
-    "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test:unit": "vitest run --exclude 'lib/infra/**'",
+    "test:infra": "vitest run lib/infra",
+    "test:e2e": "playwright test",
+    "gate": "pnpm run lint && pnpm run typecheck && pnpm run test:unit && pnpm run test:infra"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -65,6 +68,8 @@
     "@types/qs": "^6.15.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.2.6",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",

@@ -9,7 +9,6 @@ import { GUARDS_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { Reflector } from '@nestjs/core'
 
 import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import { ContratistaService } from '../service/contratista.service'
 import { COMPANY_MODULE_KEY, CompanyModuleGuard, RequireCompanyModule } from './company-module.guard'
 
@@ -41,11 +40,15 @@ const ctx = (idDealerProvider: number): SrsContext => ({
 
 @RequireCompanyModule('expenses')
 class ExpensesOnlyController {
-  handler() {}
+  handler() {
+    return undefined
+  }
 }
 
 class FreeController {
-  handler() {}
+  handler() {
+    return undefined
+  }
 }
 
 function executionContext(controller: new () => any, srsContext?: SrsContext): ExecutionContext {
@@ -129,9 +132,10 @@ describe('Todo controller de /srs/expenses tiene el check «Expenses»', () => {
     ])
   })
 
-  it.each(expenseControllers.map((c) => [c.name, c.ctrl]))('%s: SrsJwtGuard + CompanyModuleGuard + expenses', (_, ctrl) => {
+  // El login lo pide el guard global (SrsJwtGuard como APP_GUARD): el controlador solo suma CompanyModuleGuard.
+  it.each(expenseControllers.map((c) => [c.name, c.ctrl]))('%s: CompanyModuleGuard + expenses (login por el guard global)', (_, ctrl) => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, ctrl) as unknown[]
-    expect(guards).toEqual([SrsJwtGuard, CompanyModuleGuard])
+    expect(guards).toEqual([CompanyModuleGuard])
     expect(Reflect.getMetadata(COMPANY_MODULE_KEY, ctrl)).toBe('expenses')
   })
 })

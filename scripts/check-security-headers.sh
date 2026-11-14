@@ -23,6 +23,10 @@ check_headers() {
 
 COMMON=(content-security-policy strict-transport-security x-content-type-options x-frame-options referrer-policy)
 check_headers "${FRONT%/}/login" "${COMMON[@]}" permissions-policy
+# form-action tiene que llevar los orígenes del legacy (el logout y «Back to legacy» redirigen ahí).
+if ! curl -sS -o /dev/null -D - --max-time 20 "${FRONT%/}/login" | tr -d '\r' | grep -i '^content-security-policy:' | grep -qE "form-action 'self' https?://"; then
+  echo "FALLA: ${FRONT%/}/login sin el legacy en form-action (¿build sin SRS_LEGACY_ORIGINS?)"; FAIL=1
+fi
 if ! curl -sS --max-time 20 "${FRONT%/}/login" | grep -q 'data-dpl-id='; then
   echo "FALLA: ${FRONT%/}/login sin data-dpl-id (¿build sin DEPLOYMENT_ID?)"; FAIL=1
 fi

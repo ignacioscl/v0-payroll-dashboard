@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { ArrowRight, Clock, FilePlus, Loader2, Save, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -30,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  FieldMessage,
   Form,
   FormControl,
   FormField,
@@ -61,6 +61,7 @@ import {
   writeInvGenericStored,
 } from '@/lib/billing/inv-generic-storage'
 import { useFilters } from '@/lib/filter-context'
+import { focusFirstInvalidField, useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
@@ -242,7 +243,8 @@ export function GenericInvoiceDialog({
     [t],
   )
 
-  const form = useForm<FormValues>({
+  // Formulario común: al crear sin dealer, la pantalla va al combo de dealer (el foco propio de RHF lo salteaba).
+  const { form, handleSubmit } = useFormWithFocus<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: emptyValues,
     mode: 'onSubmit',
@@ -505,7 +507,9 @@ export function GenericInvoiceDialog({
   const onSubmit = async (values: FormValues) => {
     if (!values.dealer || !values.dateFrom || !values.dateTo) return
     if (items.length < 1) {
+      // Error de la invoice entera (toast); la pantalla va a la fila «Add item», que es donde se arregla.
       toast.error(t('invoices.generic.itemsRequired'))
+      focusFirstInvalidField({ description: { type: 'manual', message: t('invoices.generic.itemsRequired') } })
       return
     }
     const submittedTax = values.tax.trim()
@@ -610,7 +614,8 @@ export function GenericInvoiceDialog({
             <Form {...form}>
               <form
                 className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={(e) => void handleSubmit(onSubmit)(e)}
+                noValidate
               >
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   <div className="grid grid-cols-12 items-start gap-x-4 gap-y-2 px-6 pb-5">
@@ -618,7 +623,7 @@ export function GenericInvoiceDialog({
                       control={form.control}
                       name="dealer"
                       render={({ field }) => (
-                        <FormItem className="col-span-12 gap-1.5 md:col-span-5">
+                        <FormItem data-field="dealer" className="col-span-12 gap-1.5 md:col-span-5">
                           <FormLabel className={EYEBROW}>
                             {t('invoices.generic.dealer')}
                           </FormLabel>
@@ -654,13 +659,16 @@ export function GenericInvoiceDialog({
                           control={form.control}
                           name="dateFrom"
                           render={({ field }) => (
-                            <DatePicker
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabled={busy || datesLocked}
-                              toDate={dateTo}
-                              className="h-7 min-w-0 flex-1 justify-start border-0 bg-transparent px-2 shadow-none hover:bg-muted focus-visible:ring-0"
-                            />
+                            // `contents`: el botón sigue siendo hijo de la fila; el atributo es para llevar el foco.
+                            <span data-field="dateFrom" className="contents">
+                              <DatePicker
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={busy || datesLocked}
+                                toDate={dateTo}
+                                className="h-7 min-w-0 flex-1 justify-start border-0 bg-transparent px-2 shadow-none hover:bg-muted focus-visible:ring-0"
+                              />
+                            </span>
                           )}
                         />
                         <ArrowRight
@@ -671,21 +679,19 @@ export function GenericInvoiceDialog({
                           control={form.control}
                           name="dateTo"
                           render={({ field }) => (
-                            <DatePicker
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabled={busy || datesLocked}
-                              fromDate={dateFrom}
-                              className="h-7 min-w-0 flex-1 justify-start border-0 bg-transparent px-2 shadow-none hover:bg-muted focus-visible:ring-0 [&>svg]:hidden"
-                            />
+                            <span data-field="dateTo" className="contents">
+                              <DatePicker
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={busy || datesLocked}
+                                fromDate={dateFrom}
+                                className="h-7 min-w-0 flex-1 justify-start border-0 bg-transparent px-2 shadow-none hover:bg-muted focus-visible:ring-0 [&>svg]:hidden"
+                              />
+                            </span>
                           )}
                         />
                       </div>
-                      <p
-                        className={`min-h-5 text-xs leading-5 ${periodError ? 'text-destructive' : 'invisible'}`}
-                      >
-                        {periodError || ' '}
-                      </p>
+                      <FieldMessage message={periodError} />
                     </div>
 
                     <FormField
@@ -716,7 +722,7 @@ export function GenericInvoiceDialog({
                       control={form.control}
                       name="headerNote"
                       render={({ field }) => (
-                        <FormItem className="col-span-12 gap-1.5 md:col-span-5">
+                        <FormItem data-field="headerNote" className="col-span-12 gap-1.5 md:col-span-5">
                           <FormLabel className={EYEBROW}>
                             {t('invoices.generic.headerNote')}
                           </FormLabel>

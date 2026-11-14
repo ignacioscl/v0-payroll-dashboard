@@ -7,12 +7,10 @@ import {
   Query,
   Req,
   Res,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { PunchDealerRankingService } from '../service/punch-dealer-ranking.service'
 import { PunchDealerRankingExportService } from '../service/punch-dealer-ranking-export.service'
@@ -34,7 +32,6 @@ import {
  *
  * El guard va explícito porque no hay guard global.
  */
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/punch/dealer-ranking')
 @ApiTags('SRS Punch - Dashboard dealers ranking')
 @ApiBearerAuth()

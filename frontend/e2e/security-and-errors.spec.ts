@@ -5,7 +5,7 @@
  */
 import { expect, test } from '@playwright/test'
 
-import { noHorizontalScroll } from './helpers'
+import { E2E_MISSING_USER, login, noHorizontalScroll, openMobileMenuIfNeeded } from './helpers'
 
 function expectSecurityHeaders(res: { headers(): Record<string, string> } | null) {
   expect(res).not.toBeNull()
@@ -27,6 +27,11 @@ test.describe('seguridad y errores', () => {
     expectSecurityHeaders(me)
   })
 
+  test('/login lleva noindex, nofollow', async ({ page }) => {
+    await page.goto('/login')
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow')
+  })
+
   test('una dirección que no existe muestra «Page not found» y vuelve al panel', async ({ page }) => {
     const res = await page.goto('/esta-pagina-no-existe')
     expect(res?.status()).toBe(404)
@@ -37,4 +42,37 @@ test.describe('seguridad y errores', () => {
     // Sin sesión, el panel manda al login; con sesión, al Dashboard. En los dos casos sale de la 404.
     await expect(page).not.toHaveURL(/esta-pagina-no-existe/)
   })
+
+  test('Log out (POST) pasa por el legacy, termina en /login y recarga el documento', async ({ page }) => {
+    test.skip(E2E_MISSING_USER, 'Set E2E_USER and E2E_PASSWORD in frontend/.env.e2e.local')
+    await login(page)
+    await openMobileMenuIfNeeded(page)
+    const trigger = page.locator('button[aria-haspopup="menu"]').filter({ has: page.locator('[data-slot="avatar"]') }).last()
+    await trigger.click()
+    const postLogout = page.waitForRequest((r) => r.url().endsWith('/api/auth/logout') && r.method() === 'POST')
+    const loginDocument = page.waitForRequest((r) => r.isNavigationRequest() && /\/login(\?|$)/.test(r.url()))
+    await page.getByRole('menuitem', { name: 'Log out' }).click()
+    await postLogout
+    await loginDocument
+    await expect(page).toHaveURL(/\/login/)
+    // Sin sesión: el panel manda otra vez al login.
+    await page.goto('/')
+    await expect(page).toHaveURL(/\/login/)
+  })
+
+  test('«Back to SRS Legacy» (POST) llega al legacy sin errores de CSP', async ({ page }) => {
+    test.skip(E2E_MISSING_USER, 'Set E2E_USER and E2E_PASSWORD in frontend/.env.e2e.local')
+    const csp: string[] = []
+    page.on('console', (m) => {
+      if (/Content Security Policy|Refused to/i.test(m.text())) csp.push(m.text())
+    })
+    await login(page)
+    const proHost = new URL(page.url()).host
+    await openMobileMenuIfNeeded(page)
+    await page.locator('button[aria-haspopup="menu"]').filter({ has: page.locator('[data-slot="avatar"]') }).last().click()
+    await page.getByRole('menuitem', { name: 'Back to SRS Legacy' }).click()
+    await expect.poll(() => new URL(page.url()).host, { timeout: 30_000 }).not.toBe(proHost)
+    expect(csp).toEqual([])
+  })
 })
+

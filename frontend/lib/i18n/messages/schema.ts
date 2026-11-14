@@ -418,6 +418,10 @@ export interface Messages {
     actionEmailSuccess: string
     actionEmailError: string
     actionEmailInvalid: string
+    /** Lista de correos separada con otro signo (lib/validation/email-list.ts). */
+    emailListSeparator: string
+    /** Una dirección de más de 64 caracteres (lib/validation/email-list.ts). */
+    emailListTooLong: string
     emailQueueAdd: string
     emailQueueSuccess: string
     emailQueueError: string
@@ -444,6 +448,10 @@ export interface Messages {
     actionDiscountSuccess: string
     actionDiscountError: string
     actionDiscountInvalid: string
+    /** lib/billing/invoice-discount-rules.ts (D1, 3.17). */
+    actionDiscountNegative: string
+    actionDiscountDecimals: string
+    actionDiscountPercentOver100: string
     actionPoRoTitle: string
     actionPoRoField: string
     actionPoRoSuccess: string
@@ -1703,6 +1711,8 @@ export interface Messages {
     scope: string
     logo: string
     logoHint: string
+    logoTypeInvalid: string
+    logoTooBig: string
     logoLegacy: string
     replace: string
     remove: string

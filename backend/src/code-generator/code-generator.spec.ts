@@ -81,9 +81,9 @@ describe('generador create-feature', () => {
     expect(errors).toEqual([])
   }, 120000)
 
-  it('el controlador usa la auth de PRO (SrsJwtGuard en /srs/<nombre>) y nada de la plantilla borrada', () => {
+  it('el controlador queda cerrado por el guard global (sin @UseGuards ni @Public) en /srs/<nombre>', () => {
     const controller = readFileSync(join(featureDir, `controller/${FEATURE}.controller.ts`), 'utf8')
-    expect(controller).toContain('@UseGuards(SrsJwtGuard)')
+    expect(controller).not.toMatch(/@UseGuards|@Public/)
     expect(controller).toContain(`@Controller('/srs/${FEATURE}')`)
     expect(controller).toContain('srsContext: SrsContext')
     expect(controller).not.toMatch(/Roles|JwtAuthGuard|RequestWithUser|features\/auth/)

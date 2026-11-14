@@ -1,7 +1,8 @@
 'use client'
 
-import { AlertTriangle, StickyNote, Trash2 } from 'lucide-react'
+import { StickyNote, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -84,12 +85,7 @@ export function PunchTimeField({
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
-      {error && (
-        <p className="flex items-center gap-1 text-xs text-destructive">
-          <AlertTriangle className="h-3 w-3" />
-          {error}
-        </p>
-      )}
+      <FieldMessage message={error} />
       {showNote && onNoteChange && (
         <div className="space-y-1">
           <Label htmlFor={`${id}_note`} className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
@@ -98,6 +94,7 @@ export function PunchTimeField({
           </Label>
           <Input
             id={`${id}_note`}
+            name={`${id}Note`}
             type="text"
             placeholder={t('punch.noteForField', { field: label.toLowerCase() })}
             maxLength={254}
@@ -107,12 +104,7 @@ export function PunchTimeField({
             aria-invalid={Boolean(noteError)}
             className={cn('text-xs', noteError && 'border-destructive focus-visible:ring-destructive/30')}
           />
-          {noteError && (
-            <p className="flex items-center gap-1 text-[11px] text-destructive">
-              <AlertTriangle className="h-3 w-3" />
-              {noteError}
-            </p>
-          )}
+          <FieldMessage message={noteError} />
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import 'server-only'
 import type { SrsExchangeResponse, SrsLoginData } from '@/lib/auth/types'
 import { isLoginRoleSelection } from '@/lib/auth/types'
 import { fetchSrsUpstream } from '@/lib/srs-upstream'

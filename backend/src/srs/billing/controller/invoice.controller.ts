@@ -1,7 +1,6 @@
-import { Controller, Get, Inject, Param, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Param, ParseIntPipe, Query, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 
 import { InvoiceService } from '../service/invoice.service'
 import {
@@ -11,8 +10,6 @@ import {
 } from '../dto/invoice-list.dto'
 import { InvoiceLookupQueryDto, InvoiceLookupResponseDto } from '../dto/invoice-lookup.dto'
 import { InvoiceDetailQueryDto, InvoiceDetailResponseDto } from '../dto/invoice-detail.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/billing')
 @ApiTags('SRS Billing - Invoices')
 @ApiBearerAuth()

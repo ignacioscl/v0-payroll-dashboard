@@ -21,7 +21,7 @@ export async function GET() {
           authenticated: false,
           error: proxyErrorText(json) ?? json.error?.message ?? 'Failed to load user profile',
         },
-        { status: json.error?.code === '403' || json.error?.code === 403 ? 403 : upstream.status >= 400 ? upstream.status : 400 },
+        { status: String(json.error?.code) === '403' ? 403 : upstream.status >= 400 ? upstream.status : 400 },
       )
     }
 

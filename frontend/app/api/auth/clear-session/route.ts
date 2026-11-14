@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildClearSessionCookies } from '@/lib/auth/session'
 import { appPublicUrl } from '@/lib/app-public-url'
-
-function safeRedirectPath(to: string | null): string {
-  if (!to || !to.startsWith('/') || to.startsWith('//')) {
-    return '/login'
-  }
-  return to
-}
+import { safeRedirectPath } from '@/lib/auth/safe-redirect'
 
 function responseWithClearedCookies(request: NextRequest, to: string | null) {
   const path = safeRedirectPath(to)

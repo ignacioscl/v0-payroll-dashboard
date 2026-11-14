@@ -1,3 +1,4 @@
+import 'server-only'
 import { redirect } from 'next/navigation'
 import { checkPayrollDashboardAccess } from './verify-payroll-access'
 import { clearSessionRedirectUrl, getSrsSession } from './session'

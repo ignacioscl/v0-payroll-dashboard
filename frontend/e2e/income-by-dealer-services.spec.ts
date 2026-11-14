@@ -190,7 +190,7 @@ test.describe.serial('Income by Dealer by service — full path', () => {
     const file = await download
     expect(file.suggestedFilename()).toMatch(/^income-by-dealer-and-service-.*\.xlsx$/)
     const wb = new ExcelJS.Workbook()
-    await wb.xlsx.load(await readFile((await file.path())!))
+    await wb.xlsx.readFile((await file.path())!)
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Report Info', 'Summary', '2026 YTD', 'Vehicles'])
     const summary: unknown[][] = []
     wb.getWorksheet('Summary')!.eachRow((r) => summary.push((r.values as unknown[]).slice(1)))

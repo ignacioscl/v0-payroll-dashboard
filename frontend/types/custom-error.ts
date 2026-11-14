@@ -1,14 +1,14 @@
 interface CustomErrorParams {
   message?: string;
   status?: number;
-  validationErrors?: Record<string, any>;
+  validationErrors?: unknown;
   i18nKey?: string;
   replacements?: string[];
 }
 
 class CustomError extends Error {
   status: number;
-  validationErrors: Record<string, any>;
+  validationErrors: unknown;
   i18nKey?: string;
   replacements?: string[];
   constructor({

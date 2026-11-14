@@ -1,3 +1,4 @@
+import 'server-only'
 import { appendLogLine } from '@/lib/observability/error-log-file'
 
 /**

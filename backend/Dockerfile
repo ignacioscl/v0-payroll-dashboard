@@ -15,6 +15,10 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Casos compartidos con el front (shared/expense-rules-cases.json): llegan por el contexto `shared` del compose.
+COPY --from=shared . /shared
+# Gate dentro del build (plans/plan-buenas-practicas-v0, 3.4): no se puede saltear.
+RUN npm run lint && npm run typecheck && npm run test:unit
 RUN npm run build
 
 FROM node:22-alpine AS runner

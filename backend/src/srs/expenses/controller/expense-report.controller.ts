@@ -2,7 +2,6 @@ import { Controller, Get, Inject, Query, Req, Res, UseGuards } from '@nestjs/com
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
 import { ExpenseAnalyticsQueryDto, ExpenseEmployeesQueryDto, ExpenseListQueryDto } from '../dto/expense-list-query.dto'
 import { ExpenseReportService } from '../service/expense-report.service'
@@ -11,7 +10,7 @@ import { ExpenseReportService } from '../service/expense-report.service'
  * Expenses List, summary, export, Analytics y empleados. Las rutas con id viven en ExpenseController con
  * `':id(\\d+)'`, así `summary`, `export`, `analytics` y `employees` nunca caen en `GET /:id`.
  */
-@UseGuards(SrsJwtGuard, CompanyModuleGuard)
+@UseGuards(CompanyModuleGuard)
 @RequireCompanyModule('expenses')
 @Controller('/srs/expenses')
 @ApiTags('SRS Expenses')

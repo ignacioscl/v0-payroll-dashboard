@@ -1,8 +1,7 @@
-import { Controller, Get, Inject, Post, Query, Req, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Post, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { InvoiceListQueryDto } from '../dto/invoice-list.dto'
 import {
   InvoiceExportPrepareResponseDto,
@@ -15,7 +14,6 @@ import { InvoiceListExportService } from '../service/invoice-list-export.service
  * «Export» of the Invoices grid's toolbar (plans/plan-report-info-exports-tablas §6). Same three
  * steps as Export / Email: prepare (the grid's query, `page`/`pageSize` ignored) → status → download.
  */
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/billing/invoices/list-export')
 @ApiTags('SRS Billing - Invoices list export')
 @ApiBearerAuth()

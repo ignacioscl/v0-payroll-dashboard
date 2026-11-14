@@ -13,14 +13,30 @@ export function normalizeLegacyOrigin(url: string | null | undefined): string | 
   }
 }
 
-/** Legacy PHP base URL: session origin, else SRS_PUBLIC_URL env fallback. */
+/**
+ * Orígenes del legacy permitidos (`SRS_LEGACY_ORIGINS`, separados por coma; plans/plan-buenas-practicas-v0, 3.13). Hoy
+ * PROD: main y mooi. Los usa también la CSP (`form-action` de next.config.mjs), porque el logout y la vuelta al legacy
+ * salen por un form POST que redirige ahí.
+ */
+export function allowedLegacyOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  return (env.SRS_LEGACY_ORIGINS ?? '')
+    .split(',')
+    .map((o) => normalizeLegacyOrigin(o))
+    .filter((o): o is string => o !== null)
+}
+
+/**
+ * Legacy PHP base URL: the session origin only if it is one of SRS_LEGACY_ORIGINS (the cookie is unsigned: the user
+ * could point the logout and the SSO code anywhere), else SRS_PUBLIC_URL.
+ */
 export function resolveLegacyPublicUrl(
   legacyOrigin: string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
 ): string {
   const fromSession = normalizeLegacyOrigin(legacyOrigin)
-  if (fromSession) return fromSession
+  if (fromSession && allowedLegacyOrigins(env).includes(fromSession)) return fromSession
 
-  const fallback = process.env.SRS_PUBLIC_URL?.trim() || 'http://srs.com'
+  const fallback = env.SRS_PUBLIC_URL?.trim() || 'http://srs.com'
   return fallback.replace(/\/$/, '')
 }
 

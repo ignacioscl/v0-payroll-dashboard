@@ -1,8 +1,7 @@
-import { Controller, Get, Inject, Query, Req, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { ProductionKpiService } from '../service/production-kpi.service'
@@ -12,8 +11,6 @@ import {
   ProductionWeekRowDto,
   WoStatusSliceDto,
 } from '../dto/production-kpi.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/production')
 @ApiTags('SRS KPIs - Production')
 @ApiBearerAuth()

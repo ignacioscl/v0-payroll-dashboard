@@ -224,8 +224,16 @@ quede atrasada). Completar cada `PEGAR_*`:
 cat > /home/srssui5/v0-payroll-dashboard/.env << 'EOF'
 PAYROLL_ENV_FILE=/home/srssui5/payroll-dashboard.env
 BACKEND_ENV_FILE=/home/srssui5/srs-backend.env
+SRS_LEGACY_ORIGINS=https://main.srssuite.com,https://mooi.srssuite.com
 EOF
 ```
+
+`SRS_LEGACY_ORIGINS` (desde la etapa 3 de plans/plan-buenas-practicas-v0) va **acá y también en el Archivo A**: acá
+porque el build del front la necesita para la CSP `form-action` (Next arma los encabezados al compilar; sin ella el
+build falla a propósito), y en el Archivo A porque el logout y «Back to legacy» la leen al correr.
+
+El build usa `additional_contexts` (los tests del gate leen `shared/`): pide **Docker Compose 2.17 o más**
+(`docker compose version`).
 
 Sin este archivo, Compose busca por defecto `/opt/srs/payroll-dashboard.env` y `/opt/srs/srs-backend.env` (que en cPanel **no existen**).
 
@@ -449,6 +457,8 @@ IP_TEST  pro.srssuite.com
 cd /home/srssui5/v0-payroll-dashboard
 docker compose logs -f payroll-dashboard
 docker compose logs -f srs-backend
+# Los logs del Nest son JSON (una línea por evento). Para leerlos:
+docker logs srs-suite-backend 2>&1 | jq -r '.time + " " + .level + " " + (.context // "") + " " + .msg'
 docker compose restart payroll-dashboard srs-backend
 DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 docker compose down

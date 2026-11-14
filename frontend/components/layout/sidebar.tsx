@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -103,6 +103,8 @@ function SidebarInner({
   const { user, hasPermission } = useSrsMe()
   const { t } = useTranslation()
   const [profileOpen, setProfileOpen] = useState(false)
+  const logoutForm = useRef<HTMLFormElement>(null)
+  const toPhpForm = useRef<HTMLFormElement>(null)
   /** Accordion: at most one parent group expanded (by href). */
   const [expandedGroupHref, setExpandedGroupHref] = useState<string | null>(null)
 
@@ -493,18 +495,24 @@ function SidebarInner({
                 </Link>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-              <a href="/api/sso/to-php">
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t('sidebar.backToLegacy')}</span>
-              </a>
+            {/* Volver al legacy y cerrar sesión cambian algo: van por POST (forms ocultos de abajo), nunca por un
+                link GET que otro sitio pueda disparar (plans/plan-buenas-practicas-v0, 3.12). Recargan el documento. */}
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer"
+              onSelect={(e) => {
+                e.preventDefault()
+                toPhpForm.current?.requestSubmit()
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>{t('sidebar.backToLegacy')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
               onSelect={(e) => {
                 e.preventDefault()
-                window.location.href = '/api/auth/logout'
+                logoutForm.current?.requestSubmit()
               }}
             >
               <LogOut className="h-4 w-4" />
@@ -512,6 +520,8 @@ function SidebarInner({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <form ref={toPhpForm} method="post" action="/api/sso/to-php" hidden />
+        <form ref={logoutForm} method="post" action="/api/auth/logout" hidden />
 
         <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
           <DialogContent aria-describedby={undefined} className="sm:max-w-md">

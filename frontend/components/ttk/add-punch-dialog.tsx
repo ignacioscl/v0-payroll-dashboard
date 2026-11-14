@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { FieldMessage } from '@/components/ui/form'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -36,6 +37,7 @@ import {
   validatePunchForm,
   punchFormToAddPayload,
 } from '@/lib/ttk/punch-form-utils'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
 interface AddPunchDialogProps {
@@ -58,7 +60,8 @@ export function AddPunchDialog({
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<TtkEmployeeOption | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PunchTimeKey, string>>>({})
+  /** Errores de cada campo (bajo el campo); `validationError` queda para el error general. */
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PunchTimeKey | 'employee' | 'punchInNote', string>>>({})
 
   const addMutation = useTtkAddPunch()
   // Un punch necesita un dealer concreto: sin él no buscamos.
@@ -81,10 +84,17 @@ export function AddPunchDialog({
     setForm((prev) => ({ ...prev, [key]: value }))
     setValidationError(null)
     setFieldErrors((prev) => {
-      if (!prev[key as PunchTimeKey]) return prev
-      const { [key as PunchTimeKey]: _omitted, ...rest } = prev
+      const fieldKey = key as PunchTimeKey | 'punchInNote'
+      if (!prev[fieldKey]) return prev
+      const { [fieldKey]: _omitted, ...rest } = prev
       return rest
     })
+  }
+
+  const pickEmployee = (employee: TtkEmployeeOption | null) => {
+    setSelectedEmployee(employee)
+    setValidationError(null)
+    setFieldErrors((prev) => (prev.employee ? { ...prev, employee: undefined } : prev))
   }
 
   const clearField = (key: PunchTimeKey) => () => setField(key)('')
@@ -94,20 +104,14 @@ export function AddPunchDialog({
       setValidationError(t('dealer.selectOnlyOneInHeader'))
       return
     }
-    if (!selectedEmployee) {
-      setValidationError(t('employeeSearch.select'))
-      return
-    }
-
-    const { generalError, fieldErrors: errs } = validatePunchForm(form, t)
+    // Cada error bajo su campo y la pantalla al primero (orden del DOM: Employee, Clock In, su nota, …).
+    const { fieldErrors: timeErrors } = validatePunchForm(form, t)
+    const errs: typeof fieldErrors = { ...timeErrors }
+    if (!selectedEmployee) errs.employee = t('employeeSearch.select')
+    if (!form.punchInNote.trim()) errs.punchInNote = t('punch.clockInNoteRequired')
     setFieldErrors(errs)
-    if (generalError) {
-      setValidationError(generalError)
-      return
-    }
-
-    if (!form.punchInNote.trim()) {
-      setValidationError(t('punch.clockInNoteRequired'))
+    if (focusFirstFieldError(errs) || !selectedEmployee) {
+      setValidationError(null)
       return
     }
 
@@ -146,6 +150,7 @@ export function AddPunchDialog({
       alwaysShowNote={key === 'punchIn'}
       noteValue={key === 'punchIn' ? form.punchInNote : undefined}
       onNoteChange={key === 'punchIn' ? setField('punchInNote') : undefined}
+      noteError={key === 'punchIn' ? fieldErrors.punchInNote : undefined}
     />
   )
 
@@ -171,15 +176,16 @@ export function AddPunchDialog({
               void handleSubmit()
             }}
             className="space-y-4"
+            noValidate
           >
-            <div className="space-y-2">
+            <div data-field="employee" className="space-y-2">
               <Label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 <User className="h-4 w-4" />
                 {t('common.employee')} <span className="text-destructive">*</span>
               </Label>
               <EmployeeCombobox
                 value={selectedEmployee}
-                onChange={setSelectedEmployee}
+                onChange={pickEmployee}
                 searchTerm={employeeSearch}
                 onSearchTermChange={setEmployeeSearch}
                 employees={employeesQuery.data}
@@ -187,6 +193,7 @@ export function AddPunchDialog({
                 disabled={isProcessing}
                 dealerSelected={!!idDealer && idDealer > 0}
               />
+              <FieldMessage message={fieldErrors.employee} />
             </div>
 
             {renderTimeField('punchIn', <LogIn className="h-4 w-4 text-emerald-600" />, true)}

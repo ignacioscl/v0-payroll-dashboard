@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,18 +33,13 @@ import {
   appendEmailToField,
   formatInvoiceEmailDate,
 } from '@/lib/billing/invoice-email-ui'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
+import { EMAIL_LIST_ERROR_KEYS, checkEmailList, checkOptionalEmail } from '@/lib/validation/email-list'
 
-function isValidEmailList(value: string): boolean {
-  const parts = value
-    .split(',')
-    .map((p) => p.trim())
-    .filter(Boolean)
-  if (parts.length === 0) return false
-  return parts.every((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-}
+type FieldErrors = Partial<Record<'emailTo' | 'replyTo' | 'queueName', string>>
 
 export function InvoiceSendEmailDialog({
   open,
@@ -79,7 +75,9 @@ export function InvoiceSendEmailDialog({
   const [replyTo, setReplyTo] = React.useState('')
   // Legacy modal starts empty; server falls back to "Invoice Details" when blank.
   const [fileName, setFileName] = React.useState('')
+  /** Error general (el del PHP); los de cada campo van bajo su campo. */
   const [error, setError] = React.useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({})
   const [auditOpen, setAuditOpen] = React.useState(false)
 
   const providerLabel =
@@ -102,18 +100,34 @@ export function InvoiceSendEmailDialog({
     setMessage(prefs.message || DEFAULT_INVOICE_EMAIL_MESSAGE)
     setReplyTo(prefs.replyTo)
     setError(null)
+    setFieldErrors({})
   }, [open, statementId])
 
   const handleAccountPick = React.useCallback((email: string) => {
     setEmailTo((current) => appendEmailToField(current, email))
+    setFieldErrors((prev) => ({ ...prev, emailTo: undefined }))
   }, [])
+
+  /** Email To (obligatorio para mandar, optativo para la cola) y Reply-To; los errores van bajo cada campo. */
+  const validate = (emailRequired: boolean, queueNameRequired: boolean): boolean => {
+    const next: FieldErrors = {}
+    if (emailRequired || emailTo.trim()) {
+      const emails = checkEmailList(emailTo)
+      if (!emails.ok) {
+        next.emailTo =
+          emails.error === 'required' ? t('invoices.exportXlsRequired') : t(EMAIL_LIST_ERROR_KEYS[emails.error])
+      }
+    }
+    if (queueNameRequired) next.queueName = t('invoices.emailQueueNameRequired')
+    const reply = checkOptionalEmail(replyTo)
+    if (reply) next.replyTo = reply === 'long' ? t(EMAIL_LIST_ERROR_KEYS.long) : t('invoices.exportXlsInvalidEmail')
+    setFieldErrors(next)
+    return !focusFirstFieldError(next)
+  }
 
   const handleSend = async () => {
     if (!statementId || !idDealer) return
-    if (!isValidEmailList(emailTo)) {
-      setError(t('invoices.actionEmailInvalid'))
-      return
-    }
+    if (!validate(true, false)) return
 
     setError(null)
     try {
@@ -140,14 +154,7 @@ export function InvoiceSendEmailDialog({
 
   const handleAddToQueue = async () => {
     if (!statementId) return
-    if (!queuePanel.hasActiveQueue && !queuePanel.queueName.trim()) {
-      setError(t('invoices.emailQueueNameRequired'))
-      return
-    }
-    if (emailTo.trim() && !isValidEmailList(emailTo)) {
-      setError(t('invoices.actionEmailInvalid'))
-      return
-    }
+    if (!validate(false, !queuePanel.hasActiveQueue && !queuePanel.queueName.trim())) return
 
     setError(null)
     try {
@@ -202,13 +209,19 @@ export function InvoiceSendEmailDialog({
               <Label htmlFor="inv-email-to">{t('invoices.actionEmailTo')}</Label>
               <Input
                 id="inv-email-to"
+                name="emailTo"
                 value={emailTo}
-                onChange={(e) => setEmailTo(e.target.value)}
+                onChange={(e) => {
+                  setEmailTo(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, emailTo: undefined }))
+                }}
                 placeholder={t('invoices.actionEmailToPlaceholder')}
                 autoComplete="email"
                 disabled={busy || loadingAccounts}
+                aria-invalid={fieldErrors.emailTo ? true : undefined}
               />
               <p className="text-[11px] text-muted-foreground">{t('invoices.actionEmailToHint')}</p>
+              <FieldMessage message={fieldErrors.emailTo} />
             </div>
 
             {showAccountCombo ? (
@@ -267,18 +280,28 @@ export function InvoiceSendEmailDialog({
               <Label htmlFor="inv-email-reply">{t('invoices.actionEmailReply')}</Label>
               <Input
                 id="inv-email-reply"
+                name="replyTo"
                 type="email"
                 value={replyTo}
-                onChange={(e) => setReplyTo(e.target.value)}
+                onChange={(e) => {
+                  setReplyTo(e.target.value)
+                  setFieldErrors((prev) => ({ ...prev, replyTo: undefined }))
+                }}
                 placeholder={t('invoices.actionEmailReplyPlaceholder')}
                 disabled={busy || loadingAccounts}
+                aria-invalid={fieldErrors.replyTo ? true : undefined}
               />
+              <FieldMessage message={fieldErrors.replyTo} />
             </div>
 
             <InvoiceEmailQueueFields
               open={open}
               queueName={queuePanel.queueName}
-              onQueueNameChange={queuePanel.setQueueName}
+              onQueueNameChange={(value) => {
+                queuePanel.setQueueName(value)
+                setFieldErrors((prev) => ({ ...prev, queueName: undefined }))
+              }}
+              queueNameError={fieldErrors.queueName ?? null}
               hasActiveQueue={queuePanel.hasActiveQueue}
               activeQueueLabel={queuePanel.draft?.descripcion}
               isLoading={queuePanel.isLoading}

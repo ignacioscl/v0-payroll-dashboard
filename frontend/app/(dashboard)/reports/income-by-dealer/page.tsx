@@ -321,7 +321,7 @@ export default function IncomeByDealerPage() {
       setExportOpen(false)
     } catch (e) {
       toast.error(t('common.exportFailed'), { duration: TOAST_DURATION_MS })
-      // eslint-disable-next-line no-console
+       
       console.error('[IncomeByDealerExport]', e)
     } finally {
       setExporting(false)

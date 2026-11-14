@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { fetchBackend } from '@/lib/backend-upstream'
-import { proxyResponseBody } from '@/lib/proxy-response'
+import { proxyResponseBody, securityHeadersFrom } from '@/lib/proxy-response'
 import { upstreamErrorResponse } from '@/lib/upstream-error'
 
 type RouteContext = { params: Promise<{ path: string[] }> }
@@ -66,13 +66,14 @@ async function handle(request: NextRequest, context: RouteContext) {
     if (contentDisposition) out.set('Content-Disposition', contentDisposition)
     const contentLength = upstream.headers.get('content-length')
     if (contentLength) out.set('Content-Length', contentLength)
+    for (const [k, v] of Object.entries(securityHeadersFrom(upstream))) out.set(k, v)
     return new NextResponse(upstream.body, { status: upstream.status, headers: out })
   }
 
   const buf = await upstream.arrayBuffer()
   return new NextResponse(proxyResponseBody(upstream.status, buf), {
     status: upstream.status,
-    headers: { 'Content-Type': contentType },
+    headers: { 'Content-Type': contentType, ...securityHeadersFrom(upstream) },
   })
 }
 

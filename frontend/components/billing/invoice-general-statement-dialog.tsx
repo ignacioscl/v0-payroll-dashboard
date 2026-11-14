@@ -18,6 +18,7 @@ import {
   usePrintGeneralStatementPdf,
   type GeneralStatementReportType,
 } from '@/hooks/use-print-general-statement-pdf'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -47,6 +48,7 @@ export function InvoiceGeneralStatementDialog({
   const printGs = usePrintGeneralStatementPdf()
   const addToQueue = useAddInvoiceEmailQueue()
   const queuePanel = useInvoiceEmailQueuePanelState(open)
+  const [queueNameError, setQueueNameError] = React.useState<string | null>(null)
 
   const [reportType, setReportType] = React.useState<GeneralStatementReportType | 'general'>(
     'general',
@@ -73,6 +75,7 @@ export function InvoiceGeneralStatementDialog({
   React.useEffect(() => {
     if (!open) return
     setReportType('general')
+    setQueueNameError(null)
     setExcludeZero(false)
     setIncludeGeneric(false)
     setAttachTimeCard(false)
@@ -129,10 +132,10 @@ export function InvoiceGeneralStatementDialog({
       return
     }
     if (!queuePanel.hasActiveQueue && !queuePanel.queueName.trim()) {
-      toast({
-        variant: 'destructive',
-        title: t('invoices.emailQueueNameRequired'),
-      })
+      // Bajo el campo, con la pantalla llevada ahí (no en un toast).
+      const message = t('invoices.emailQueueNameRequired')
+      setQueueNameError(message)
+      focusFirstFieldError({ queueName: message })
       return
     }
     try {
@@ -235,7 +238,11 @@ export function InvoiceGeneralStatementDialog({
       <InvoiceEmailQueueFields
         open={open}
         queueName={queuePanel.queueName}
-        onQueueNameChange={queuePanel.setQueueName}
+        onQueueNameChange={(value) => {
+          queuePanel.setQueueName(value)
+          setQueueNameError(null)
+        }}
+        queueNameError={queueNameError}
         hasActiveQueue={queuePanel.hasActiveQueue}
         activeQueueLabel={queuePanel.draft?.descripcion}
         isLoading={queuePanel.isLoading}

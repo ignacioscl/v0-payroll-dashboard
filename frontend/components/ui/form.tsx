@@ -135,24 +135,36 @@ function FormDescription({ className, ...props }: React.ComponentProps<'p'>) {
   )
 }
 
-function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
-  const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message ?? '') : props.children
-
+/**
+ * El rengl\u00f3n del error bajo un campo, siempre ocupado (`min-h-5`) para que el error no corra la fila (regla
+ * `zod-form-layout-no-shift`). Lo usa `FormMessage` y lo usan solos los formularios hechos a mano, que no est\u00e1n en
+ * react-hook-form: el error va bajo su campo y `focusFirstFieldError` lleva la pantalla ah\u00ed.
+ */
+function FieldMessage({
+  className,
+  message,
+  ...props
+}: Omit<React.ComponentProps<'p'>, 'children'> & { message?: React.ReactNode }) {
   return (
     <p
       data-slot="form-message"
-      id={formMessageId}
       className={cn(
         'min-h-5 text-xs leading-5',
-        body ? 'text-destructive' : 'invisible',
+        message ? 'text-destructive' : 'invisible',
         className,
       )}
       {...props}
     >
-      {body || '\u00a0'}
+      {message || '\u00a0'}
     </p>
   )
+}
+
+function FormMessage({ children, ...props }: React.ComponentProps<'p'>) {
+  const { error, formMessageId } = useFormField()
+  const body = error ? String(error?.message ?? '') : children
+
+  return <FieldMessage id={formMessageId} message={body} {...props} />
 }
 
 export {
@@ -163,5 +175,6 @@ export {
   FormControl,
   FormDescription,
   FormMessage,
+  FieldMessage,
   FormField,
 }

@@ -78,7 +78,6 @@ const DEALER_C = 76 // AutoNation Mercedes-Benz of Pompano
 const OTHER_PROVIDER = 188 // GC Installations
 const OTHER_DEALER = 186 // dealer de GC que no es de Auto Wax
 const COMPANY_1 = 329 // The Home Depot
-const COMPANY_2 = 330 // Harbor Freight Tools
 const CATEGORY_1 = 485 // Body Shop Work
 const CATEGORY_2 = 486 // USPS Shipping Cost
 const EMPLOYEE_ON_A = 137 // empleado de Auto Wax asignado a 408

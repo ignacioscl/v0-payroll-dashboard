@@ -425,7 +425,7 @@ describe('writeInvoiceExportWorkbook', () => {
       checkNumber: '5521',
       neto: 75,
     }
-    let asked: number[][] = []
+    const asked: number[][] = []
     const wb = await readWorkbook((stream) =>
       writeInvoiceExportWorkbook({
         ...base,

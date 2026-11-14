@@ -1,3 +1,4 @@
+import 'server-only'
 import { fetchWithHeadersTimeout } from '@/lib/upstream-fetch'
 import { BACKEND_TIMEOUT_MS } from '@/lib/upstream-timeouts'
 

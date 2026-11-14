@@ -7,7 +7,8 @@ import { DB_CONNECT_TIMEOUT_MS } from './db-timeouts'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 export const dataSourceOptions: DataSourceOptions = {
-  type: process.env.DB_CONNECTION as any,
+  // Mismo valor por defecto que srs.datasource.ts y jobs.datasource.ts (sin .env, p. ej. en el build de Docker).
+  type: (process.env.DB_CONNECTION?.trim() || 'mysql') as any,
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT ?? '8100'),
   username: process.env.DB_USERNAME,

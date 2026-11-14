@@ -1,5 +1,5 @@
 import '@/lib/api/axios-defaults';
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import qs from 'qs';
 import { useState } from 'react';
 import { PaginationDto } from '@/types/pagination-dto';
@@ -20,8 +20,18 @@ import { isSrsLoginHtml } from '@/lib/srs/parse-srs-response';
  * El proxy de Next agrega una tercera forma: `{ error: 'Unauthorized' }`, con
  * `error` string (lib/srs-proxy.ts:27).
  */
-export function srsErrorMessage(error: any): any {
-  const data = error?.response?.data;
+/** Lo que el PHP, el Nest o el proxy de Next mandan en el cuerpo de un error. */
+type SrsErrorBody = {
+  error?: string | { message?: string };
+  message?: string;
+  validationErrors?: string | [];
+  i18nKey?: string;
+  replacements?: string[];
+};
+type SrsAxiosError = AxiosError<SrsErrorBody>;
+
+export function srsErrorMessage(caught: unknown): string | undefined {
+  const data = (caught as SrsAxiosError | undefined)?.response?.data;
   if (!data) return undefined;
   if (typeof data.error === 'string') return data.error;
   return data.error?.message ?? data.message;
@@ -38,7 +48,7 @@ interface UseApiRequest<T, Q, R> {
   getCustom: (path: string, pagination?: PaginationState, query?: Q) => Promise<PaginationDto<T>>;
   getOne: (id: number) => Promise<R>;
   downloadFile: (id: number | string) => Promise<Blob>;
-  downloadFileCustom: (customUrl?: string, body?: Record<string, any>) => Promise<Blob>;
+  downloadFileCustom: (customUrl?: string, body?: Record<string, unknown>) => Promise<Blob>;
   postBlob: (payload: T) => Promise<Blob>;
   getOneCustom: (queryString: Q) => Promise<T>;
   post: (payload: T) => Promise<R>;
@@ -46,16 +56,17 @@ interface UseApiRequest<T, Q, R> {
   updateCustom: (queryString: Q | string, payload: T) => Promise<void>;
   deleteItem: (id: number) => Promise<void>;
   deleteCustom: (queryString: string | Q) => Promise<void>;
-  error: any;
+  error: AxiosError | undefined;
   errorDetail: ApiError | undefined;
   pagination: PaginationState;
-  setPagination: (a: any) => void;
+  setPagination: React.Dispatch<React.SetStateAction<PaginationState>>;
 }
 
+/** Los campos pueden faltar: un error de red no trae `response`. */
 interface ApiError {
-  message: string;
-  status: number;
-  validationErrors: string | [];
+  message?: string;
+  status?: number;
+  validationErrors?: string | [];
   i18nKey?: string;
   replacements?: string[];
 }
@@ -79,14 +90,15 @@ export function useApiRequest<T, Q = undefined, R = T>(
     url = getUrl();
   }
 
-  const [error, setError] = useState();
+  const [error, setError] = useState<AxiosError | undefined>();
   const [errorDetail, setErrorDetail] = useState<ApiError>();
 
   const getRaw = async (): Promise<R> => {
     try {
       const { data } = await axios.get(url);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error);
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -106,7 +118,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
   };
 
   const getAll = async (pagination?: PaginationState, query?: Q): Promise<PaginationDto<T>> => {
-    let queryParams = {
+    const queryParams = {
       page: pagination?.pageIndex ?? 0,
       pageSize: pagination?.pageSize ?? 10,
       ...query,
@@ -135,7 +147,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
     try {
       const { data } = await axios.get(`${url}${queryString}`);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -169,7 +182,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
     try {
       const { data } = await axios.get(`${url}${path}${queryString}`);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -192,7 +206,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
     try {
       const { data } = await axios.get(`${url}/${id}`);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -217,7 +232,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
       const queryStringFormatted = qs.stringify(queryString, { addQueryPrefix: true });
       const { data } = await axios.get(`${url}/${queryStringFormatted}`);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -243,7 +259,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
         responseType: 'blob',
       });
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error);
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -264,7 +281,7 @@ export function useApiRequest<T, Q = undefined, R = T>(
 
   const downloadFileCustom = async (
     customUrl?: string,
-    queryParams?: Record<string, any>
+    queryParams?: Record<string, unknown>
   ): Promise<Blob> => {
     try {
       const { data } = await axios.get(customUrl || url, {
@@ -272,7 +289,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
         ...(queryParams && { params: queryParams }),
       });
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error);
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -298,7 +316,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
         validateStatus: (status) => status >= 200 && status < 300,
       });
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
         const text = await error.response.data.text();
         const message = isSrsLoginHtml(text)
@@ -347,7 +366,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
     try {
       const { data } = await axios.post(`${url}`, payload);
       return data;
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       console.log('error pasa', error.status);
       if ((error.response && error.response.status === 401) || error.status === 401) {
         console.log('401');
@@ -375,7 +395,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
   const update = async (id: number, payload: T): Promise<void> => {
     try {
       await axios.put(`${url}/${id}`, payload);
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -404,7 +425,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
 
     try {
       await axios.put(`${url}${queryString}`, payload);
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -426,7 +448,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
   const deleteItem = async (id: number): Promise<void> => {
     try {
       await axios.delete(`${url}/${id}`);
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),
@@ -455,7 +478,8 @@ export function useApiRequest<T, Q = undefined, R = T>(
 
     try {
       await axios.delete(`${url}${queryString}`);
-    } catch (error: any) {
+    } catch (caught) {
+      const error = caught as SrsAxiosError;
       setError(error); // Lanza el error para que el llamador pueda manejarlo si es necesario
       setErrorDetail({
         message: srsErrorMessage(error),

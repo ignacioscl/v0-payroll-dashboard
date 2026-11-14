@@ -8,7 +8,7 @@ export const COMPANY_MODULE_KEY = 'companyModule'
 
 /**
  * The company of the session needs this module checked (legacy dealer_edit > Modules & function access).
- * Goes with `@UseGuards(SrsJwtGuard, CompanyModuleGuard)`: SrsJwtGuard leaves `request.srsContext`.
+ * Goes with `@UseGuards(CompanyModuleGuard)`: SrsJwtGuard leaves `request.srsContext`.
  */
 export const RequireCompanyModule = (module: CompanyModule) => SetMetadata(COMPANY_MODULE_KEY, module)
 

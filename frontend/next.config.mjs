@@ -8,6 +8,16 @@
  */
 const isDev = process.env.NODE_ENV === 'development'
 
+/**
+ * Orígenes del legacy (`SRS_LEGACY_ORIGINS`, separados por coma): el logout y «Back to legacy» salen por un form POST
+ * que redirige (303) al legacy, y Chrome aplica `form-action` también a esa redirección (plans/plan-buenas-practicas-v0,
+ * 3.12). Next calcula `headers()` al compilar: la variable tiene que llegar al build (Dockerfile, ARG).
+ */
+const legacyOrigins = (process.env.SRS_LEGACY_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter((o) => /^https?:\/\/[^\s/]+$/.test(o))
+
 export const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
@@ -16,7 +26,7 @@ export const contentSecurityPolicy = [
   "font-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  ["form-action 'self'", ...legacyOrigins].join(' '),
   "frame-ancestors 'none'",
 ].join('; ')
 
@@ -35,9 +45,6 @@ const nextConfig = {
   // Sin «X-Powered-By: Next.js».
   poweredByHeader: false,
   allowedDevOrigins: ['pro.srs.com', 'prosrs.com', 'www.prosrs.com', 'srs.com'],
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
   },

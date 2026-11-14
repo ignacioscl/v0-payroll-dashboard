@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { authorizeAttachmentAccess, fetchNodeTickets, nodeTicketsUrl } from '@/lib/expense-attachments-server'
 import { upstreamErrorResponse } from '@/lib/upstream-error'
+import { servedAttachmentHeaders } from '@/lib/expense-attachments-validate'
 
 type RouteContext = { params: Promise<{ idDealer: string; idExpense: string; filename: string }> }
 
@@ -29,16 +30,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Not found' }, { status: upstream.status === 404 ? 404 : 502 })
   }
 
-  const out = new Headers()
-  const type = upstream.headers.get('content-type')
-  out.set(
-    'Content-Type',
-    type ??
-      (safeName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
-  )
+  // Solo PDF e imágenes se muestran; otro tipo se descarga encerrado (3.14). Sin tipo, se deduce del nombre como antes.
+  const type =
+    upstream.headers.get('content-type') ?? (safeName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
+  const out = new Headers(servedAttachmentHeaders(type, safeName))
   const length = upstream.headers.get('content-length')
   if (length) out.set('Content-Length', length)
-  out.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(safeName)}`)
   out.set('Cache-Control', 'private, no-store')
   return new NextResponse(upstream.body, { status: 200, headers: out })
 }

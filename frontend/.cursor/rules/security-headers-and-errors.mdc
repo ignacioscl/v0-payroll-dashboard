@@ -40,3 +40,21 @@ alwaysApply: false
 - `frontend/Dockerfile`: `ARG NEXT_DEPLOYMENT_ID` y `RUN test -n "$NEXT_DEPLOYMENT_ID"` antes del build. El deploy es
   `DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build`.
 - Control: `lib/infra/docker-compose.test.ts`.
+
+## Etapa 3
+
+- **Cambios de sesión por POST**: cerrar sesión y «Back to legacy» son forms POST (303); el GET da 405.
+  `clear-session` solo redirige a `/login` o `/login?error=forbidden` (`lib/auth/safe-redirect.ts`).
+- **`proxy.ts`** (Next 16, ex `middleware`): en `/api` solo el chequeo de origen de los POST/PUT/DELETE
+  (`lib/security/same-origin.ts`). Solo revisiones rápidas.
+- **`SRS_LEGACY_ORIGINS`**: a dónde pueden ir el logout y el SSO (la cookie de usuario no está firmada) y orígenes que
+  suma `form-action`. Va en el `.env` del compose (build) y en `payroll-dashboard.env` (ejecución).
+- **`server-only`** arriba de todo módulo con secretos, cookies o pedidos a otro servicio. `next build` falla si uno
+  llega a un componente de cliente; en vitest es un alias vacío.
+- **Adjuntos**: tope del transporte y del archivo real, tipo por firma; al servir, solo PDF e imágenes `inline`
+  (`lib/expense-attachments-validate.ts`).
+- **`robots: noindex, nofollow`** en el layout raíz (sin `robots.txt` con Disallow).
+- **Gate**: `pnpm run gate` (lint, typecheck, test:unit, test:infra) y `pnpm run lint && pnpm run test:unit` dentro del
+  `Dockerfile`; `next build` valida tipos (sin `ignoreBuildErrors`). Controles en `lib/proxy.test.ts`,
+  `lib/gate/*.test.ts`, `lib/expense-attachments-upload.test.ts`.
+

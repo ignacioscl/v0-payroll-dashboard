@@ -121,7 +121,7 @@ export type PunchGroupedExportInput = {
 const EXPORT_PAGE_SIZE = 500
 
 export function sanitizeExcelSheetName(name: string, used: Set<string>): string {
-  let base = name.replace(/[\\/?*[\]:]/g, '').trim().slice(0, 31) || 'Employee'
+  const base = name.replace(/[\\/?*[\]:]/g, '').trim().slice(0, 31) || 'Employee'
   let candidate = base
   let n = 2
   while (used.has(candidate)) {

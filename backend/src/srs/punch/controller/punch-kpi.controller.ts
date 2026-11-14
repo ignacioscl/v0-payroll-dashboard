@@ -1,13 +1,10 @@
-import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { PunchKpiService } from '../service/punch-kpi.service'
 import { PunchKpiDto, PunchOffenderRowDto } from '../dto/punch-kpi.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/punch')
 @ApiTags('SRS KPIs - Punch Quality')
 @ApiBearerAuth()

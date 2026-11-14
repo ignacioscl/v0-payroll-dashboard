@@ -41,6 +41,20 @@ describe('docker-compose y Dockerfile', () => {
     expect(serviceBlock('payroll-dashboard')).toMatch(/\n {6}args:\n(?: {8}#.*\n)* {8}NEXT_DEPLOYMENT_ID: \$\{DEPLOYMENT_ID:-\}/)
   })
 
+  it('el front recibe SRS_LEGACY_ORIGINS en el build y el Dockerfile falla sin ella', () => {
+    expect(serviceBlock('payroll-dashboard')).toMatch(/ {8}SRS_LEGACY_ORIGINS: \$\{SRS_LEGACY_ORIGINS:-\}/)
+    expect(dockerfile).toContain('ARG SRS_LEGACY_ORIGINS')
+    expect(dockerfile).toMatch(/RUN test -n "\$SRS_LEGACY_ORIGINS"/)
+  })
+
+  it('los dos builds reciben el contexto shared y corren el gate', () => {
+    expect(serviceBlock('payroll-dashboard')).toMatch(/additional_contexts:\n {8}shared: \.\/shared/)
+    expect(serviceBlock('srs-backend')).toMatch(/additional_contexts:\n {8}shared: \.\/shared/)
+    expect(dockerfile).toMatch(/RUN pnpm run lint && pnpm run test:unit/)
+    const back = readFileSync(join(FRONT, '..', 'backend', 'Dockerfile'), 'utf-8')
+    expect(back).toMatch(/RUN npm run lint && npm run typecheck && npm run test:unit/)
+  })
+
   it('el backend tiene stop_grace_period', () => {
     expect(serviceBlock('srs-backend')).toMatch(/\n {4}stop_grace_period: \d+s/)
   })

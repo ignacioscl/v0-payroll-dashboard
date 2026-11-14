@@ -20,7 +20,9 @@ import {
 } from './testing/import-graph'
 
 /** Archivos que nadie importa pero se quedan, con el motivo. */
-const UNUSED_FILES_ALLOWED: Record<string, string> = {}
+const UNUSED_FILES_ALLOWED: Record<string, string> = {
+  'lib/gate/__lint__/a-interno.tsx': 'archivo fijo que lib/gate/lint.test.ts le pasa a ESLint (no se importa)',
+}
 
 /** Dependencias que ningún archivo importa pero hacen falta, con el motivo. */
 const UNIMPORTED_DEPENDENCIES_ALLOWED: Record<string, string> = {

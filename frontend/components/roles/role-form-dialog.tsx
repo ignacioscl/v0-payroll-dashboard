@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { RoleParentCombobox } from '@/components/roles/role-parent-combobox'
@@ -19,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  FieldMessage,
   Form,
   FormControl,
   FormField,
@@ -43,6 +43,7 @@ import { useCreateRolesFromTemplate } from '@/hooks/use-role-template-roles'
 import { NestRequestError } from '@/lib/srs-role-templates-api'
 import { canManageRoleTemplates } from '@/lib/auth/roles-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { focusFirstFieldError, useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import {
   createRoleFormSchema,
@@ -93,7 +94,6 @@ export function RoleFormDialog({
   // Interno desde template: el nombre queda «<template> - <lo que escribe>» (vacío = el del template).
   const [templateSuffix, setTemplateSuffix] = React.useState('')
   const [templateNameError, setTemplateNameError] = React.useState<string | null>(null)
-  const templateSuffixRef = React.useRef<HTMLInputElement>(null)
 
   const schema = React.useMemo(
     () =>
@@ -109,7 +109,8 @@ export function RoleFormDialog({
     [isEdit, isCompanyTypeCompany, t],
   )
 
-  const form = useForm<RoleFormValues>({
+  // Formulario común: al enviar con un error, la pantalla va al primer campo con problema (también los combos).
+  const { form, handleSubmit, applyServerErrors } = useFormWithFocus<RoleFormValues>({
     resolver: zodResolver(schema),
     defaultValues: emptyRoleFormValues,
     mode: 'onSubmit',
@@ -158,13 +159,15 @@ export function RoleFormDialog({
 
   const createFromSelectedTemplate = async (values: RoleFormValues) => {
     if (!template || template.id < 1) {
-      setTemplateError(t('roles.templateRequired'))
+      const message = t('roles.templateRequired')
+      setTemplateError(message)
+      focusFirstFieldError({ template: message })
       return
     }
     if (template.tipo === 2) {
       const dealerId = values.idDealer ? Number(values.idDealer) : 0
       if (dealerId < 1) {
-        form.setError('idDealer', { message: t('roles.dealerRequired') })
+        applyServerErrors([{ field: 'idDealer', message: t('roles.dealerRequired') }])
         return
       }
     }
@@ -180,9 +183,9 @@ export function RoleFormDialog({
     } catch (err) {
       // 409 = ya hay un interno con ese nombre: el error va en el campo del nombre, con el foco ahí.
       if (template.tipo === 1 && err instanceof NestRequestError && err.status === 409) {
-        setTemplateNameError(t('roles.nameTakenAddSuffix'))
-        templateSuffixRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-        templateSuffixRef.current?.focus()
+        const message = t('roles.nameTakenAddSuffix')
+        setTemplateNameError(message)
+        focusFirstFieldError({ templateSuffix: message })
         return
       }
       toast.error(getSrsErrorMessage(err, t('roles.saveError')))
@@ -229,15 +232,12 @@ export function RoleFormDialog({
     } catch (err) {
       // 422 = rechazo del rol padre: el error va en el campo y la pantalla lo lleva a la vista.
       if (err instanceof SrsFailError && err.code === '422') {
-        form.setError('parent', { message: err.message })
-        const field = document.getElementById('role-parent')
-        field?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-        field?.querySelector<HTMLElement>('button')?.focus()
+        applyServerErrors([{ field: 'parent', message: err.message }])
         return
       }
       // 409 = ya hay un rol interno con ese nombre: el error va en Name, con el foco ahí.
       if (err instanceof SrsFailError && err.code === '409') {
-        form.setError('role', { message: t('roles.nameTaken') }, { shouldFocus: true })
+        applyServerErrors([{ field: 'role', message: t('roles.nameTaken') }])
         return
       }
       toast.error(getSrsErrorMessage(err, t('roles.saveError')))
@@ -250,7 +250,7 @@ export function RoleFormDialog({
       void createFromSelectedTemplate(form.getValues())
       return
     }
-    void form.handleSubmit(onSubmit)(e)
+    void handleSubmit(onSubmit)(e)
   }
 
   return (
@@ -261,7 +261,7 @@ export function RoleFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form className="space-y-4" onSubmit={handleFormSubmit}>
+          <form className="space-y-4" onSubmit={handleFormSubmit} noValidate>
             {!isEdit ? (
               <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                 {t('roles.addFromTemplateHint')}
@@ -296,7 +296,7 @@ export function RoleFormDialog({
                 </div>
 
                 {fromTemplate ? (
-                  <div className="space-y-2">
+                  <div data-field="template" className="space-y-2">
                     <Label>{t('roles.basedOnFilter')}</Label>
                     <RoleTemplateFilterCombobox
                       value={template}
@@ -311,9 +311,7 @@ export function RoleFormDialog({
                       enabled={open && fromTemplate}
                       placeholder={t('roles.selectTemplate')}
                     />
-                    {templateError ? (
-                      <p className="text-sm font-medium text-destructive">{templateError}</p>
-                    ) : null}
+                    <FieldMessage message={templateError} />
                     {template ? (
                       <p className="text-xs text-muted-foreground">
                         {template.tipo === 1
@@ -331,7 +329,7 @@ export function RoleFormDialog({
                         </Label>
                         <Input
                           id="role-template-suffix"
-                          ref={templateSuffixRef}
+                          name="templateSuffix"
                           leadingText={`${template.nombre} - `}
                           value={templateSuffix}
                           maxLength={Math.max(1, 64 - template.nombre.length - 3)}
@@ -342,9 +340,7 @@ export function RoleFormDialog({
                             setTemplateNameError(null)
                           }}
                         />
-                        {templateNameError ? (
-                          <p className="text-sm text-destructive">{templateNameError}</p>
-                        ) : null}
+                        <FieldMessage message={templateNameError} />
                       </div>
                     ) : null}
                   </div>
@@ -357,7 +353,7 @@ export function RoleFormDialog({
                 control={form.control}
                 name="type"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem data-field="type">
                     <FormLabel>{t('roles.type')}</FormLabel>
                     <Select
                       value={field.value ?? ''}
@@ -405,7 +401,7 @@ export function RoleFormDialog({
                 control={form.control}
                 name="idDealer"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem data-field="idDealer">
                     <FormLabel>{t('roles.colDealer')}</FormLabel>
                     <Select
                       value={field.value || undefined}
@@ -448,7 +444,7 @@ export function RoleFormDialog({
                     control={form.control}
                     name="idDepartment"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem data-field="idDepartment">
                         <FormLabel>{t('roles.colDepartment')}</FormLabel>
                         <Select
                           value={field.value || 'none'}
@@ -543,7 +539,7 @@ export function RoleFormDialog({
                 control={form.control}
                 name="parent"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem data-field="parent">
                     <FormLabel htmlFor="role-parent">{t('roles.parentRole')}</FormLabel>
                     <RoleParentCombobox
                       id="role-parent"

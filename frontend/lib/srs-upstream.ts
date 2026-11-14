@@ -4,6 +4,8 @@
  * (e.g. http://srs.com) or we fall back to node:http with Host from SRS_PUBLIC_URL.
  */
 
+import 'server-only'
+
 import http from 'node:http'
 import https from 'node:https'
 
@@ -71,8 +73,7 @@ function nodeHttpFetch(
 
   return new Promise((resolve, reject) => {
     // Hasta el evento `response` (los encabezados); el body no tiene corte propio. El `signal` de http.request
-    // rechaza con AbortError, no con TimeoutError: por eso el temporizador propio.
-    let timer: ReturnType<typeof setTimeout> | undefined
+    // rechaza con AbortError, no con TimeoutError: por eso el temporizador propio (se arma abajo, después del req).
     const req = lib.request(
       {
         protocol: target.protocol,
@@ -98,7 +99,7 @@ function nodeHttpFetch(
         })
       },
     )
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       const err = timeoutError(timeoutMs)
       req.destroy(err)
       reject(err)

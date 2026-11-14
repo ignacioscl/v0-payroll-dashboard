@@ -21,3 +21,7 @@ test-results/
 playwright-report/
 # Archivo de errores del servidor de Next en local (ERROR_LOG_PATH=logs/errors.log)
 /logs/
+
+# Lo genera Next en cada next dev/build (cambia entre .next/types y .next/dev/types): la doc pide no versionarlo
+# (03-api-reference/05-config/02-typescript.md). Sacarlo del índice: git rm --cached frontend/next-env.d.ts
+next-env.d.ts

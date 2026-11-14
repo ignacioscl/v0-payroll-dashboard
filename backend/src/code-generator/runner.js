@@ -5,7 +5,7 @@
  *
  * Arma `src/features/<nombre>/` con la estructura de la regla `nest-feature-one-resource.mdc` (module, entity,
  * repository, service, dto, controller) a partir de `template/`, y lo suma a `app.module.ts` en las marcas
- * `//ImportTemplateModule` y `//TemplateModule`. El controlador sale con `SrsJwtGuard` en `/srs/<nombre>`
+ * `//ImportTemplateModule` y `//TemplateModule`. El controlador sale en `/srs/<nombre>`, cerrado por el guard global (`SrsJwtGuard` como `APP_GUARD`)
  * (regla `typeorm-crud-no-raw-sql.mdc`).
  *
  * Lo prueba `code-generator.spec.ts`: genera a una carpeta temporal y compila lo generado con el compilador de

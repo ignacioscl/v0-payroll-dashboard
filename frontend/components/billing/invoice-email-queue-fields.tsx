@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -44,6 +45,7 @@ export function InvoiceEmailQueueFields({
   fileName,
   onFileNameChange,
   className,
+  queueNameError,
 }: {
   open: boolean
   queueName: string
@@ -56,6 +58,11 @@ export function InvoiceEmailQueueFields({
   fileName?: string
   onFileNameChange?: (value: string) => void
   className?: string
+  /**
+   * Error de Queue Name bajo el campo (`null` = sin error). El campo lleva `name="queueName"` para que
+   * `focusFirstFieldError({ queueName })` lleve la pantalla ahí.
+   */
+  queueNameError?: string | null
 }) {
   const { t } = useTranslation()
 
@@ -85,12 +92,15 @@ export function InvoiceEmailQueueFields({
           <Label htmlFor="inv-email-queue-name">{t('invoices.emailQueueName')}</Label>
           <Input
             id="inv-email-queue-name"
+            name="queueName"
             value={queueName}
             onChange={(e) => onQueueNameChange(e.target.value)}
             placeholder={t('invoices.emailQueueNamePlaceholder')}
             disabled={disabled}
+            aria-invalid={queueNameError ? true : undefined}
           />
           <p className="text-[11px] text-muted-foreground">{t('invoices.emailQueueNameHint')}</p>
+          {queueNameError !== undefined ? <FieldMessage message={queueNameError} /> : null}
         </div>
       ) : null}
 

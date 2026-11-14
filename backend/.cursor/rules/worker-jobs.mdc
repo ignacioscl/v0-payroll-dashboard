@@ -59,8 +59,9 @@ Las entities de jobs se llaman `*.jobsentity.ts` porque el glob de la conexión 
 - Cada ejecución crea una fila en `JOB_RUN` (inicio, fin, estado, contadores, resumen JSON, host, pid) y líneas
   en `JOB_RUN_LOG` por unidad recalculada o fallida. Sin `JOB_RUN` no hay corrida.
 - Tiempos en UTC; la zona de negocio es del cron, no del log.
-- `GET /api/health/jobs` (Terminus) da 503 si un job crítico falló o no corrió en su ventana. **No se toca**
-  `/api/health`: es el healthcheck del contenedor.
+- `GET /api/health/jobs` (Terminus) da 503 si un job crítico falló o no corrió en su ventana. `/api/health` es el
+  healthcheck del contenedor y **mira solo la base** (D9 de plans/plan-buenas-practicas-v0, 3 s): jobs y mail van en
+  `/api/health/jobs`, nunca en `/api/health`.
 - Alerta por email (`EmailService`, `JOBS_ALERT_EMAIL`) al fallar, como máximo una por hora por job, y desde el
   watchdog diario.
 

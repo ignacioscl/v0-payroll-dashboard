@@ -6,6 +6,8 @@
  * encabezados. Si el pedido del navegador (`init.signal`) se aborta, este también, antes o después.
  */
 
+import 'server-only'
+
 export const TIMEOUT_ERROR_NAME = 'TimeoutError'
 
 export function timeoutError(ms: number): DOMException {

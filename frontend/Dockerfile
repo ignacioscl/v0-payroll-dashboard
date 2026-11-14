@@ -13,6 +13,8 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Casos compartidos con el back (shared/expense-rules-cases.json): llegan por el contexto `shared` del compose.
+COPY --from=shared . /shared
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 # Identificador del deploy (plans/plan-buenas-practicas-v0, 2.11): Next lo guarda en el build, agrega `?dpl=` a los
@@ -21,6 +23,12 @@ ENV NODE_ENV=production
 ARG NEXT_DEPLOYMENT_ID
 ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
 RUN test -n "$NEXT_DEPLOYMENT_ID" || (echo "Falta DEPLOYMENT_ID: DEPLOYMENT_ID=\$(git rev-parse --short HEAD) docker compose up -d --build" && exit 1)
+# Orígenes del legacy para la CSP `form-action` (3.12): Next arma los encabezados al compilar. Vienen del .env del compose.
+ARG SRS_LEGACY_ORIGINS
+ENV SRS_LEGACY_ORIGINS=$SRS_LEGACY_ORIGINS
+RUN test -n "$SRS_LEGACY_ORIGINS" || (echo "Falta SRS_LEGACY_ORIGINS en el .env del compose" && exit 1)
+# Gate dentro del build (plans/plan-buenas-practicas-v0, 3.4): no se puede saltear. Los tipos los controla `next build`.
+RUN pnpm run lint && pnpm run test:unit
 RUN pnpm run build
 
 FROM node:22-alpine AS runner

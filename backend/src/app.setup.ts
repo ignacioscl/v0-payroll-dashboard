@@ -2,8 +2,8 @@ import { ClassSerializerInterceptor, HttpStatus, INestApplication, ValidationPip
 import { ConfigService } from '@nestjs/config'
 import { Reflector } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import * as Sentry from '@sentry/node'
-import * as express from 'express'
 import helmet from 'helmet'
 import { ValidationError } from 'class-validator'
 
@@ -11,12 +11,16 @@ import { PaginationInterceptor } from './commons/interceptor/pagination.intercep
 import { LoggerSystem } from './commons/logs/logger.system'
 import { DataError, IdetailError } from './commons/errors/data.error'
 import { I18nErrorFilter } from './commons/filter/i18n.error.filter'
+import { ExtraFieldsProbePipe } from './commons/pipes/extra-fields-probe.pipe'
 
 /**
  * Todo lo que el arranque hace después de crear la app (plans/plan-buenas-practicas-v0, 2.3): así
  * el test (`app.setup.spec.ts`) arma la app igual que producción. `main.ts` solo crea la app, llama
  * esto y escucha. Regla del repo: `.cursor/rules/nest-security-baseline.mdc`.
  */
+/** Tope del body JSON de cualquier pedido (antes 50 MB «para imágenes en base64» de la plantilla borrada). */
+export const JSON_BODY_LIMIT = '1mb'
+
 export async function configureApp(app: INestApplication): Promise<void> {
   // helmet antes de cualquier app.use (https://docs.nestjs.com/security/helmet).
   app.use(
@@ -25,9 +29,9 @@ export async function configureApp(app: INestApplication): Promise<void> {
       frameguard: { action: 'deny' },
     }),
   )
-  // Body hasta 50 MB: hay imágenes en base64.
-  app.use(express.json({ limit: '50mb' }))
-  app.use(express.urlencoded({ limit: '50mb', extended: true }))
+  // Un pedido gigante se corta en la puerta (3.9). Lo más grande que manda el front son listas de ids (decenas de KB);
+  // el logo va por multipart (su propio tope) y los adjuntos al Node. El urlencoded queda en el valor por defecto.
+  ;(app as NestExpressApplication).useBodyParser('json', { limit: JSON_BODY_LIMIT })
 
   app.setGlobalPrefix('api')
 
@@ -35,12 +39,14 @@ export async function configureApp(app: INestApplication): Promise<void> {
   app.useLogger(logger)
 
   app.useGlobalPipes(
+    // Medición de campos de más (3.10): antes del ValidationPipe, que los borra en silencio. Solo anota en el log.
+    new ExtraFieldsProbePipe(),
     new ValidationPipe({
       transform: true,
       whitelist: true,
       exceptionFactory: (errors: ValidationError[]) => {
         const result: IdetailError[] = flattenValidationErrors(errors)
-        console.error('Validation Errors: ', result)
+        logger.warn(`Validation Errors: ${JSON.stringify(result)}`)
         return new DataError(HttpStatus.BAD_REQUEST, 'Validation Error', undefined, undefined, result)
       },
       stopAtFirstError: false,

@@ -17,7 +17,6 @@ import {
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
 import {
   AddDealersDto,
@@ -28,7 +27,7 @@ import { RecurringListQueryDto, RecurringRuleDto, SplitTypeDto, UpdateRecurringR
 import { RecurringExpenseFacadeService } from '../service/recurring-expense-facade.service'
 
 /** Expenses › Recurring Expenses (contrato en plans/plan-expenses-pro/AVANCE.md). Todo con 111. */
-@UseGuards(SrsJwtGuard, CompanyModuleGuard)
+@UseGuards(CompanyModuleGuard)
 @RequireCompanyModule('expenses')
 @Controller('/srs/expenses/recurring')
 @ApiTags('SRS Expenses - Recurring')

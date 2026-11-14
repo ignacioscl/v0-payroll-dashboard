@@ -38,7 +38,8 @@ describe('reportRequestError', () => {
     expect(readFileSync(path, 'utf-8')).toBe(`${line}\n`)
   })
 
-  it('sin permiso de escritura sale igual por stderr', () => {
+  // Como root (el build de Docker) chmod no impide escribir: la prueba no tiene sentido ahí.
+  it.skipIf(process.getuid?.() === 0)('sin permiso de escritura sale igual por stderr', () => {
     const locked = join(dir, 'locked')
     mkdirSync(locked)
     chmodSync(locked, 0o500)

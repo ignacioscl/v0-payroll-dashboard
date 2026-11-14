@@ -3,7 +3,7 @@
  * La app armada como en producción (`configureApp`, plans/plan-buenas-practicas-v0, 2.13.1), con un
  * controlador de prueba y sin base. Pedidos reales con `fetch` contra `listen(0)`.
  */
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Body, Controller, Get, HttpStatus, INestApplication, Module, Post } from '@nestjs/common'
@@ -55,6 +55,9 @@ class ProbeController {
   }
   @Get('busy') busy() {
     throw poolBusyError()
+  }
+  @Post('echo') echo(@Body() body: Record<string, unknown>) {
+    return { size: JSON.stringify(body).length }
   }
   @Get('slow') async slow() {
     await new Promise((r) => setTimeout(r, 500))
@@ -178,10 +181,11 @@ describe('configureApp', () => {
     expect(readFileSync(logPath, 'utf-8').trim().split('\n')).toHaveLength(1)
   })
 
-  it('sin permiso de escritura en el archivo, la respuesta es la misma', async () => {
+  // Como root (el build de Docker) chmod no impide escribir: la prueba no tiene sentido ahí.
+  ;(process.getuid?.() === 0 ? it.skip : it)('sin permiso de escritura en el archivo, la respuesta es la misma', async () => {
     const locked = join(dir, 'locked')
     rmSync(locked, { recursive: true, force: true })
-    require('node:fs').mkdirSync(locked)
+    mkdirSync(locked)
     chmodSync(locked, 0o500)
     process.env.ERROR_LOG_PATH = join(locked, 'errors.log')
     const stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true)
@@ -195,6 +199,18 @@ describe('configureApp', () => {
       chmodSync(locked, 0o700)
       process.env.ERROR_LOG_PATH = logPath
     }
+  })
+
+  it('body JSON: 1,1 MB → 413; 900 KB → llega al controlador', async () => {
+    const post = (bytes: number) =>
+      fetch(`${url}/api/probe/echo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: 'a'.repeat(bytes) }),
+      })
+    expect((await post(1.1 * 1024 * 1024)).status).toBe(413)
+    const ok = await post(900 * 1024)
+    expect(ok.status).toBe(201)
   })
 
   it('Swagger abre fuera de producción', async () => {

@@ -23,7 +23,6 @@ import { countRequestedDealersInScope } from '../../shared/kpi/srs-kpi-dealer-sc
 import {
   buildNyStampedExportFilename,
   contentDispositionAttachment,
-  formatNyStamp,
   XLSX_MIME,
 } from '../../punch/punch-export-format'
 import { loadDealerNames, loadUserName } from '../../punch/punch-export-lookups'

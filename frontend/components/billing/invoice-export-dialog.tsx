@@ -11,6 +11,7 @@ import {
   BillingToggleRow,
 } from '@/components/billing/billing-action-dialog'
 import { SentEmailAccountCombobox } from '@/components/billing/sent-email-account-combobox'
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,6 +28,7 @@ import {
   persistInvoiceEmailPrefsAfterSend,
 } from '@/lib/billing/invoice-email-prefs'
 import { appendEmailToField } from '@/lib/billing/invoice-email-ui'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { DB_POOL_BUSY, isSrsBusyError } from '@/lib/srs-busy-error'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
@@ -39,29 +41,21 @@ import {
   type InvoiceXlsExportType,
 } from '@/lib/srs-invoices-api'
 import { startTicketDownload } from '@/lib/ttk/ticket-download'
+import {
+  EMAIL_LIST_ERROR_KEYS,
+  EMAIL_MAX_LENGTH,
+  checkEmailList,
+  checkOptionalEmail,
+} from '@/lib/validation/email-list'
 
-/** Lengths of the EMAIL_* columns (D22). */
-const MAX_EMAIL = 64
+/** Lengths of the EMAIL_* columns (D22); the one of an address is in lib/validation/email-list.ts. */
 const MAX_NAME = 64
 const MAX_SUBJECT = 512
 const MAX_MESSAGE = 1024
 const POLL_MS = 800
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type ExportAction = 'export' | 'email' | 'queue'
 type FieldErrors = Partial<Record<'emailTo' | 'replyTo' | 'queueName' | 'fileName' | 'subject' | 'message', string>>
-
-/** Email To → addresses, or the error key (D15, D22). */
-function checkEmailList(raw: string): 'required' | 'invalid' | 'long' | null {
-  const parts = raw
-    .split(',')
-    .map((p) => p.trim())
-    .filter(Boolean)
-  if (parts.length === 0) return 'required'
-  if (parts.some((p) => !EMAIL_RE.test(p))) return 'invalid'
-  if (parts.some((p) => p.length > MAX_EMAIL)) return 'long'
-  return null
-}
 
 /**
  * "Generate Xls Report" of Billing → Invoices (plans/plan-export-invoices-nest §1.3, §1.4, §8.7).
@@ -199,13 +193,15 @@ export function InvoiceExportDialog({
     const next: FieldErrors = {}
     if (fileName.trim().length > MAX_NAME) next.fileName = t('invoices.exportXlsMaxChars', { n: MAX_NAME })
     if (isMail) {
+      // D15, D22: lib/validation/email-list.ts, pareja del DTO del Nest.
       const emails = checkEmailList(emailTo)
-      if (emails === 'required') next.emailTo = t('invoices.exportXlsRequired')
-      else if (emails === 'invalid') next.emailTo = t('invoices.exportXlsInvalidEmails')
-      else if (emails === 'long') next.emailTo = t('invoices.exportXlsMaxChars', { n: MAX_EMAIL })
-      const reply = replyTo.trim()
-      if (reply && !EMAIL_RE.test(reply)) next.replyTo = t('invoices.exportXlsInvalidEmail')
-      else if (reply.length > MAX_EMAIL) next.replyTo = t('invoices.exportXlsMaxChars', { n: MAX_EMAIL })
+      if (!emails.ok) {
+        next.emailTo =
+          emails.error === 'required' ? t('invoices.exportXlsRequired') : t(EMAIL_LIST_ERROR_KEYS[emails.error])
+      }
+      const reply = checkOptionalEmail(replyTo)
+      if (reply === 'invalid') next.replyTo = t('invoices.exportXlsInvalidEmail')
+      else if (reply === 'long') next.replyTo = t('invoices.exportXlsMaxChars', { n: EMAIL_MAX_LENGTH })
       if (subject.length > MAX_SUBJECT) next.subject = t('invoices.exportXlsMaxChars', { n: MAX_SUBJECT })
       if (message.length > MAX_MESSAGE) next.message = t('invoices.exportXlsMaxChars', { n: MAX_MESSAGE })
       if (action === 'queue' && queueName.trim().length > MAX_NAME) {
@@ -213,7 +209,8 @@ export function InvoiceExportDialog({
       }
     }
     setFieldErrors(next)
-    return Object.keys(next).length === 0
+    // La pantalla va al primer campo con error (orden del DOM) y le da el foco.
+    return !focusFirstFieldError(next)
   }
 
   const onConfirm = async () => {
@@ -266,8 +263,9 @@ export function InvoiceExportDialog({
         : t('invoices.exportXlsActionQueue')
   const confirmIcon = action === 'export' ? FileSpreadsheet : action === 'email' ? Mail : Plus
 
-  const fieldError = (key: keyof FieldErrors) =>
-    fieldErrors[key] ? <p className="text-[11px] text-destructive">{fieldErrors[key]}</p> : null
+  const fieldError = (key: keyof FieldErrors) => <FieldMessage message={fieldErrors[key]} />
+  const clearFieldError = (key: keyof FieldErrors) =>
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev))
 
   return (
     <BillingActionDialog
@@ -336,8 +334,13 @@ export function InvoiceExportDialog({
             <Label htmlFor="inv-export-email-to">{t('invoices.exportXlsEmailTo')}</Label>
             <Input
               id="inv-export-email-to"
+              name="emailTo"
               value={emailTo}
-              onChange={(e) => setEmailTo(e.target.value)}
+              onChange={(e) => {
+                setEmailTo(e.target.value)
+                clearFieldError('emailTo')
+              }}
+              aria-invalid={fieldErrors.emailTo ? true : undefined}
               placeholder={t('invoices.exportXlsEmailTo')}
               autoComplete="email"
               disabled={pending}
@@ -352,7 +355,10 @@ export function InvoiceExportDialog({
               <SentEmailAccountCombobox
                 key={open ? `export-email-accounts-${action}` : 'export-email-accounts-closed'}
                 accounts={accountOptions}
-                onPick={(email) => setEmailTo((cur) => appendEmailToField(cur, email))}
+                onPick={(email) => {
+                  setEmailTo((cur) => appendEmailToField(cur, email))
+                  clearFieldError('emailTo')
+                }}
                 isLoading={sentAccounts.isLoading}
                 disabled={pending}
               />
@@ -364,8 +370,13 @@ export function InvoiceExportDialog({
               <Label htmlFor="inv-export-queue-name">{t('invoices.exportXlsQueueName')}</Label>
               <Input
                 id="inv-export-queue-name"
+                name="queueName"
                 value={queueName}
-                onChange={(e) => setQueueName(e.target.value)}
+                onChange={(e) => {
+                  setQueueName(e.target.value)
+                  clearFieldError('queueName')
+                }}
+                aria-invalid={fieldErrors.queueName ? true : undefined}
                 placeholder={t('invoices.exportXlsQueueName')}
                 disabled={pending}
               />
@@ -380,8 +391,13 @@ export function InvoiceExportDialog({
         <Label htmlFor="inv-export-filename">{t('invoices.exportXlsFileName')}</Label>
         <Input
           id="inv-export-filename"
+          name="fileName"
           value={fileName}
-          onChange={(e) => setFileName(e.target.value)}
+          onChange={(e) => {
+            setFileName(e.target.value)
+            clearFieldError('fileName')
+          }}
+          aria-invalid={fieldErrors.fileName ? true : undefined}
           placeholder={t('invoices.exportXlsFileName')}
           disabled={pending}
         />
@@ -395,8 +411,13 @@ export function InvoiceExportDialog({
             <Label htmlFor="inv-export-subject">{t('invoices.exportXlsSubject')}</Label>
             <Input
               id="inv-export-subject"
+              name="subject"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => {
+                setSubject(e.target.value)
+                clearFieldError('subject')
+              }}
+              aria-invalid={fieldErrors.subject ? true : undefined}
               placeholder={t('invoices.exportXlsSubject')}
               disabled={pending}
             />
@@ -406,8 +427,13 @@ export function InvoiceExportDialog({
             <Label htmlFor="inv-export-message">{t('invoices.exportXlsMessage')}</Label>
             <Textarea
               id="inv-export-message"
+              name="message"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value)
+                clearFieldError('message')
+              }}
+              aria-invalid={fieldErrors.message ? true : undefined}
               placeholder={t('invoices.exportXlsMessage')}
               rows={4}
               disabled={pending}
@@ -418,8 +444,13 @@ export function InvoiceExportDialog({
             <Label htmlFor="inv-export-reply-to">{t('invoices.exportXlsReplyTo')}</Label>
             <Input
               id="inv-export-reply-to"
+              name="replyTo"
               value={replyTo}
-              onChange={(e) => setReplyTo(e.target.value)}
+              onChange={(e) => {
+                setReplyTo(e.target.value)
+                clearFieldError('replyTo')
+              }}
+              aria-invalid={fieldErrors.replyTo ? true : undefined}
               placeholder={t('invoices.exportXlsReplyTo')}
               disabled={pending}
             />

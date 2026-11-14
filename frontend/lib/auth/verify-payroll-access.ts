@@ -1,3 +1,4 @@
+import 'server-only'
 import { srsFetch } from '@/lib/srs-fetch'
 import { UpstreamUnavailableError } from '@/lib/upstream-error'
 import { SRS_ME_TIMEOUT_MS } from '@/lib/upstream-timeouts'

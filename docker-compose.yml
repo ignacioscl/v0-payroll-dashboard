@@ -8,9 +8,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Los tests del build leen shared/ (fuera del contexto). Pide Docker Compose 2.17 o más.
+      additional_contexts:
+        shared: ./shared
       args:
         # Identificador del deploy: una pestaña abierta con el JavaScript viejo se recarga sola en el próximo clic.
         NEXT_DEPLOYMENT_ID: ${DEPLOYMENT_ID:-}
+        # Orígenes del legacy para la CSP form-action (se arma al compilar). Va en el .env del compose.
+        SRS_LEGACY_ORIGINS: ${SRS_LEGACY_ORIGINS:-}
     image: srs-payroll-dashboard:latest
     container_name: srs-payroll-dashboard
     ports:
@@ -63,6 +68,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Los tests del build leen shared/ (fuera del contexto). Pide Docker Compose 2.17 o más.
+      additional_contexts:
+        shared: ./shared
     image: srs-suite-backend:latest
     container_name: srs-suite-backend
     ports:
@@ -76,8 +84,8 @@ services:
       - ${BACKEND_ENV_FILE:-/opt/srs/srs-backend.env}
     volumes:
       # Logos que el provider sube desde v0 (Settings > Visual). Viven en el repo,
-      # fuera de la imagen, para que sobrevivan al deploy. Los sirve ServeStaticModule
-      # en /branding/<archivo>. Ruta relativa: misma en prod y en dev.
+      # fuera de la imagen, para que sobrevivan al deploy. Nadie sirve esta carpeta directo: el logo lo
+      # devuelve GET /api/srs/contratista/branding/logo, con login. Ruta relativa: misma en prod y en dev.
       - ./uploads/branding:/app/public/branding
       # Errores 5xx del Nest, una línea JSON cada uno (D2); sobrevive al deploy.
       - ./logs/backend:/app/logs

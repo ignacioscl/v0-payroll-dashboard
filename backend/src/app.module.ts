@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { ServeStaticModule } from '@nestjs/serve-static'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { join } from 'path'
 
 import { dataSourceOptions } from './typeorm.config'
 
@@ -40,13 +38,15 @@ import { SrsMonthlyClosingModule } from './srs/monthly-closing/monthly-closing.m
 // --- Jobs (worker) ---
 import { jobsDataSourceOptions, JOBS_CONNECTION } from './jobs/jobs.datasource'
 import { JobsModule } from './jobs/jobs.module'
+import { validateEnv } from './config/env.validation'
 //ImportTemplateModule
 //NO BORRAR LA LINEA DE ARRIBA
 
 @Module({
   imports: [
     LoggerSystemModule,
-    ConfigModule.forRoot({ load: [configuration], isGlobal: true }),
+    // Sin una variable obligatoria el Nest no arranca y el log dice cuál (config/env.validation.ts).
+    ConfigModule.forRoot({ load: [configuration], isGlobal: true, validate: validateEnv }),
     TypeOrmModule.forRootAsync({
       useFactory() {
         return dataSourceOptions
@@ -72,9 +72,6 @@ import { JobsModule } from './jobs/jobs.module'
       useFactory() {
         return jobsDataSourceOptions
       },
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
     }),
     HealthModule,
     SrsProductionModule,

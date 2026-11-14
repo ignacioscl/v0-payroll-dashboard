@@ -12,6 +12,7 @@ import {
   MaxLength,
 } from 'class-validator'
 
+import { EMAIL_OR_EMPTY_PATTERN, checkEmailList } from '../email-list'
 import type { InvoiceListQueryDto } from './invoice-list.dto'
 
 /** 1 = "Invoice" (one row per grid row); 2 = "Invoice with Wo Details" (one row per WO line). */
@@ -39,26 +40,14 @@ export class InvoiceExportPrepareBodyDto {
   fileName?: string
 }
 
-/** Same expression as the dialog and as the PHP (plans/plan-export-invoices-nest §2.1.6, D15). */
-export const INVOICE_EXPORT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 /**
  * Email To → the list of addresses (D15, D22): split by comma, trimmed, empty ones skipped,
  * repeats removed. null when there is none, or when one is not valid or longer than 64.
+ * The rule lives in ../email-list.ts (pair of frontend/lib/validation/email-list.ts).
  */
 export function parseInvoiceExportEmails(raw: string): string[] | null {
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const part of (raw ?? '').split(',')) {
-    const email = part.trim()
-    if (!email) continue
-    if (email.length > 64 || !INVOICE_EXPORT_EMAIL_PATTERN.test(email)) return null
-    const key = email.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(email)
-  }
-  return out.length ? out : null
+  const check = checkEmailList(raw)
+  return check.ok ? check.emails : null
 }
 
 /**
@@ -90,7 +79,8 @@ export class InvoiceExportMailBodyDto extends InvoiceExportPrepareBodyDto {
   @IsOptional()
   @IsString()
   @MaxLength(64, { message: 'Max 64 characters.' })
-  @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'This value should be a valid email.' })
+  // Same expression as Email To (../email-list.ts, pair of the dialog).
+  @Matches(EMAIL_OR_EMPTY_PATTERN, { message: 'This value should be a valid email.' })
   replyTo?: string
 
   @ApiPropertyOptional({ maxLength: 64, description: 'Create File to Email only' })

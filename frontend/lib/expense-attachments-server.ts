@@ -1,3 +1,4 @@
+import 'server-only'
 import { NextResponse } from 'next/server'
 
 import { getSrsSession } from '@/lib/auth/session'

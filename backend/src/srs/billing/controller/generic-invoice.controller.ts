@@ -10,11 +10,9 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import {
   CreateGenericInvoiceDto,
   CreateGenericInvoiceResponseDto,
@@ -28,8 +26,6 @@ import {
   UpdateGenericInvoiceResponseDto,
 } from '../dto/generic-invoice.dto'
 import { GenericInvoiceService } from '../service/generic-invoice.service'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/billing')
 @ApiTags('SRS Billing - Generic Invoices')
 @ApiBearerAuth()

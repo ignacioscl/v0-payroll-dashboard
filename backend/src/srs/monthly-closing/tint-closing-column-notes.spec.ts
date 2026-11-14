@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { TINT_CLOSING_COLUMN_NOTES_IN_ORDER } from './tint-closing-column-notes'
 
@@ -7,8 +7,12 @@ import { TINT_CLOSING_COLUMN_NOTES_IN_ORDER } from './tint-closing-column-notes'
  * and the notes on the Excel headers say the same, word by word. The catalog is read as text because the
  * frontend is another package.
  */
+const enPath = join(__dirname, '../../../../frontend/lib/i18n/messages/en.ts')
+// Dentro de la imagen de Docker del back no está el front: el control corre en el gate local (npm run gate).
+const frontPresent = existsSync(enPath)
+if (!frontPresent) console.warn('SKIPPED tint-closing-column-notes.spec.ts: el front no está (build de Docker del back)')
+
 function cartelItems(): string[] {
-  const enPath = join(__dirname, '../../../../frontend/lib/i18n/messages/en.ts')
   const source = readFileSync(enPath, 'utf8')
   const start = source.indexOf('tintClosing: {')
   expect(start).toBeGreaterThan(-1)
@@ -21,7 +25,7 @@ function cartelItems(): string[] {
   return items
 }
 
-describe('Window Tint Closing: cartel = notes of the Excel', () => {
+;(frontPresent ? describe : describe.skip)('Window Tint Closing: cartel = notes of the Excel', () => {
   it('has one cartel item per column, with the same text', () => {
     expect(cartelItems()).toEqual([...TINT_CLOSING_COLUMN_NOTES_IN_ORDER])
   })

@@ -8,6 +8,7 @@ import {
   nodeTicketsUrl,
 } from '@/lib/expense-attachments-server'
 import { upstreamErrorResponse } from '@/lib/upstream-error'
+import { checkAttachmentUpload, readBodyWithLimit, ATTACHMENT_TOO_BIG_MESSAGE } from '@/lib/expense-attachments-validate'
 
 type RouteContext = { params: Promise<{ idDealer: string; idExpense: string }> }
 
@@ -89,8 +90,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const denied = await denyAttachmentUpload(auth.session, auth.idExpense)
     if (denied) return denied
 
+    // Tope del transporte (aunque no venga Content-Length), después el archivo real y su tipo (3.14).
     const contentType = request.headers.get('content-type') ?? 'application/json'
-    const body = await request.arrayBuffer()
+    const read = await readBodyWithLimit(request)
+    if (!read.ok) return NextResponse.json({ error: ATTACHMENT_TOO_BIG_MESSAGE }, { status: 413 })
+    const check = await checkAttachmentUpload(contentType, read.bytes)
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status })
+    const body = read.bytes
     upstream = await fetchNodeTickets(nodeTicketsUrl(auth.idDealer, auth.idExpense), {
       method: 'POST',
       headers: { 'Content-Type': contentType, Authorization: auth.session.token },

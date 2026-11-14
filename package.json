@@ -1,0 +1,9 @@
+{
+  "name": "srs-suite",
+  "private": true,
+  "description": "Solo scripts: el control antes de commitear (plans/plan-buenas-practicas-v0, 3.4).",
+  "scripts": {
+    "gate": "pnpm --dir frontend run gate && npm --prefix backend run gate",
+    "gate:e2e": "pnpm --dir frontend run test:e2e"
+  }
+}

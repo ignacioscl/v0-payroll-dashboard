@@ -1,6 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
+
+import { IS_PUBLIC_KEY } from '../../commons/decorator/public.decorator'
 
 import { SrsAuthContextService } from './srs-auth-context.service'
 
@@ -12,6 +15,8 @@ import { SrsAuthContextService } from './srs-auth-context.service'
  *
  * Con el `id` del usuario resuelve provider + tipo (SrsAuthContextService) y lo
  * deja en request.srsContext para filtrar por provider/dealers en cada query.
+ *
+ * Es el guard global (`APP_GUARD` en SrsAuthModule): toda ruta pide login salvo las marcadas `@Public()` por método.
  */
 @Injectable()
 export class SrsJwtGuard implements CanActivate {
@@ -19,9 +24,13 @@ export class SrsJwtGuard implements CanActivate {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly authContext: SrsAuthContextService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [ctx.getHandler(), ctx.getClass()])) {
+      return true
+    }
     const request = ctx.switchToHttp().getRequest()
     const header = (request.headers['authorization'] ?? '') as string
     const token = header.replace('Bearer ', '').trim()

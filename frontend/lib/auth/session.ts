@@ -1,3 +1,4 @@
+import 'server-only'
 import { cookies } from 'next/headers'
 import type { SrsSession, SrsSessionUser } from './types'
 import { SRS_TOKEN_COOKIE, SRS_USER_COOKIE, SRS_SESSION_MAX_AGE } from './constants'
