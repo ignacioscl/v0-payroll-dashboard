@@ -6,6 +6,8 @@ import {
   IncomeByDealerDto,
   IncomeByDealerServicesQueryDto,
   IncomeServicesByDealerDto,
+  IncomeServiceVehiclesDto,
+  IncomeServiceVehiclesQueryDto,
   RemovedDealersAvailableDto,
   RemovedDealersAvailableQueryDto,
 } from '../dto/billing-kpi.dto'
@@ -83,6 +85,22 @@ export class BillingKpiService {
     ctx: SrsContext,
     query: IncomeByDealerServicesQueryDto,
   ): Promise<IncomeServicesByDealerDto> {
+    const { filter, range } = await this.oneDealerOneYear(ctx, query)
+    const years = await this.repository.getIncomeServicesByDealer(filter, range, query.withVehicles === true)
+    return { years }
+  }
+
+  /**
+   * The vehicles of one service of the open row (plans/plan-income-by-dealer-ttk-y-autos T3): same permission, filter and
+   * «one dealer and one year» as getIncomeServicesByDealer.
+   */
+  async getIncomeServiceVehicles(ctx: SrsContext, query: IncomeServiceVehiclesQueryDto): Promise<IncomeServiceVehiclesDto> {
+    const { filter, range } = await this.oneDealerOneYear(ctx, query)
+    return this.repository.getIncomeServiceVehicles(filter, range[0], query.service)
+  }
+
+  /** Permission, session filter and one dealer and one calendar year per request, or 400. */
+  private async oneDealerOneYear(ctx: SrsContext, query: SrsKpiQueryDto) {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_PRODUCTION_REPORT)
     const filter = buildSrsKpiFilter(ctx, query)
     const range = splitRangeByYear(filter.fechaDesde, filter.fechaHasta)
@@ -90,8 +108,7 @@ export class BillingKpiService {
     if (filter.dealerIds.length !== 1 || range.length !== 1) {
       throw new BadRequestException('Ask one dealer and one calendar year per request')
     }
-    const years = await this.repository.getIncomeServicesByDealer(filter, range, query.withVehicles === true)
-    return { years }
+    return { filter, range }
   }
 
   /**

@@ -1564,6 +1564,20 @@ export const es: Messages = {
     infoGeneric: 'Líneas de invoices genéricas: no tienen vehículo, y su cantidad es la escrita en la invoice.',
     infoTtk: 'Invoices TTK, por empleado: no tienen vehículo.',
     servicesTitle: 'Ingresos por sucursal y servicio',
+    // Facturas TTK y autos de un servicio: textos de plans/plan-income-by-dealer-ttk-y-autos §5.3 (D5 y D6, 12/11).
+    showEmployees: 'Ver empleados',
+    hideEmployees: 'Ocultar empleados',
+    showVehiclesOf: 'Ver los vehículos de {service}',
+    showVehicles: 'Ver vehículos',
+    hideVehicles: 'Ocultar vehículos',
+    viewInWindow: 'Ver en una ventana',
+    showingVehicles: 'Se muestran {shown} de {total} vehículos',
+    viewAll: 'Ver todos',
+    woNumbers: 'N.º OT {numbers}',
+    vehiclesTitle: '{service} — {dealer}',
+    vehiclesNumbers: 'Cant. {qty} · Vehículos {vehicles} · Ingresos {income}',
+    vehiclesSearch: 'Buscar VIN o WO…',
+    vehiclesEmpty: 'No hay vehículos para este servicio.',
   },
   // Los nombres de columna de PRO van en inglés en los dos idiomas (plans/plan-reporte-tint §5.4).
   monthlyClosing: {

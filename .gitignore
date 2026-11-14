@@ -13,6 +13,9 @@ docker-compose.override.yml
 # .env del compose (solo define PAYROLL_ENV_FILE / BACKEND_ENV_FILE en el server)
 .env
 
+# Build de Next suelto en la raíz (lo deja `next dev` si se corre desde acá)
+.next/
+
 # Logs sueltos
 *.log
 

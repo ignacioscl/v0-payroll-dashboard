@@ -12,6 +12,8 @@ import {
   IncomeByDealerDto,
   IncomeByDealerServicesQueryDto,
   IncomeServicesByDealerDto,
+  IncomeServiceVehiclesDto,
+  IncomeServiceVehiclesQueryDto,
   RemovedDealersAvailableDto,
   RemovedDealersAvailableQueryDto,
   UnbilledAgingBucketDto,
@@ -77,6 +79,15 @@ export class BillingKpiController {
     @Query() query: IncomeByDealerServicesQueryDto,
   ): Promise<IncomeServicesByDealerDto> {
     return this.service.getIncomeServicesByDealer(request.srsContext, query)
+  }
+
+  @Get('/income-by-dealer/services/vehicles')
+  @ApiOkResponse({ type: IncomeServiceVehiclesDto })
+  async getIncomeServiceVehicles(
+    @Req() request: any,
+    @Query() query: IncomeServiceVehiclesQueryDto,
+  ): Promise<IncomeServiceVehiclesDto> {
+    return this.service.getIncomeServiceVehicles(request.srsContext, query)
   }
 
   @Get('/removed-dealers-available')

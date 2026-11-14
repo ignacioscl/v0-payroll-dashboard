@@ -49,3 +49,47 @@ describe('BillingKpiService.getIncomeServicesByDealer', () => {
     expect(repository.getIncomeServicesByDealer).not.toHaveBeenCalled()
   })
 })
+
+/** GET /srs/kpis/billing/income-by-dealer/services/vehicles (plans/plan-income-by-dealer-ttk-y-autos T3 y T7). */
+describe('BillingKpiService.getIncomeServiceVehicles', () => {
+  const ctx = { idUsuario: 5, idUsuarioRolrel: null, idRol: 3, idDealerProvider: 79, isUserDealer: false } as SrsContext
+  const query = { fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', idDealer: '76', service: 'Full Detail' }
+
+  function build(allowed: boolean) {
+    const repository = { getIncomeServiceVehicles: jest.fn().mockResolvedValue({ rows: [] }) }
+    const permissions = {
+      assertRolAccion: jest.fn(allowed ? () => Promise.resolve() : () => Promise.reject(new ForbiddenException())),
+    }
+    return { service: new BillingKpiService(repository as any, permissions as any), repository, permissions }
+  }
+
+  it('sin el permiso de Production Report no consulta la base', async () => {
+    const { service, repository, permissions } = build(false)
+    await expect(service.getIncomeServiceVehicles(ctx, query)).rejects.toBeInstanceOf(ForbiddenException)
+    expect(permissions.assertRolAccion).toHaveBeenCalledWith(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    expect(repository.getIncomeServiceVehicles).not.toHaveBeenCalled()
+  })
+
+  it('la empresa sale de la sesión; pasa el año recortado y el servicio tal cual (también vacío)', async () => {
+    const { service, repository } = build(true)
+    await service.getIncomeServiceVehicles(ctx, { ...query, idDealerProvider: 999 } as any)
+    const [filter, year, svc] = repository.getIncomeServiceVehicles.mock.calls[0]
+    expect(filter.idDealerProvider).toBe(79)
+    expect(filter.dealerIds).toEqual([76])
+    expect(year).toEqual({ year: 2026, fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', partial: true })
+    expect(svc).toBe('Full Detail')
+    await service.getIncomeServiceVehicles(ctx, { ...query, service: '' })
+    expect(repository.getIncomeServiceVehicles.mock.calls[1][2]).toBe('')
+  })
+
+  it('un dealer y un año por pedido: más de uno es 400 sin consultar la base', async () => {
+    const { service, repository } = build(true)
+    await expect(service.getIncomeServiceVehicles(ctx, { ...query, fechaDesde: '2025-12-01' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    await expect(service.getIncomeServiceVehicles(ctx, { ...query, idDealer: '76,77' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(repository.getIncomeServiceVehicles).not.toHaveBeenCalled()
+  })
+})

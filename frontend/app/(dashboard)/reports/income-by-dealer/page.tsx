@@ -597,6 +597,7 @@ export default function IncomeByDealerPage() {
                 fechaHasta={y.fechaHasta}
                 filterDateDone={filterDateDone}
                 wrap={wrap}
+                yearLabel={yearLabel(y, t)}
               />
             )}
             subComponentLayout="full"
