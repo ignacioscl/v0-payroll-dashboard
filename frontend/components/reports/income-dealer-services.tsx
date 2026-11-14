@@ -404,7 +404,13 @@ function ServiceVehiclesRows({
   const rows = query.data?.rows ?? []
   const shown = rows.slice(0, VEHICLES_IN_ROW)
   const desc = (r: (typeof rows)[number]) => [r.make, r.model, r.carYear ?? ''].filter((x) => x !== '').join(' ')
-  const wos = (r: (typeof rows)[number]) => t('incomeByDealer.woNumbers', { numbers: r.wos.join(', ') })
+  // «WO # MBP22171 · 10/05/2026»: each WO with its date (the date of the period), as the Date column of the window.
+  const wos = (r: (typeof rows)[number]) =>
+    t('incomeByDealer.woNumbers', {
+      numbers: r.wos
+        .map((n, i) => (r.woDates[i] ? `${n} · ${formatUsCalendarDate(r.woDates[i])}` : n))
+        .join(', '),
+    })
   return (
     <>
       {shown.map((r) =>

@@ -252,7 +252,8 @@ export function groupServiceVehicles(
   cars: Map<number, IncomeCar>,
   service: string,
 ): IncomeServiceVehiclesBodyDto {
-  const byVin = new Map<string, Sum & { idCar: number; wos: Set<string> }>()
+  // WO # → its date: the one the report uses for the period (creation, or Done with «Filter by completion date»).
+  const byVin = new Map<string, Sum & { idCar: number; wos: Map<string, string> }>()
   let cents = 0
   let qtyHundredths = 0
   service = serviceName(service)
@@ -266,23 +267,25 @@ export function groupServiceVehicles(
     if (!vin) continue
     let v = byVin.get(vin)
     if (!v) {
-      v = { idCar: l.idCar!, cents: 0, qtyHundredths: 0, wos: new Set() }
+      v = { idCar: l.idCar!, cents: 0, qtyHundredths: 0, wos: new Map() }
       byVin.set(vin, v)
     }
     v.cents += lc
     v.qtyHundredths += lq
-    if (l.nro) v.wos.add(l.nro)
+    if (l.nro && !v.wos.has(l.nro)) v.wos.set(l.nro, l.dateFrom ?? '')
   }
   const rows = [...byVin]
     .sort((a, b) => b[1].cents - a[1].cents || a[0].localeCompare(b[0]))
     .map(([vin, v]) => {
       const c = cars.get(v.idCar)
+      const wos = [...v.wos.keys()].sort()
       return {
         vin,
         make: c?.make ?? '',
         model: c?.model ?? '',
         carYear: c?.year ?? null,
-        wos: [...v.wos].sort(),
+        wos,
+        woDates: wos.map((n) => v.wos.get(n) ?? ''),
         qty: fromCents(v.qtyHundredths),
         income: fromCents(v.cents),
       }

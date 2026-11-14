@@ -351,6 +351,8 @@ export interface IncomeServiceVehicle {
   model: string
   carYear: number | null
   wos: string[]
+  /** Date of each WO (YYYY-MM-DD), same order as wos: the date the report uses for the period. */
+  woDates: string[]
   qty: number
   income: number
 }

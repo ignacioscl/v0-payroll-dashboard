@@ -130,6 +130,14 @@ describeIf('Income by Dealer: facturas TTK y autos — integración contra la co
         expect(v.rows.reduce((a, r) => a + toCents(r.income), 0)).toBe(toCents(s.income))
         expect(v.rows.reduce((a, r) => a + toCents(r.qty), 0)).toBe(toCents(s.qty))
         expect(v.rows.every((r) => r.vin && r.wos.length > 0)).toBe(true)
+        // Cada WO con su fecha, y la fecha dentro del rango pedido (es la que el reporte usa para el período).
+        expect(
+          v.rows.every(
+            (r) =>
+              r.woDates.length === r.wos.length &&
+              r.woDates.every((d) => d >= v.fechaDesde && d <= v.fechaHasta),
+          ),
+        ).toBe(true)
       }
     }
     const fd = await service.getIncomeServiceVehicles(ctxAutoWax, { ...OCT, idDealer: String(pompano), service: 'Full Detail' })

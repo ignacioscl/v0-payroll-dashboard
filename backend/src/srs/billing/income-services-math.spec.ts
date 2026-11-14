@@ -212,6 +212,8 @@ describe('groupServiceVehicles', () => {
   const woN = (service: string, amount: number, idCar: number, nro: string, qty = 1): IncomeServiceLine => ({
     ...wo(10, service, amount, idCar, qty),
     nro,
+    // W1 → 2026-10-01: la fecha del período de cada WO, para ver que viaja con su número.
+    dateFrom: `2026-10-${nro.slice(1).padStart(2, '0')}`,
   })
 
   it('un auto con dos WO del servicio es un renglón con las dos WO y Qty 2; otro servicio y $0 no entran', () => {
@@ -224,8 +226,8 @@ describe('groupServiceVehicles', () => {
     ]
     const v = groupServiceVehicles(lines, cars, 'Full Detail')
     expect(v.rows).toEqual([
-      { vin: 'VIN1', make: 'BMW', model: 'X5', carYear: 2025, wos: ['W1', 'W2'], qty: 2, income: 198 },
-      { vin: 'VIN2', make: 'BMW', model: 'X5', carYear: 2025, wos: ['W3'], qty: 1, income: 99 },
+      { vin: 'VIN1', make: 'BMW', model: 'X5', carYear: 2025, wos: ['W1', 'W2'], woDates: ['2026-10-01', '2026-10-02'], qty: 2, income: 198 },
+      { vin: 'VIN2', make: 'BMW', model: 'X5', carYear: 2025, wos: ['W3'], woDates: ['2026-10-03'], qty: 1, income: 99 },
     ])
     expect(v.vehicles).toBe(2)
     expect(v.qty).toBe(3)

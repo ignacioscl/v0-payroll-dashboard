@@ -79,6 +79,20 @@ export function IncomeServiceVehiclesDialog({
         meta: { label: t('invoices.colWo') } satisfies DataTableColumnMeta<IncomeServiceVehicle>,
       },
       {
+        // The date of each WO, in the order of WO #: the one the report uses for the period (creation, or Done with
+        // «Filter by completion date»). Sorted by the YYYY-MM-DD text, so the order is by date.
+        id: 'woDates',
+        accessorFn: (r) => r.woDates.join(', '),
+        size: 110,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colDate')} />,
+        cell: ({ row }) => (
+          <span className="whitespace-normal break-words tabular-nums">
+            {row.original.woDates.map((d) => formatUsCalendarDate(d)).join(', ')}
+          </span>
+        ),
+        meta: { label: t('expenses.colDate') } satisfies DataTableColumnMeta<IncomeServiceVehicle>,
+      },
+      {
         accessorKey: 'qty',
         size: 70,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('incomeByDealer.colQty')} />,

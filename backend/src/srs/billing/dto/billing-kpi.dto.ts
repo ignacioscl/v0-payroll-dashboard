@@ -260,6 +260,11 @@ export class IncomeServiceVehicleDto {
   @ApiProperty({ example: 'X5' }) model!: string
   @ApiPropertyOptional({ example: 2025 }) carYear!: number | null
   @ApiProperty({ example: ['MBP22106'], description: 'WO numbers of the vehicle with this service' }) wos!: string[]
+  @ApiProperty({
+    example: ['2026-10-05'],
+    description: 'Date of each WO, same order as wos: creation, or Done with filterDateDone (the date of the period)',
+  })
+  woDates!: string[]
   @ApiProperty({ example: 1 }) qty!: number
   @ApiProperty({ example: 99 }) income!: number
 }
