@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
+import { upstreamErrorResponse } from '@/lib/upstream-error'
+import { fetchWithHeadersTimeout } from '@/lib/upstream-fetch'
+import { FACE_TIMEOUT_MS } from '@/lib/upstream-timeouts'
 
 function getFaceApiBaseUrl(): string {
   const url = (process.env.FACE_RECOGNITION_URL ?? 'http://localhost:3008').trim()
@@ -46,12 +49,16 @@ export async function forwardToFace({
 
   const hasBody = method !== 'GET' && method !== 'HEAD' && body != null
 
-  const upstream = await fetch(target.toString(), {
-    method,
-    headers,
-    body: hasBody ? body : undefined,
-    cache: 'no-store',
-  })
+  let upstream: Response
+  try {
+    upstream = await fetchWithHeadersTimeout(
+      target.toString(),
+      { method, headers, body: hasBody ? body : undefined, cache: 'no-store' },
+      FACE_TIMEOUT_MS,
+    )
+  } catch (err) {
+    return upstreamErrorResponse(err)
+  }
 
   const responseHeaders = new Headers()
   const upstreamType = upstream.headers.get('content-type')

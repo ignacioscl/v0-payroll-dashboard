@@ -19,3 +19,5 @@ node_modules
 # Playwright
 test-results/
 playwright-report/
+# Archivo de errores del servidor de Next en local (ERROR_LOG_PATH=logs/errors.log)
+/logs/

@@ -4,6 +4,8 @@ export { srsProxyUrl } from '@/lib/srs-proxy-url'
 
 export type SrsFetchInit = RequestInit & {
   searchParams?: Record<string, string | number | undefined>
+  /** Hasta los encabezados; por defecto `SRS_PROXY_TIMEOUT_MS` (lib/upstream-timeouts.ts). */
+  timeoutMs?: number
 }
 
 /**
@@ -45,6 +47,7 @@ export async function srsFetch(path: string, init?: SrsFetchInit) {
     body,
     contentType: headers.get('content-type'),
     accept: headers.get('accept'),
+    timeoutMs: init?.timeoutMs,
   })
 
   return response

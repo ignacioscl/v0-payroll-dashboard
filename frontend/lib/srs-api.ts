@@ -1,6 +1,27 @@
 import type { SrsExchangeResponse, SrsLoginData } from '@/lib/auth/types'
 import { isLoginRoleSelection } from '@/lib/auth/types'
 import { fetchSrsUpstream } from '@/lib/srs-upstream'
+import { UPSTREAM_UNEXPECTED_MESSAGE, upstreamErrorMessage } from '@/lib/upstream-error'
+import { SRS_SSO_TIMEOUT_MS } from '@/lib/upstream-timeouts'
+
+/**
+ * Login y SSO contra el PHP, con `SRS_SSO_TIMEOUT_MS` hasta los encabezados. Si no contesta o no se puede conectar, el
+ * error lleva el texto de D1 (lo muestran el formulario de login y `/auth/error`), nunca «The operation was aborted».
+ */
+async function fetchSso(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetchSrsUpstream(path, init, { timeoutMs: SRS_SSO_TIMEOUT_MS })
+  } catch (err) {
+    console.error('SSO upstream failed', { path, name: (err as Error)?.name, message: (err as Error)?.message })
+    throw new Error(upstreamErrorMessage(err))
+  }
+}
+
+/** El PHP devolvió algo que no es JSON (HTML de error): el detalle al log del servidor, al usuario el texto de D1. */
+function unexpectedResponse(path: string, status: number, text: string): Error {
+  console.error('SSO upstream returned non-JSON', { path, status, preview: text.replace(/\s+/g, ' ').slice(0, 280) })
+  return new Error(UPSTREAM_UNEXPECTED_MESSAGE)
+}
 
 function getSsoSecret(): string {
   const secret = process.env.SRS_SSO_SECRET?.trim()
@@ -13,7 +34,7 @@ function getSsoSecret(): string {
 export async function exchangeSsoCode(code: string) {
   const secret = getSsoSecret()
 
-  const res = await fetchSrsUpstream('/php/api/sso/exchange.php', {
+  const res = await fetchSso('/php/api/sso/exchange.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -28,10 +49,7 @@ export async function exchangeSsoCode(code: string) {
   try {
     json = JSON.parse(text) as SrsExchangeResponse
   } catch {
-    const preview = text.replace(/\s+/g, ' ').slice(0, 280)
-    throw new Error(
-      `SRS server returned HTML instead of JSON (${res.status}). Check SRS_API_URL + Host from SRS_PUBLIC_URL — ${preview}`
-    )
+    throw unexpectedResponse('exchange.php', res.status, text)
   }
 
   if (!res.ok || json.status !== 'success' || !json.data || !('token' in json.data) || !json.data.token) {
@@ -47,7 +65,7 @@ export async function loginWithCredentials(
   password: string,
   idUsuarioRolrel?: number
 ) {
-  const res = await fetchSrsUpstream('/php/api/sso/login.php', {
+  const res = await fetchSso('/php/api/sso/login.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -62,7 +80,7 @@ export async function loginWithCredentials(
   try {
     json = JSON.parse(text) as SrsExchangeResponse
   } catch {
-    throw new Error(`SRS returned non-JSON (${res.status}): ${text.slice(0, 200)}`)
+    throw unexpectedResponse('login.php', res.status, text)
   }
   if (!res.ok || json.status !== 'success' || !json.data) {
     throw new Error(json.error?.message || 'Login failed')
@@ -93,7 +111,7 @@ export async function loginWithCredentialsFlow(
 }
 
 export async function createPhpAdoptCode(token: string, user: unknown) {
-  const res = await fetchSrsUpstream('/php/api/sso/adopt.php', {
+  const res = await fetchSso('/php/api/sso/adopt.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -108,10 +126,7 @@ export async function createPhpAdoptCode(token: string, user: unknown) {
   try {
     json = JSON.parse(text) as typeof json
   } catch {
-    const preview = text.replace(/\s+/g, ' ').slice(0, 280)
-    throw new Error(
-      `adopt.php returned non-JSON (${res.status}). ${preview}`,
-    )
+    throw unexpectedResponse('adopt.php', res.status, text)
   }
 
   if (!res.ok || json.status !== 'success' || !json.data?.code) {

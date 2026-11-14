@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { fetchSrsUpstream, getSrsApiBaseUrl } from '@/lib/srs-upstream'
+import { upstreamErrorResponse } from '@/lib/upstream-error'
 
 export type SrsProxyOptions = {
   method: string
@@ -9,6 +10,8 @@ export type SrsProxyOptions = {
   body?: ArrayBuffer | null
   contentType?: string | null
   accept?: string | null
+  /** Hasta los encabezados; por defecto `SRS_PROXY_TIMEOUT_MS` (lib/upstream-timeouts.ts). */
+  timeoutMs?: number
 }
 
 /**
@@ -21,6 +24,7 @@ export async function forwardToSrs({
   body = null,
   contentType = null,
   accept = null,
+  timeoutMs,
 }: SrsProxyOptions) {
   const session = await getSrsSession()
   if (!session) {
@@ -45,11 +49,17 @@ export async function forwardToSrs({
 
   const hasBody = method !== 'GET' && method !== 'HEAD' && body != null
 
-  const upstream = await fetchSrsUpstream(target.toString(), {
-    method,
-    headers,
-    body: hasBody ? body : undefined,
-  })
+  let upstream: Response
+  try {
+    upstream = await fetchSrsUpstream(
+      target.toString(),
+      { method, headers, body: hasBody ? body : undefined },
+      { timeoutMs },
+    )
+  } catch (err) {
+    // No contestó a tiempo → 504; caído → 502. Nunca un 500 vacío.
+    return upstreamErrorResponse(err)
+  }
 
   const responseHeaders = new Headers()
   const upstreamType = upstream.headers.get('content-type')

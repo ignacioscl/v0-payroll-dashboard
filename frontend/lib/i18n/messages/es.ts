@@ -1811,6 +1811,15 @@ export const es: Messages = {
     body: 'Abra el panel de nómina desde SRS (menú Time Tracking) mientras esté conectado.',
     tryAgain: 'Intentar de nuevo',
   },
+  // plans/plan-buenas-practicas-v0, D1: tarjeta de error (error.tsx) y página que no existe (not-found.tsx).
+  routeError: {
+    title: 'Ocurrió un error',
+    body: 'No se pudo cargar esta página. Intentá de nuevo en un momento.',
+  },
+  notFound: {
+    title: 'No se encontró la página',
+    body: 'La dirección que abriste no existe.',
+  },
   employeeThumbnail: {
     title: 'Elegir miniatura — {name}',
     punchNumber: 'Ponchada #{id}',

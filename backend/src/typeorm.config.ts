@@ -3,6 +3,7 @@ import 'dotenv/config'
 
 import { DataSource, DataSourceOptions } from 'typeorm'
 import { resolveTypeOrmLogging } from './db-logging'
+import { DB_CONNECT_TIMEOUT_MS } from './db-timeouts'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 export const dataSourceOptions: DataSourceOptions = {
@@ -18,13 +19,8 @@ export const dataSourceOptions: DataSourceOptions = {
   namingStrategy: new SnakeNamingStrategy(),
   migrations: [],
   migrationsRun: false, // NO NEGOCIABLE: no correr migraciones sobre la base
-  requestTimeout: 600000,
   timezone: 'Z', // Usar UTC para evitar problemas de zona horaria
-
-  options: {
-    encrypt: false, // Esto desactiva el uso de SSL
-    trustServerCertificate: true, // Esto indica al servidor que confíe en el certificado del servidor
-  },
+  connectTimeout: DB_CONNECT_TIMEOUT_MS,
   extra: {
     // Configuración adicional para manejo de fechas
     dateStrings: true,

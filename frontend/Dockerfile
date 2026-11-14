@@ -15,6 +15,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Identificador del deploy (plans/plan-buenas-practicas-v0, 2.11): Next lo guarda en el build, agrega `?dpl=` a los
+# archivos y recarga una pestaña vieja en el próximo clic. Sin él el build falla en vez de salir sin protección:
+# DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
+ARG NEXT_DEPLOYMENT_ID
+ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
+RUN test -n "$NEXT_DEPLOYMENT_ID" || (echo "Falta DEPLOYMENT_ID: DEPLOYMENT_ID=\$(git rev-parse --short HEAD) docker compose up -d --build" && exit 1)
 RUN pnpm run build
 
 FROM node:22-alpine AS runner

@@ -5,6 +5,7 @@ import { DataSource, DataSourceOptions } from 'typeorm'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 import { resolveTypeOrmLogging } from '../db-logging'
+import { DB_CONNECT_TIMEOUT_MS } from '../db-timeouts'
 
 /**
  * DataSource hacia la base LEGACY de SRS (MariaDB), compartida con el monolito PHP.
@@ -36,6 +37,7 @@ export const srsDataSourceOptions: DataSourceOptions = {
   migrations: [],
   migrationsRun: false,
   timezone: 'Z',
+  connectTimeout: DB_CONNECT_TIMEOUT_MS,
   extra: {
     dateStrings: true,
     timezone: 'Z',

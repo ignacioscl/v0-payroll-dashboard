@@ -1805,6 +1805,15 @@ export const en: Messages = {
     body: 'Open the payroll dashboard from SRS (Time Tracking menu) while logged in.',
     tryAgain: 'Try again',
   },
+  // plans/plan-buenas-practicas-v0, D1: tarjeta de error (error.tsx) y página que no existe (not-found.tsx).
+  routeError: {
+    title: 'Something went wrong',
+    body: 'This page could not be loaded. Try again in a moment.',
+  },
+  notFound: {
+    title: 'Page not found',
+    body: 'The address you opened does not exist.',
+  },
   employeeThumbnail: {
     title: 'Choose thumbnail — {name}',
     punchNumber: 'Punch #{id}',

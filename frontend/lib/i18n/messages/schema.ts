@@ -1728,6 +1728,14 @@ export interface Messages {
     body: string
     tryAgain: string
   }
+  routeError: {
+    title: string
+    body: string
+  }
+  notFound: {
+    title: string
+    body: string
+  }
   employeeThumbnail: {
     title: string
     punchNumber: string

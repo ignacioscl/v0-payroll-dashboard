@@ -6,12 +6,18 @@ Desarrollo local → `DOCKER.md` (sin Docker en prod, usás `frontend/.env.local
 
 ## Resumen (léelo primero)
 
-`docker compose up -d --build` levanta **dos contenedores**:
+`DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build` levanta **dos contenedores**. Sin
+`DEPLOYMENT_ID` el build del front falla a propósito: es el identificador que hace que una pestaña abierta con el
+JavaScript viejo se recargue sola en el próximo clic (plans/plan-buenas-practicas-v0, 2.11).
 
-| Contenedor              | Puerto en el host | Qué hace                                |
-| ----------------------- | ----------------- | --------------------------------------- |
-| `srs-payroll-dashboard` | **3010**          | Next.js — lo que Apache de `pro` proxea |
-| `srs-suite-backend`     | **3020**          | NestJS — KPIs (lee MariaDB directo)     |
+| Contenedor              | Puerto en el host        | Qué hace                                |
+| ----------------------- | ------------------------ | --------------------------------------- |
+| `srs-payroll-dashboard` | **127.0.0.1:3010**       | Next.js — lo que Apache de `pro` proxea |
+| `srs-suite-backend`     | **127.0.0.1:3020**       | NestJS — KPIs (lee MariaDB directo)     |
+
+Los dos puertos escuchan **solo en 127.0.0.1** del server (sin la IP, Docker los abre en todas las interfaces por
+iptables, aunque el firewall diga otra cosa). Apache proxea a `127.0.0.1:3010`; el front llega al Nest por la red de
+Docker.
 
 El **browser solo habla con `3010`**. El backend (`3020`) lo usa el frontend por red interna de Docker (`http://srs-backend:3020`). No hace falta proxy Apache al `:3020`.
 
@@ -81,7 +87,7 @@ FLUSH PRIVILEGES;
 
 ```bash
 cd /home/srssui5/v0-payroll-dashboard
-docker compose up -d --build
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
 
 Levanta `srs-suite-backend` (nuevo) y recrea el front con `BACKEND_API_URL`.
@@ -314,7 +320,7 @@ git pull
 # 7. CSF + GRANT MariaDB
 
 # 8. Levantar
-docker compose up -d --build
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
 
 ---
@@ -324,6 +330,12 @@ docker compose up -d --build
 ```bash
 # Frontend
 curl -s -o /dev/null -w "frontend login: %{http_code}\n" http://127.0.0.1:3010/login
+
+# Encabezados de seguridad (front y Nest) y data-dpl-id
+bash scripts/check-security-headers.sh http://127.0.0.1:3010 http://127.0.0.1:3020
+
+# Puertos solo en 127.0.0.1
+ss -ltnp | grep -E ":30(1|2)0 "
 
 # Backend (health)
 curl -s http://127.0.0.1:3020/api/health
@@ -354,7 +366,7 @@ docker compose ps
 ```bash
 cd /home/srssui5/v0-payroll-dashboard
 git pull
-docker compose up -d --build
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
 
 Solo cambiaste variables (sin código): hay que **recrear** el contenedor; un `restart` no relee el
@@ -363,6 +375,42 @@ Solo cambiaste variables (sin código): hay que **recrear** el contenedor; un `r
 ```bash
 docker compose up -d --force-recreate --no-deps payroll-dashboard   # Archivo A
 docker compose up -d --force-recreate --no-deps srs-backend         # Archivo B
+```
+
+`--force-recreate` sin `--build` y `up -d --build srs-backend` no necesitan `DEPLOYMENT_ID`; todo lo que
+reconstruye el front, sí.
+
+---
+
+## Errores 5xx: archivo del servidor
+
+Hoy los errores van a `docker logs`, que se borra en cada deploy. Por eso cada error 5xx deja **una línea JSON** en un
+archivo del host que sobrevive al deploy (D2 de plans/plan-buenas-practicas-v0): fecha, método, ruta sin query,
+estado, mensaje y stack; **nunca** body, encabezados, cookies ni token. Rota a los 10 MB (guarda 5).
+
+| Quién | Archivo en el host |
+| ----- | ------------------ |
+| Nest  | `logs/backend/errors.log` (volumen `./logs/backend:/app/logs`) |
+| Next  | `logs/front/errors.log` (volumen `./logs/front:/app/logs`) |
+
+```bash
+ssh srs-prod 'tail -n 50 /home/srssui5/v0-payroll-dashboard/logs/backend/errors.log'
+ssh srs-prod 'tail -n 50 /home/srssui5/v0-payroll-dashboard/logs/front/errors.log'
+```
+
+Las carpetas se crean **una vez**, escribibles por el usuario de cada contenedor (`nestjs`, uid 100; el de `nextjs`
+se ve con `docker exec srs-payroll-dashboard id -u`). Si no puede escribir, el error sale igual por `docker logs`.
+
+Sentry queda listo: sin `SENTRY_DSN` (Archivo B) no manda nada. Tarea `sentry-v0`.
+
+## Tiempos máximos de la base
+
+La base de PROD corta cualquier sentencia a los **120 s** (`@@global.max_statement_time = 120`, MariaDB 10.11): el
+Nest no pone un límite propio. **La base local (MariaDB 10.3) no tiene ese límite**: una consulta que en PROD corta a
+los 120 s, en local sigue. No midas tiempos en local y los des por buenos en PROD. Control en el deploy:
+
+```bash
+ssh srs-prod 'mysql -N -e "SELECT @@global.max_statement_time"'
 ```
 
 ---
@@ -402,7 +450,7 @@ cd /home/srssui5/v0-payroll-dashboard
 docker compose logs -f payroll-dashboard
 docker compose logs -f srs-backend
 docker compose restart payroll-dashboard srs-backend
-docker compose up -d --build
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 docker compose down
 ```
 

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { fetchBackend } from '@/lib/backend-upstream'
 import type { SrsSession } from '@/lib/auth/types'
+import { fetchWithHeadersTimeout } from '@/lib/upstream-fetch'
+import { NODE_TICKETS_TIMEOUT_MS } from '@/lib/upstream-timeouts'
 
 /**
  * BFF de adjuntos de Expenses (T4 del plan): exige sesión, comprueba por el Nest que el gasto sea de
@@ -20,6 +22,11 @@ export function getSrsNodeApiBaseUrl(): string {
 export function nodeTicketsUrl(idDealer: number, idExpense: number, filename?: string): string {
   const base = `${getSrsNodeApiBaseUrl()}/expenses/tickets/${idDealer}/${idExpense}`
   return filename ? `${base}/${encodeURIComponent(filename)}` : base
+}
+
+/** Pedido al Node de adjuntos con tiempo máximo hasta los encabezados; la subida o bajada del archivo no se corta. */
+export function fetchNodeTickets(url: string, init: RequestInit): Promise<Response> {
+  return fetchWithHeadersTimeout(url, { ...init, cache: 'no-store' }, NODE_TICKETS_TIMEOUT_MS)
 }
 
 type ExpenseDetailLite =

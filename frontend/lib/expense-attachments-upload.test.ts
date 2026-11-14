@@ -10,6 +10,8 @@ vi.mock('@/lib/expense-attachments-server', () => ({
   denyAttachmentUpload: (...a: unknown[]) => deny(...a),
   logAttachmentUpload: (...a: unknown[]) => log(...a),
   nodeTicketsUrl: () => 'http://node/tickets',
+  // El pedido al Node pasa por fetchNodeTickets (tiempo máximo hasta los encabezados); acá va directo al fetch falso.
+  fetchNodeTickets: (url: string, init: RequestInit) => fetch(url, init),
 }))
 
 import { POST } from '@/app/api/expense-attachments/[idDealer]/[idExpense]/route'
