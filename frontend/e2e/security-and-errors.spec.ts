@@ -70,7 +70,11 @@ test.describe('seguridad y errores', () => {
     const proHost = new URL(page.url()).host
     await openMobileMenuIfNeeded(page)
     await page.locator('button[aria-haspopup="menu"]').filter({ has: page.locator('[data-slot="avatar"]') }).last().click()
+    // El SSO tiene que llegar a consume.php con un código (si adopt.php falla, salta directo a index.php). Lo que pase
+    // después depende del rol en el legacy: el usuario e2e no tiene pantallas ahí y el legacy lo manda al login.
+    const consume = page.waitForResponse((r) => /\/php\/api\/sso\/consume\.php\?code=[0-9a-f]{16,}/.test(r.url()), { timeout: 30_000 })
     await page.getByRole('menuitem', { name: 'Back to SRS Legacy' }).click()
+    expect((await consume).status()).toBe(302)
     await expect.poll(() => new URL(page.url()).host, { timeout: 30_000 }).not.toBe(proHost)
     expect(csp).toEqual([])
   })

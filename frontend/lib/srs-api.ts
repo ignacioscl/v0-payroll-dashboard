@@ -13,7 +13,9 @@ async function fetchSso(path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetchSrsUpstream(path, init, { timeoutMs: SRS_SSO_TIMEOUT_MS })
   } catch (err) {
-    console.error('SSO upstream failed', { path, name: (err as Error)?.name, message: (err as Error)?.message })
+    const e = err as Error & { cause?: { code?: string; message?: string } }
+    // En texto: el log de Next muestra «{}» si se le pasa un objeto.
+    console.error(`SSO upstream failed ${path}: ${e?.name}: ${e?.message}${e?.cause ? ` (cause: ${e.cause.code ?? ''} ${e.cause.message ?? ''})` : ''}`)
     throw new Error(upstreamErrorMessage(err))
   }
 }
