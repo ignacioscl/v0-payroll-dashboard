@@ -65,6 +65,8 @@ function periodsLine(periods: ClosingPeriod[], t: TranslateFn): string {
  * Reports › Monthly Closing (plans/plan-monthly-closing §5.4) y Reports › Window Tint Closing
  * (plans/plan-reporte-tint §5, `scope="tint"`): una sola pantalla, el alcance cambia columnas, textos y cuentas.
  */
+const DEALER_PINNING = { left: ['dealer'] }
+
 export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -99,10 +101,8 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
   const data = report.data
   const rows = data?.rows ?? []
 
-  const columnPinning = React.useMemo(
-    () => (isMobile ? { left: [], right: [] } : { left: ['dealer'] }),
-    [isMobile],
-  )
+  // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
+  const columnPinning = DEALER_PINNING
 
   const columns = React.useMemo<ColumnDef<ClosingRow>[]>(() => {
     const money = (key: 'income' | 'payroll' | 'expenses', title: string): ColumnDef<ClosingRow> => ({
@@ -123,17 +123,13 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         accessorKey: 'dealer',
         size: 320,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealer.label')} />,
-        // Misma celda que Production vs Goal (production-dealer-table.tsx): en celular el nombre entero en varias
-        // líneas, nunca «…» (regla data-table). Window Tint Closing: con servicios sin «tint», en rojo con ⚠.
+        // Misma celda que Production vs Goal (production-dealer-table.tsx); en celular el DataTable no la corta.
+        // Window Tint Closing: con servicios sin «tint», en rojo con ⚠.
         cell: ({ row }) => {
           const nonTint = row.original.nonTint === true
           const removed = removedIds.has(row.original.dealerId)
           if (!removed && !nonTint) {
-            return (
-              <span className={cn('block font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
-                {row.original.dealer}
-              </span>
-            )
+            return <span className="block truncate font-medium">{row.original.dealer}</span>
           }
           return (
             <span
@@ -147,17 +143,14 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
                   data-testid="monthly-closing-non-tint-icon"
                 />
               ) : null}
-              <span className={cn('font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
-                {row.original.dealer}
-              </span>
+              <span className="truncate font-medium">{row.original.dealer}</span>
               {removed ? <RemovedDealerBadge /> : null}
             </span>
           )
         },
         meta: {
           label: t('dealer.label'),
-          // Ninguna columna fija en celular: tapa a las demás (regla data-table).
-          pin: isMobile ? undefined : 'left',
+          pin: 'left',
         } satisfies DataTableColumnMeta<ClosingRow>,
       },
     ]

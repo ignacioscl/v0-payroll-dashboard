@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils'
 
 /**
  * Dentro de un modal, el bloqueo de scroll del Dialog se come la rueda del mouse en lo que va en un
- * portal: un combo no scrolleaba su lista. `modal` le da al popover su propio bloqueo. `DialogContent`
- * prende este contexto, así vale para todo combo dentro de cualquier modal.
+ * portal: un combo no scrolleaba su lista. `modal` le da al popover su propio bloqueo. `DialogContent` y
+ * `SheetContent` prenden este contexto, así vale para todo combo dentro de cualquier modal o panel
+ * (plans/plan-buenas-practicas-v0, 5.5: la lista de dealers del panel de filtros del celular no se movía).
  */
 export const PopoverInDialogContext = React.createContext(false)
 
@@ -38,7 +39,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden',
+          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-(--z-overlay) w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden',
           className,
         )}
         {...props}

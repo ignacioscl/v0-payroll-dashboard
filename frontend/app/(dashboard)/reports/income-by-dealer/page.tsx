@@ -24,6 +24,7 @@ import { ReportRulesNotice } from '@/components/shared/report-rules-notice'
 import {
   DataTable,
   DataTableColumnHeader,
+  MOBILE_WRAP_TEXT,
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
 import { Button } from '@/components/ui/button'
@@ -32,7 +33,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { useRemovedDealersSwitch } from '@/hooks/use-removed-dealers-available'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
@@ -102,9 +102,9 @@ export default function IncomeByDealerPage() {
   const [exporting, setExporting] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [exportKind, setExportKind] = useState<ExportKind>('income')
-  const isMobile = useIsMobile()
-  // Names wrap on mobile, never cut with «…» (rule of tables on mobile); one line on desktop.
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular el DataTable no corta el texto de sus celdas; el detalle por servicio, que es una tabla propia,
+  // usa MOBILE_WRAP_TEXT (plans/plan-buenas-practicas-v0, 5.2).
+  const wrap = 'truncate'
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -596,7 +596,7 @@ export default function IncomeByDealerPage() {
                 fechaDesde={y.fechaDesde}
                 fechaHasta={y.fechaHasta}
                 filterDateDone={filterDateDone}
-                wrap={wrap}
+                wrap={MOBILE_WRAP_TEXT}
                 yearLabel={yearLabel(y, t)}
               />
             )}

@@ -10,7 +10,7 @@ import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAddRuleDealers, useRemoveRuleAssign, useUpdateRuleAssign } from '@/hooks/use-recurring-rules'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { downloadServerXlsx } from '@/lib/download-xlsx'
@@ -307,7 +307,6 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
                     </td>
                   ) : null}
                   <td className="px-1 py-1.5 text-right">
-                    <TooltipProvider delayDuration={300}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button type="button" size="icon" variant="ghost" className="size-7 text-destructive" disabled={rowBusy} onClick={() => setConfirmRemove(a)}>
@@ -317,7 +316,6 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
                         </TooltipTrigger>
                         <TooltipContent side="top">{t('expenses.delete')}</TooltipContent>
                       </Tooltip>
-                    </TooltipProvider>
                   </td>
                 </tr>
               )

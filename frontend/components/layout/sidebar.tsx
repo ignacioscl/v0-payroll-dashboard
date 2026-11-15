@@ -36,7 +36,6 @@ import { brandingLogoUrl } from '@/lib/srs-provider-branding-api'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
@@ -561,13 +560,13 @@ export function Sidebar() {
   const { t } = useTranslation()
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <>
       {/* Desktop sidebar — hidden on mobile */}
       <m.aside
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
+        className="fixed left-0 top-0 z-(--z-sidebar) h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
       >
         <SidebarInner />
       </m.aside>
@@ -585,6 +584,6 @@ export function Sidebar() {
           />
         </SheetContent>
       </Sheet>
-    </TooltipProvider>
+    </>
   )
 }

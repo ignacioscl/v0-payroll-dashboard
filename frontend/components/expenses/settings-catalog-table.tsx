@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { catalogQueryKey, useDeleteCatalogItem, useUpdateCatalogItem } from '@/hooks/use-expenses-catalog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -74,7 +74,8 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
   const [merging, setMerging] = React.useState<CatalogItem | null>(null)
 
   const columnPinning = React.useMemo(() => ({ left: [], right: [] }), [])
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular el DataTable no corta el texto (plans/plan-buenas-practicas-v0, 5.2).
+  const wrap = 'truncate'
   const isCompanies = kind === 'companies'
 
   const columns = React.useMemo<ColumnDef<CatalogItem>[]>(
@@ -199,7 +200,6 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
                       <p className="px-2 pb-1.5 text-xs text-muted-foreground">{t('expensesCatalog.deleteDisabledHint')}</p>
                     </>
                   ) : (
-                    <TooltipProvider delayDuration={200}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div>{deleteItem}</div>
@@ -208,7 +208,6 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
                           {t('expensesCatalog.deleteDisabledHint')}
                         </TooltipContent>
                       </Tooltip>
-                    </TooltipProvider>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -334,7 +333,6 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
                   setPageIndex(0)
                 }}
               />
-              <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Label htmlFor={`expenses-settings-${kind}-duplicates`} className="cursor-pointer text-sm font-normal">
@@ -345,7 +343,6 @@ export function SettingsCatalogTable({ kind, enabled }: { kind: CatalogKind; ena
                     {t('expensesCatalog.duplicatesHelp')}
                   </TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
             </div>
             <div className="flex items-center gap-2">
               <Switch

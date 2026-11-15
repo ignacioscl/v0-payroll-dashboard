@@ -46,11 +46,14 @@ async function filtersScope(page: Page): Promise<{ scope: Locator; apply: () => 
 async function pickOneDealer(page: Page, scope: Locator, name: string) {
   // El combo de dealers dice «All Dealers», «N dealers» o el nombre del dealer elegido.
   const combo = scope.getByRole('combobox').filter({ hasText: new RegExp(`dealers|${name}`, 'i') }).first()
+  // El texto se lee antes de abrir: dentro de la hoja de filtros el combo abre en modo modal y lo de atrás queda
+  // fuera del árbol accesible (plans/plan-buenas-practicas-v0, 5.5).
+  const allChecked = (await combo.innerText()).includes('All Dealers')
   await combo.click()
   const search = page.locator('[cmdk-input]').last()
   // Si están todos tildados, «All Dealers» los destilda; después se tilda el dealer.
   const all = page.getByRole('button', { name: /^All Dealers$/ })
-  if ((await all.isVisible().catch(() => false)) && (await combo.innerText()).includes('All Dealers')) await all.click()
+  if (allChecked && (await all.isVisible().catch(() => false))) await all.click()
   await search.fill(name)
   await page.getByRole('option', { name, exact: true }).click()
   await page.keyboard.press('Escape')

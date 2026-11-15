@@ -185,12 +185,19 @@ header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />
 meta: { pin: 'left' }    // o 'right'
 ```
 
-**En celular (menos de 768 px) ninguna columna va fija.** Una columna fija en 375 px tapa las demás y no deja leer
-la tabla. Con `useIsMobile()` (`hooks/use-mobile.ts`) la columna va sin `pin` y el `columnPinning` va vacío
-(`{ left: [], right: [] }`, memoizado: un objeto nuevo en cada render reinicia el pinning sin parar). Ejemplo:
-`components/dashboard/production-dealer-table.tsx`. En celular el texto de esa columna tampoco se corta con «…»: va
-en varias líneas (`whitespace-normal break-words`) para que se lea el nombre entero. *(Regla de Ignacio, 27/10/2026:
-Production vs Goal en celular, la columna Dealer tapaba Goal y Attainment, y después los nombres largos no se leían.)* Las tablas que hoy fijan columnas en celular se corrigen en su propio plan.
+**En celular (menos de 768 px) ninguna columna va fija y ningún texto se corta: lo hace el `DataTable` solo.** Una
+columna fija en 375 px tapa las demás y no deja leer la tabla. El componente usa `useIsMobile()` y en celular pasa
+`columnPinning` vacío (la constante `NO_PINNING`), y a toda celda de texto (no `meta.numeric`) le suma
+`MOBILE_WRAP_CELL`: va en varias líneas, también el `truncate` que la pantalla ponga adentro. **Las pantallas declaran
+`pin` y `truncate` sin mirar el ancho**: nada de `pin: isMobile ? …` ni `isMobile ? { left: [] } : …`. Si un
+`columnPinning` se pasa a mano, es una constante del módulo (un objeto nuevo en cada render reinicia el pinning sin
+parar). Para el texto que una pantalla dibuja **fuera** de las celdas del `DataTable` (una sub-tabla propia en
+`renderSubComponent`) está `MOBILE_WRAP_TEXT` de `@/components/shared/data-table`. Control: e2e
+`e2e/data-table-mobile.spec.ts` (375 px, Invoices, Dashboard, Production vs Goal y Role Templates: nada fijo de costado,
+nada con «…» cortado; en compu Invoices sigue fija) y `lib/ui-guards.test.ts` (ninguna pantalla decide el pin por el
+ancho). *(Regla de Ignacio, 27/10/2026: Production vs Goal en celular, la columna Dealer tapaba Goal y Attainment, y
+después los nombres largos no se leían. 15/11/2026, plans/plan-buenas-practicas-v0 5.2: cada pantalla lo corregía por
+su cuenta y Invoices, Punch Report agrupado, el Dashboard y Role Templates seguían fijando; pasó al componente.)*
 
 En compu, `truncate` va en un elemento `block` (o en un hijo de `flex` con `min-w-0`): sobre un `span` en línea no
 pone «…» y el nombre se corta en seco contra la columna siguiente. Se copia la celda de `production-dealer-table.tsx`

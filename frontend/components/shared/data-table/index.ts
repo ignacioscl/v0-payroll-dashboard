@@ -21,6 +21,7 @@ export {
   NUMBER_OPERATOR_LABELS,
   DATE_OPERATOR_LABELS,
   DATA_TABLE_PAGE_SIZE_ALL,
+  MOBILE_WRAP_TEXT,
 } from './data-table-helpers'
 
 export {

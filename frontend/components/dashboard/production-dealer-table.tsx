@@ -38,6 +38,8 @@ function AttainmentBadge({ pct }: { pct: number }) {
   )
 }
 
+const DEALER_PINNING = { left: ['dealer'] }
+
 type ProductionDealerTableProps = {
   data?: ProductionDealerRow[]
   loading?: boolean
@@ -55,10 +57,8 @@ export function ProductionDealerTable({
 }: ProductionDealerTableProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
-  const columnPinning = React.useMemo(
-    () => (isMobile ? { left: [], right: [] } : { left: ['dealer'] }),
-    [isMobile],
-  )
+  // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
+  const columnPinning = DEALER_PINNING
   const rows = data ?? []
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'attainmentPct', desc: true },
@@ -73,23 +73,17 @@ export function ProductionDealerTable({
           <DataTableColumnHeader column={column} title={t('dealer.label')} />
         ),
         cell: ({ row }) =>
-          // On a phone the whole name wraps instead of «…» (rule data-table).
           removedIds?.has(row.original.dealerId) ? (
             <span className={cn('flex min-w-0 gap-2', isMobile ? 'flex-wrap items-start' : 'items-center')}>
-              <span className={cn('font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
-                {row.original.dealer}
-              </span>
+              <span className="truncate font-medium">{row.original.dealer}</span>
               <RemovedDealerBadge />
             </span>
           ) : (
-            <span className={cn('block font-medium', isMobile ? 'whitespace-normal break-words' : 'truncate')}>
-              {row.original.dealer}
-            </span>
+            <span className="block truncate font-medium">{row.original.dealer}</span>
           ),
         meta: {
           label: t('dealer.label'),
-          // No fixed columns on a phone: they cover the others (rule data-table).
-          pin: isMobile ? undefined : 'left',
+          pin: 'left',
         } satisfies DataTableColumnMeta<ProductionDealerRow>,
       },
       {

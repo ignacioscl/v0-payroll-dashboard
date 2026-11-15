@@ -28,7 +28,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useDeleteInvoiceStatements } from '@/hooks/use-invoice-statement-mutations'
@@ -149,7 +148,6 @@ export function InvoiceRowActions({
 
   return (
     <>
-      <TooltipProvider delayDuration={250}>
         <div className="flex items-center justify-end gap-1">
           {hasPresence ? (
             <div
@@ -302,7 +300,6 @@ export function InvoiceRowActions({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </TooltipProvider>
 
       <InvoiceStatementLogDialog
         open={logOpen}

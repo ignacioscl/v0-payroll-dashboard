@@ -34,11 +34,12 @@ import {
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { AppLink } from '@/components/shared/app-link'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { activateBoxLink, ROW_LINK_SELECTOR } from '@/lib/navigation/activate-box-link'
 
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
-import { DATA_TABLE_PAGE_SIZE_ALL, type ColumnFilterConfig } from './data-table-helpers'
+import { DATA_TABLE_PAGE_SIZE_ALL, MOBILE_WRAP_CELL, type ColumnFilterConfig } from './data-table-helpers'
 import { scrollElementBelowNav, DASHBOARD_NAV_HEIGHT } from '@/lib/scroll/scroll-table-to-viewport'
 
 /* -------------------------------------------------------------------------- */
@@ -208,6 +209,9 @@ function buildInitialPinning<TData, TValue>(
 }
 
 type PinSide = false | 'left' | 'right'
+
+/** Estado sin columnas fijas para celular; constante para no crear un objeto nuevo en cada render. */
+const NO_PINNING: ColumnPinningState = { left: [], right: [] }
 
 /**
  * Single source of truth for column geometry, computed once per render from
@@ -606,6 +610,8 @@ export function DataTable<TData, TValue = unknown>({
   }, [tableId, columnVisibility])
 
   /* ---------- Pinning (initial from meta.pin) ---------- */
+  // Debajo de 768 px no se fija nada; las pantallas declaran `pin` sin mirar el ancho.
+  const isMobile = useIsMobile()
   const initialPinning = React.useMemo(
     () => columnPinning ?? buildInitialPinning(columns),
     [columnPinning, columns],
@@ -711,7 +717,8 @@ export function DataTable<TData, TValue = unknown>({
       rowSelection: rowSelection ?? localSelection,
       expanded,
       pagination: paginationState,
-      columnPinning: internalPinning,
+      // En celular ninguna columna queda fija: la tabla se mueve entera (regla global «Tablas en celular»).
+      columnPinning: isMobile ? NO_PINNING : internalPinning,
       columnSizing,
     },
     enableRowSelection,
@@ -1076,6 +1083,9 @@ export function DataTable<TData, TValue = unknown>({
               }}
               className={cn(
                 'box-border overflow-hidden px-3 text-xs whitespace-nowrap',
+                // En celular el texto va en varias líneas en vez de cortarse con «…» (también el `truncate`
+                // que ponga la pantalla). Los números no cambian.
+                !meta?.numeric && MOBILE_WRAP_CELL,
                 rowPadding,
                 meta?.mono && 'font-mono',
                 meta?.numeric && 'text-right tabular-nums',
@@ -1171,7 +1181,7 @@ export function DataTable<TData, TValue = unknown>({
         onScroll={onTopScroll}
         aria-hidden="true"
         className={cn(
-          'sticky top-16 z-20 w-full overflow-x-auto overflow-y-hidden border-b border-border bg-card',
+          'sticky top-16 z-(--z-sticky) w-full overflow-x-auto overflow-y-hidden border-b border-border bg-card',
           // Reserve enough vertical space for any browser's horizontal
           // scrollbar; on macOS the bar is overlay/auto-hiding, so the strip
           // looks empty most of the time which is fine.

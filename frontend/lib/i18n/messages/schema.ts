@@ -773,6 +773,8 @@ export interface Messages {
     exportSuccess: string
     exportInProgress: string
     clearSearch: string
+    showPassword: string
+    hidePassword: string
     clearAll: string
     checkAll: string
     checkAllFiltered: string
@@ -1770,7 +1772,6 @@ export interface Messages {
     ofTotal: string
     clearSelection: string
     deleteItem: string
-    clearSearch: string
     navigateHint: string
   }
   /** Expenses in Pro (plans/plan-expenses-pro/PLAN.md T9: the English texts are literal). */

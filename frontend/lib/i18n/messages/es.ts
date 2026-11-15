@@ -794,6 +794,8 @@ export const es: Messages = {
     exportSuccess: 'Exportados {count} registro(s)',
     exportInProgress: 'Exportación en curso',
     clearSearch: 'Limpiar búsqueda',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
     clearAll: 'Limpiar todo',
     checkAll: 'Seleccionar todos',
     checkAllFiltered: 'Seleccionar todos los filtrados',
@@ -1851,7 +1853,6 @@ export const es: Messages = {
     ofTotal: ' de {total}',
     clearSelection: 'Limpiar selección',
     deleteItem: 'Borrar ítem guardado',
-    clearSearch: 'Limpiar búsqueda',
     navigateHint: '↑ ↓ para navegar ↵ para seleccionar',
   },
   expenses: {

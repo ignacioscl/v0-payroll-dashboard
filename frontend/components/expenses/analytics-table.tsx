@@ -7,7 +7,6 @@ import { PieChart } from 'lucide-react'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { DataTable, DataTableColumnHeader, type DataTableColumnMeta } from '@/components/shared/data-table'
 import { ServerXlsxExportButton } from '@/components/shared/server-xlsx-export-button'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { fmtAmount } from '@/lib/expenses/expense-format'
 import { toCents } from '@/lib/expenses/expense-rules'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -39,9 +38,9 @@ export function AnalyticsTable({
   removedIds?: ReadonlySet<number>
 }) {
   const { t } = useTranslation()
-  const isMobile = useIsMobile()
   const columnPinning = React.useMemo(() => ({ left: [], right: [] }), [])
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular la tabla no corta el texto (DataTable, plans/plan-buenas-practicas-v0, 5.2).
+  const wrap = 'truncate'
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'total', desc: true }])
   const rows = React.useMemo(() => data?.rows ?? [], [data])
   const total = data?.total ?? '0'

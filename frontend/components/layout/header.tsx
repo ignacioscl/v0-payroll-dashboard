@@ -135,7 +135,7 @@ export function Header() {
     <>
       <header
         className={cn(
-          'fixed right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur-xl transition-all duration-200 ease-in-out',
+          'fixed right-0 top-0 z-(--z-header) flex h-16 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur-xl transition-all duration-200 ease-in-out',
           // Mobile: full width. Desktop: offset by sidebar.
           'left-0',
           collapsed ? 'md:left-[72px]' : 'md:left-[260px]'

@@ -2,9 +2,9 @@
 
 import * as React from 'react'
 import type { Table } from '@tanstack/react-table'
-import { Filter, Loader2, Maximize2, Search, X } from 'lucide-react'
+import { Filter, Loader2, Maximize2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SearchInput } from '@/components/shared/search-input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -168,25 +168,13 @@ export function DataTableToolbar<TData>({
         {enableGlobalFilter && (
           <>
             <Separator orientation="vertical" className="mx-0.5 h-4" />
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={globalFilter}
-                onChange={(e) => table.setGlobalFilter(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-7 w-[180px] px-2 pl-7 text-[11px] sm:w-[240px]"
-              />
-              {globalFilter && (
-                <button
-                  type="button"
-                  onClick={() => table.setGlobalFilter('')}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label={t('common.clearSearch')}
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
+            <SearchInput
+              value={globalFilter}
+              onValueChange={(value) => table.setGlobalFilter(value)}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              inputClassName="h-7 w-[180px] px-2 pl-7 pr-7 text-[11px] sm:w-[240px]"
+            />
           </>
         )}
 

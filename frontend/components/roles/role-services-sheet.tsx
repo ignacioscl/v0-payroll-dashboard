@@ -1,13 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { ArrowRight, Search, TriangleAlert } from 'lucide-react'
+import { ArrowRight, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
-import { Input } from '@/components/ui/input'
+import { SearchInput } from '@/components/shared/search-input'
 import { Label } from '@/components/ui/label'
 import {
   Sheet,
@@ -318,20 +318,14 @@ export function RoleServicesSheet({ role, open, onOpenChange }: RoleServicesShee
               )}
             </div>
           </div>
-          <div className="relative">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={search}
-              className="pl-9"
-              placeholder={t('roles.servicesSearch')}
-              aria-label={t('roles.servicesSearch')}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          <SearchInput
+            value={search}
+            iconClassName="left-3 size-4"
+            inputClassName="pl-9"
+            placeholder={t('roles.servicesSearch')}
+            aria-label={t('roles.servicesSearch')}
+            onValueChange={setSearch}
+          />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4">{body}</div>
