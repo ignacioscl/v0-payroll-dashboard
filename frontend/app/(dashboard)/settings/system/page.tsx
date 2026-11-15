@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { AppLink } from '@/components/shared/app-link'
 import { Settings2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -159,9 +159,9 @@ export default function SystemConfigPage() {
         ) : null}
       </Tabs>
 
-      <Link href="/" className="text-sm text-primary hover:underline">
+      <AppLink href="/" className="text-sm text-primary hover:underline">
         {t('systemConfig.backToDashboard')}
-      </Link>
+      </AppLink>
     </div>
   )
 }

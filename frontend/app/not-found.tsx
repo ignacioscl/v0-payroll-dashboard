@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { AppLink } from '@/components/shared/app-link'
 import { FileQuestion, LayoutDashboard } from 'lucide-react'
 
 import { PageState } from '@/components/layout/page-state'
@@ -19,10 +19,10 @@ export default function NotFound() {
         message={t('notFound.body')}
         action={
           <Button asChild variant="outline">
-            <Link href="/">
+            <AppLink href="/">
               <LayoutDashboard aria-hidden />
               {t('systemConfig.backToDashboard')}
-            </Link>
+            </AppLink>
           </Button>
         }
       />

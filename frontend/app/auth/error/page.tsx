@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { AppLink } from '@/components/shared/app-link'
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle } from 'lucide-react'
@@ -25,7 +25,7 @@ function AuthErrorContent() {
         <p className="text-sm text-muted-foreground">{t('authError.body')}</p>
         <p className="text-xs font-mono text-muted-foreground break-all">{reason}</p>
         <Button asChild variant="outline" className="w-full">
-          <Link href="/">{t('authError.tryAgain')}</Link>
+          <AppLink href="/">{t('authError.tryAgain')}</AppLink>
         </Button>
       </CardContent>
     </Card>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Calculator, Hash, Plus, Receipt, Tag } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
+import { ContentSkeleton } from '@/components/layout/content-skeleton'
 import { CatalogCombobox, type CatalogChoice } from '@/components/expenses/catalog-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
@@ -298,7 +299,7 @@ function ExpensesListPage() {
 
 export default function ExpensesPage() {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<ContentSkeleton />}>
       <ExpensesListPage />
     </React.Suspense>
   )

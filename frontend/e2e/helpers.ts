@@ -72,3 +72,26 @@ export async function pickDatePreset(page: Page, scope: Locator, preset: string)
     await expect(picker).toHaveCount(0)
   })
 }
+
+/**
+ * All Dealers y un atajo de fechas («Last 30 days», «Last Month»…) en el encabezado (compu) o en la hoja de filtros
+ * (celular). Lo usan expenses.spec.ts y box-links.spec.ts.
+ */
+export async function pickAllDealersAndDatePreset(page: Page, preset: string) {
+  const openFilters = page.getByRole('button', { name: 'Open filters' })
+  const mobile = await openFilters.isVisible()
+  if (mobile) await openFilters.click()
+  const scope = mobile ? page.getByRole('dialog') : page.locator('header')
+  const dealers = scope.getByRole('combobox').filter({ hasText: /Dealers/ })
+  await expect(dealers).toBeVisible()
+  if (!(await dealers.innerText()).includes('All Dealers')) {
+    await dealers.click()
+    await page.getByRole('button', { name: /^All Dealers$/ }).click()
+    await page.keyboard.press('Escape')
+  }
+  await pickDatePreset(page, scope, preset)
+  if (mobile) {
+    await page.getByRole('dialog').getByRole('button', { name: 'Apply', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+  }
+}

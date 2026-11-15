@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { srsFetch } from '@/lib/srs-fetch'
 import type { SrsMeResponse } from '@/lib/auth/types'
+import { toMeQueryData } from '@/lib/auth/me-query'
 import { proxyErrorText, readUpstreamJson, UPSTREAM_UNEXPECTED_MESSAGE } from '@/lib/upstream-error'
 import { SRS_ME_TIMEOUT_MS } from '@/lib/upstream-timeouts'
 
@@ -32,12 +33,7 @@ export async function GET() {
       )
     }
 
-    return NextResponse.json({
-      authenticated: true,
-      user: json.data.user,
-      permissionIds: json.data.permissionIds ?? [],
-      permissions: json.data.permissions ?? [],
-    })
+    return NextResponse.json({ authenticated: true, ...toMeQueryData(json.data) })
   } catch {
     // El detalle quedó en el log del servidor (readUpstreamJson); al navegador, el texto de D1.
     return NextResponse.json({ authenticated: false, error: UPSTREAM_UNEXPECTED_MESSAGE }, { status: 502 })

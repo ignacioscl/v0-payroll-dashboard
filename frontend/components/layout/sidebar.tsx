@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { AppLink } from '@/components/shared/app-link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useSidebar } from '@/lib/sidebar-context'
@@ -315,14 +315,14 @@ function SidebarInner({
             // Icon rail: parent link + optional child icon links (no accordion labels)
             if (effectiveCollapsed) {
               const linkContent = (
-                <Link
+                <AppLink
                   href={item.href}
                   onClick={onNavigate}
                   className={itemClassName}
                 >
                   {activeBar}
                   {iconEl}
-                </Link>
+                </AppLink>
               )
 
               return (
@@ -339,7 +339,7 @@ function SidebarInner({
                     return (
                       <Tooltip key={child.href}>
                         <TooltipTrigger asChild>
-                          <Link
+                          <AppLink
                             href={child.href}
                             onClick={onNavigate}
                             className={cn(
@@ -350,7 +350,7 @@ function SidebarInner({
                             )}
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
-                          </Link>
+                          </AppLink>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="font-medium">
                           {child.name}
@@ -364,7 +364,7 @@ function SidebarInner({
 
             if (!hasChildren) {
               return (
-                <Link
+                <AppLink
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
@@ -373,7 +373,7 @@ function SidebarInner({
                   {activeBar}
                   {iconEl}
                   {labelEl}
-                </Link>
+                </AppLink>
               )
             }
 
@@ -410,7 +410,7 @@ function SidebarInner({
                           const thisChildActive = pathname === child.href
                           const ChildIcon = child.icon
                           return (
-                            <Link
+                            <AppLink
                               key={child.href}
                               href={child.href}
                               onClick={onNavigate}
@@ -423,7 +423,7 @@ function SidebarInner({
                             >
                               <ChildIcon className="h-4 w-4 shrink-0" />
                               <span className="overflow-hidden whitespace-nowrap">{child.name}</span>
-                            </Link>
+                            </AppLink>
                           )
                         })}
                       </div>
@@ -489,10 +489,10 @@ function SidebarInner({
             </DropdownMenuItem>
             {user?.isSystemAdmin && (
               <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                <Link href="/settings/system" onClick={onNavigate}>
+                <AppLink href="/settings/system" onClick={onNavigate}>
                   <Settings2 className="h-4 w-4" />
                   <span>{t('sidebar.settings')}</span>
-                </Link>
+                </AppLink>
               </DropdownMenuItem>
             )}
             {/* Volver al legacy y cerrar sesión cambian algo: van por POST (forms ocultos de abajo), nunca por un

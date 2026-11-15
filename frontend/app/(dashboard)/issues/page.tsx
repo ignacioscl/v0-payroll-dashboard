@@ -9,6 +9,9 @@ import { GroupedIssuesDataTable } from '@/components/ttk/grouped-issues-table'
 import { PunchReportFilterPanel } from '@/components/ttk/punch-report-filter-panel'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { PageHeading } from '@/components/layout/page-heading'
+import { ContentSkeleton } from '@/components/layout/content-skeleton'
+import { HeaderActions } from '@/components/layout/header-actions'
+import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
@@ -152,6 +155,9 @@ function IssuesPageContent() {
 
   return (
     <div className="space-y-8">
+      <HeaderActions>
+        <IssuesAddPunchHeaderButton />
+      </HeaderActions>
       <PageHeading
         title={t('punch.report')}
         subtitle={t('punch.reportSubtitle')}
@@ -315,7 +321,7 @@ function IssuesPageContent() {
  */
 export default function IssuesPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ContentSkeleton />}>
       <IssuesPageContent />
     </Suspense>
   )

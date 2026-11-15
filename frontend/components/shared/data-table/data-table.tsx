@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { AppLink } from '@/components/shared/app-link'
+import { activateBoxLink, ROW_LINK_SELECTOR } from '@/lib/navigation/activate-box-link'
 
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTablePagination } from './data-table-pagination'
@@ -406,7 +408,21 @@ export interface DataTableProps<TData, TValue = unknown> {
   getRowId?: (row: TData, index: number) => string
 
   // ---------- Interactivity ----------
+  /** Click on a row that opens something on this screen (a modal, a sheet). To go to another screen, `rowLink`. */
   onRowClick?: (row: TData) => void
+
+  /**
+   * The row leads to another screen: the content of the link cell (`rowLinkColumnId`, or the first visible cell) goes
+   * inside a real `<AppLink>` (same look, plus the underline on hover) and a click anywhere else on the row goes
+   * through it (`activateBoxLink`): Ctrl/Cmd/Shift or the middle button open another tab, a click on an own button or
+   * link or with selected text does nothing. `onNavigate` runs only for a same-tab navigation (the `onNavigate` of
+   * `<Link>`), so filters set there do not leak into the current tab on Ctrl/Cmd + click
+   * (plans/plan-buenas-practicas-v0, 4.4). Return `null` for a row that does not navigate; with a link, it wins over
+   * `onRowClick`.
+   */
+  rowLink?: (row: TData) => { href: string; onNavigate?: () => void } | null
+  /** Column whose cell holds the row link. Defaults to the first visible column. */
+  rowLinkColumnId?: string
 
   /**
    * Extra classes per row, to mark a subset (e.g. the invoices that only partly fall in the
@@ -542,6 +558,8 @@ export function DataTable<TData, TValue = unknown>({
   onRowSelectionChange,
   getRowId,
   onRowClick,
+  rowLink,
+  rowLinkColumnId,
   getRowClassName,
   renderSubComponent,
   getRowCanExpand,
@@ -999,21 +1017,32 @@ export function DataTable<TData, TValue = unknown>({
   ) => {
     const baseBg = rowBg(index)
     const isExpanded = renderSubComponent ? row.getIsExpanded() : false
+    const link = rowLink?.(row.original) ?? null
+    const visibleCells = row.getVisibleCells()
+    const linkCellId = link
+      ? (visibleCells.find((c) => c.column.id === rowLinkColumnId) ?? visibleCells[0])?.id
+      : undefined
+    const onLinkRowClick = link
+      ? (e: React.MouseEvent<HTMLTableRowElement>) => {
+          activateBoxLink(e, ROW_LINK_SELECTOR)
+        }
+      : undefined
     return (
       <React.Fragment key={row.id}>
       <TableRow
         {...measureProps}
         data-state={row.getIsSelected() ? 'selected' : undefined}
-        onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+        onClick={onLinkRowClick ?? (onRowClick ? () => onRowClick(row.original) : undefined)}
+        onAuxClick={onLinkRowClick}
         className={cn(
           'border-b border-border/50 transition-colors',
           baseBg,
           getRowClassName?.(row.original, index),
           isExpanded && 'bg-accent/30',
-          onRowClick && 'cursor-pointer hover:bg-accent/40',
+          (link || onRowClick) && 'cursor-pointer hover:bg-accent/40',
         )}
       >
-        {row.getVisibleCells().map((cell) => {
+        {visibleCells.map((cell) => {
           const meta = cell.column.columnDef.meta as
             | DataTableColumnMeta<TData>
             | undefined
@@ -1053,7 +1082,18 @@ export function DataTable<TData, TValue = unknown>({
                 meta?.cellClassName,
               )}
             >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              {link && cell.id === linkCellId ? (
+                <AppLink
+                  href={link.href}
+                  onNavigate={link.onNavigate}
+                  data-row-link=""
+                  className="block min-w-0 rounded-sm hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </AppLink>
+              ) : (
+                flexRender(cell.column.columnDef.cell, cell.getContext())
+              )}
             </TableCell>
           )
         })}

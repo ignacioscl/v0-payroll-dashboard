@@ -11,13 +11,14 @@ import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { IncomeYearFilter } from '@/components/filters/income-year-filter'
 import { MonthFilter } from '@/components/filters/month-filter'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
-import { IssuesAddPunchHeaderButton } from '@/components/ttk/issues-add-punch-header-button'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 import { resolveOpenRange, type InvoiceDateMode } from '@/lib/filters/date-range-open-ends'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 import { NotificationsPopover } from './notifications-popover'
+import { HeaderActionsSlot } from './header-actions'
+import { getHeaderFilters } from '@/lib/header-filters'
 import {
   Sheet,
   SheetContent,
@@ -96,17 +97,8 @@ export function Header() {
     [setInvoiceDateFrom, setInvoiceDateTo, setInvoiceDateMode],
   )
 
-  const isInvoicesPage = pathname === '/billing/invoices' || pathname.startsWith('/billing/invoices/')
-  const isRolesPage = pathname === '/roles' || pathname.startsWith('/roles/')
-  // Expenses has its own «Assigned to» / «Created by» combos (Nest endpoint): the punch employee
-  // search of the header does not apply there. Dealers and date range do (list, analytics).
-  const isExpensesPage = pathname === '/expenses' || pathname.startsWith('/expenses/')
-  const isIssuesPage = pathname === '/issues' || pathname.startsWith('/issues/')
-  // Income by Dealer: switch «By year» que cambia el calendario por un combo de años.
-  const isIncomeByDealerPage = pathname === '/reports/income-by-dealer'
-  // Monthly Closing y Window Tint Closing: el combo de mes en vez del calendario (MC §5.4.1).
-  const isClosingPage = pathname === '/reports/monthly-closing' || pathname === '/reports/window-tint-closing'
-  const showDateFilter = !isRolesPage
+  // Qué filtros van en cada pantalla: una tabla por ruta (lib/header-filters.ts; plans/plan-buenas-practicas-v0, 4.7).
+  const filters = getHeaderFilters(pathname)
   // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
   // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
   // derecha. Vive en cada pantalla, junto a lo que gobierna (ErrorStatusToggle).
@@ -114,8 +106,8 @@ export function Header() {
   // Count active filters for mobile badge
   const activeFilterCount =
     (selectedDealers.length > 0 ? 1 : 0) +
-    (showDateFilter
-      ? isInvoicesPage
+    (filters.date
+      ? filters.date === 'invoice'
         ? invoiceIgnorePeriod || invoiceIgnorePeriodLocked || invoiceRange?.from
           ? 1
           : 0
@@ -160,9 +152,9 @@ export function Header() {
 
         {/* Desktop filters */}
         <div className="hidden md:flex min-w-0 flex-1 items-center gap-2">
-          {!isExpensesPage ? <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" /> : null}
+          {filters.search ? <EmployeeSearchInput className="w-56 shrink-0 lg:w-64" /> : null}
 
-          {isInvoicesPage ? (
+          {filters.district ? (
             <DistrictMultiSelect className="w-[170px] shrink-0" />
           ) : null}
 
@@ -174,18 +166,18 @@ export function Header() {
             className="w-[200px] shrink-0"
           />
 
-          {showDateFilter ? (
-            isInvoicesPage ? (
+          {filters.date ? (
+            filters.date === 'invoice' ? (
               <DateRangePicker {...invoiceRangeProps} className="shrink-0" />
-            ) : isIncomeByDealerPage ? (
+            ) : filters.date === 'year' ? (
               <IncomeYearFilter className="shrink-0" />
-            ) : isClosingPage ? (
+            ) : filters.date === 'month' ? (
               <MonthFilter className="shrink-0" />
             ) : (
               <DateRangePicker
                 value={dateRange}
                 onChange={setDateRange}
-                maxRangeYears={isIssuesPage ? 1 : undefined}
+                maxRangeYears={filters.maxRangeYears}
               />
             )
           ) : null}
@@ -194,7 +186,7 @@ export function Header() {
 
         {/* Right side */}
         <div className="flex shrink-0 items-center gap-2">
-          {isIssuesPage ? <IssuesAddPunchHeaderButton /> : null}
+          <HeaderActionsSlot />
 
           {/* Mobile: filter button */}
           <button
@@ -223,7 +215,7 @@ export function Header() {
 
           <div className="flex flex-col gap-4 px-4">
             {/* Search */}
-            {!isExpensesPage ? (
+            {filters.search ? (
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-muted-foreground">{t('common.search')}</span>
                 <EmployeeSearchInput className="w-full" />
@@ -243,22 +235,22 @@ export function Header() {
             </div>
 
             {/* Date range / invoice period — hidden on Roles */}
-            {showDateFilter ? (
+            {filters.date ? (
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-muted-foreground">
-                  {isClosingPage ? t('monthlyClosing.month') : t('filters.dateRange')}
+                  {filters.date === 'month' ? t('monthlyClosing.month') : t('filters.dateRange')}
                 </span>
-                {isInvoicesPage ? (
+                {filters.date === 'invoice' ? (
                   <DateRangePicker {...invoiceRangeProps} className="w-full min-w-0" />
-                ) : isIncomeByDealerPage ? (
+                ) : filters.date === 'year' ? (
                   <IncomeYearFilter />
-                ) : isClosingPage ? (
+                ) : filters.date === 'month' ? (
                   <MonthFilter className="w-full" />
                 ) : (
                   <DateRangePicker
                     value={dateRange}
                     onChange={setDateRange}
-                    maxRangeYears={isIssuesPage ? 1 : undefined}
+                    maxRangeYears={filters.maxRangeYears}
                   />
                 )}
               </div>

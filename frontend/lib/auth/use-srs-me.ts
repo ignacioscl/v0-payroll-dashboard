@@ -5,8 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useApiRequest } from '@/lib/hooks/use-api-request'
 import { UrlEnum } from '@/types/enum-url'
 import type { SrsMeApiResponse, SrsMeUser, SrsPermission } from './types'
-
-export const meQueryKey = ['auth', 'me'] as const
+import { meQueryKey, toMeQueryData } from './me-query'
 
 export function useSrsMe() {
   const apiRequest = useApiRequest<SrsMeUser, undefined, SrsMeApiResponse>(
@@ -20,11 +19,7 @@ export function useSrsMe() {
       if (!json.authenticated || !json.user) {
         return null
       }
-      return {
-        user: json.user,
-        permissionIds: json.permissionIds ?? [],
-        permissions: json.permissions ?? [],
-      }
+      return toMeQueryData({ user: json.user, permissionIds: json.permissionIds, permissions: json.permissions })
     },
     retry: false,
     staleTime: 30_000,

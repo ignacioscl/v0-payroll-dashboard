@@ -32,14 +32,20 @@ test.describe('seguridad y errores', () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow')
   })
 
-  test('una dirección que no existe muestra «Page not found» y vuelve al panel', async ({ page }) => {
+  test('sin sesión, una dirección que no existe lleva al login (el proxy no sabe qué pantallas hay)', async ({ page }) => {
+    await page.goto('/esta-pagina-no-existe')
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
+  test('con sesión, una dirección que no existe muestra «Page not found» y vuelve al panel', async ({ page }) => {
+    test.skip(E2E_MISSING_USER, 'Set E2E_USER and E2E_PASSWORD in frontend/.env.e2e.local')
+    await login(page)
     const res = await page.goto('/esta-pagina-no-existe')
     expect(res?.status()).toBe(404)
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
     await expect(page.getByText('The address you opened does not exist.')).toBeVisible()
     await noHorizontalScroll(page)
     await page.getByRole('link', { name: 'Back to dashboard' }).click()
-    // Sin sesión, el panel manda al login; con sesión, al Dashboard. En los dos casos sale de la 404.
     await expect(page).not.toHaveURL(/esta-pagina-no-existe/)
   })
 

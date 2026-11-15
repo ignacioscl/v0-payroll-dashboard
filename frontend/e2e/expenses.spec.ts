@@ -19,7 +19,7 @@ import {
   login,
   noHorizontalScroll,
   openMobileMenuIfNeeded,
-  pickDatePreset,
+  pickAllDealersAndDatePreset,
 } from './helpers'
 
 /** «Show deleted» vive en el panel de filtros, que arranca cerrado. */
@@ -63,26 +63,6 @@ async function pickDealers(page: Page, count: number, trigger?: Locator): Promis
   }
   await page.keyboard.press('Escape')
   return names
-}
-
-/** All Dealers y «Last 30 days» en el encabezado (compu) o en la hoja de filtros (celular). */
-async function pickAllDealersAndLast30Days(page: Page) {
-  const openFilters = page.getByRole('button', { name: 'Open filters' })
-  const mobile = await openFilters.isVisible()
-  if (mobile) await openFilters.click()
-  const scope = mobile ? page.getByRole('dialog') : page.locator('header')
-  const dealers = scope.getByRole('combobox').filter({ hasText: /Dealers/ })
-  await expect(dealers).toBeVisible()
-  if (!(await dealers.innerText()).includes('All Dealers')) {
-    await dealers.click()
-    await page.getByRole('button', { name: /^All Dealers$/ }).click()
-    await page.keyboard.press('Escape')
-  }
-  await pickDatePreset(page, scope, 'Last 30 days')
-  if (mobile) {
-    await page.getByRole('dialog').getByRole('button', { name: 'Apply', exact: true }).click()
-    await expect(page.getByRole('dialog')).toBeHidden()
-  }
 }
 
 test.describe.serial('Expenses — full path (F7)', () => {
@@ -268,7 +248,7 @@ test.describe.serial('Expenses — full path (F7)', () => {
     // Analytics lee los dealers y las fechas del encabezado: All Dealers y «Last 30 days», que incluye hoy (la fecha
     // de los gastos que crea este archivo). Sin eso el test dependía de lo que hubiera quedado en la cookie y del día.
     // Las fechas no se guardan: de acá en adelante se navega por el menú, sin recargar.
-    await pickAllDealersAndLast30Days(page)
+    await pickAllDealersAndDatePreset(page, 'Last 30 days')
     const listTotal = (await page.getByText('Total Expenses').locator('..').locator('..').innerText()).trim()
     await openMobileMenuIfNeeded(page)
     const analyticsLink = page.getByRole('link', { name: 'Analytics', exact: true })

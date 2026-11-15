@@ -1161,6 +1161,7 @@ export interface Messages {
     denied: string
     needTtk: string
     noDashboardAccess: string
+    noScreenAccess: string
   }
   layout: {
     openMenu: string

@@ -1170,6 +1170,7 @@ export const en: Messages = {
     denied: 'Access denied',
     needTtk: 'You need Time Tracking (Daily Punch) permissions to access this page.',
     noDashboardAccess: 'You do not have access to the payroll dashboard with your current role.',
+    noScreenAccess: 'You do not have access to this screen with your current role.',
   },
   layout: {
     openMenu: 'Open menu',

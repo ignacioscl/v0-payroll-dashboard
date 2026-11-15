@@ -105,7 +105,9 @@ PHP mock: `public/php/api/payroll/datatable-mock.php`.
   getRowId={(r) => String(r.id)}
 
   // --- Click handlers ---
-  onRowClick={(row) => router.push(...)}
+  rowLink={(row) => ({ href: `/expenses?id=${row.id}`, onNavigate: () => setFilters(row) })}  // ir a otra pantalla
+  rowLinkColumnId="name"       // celda que lleva el enlace (default: la primera visible)
+  onRowClick={(row) => openDetail(row)}  // abrir un modal o una hoja en esta pantalla
 
   // --- Toolbar ---
   enableViewOptions
@@ -123,6 +125,27 @@ PHP mock: `public/php/api/payroll/datatable-mock.php`.
   stickyHeader                 // default true
 />
 ```
+
+## Fila que lleva a otra pantalla: `rowLink`, no `onRowClick`
+
+**Para ir a otra pantalla, `rowLink`; `onRowClick` es para abrir un modal** (o una hoja) en la misma pantalla. Nunca
+`onRowClick={(row) => router.push(...)}`: sin enlace no hay precarga y Ctrl/Cmd + clic no abre otra pestaña (regla
+global «Cambiar de pantalla es instantáneo», punto 1).
+
+- Con `rowLink`, el contenido de la celda del enlace (`rowLinkColumnId`, o la primera visible) va dentro de un
+  `<AppLink data-row-link>` con el mismo aspecto (solo suma el subrayado al pasar), y el clic en el resto de la fila
+  pasa por él con `activateBoxLink` (`lib/navigation/activate-box-link.ts`): clic normal → misma pestaña; Ctrl, Cmd,
+  Shift o el botón del medio → otra pestaña; sobre un botón o enlace propio, o con texto seleccionado → nada.
+- Los filtros que la pantalla de destino lee de memoria se fijan en **`onNavigate`**, no en un `onClick`: `onNavigate`
+  corre solo cuando se navega en la misma pestaña, así Ctrl/Cmd + clic no cambia los filtros de la pestaña actual
+  (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.md`, `onNavigate`). Si los filtros viajan
+  en la dirección (`/expenses?idCategory=…`), llegan también a la otra pestaña.
+- `rowLink` devuelve `null` para una fila que no navega (p. ej. sin permiso: la fila tampoco parece clickeable).
+- La celda del enlace no puede tener un botón o un enlace adentro (HTML no permite controles dentro de un `<a>`).
+- Ejemplos: `components/expenses/analytics-table.tsx` (filtros en la dirección) y
+  `components/dashboard/dealers-ranking-dialog.tsx` (filtros en `onNavigate`, enlace en la columna del dealer). Lo
+  mismo en tarjetas: `KPICard` con `href` y `onNavigate`. Lo prueba `e2e/box-links.spec.ts`.
+  *(plans/plan-buenas-practicas-v0, 4.4, 14/11/2026: cuatro cajas navegaban con `router.push` en el clic.)*
 
 ## Column meta (`DataTableColumnMeta`)
 

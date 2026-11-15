@@ -7,7 +7,7 @@
  * - E2E_USER_NO_MODULES: de una empresa con los dos checks apagados (p. ej. Mooi), con los mismos permisos.
  *
  * Lo que recorre: con la empresa sin checks, el menú no muestra Expenses ni Window Tint Closing (Monthly Closing sí),
- * `/expenses` y `/reports/window-tint-closing` por URL lo sacan, y la API responde 403. Con Auto Wax, se ven y abren.
+ * `/expenses` y `/reports/window-tint-closing` por URL muestran «Access denied» dentro del marco, y la API responde 403. Con Auto Wax, se ven y abren.
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
@@ -38,7 +38,7 @@ async function openReportsGroup(page: Page) {
 test.describe('empresa sin los checks', () => {
   test.skip(E2E_MISSING_USER_NO_MODULES, E2E_MISSING_USER_NO_MODULES_REASON)
 
-  test('el menú no los muestra, la URL directa lo saca y la API da 403', async ({ page }) => {
+  test('el menú no los muestra, la URL directa da «Access denied» y la API da 403', async ({ page }) => {
     await login(page, E2E_USER_NO_MODULES, E2E_PASSWORD_NO_MODULES)
     await openReportsGroup(page)
 
@@ -48,10 +48,11 @@ test.describe('empresa sin los checks', () => {
     await expect(page.getByRole('link', { name: /^Expenses/ })).toHaveCount(0)
     await noHorizontalScroll(page)
 
+    // Sin saltar a otra pantalla: «Access denied» dentro del marco y la dirección igual (plans/plan-buenas-practicas-v0, 4.6, D11).
     for (const path of ['/expenses', '/expenses/recurring', '/reports/window-tint-closing']) {
       await page.goto(path)
-      await page.waitForURL((url) => url.pathname !== path)
-      expect(new URL(page.url()).pathname).not.toBe(path)
+      await expect(page.locator('main').getByText('Access denied')).toBeVisible()
+      expect(new URL(page.url()).pathname).toBe(path)
     }
 
     const expenses = await page.request.get('/api/srs-kpis/expenses')

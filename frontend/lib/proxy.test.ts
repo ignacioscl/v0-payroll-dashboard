@@ -80,3 +80,81 @@ describe('origen del legacy (cookie sin firma)', () => {
     expect(resolveLegacyPublicUrl('https://evil.com', e)).toBe('https://main.srssuite.com')
   })
 })
+
+// ---- Etapa 4.6: la revisión de la cookie en las pantallas (P4) ----
+import fs from 'node:fs'
+import path from 'node:path'
+import { getRedirectUrl, unstable_doesMiddlewareMatch } from 'next/experimental/testing/server'
+import { config as proxyConfig } from '../proxy'
+
+const ROOT = path.resolve(__dirname, '..')
+
+/** Toda pantalla del panel, sacada de las carpetas (`app/(dashboard)/**\/page.tsx`); `[id]` → un valor cualquiera. */
+function dashboardRoutes(): string[] {
+  const base = path.join(ROOT, 'app', '(dashboard)')
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name === 'page.tsx') {
+        const rel = path.relative(base, dir).split(path.sep).filter((s) => s && !/^\(.*\)$/.test(s))
+        out.push('/' + rel.map((s) => (s.startsWith('[') ? '1' : s)).join('/'))
+      }
+    }
+  }
+  walk(base)
+  return out
+}
+
+// En Next 16.2.6 la función se llama todavía `unstable_doesMiddlewareMatch` (la doc ya la nombra `unstable_doesProxyMatch`).
+const runsOn = (url: string) => unstable_doesMiddlewareMatch({ config: proxyConfig, url })
+
+const userCookie = (u: Record<string, unknown>) => encodeURIComponent(JSON.stringify(u))
+const screen = (url: string, cookies?: { token?: string; user?: Record<string, unknown> }) => {
+  const headers: Record<string, string> = {}
+  const parts: string[] = []
+  if (cookies?.token) parts.push(`srs_auth_token=${cookies.token}`)
+  if (cookies?.user) parts.push(`srs_auth_user=${userCookie(cookies.user)}`)
+  if (parts.length) headers.cookie = parts.join('; ')
+  return new NextRequest(`https://pro.srssuite.com${url}`, { headers })
+}
+
+describe('proxy en las pantallas (4.6)', () => {
+  it('corre en cada pantalla del panel (la lista sale de las carpetas)', () => {
+    const routes = dashboardRoutes()
+    expect(routes.length).toBeGreaterThan(10)
+    expect(routes).toContain('/')
+    for (const route of routes) expect(runsOn(route), route).toBe(true)
+  })
+
+  it('no corre en /login (healthcheck), /auth/*, estáticos ni archivos con punto', () => {
+    for (const url of ['/login', '/auth/callback', '/auth/error', '/_next/static/x.js', '/_next/image', '/favicon-32.png']) {
+      expect(runsOn(url), url).toBe(false)
+    }
+  })
+
+  it('en /api corre, pero solo el chequeo de origen: GET /api/auth/me sin cookies no redirige', () => {
+    process.env.PAYROLL_PUBLIC_URL = 'https://pro.srssuite.com'
+    expect(runsOn('/api/auth/me')).toBe(true)
+    const res = proxy(new NextRequest('https://pro.srssuite.com/api/auth/me'))
+    expect(getRedirectUrl(res)).toBeNull()
+    expect(res.status).toBe(200)
+  })
+
+  it('sin cookies → /login, con la URL pública (no la del contenedor)', () => {
+    process.env.PAYROLL_PUBLIC_URL = 'https://pro.srssuite.com'
+    expect(getRedirectUrl(proxy(screen('/billing/invoices')))).toBe('https://pro.srssuite.com/login')
+    expect(getRedirectUrl(proxy(screen('/', { token: 't' })))).toBe('https://pro.srssuite.com/login')
+    expect(getRedirectUrl(proxy(screen('/', { user: { id: 1 } })))).toBe('https://pro.srssuite.com/login')
+  })
+
+  it('externo en / → /issues; externo en /issues sigue; interno en / sigue', () => {
+    process.env.PAYROLL_PUBLIC_URL = 'https://pro.srssuite.com'
+    const external = { token: 't', user: { id: 1, isCompanyTypeCompany: true } }
+    const internal = { token: 't', user: { id: 2, isCompanyTypeCompany: false } }
+    expect(getRedirectUrl(proxy(screen('/', external)))).toBe('https://pro.srssuite.com/issues')
+    expect(getRedirectUrl(proxy(screen('/issues', external)))).toBeNull()
+    expect(getRedirectUrl(proxy(screen('/', internal)))).toBeNull()
+  })
+})

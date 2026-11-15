@@ -1174,6 +1174,7 @@ export const es: Messages = {
     denied: 'Acceso denegado',
     needTtk: 'Necesita permisos de Seguimiento de tiempo (Daily Punch) para acceder a esta página.',
     noDashboardAccess: 'No tiene acceso al panel de nómina con su rol actual.',
+    noScreenAccess: 'No tiene acceso a esta pantalla con su rol actual.',
   },
   layout: {
     openMenu: 'Abrir menú',
