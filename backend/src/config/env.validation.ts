@@ -86,8 +86,7 @@ class ProductionSecret {
 /**
  * Un `JWT_SECRET` corto en producción **avisa en el log y arranca igual**: la clave es la misma `JWT_AUTH` del
  * `config.php` del legacy, y la de PROD tiene 9 caracteres (16/11/2026). Cambiarla deja afuera a todos (legacy, v0 y
- * app TTK), así que va como tarea aparte (`jwt-secret-corto-prod`, PLAN-GENERAL). Cuando esté cambiada, esto vuelve a
- * frenar el arranque.
+ * app TTK), y en PROD no se sube nada que afecte a todos (Ignacio, 16/11/2026): la clave no se cambia y esto queda así.
  */
 const logger = new Logger('EnvValidation')
 
@@ -100,7 +99,7 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   const errors = validateSync(env, { skipMissingProperties: false })
   if (trimmed.NODE_ENV === 'production' && typeof trimmed.JWT_SECRET === 'string' && trimmed.JWT_SECRET !== '') {
     for (const e of validateSync(plainToInstance(ProductionSecret, trimmed))) {
-      logger.warn(`${e.property}: ${Object.values(e.constraints ?? {}).join(', ')} (tarea jwt-secret-corto-prod)`)
+      logger.warn(`${e.property}: ${Object.values(e.constraints ?? {}).join(', ')} (aviso: la clave de PROD no se cambia)`)
     }
   }
   if (errors.length > 0) {

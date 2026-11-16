@@ -33,7 +33,7 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...OK, DB_PORT: 'abc' })).toThrow(/DB_PORT/)
   })
 
-  it('en producción un JWT_SECRET corto avisa en el log y arranca igual (tarea jwt-secret-corto-prod); en dev no avisa', () => {
+  it('en producción un JWT_SECRET corto avisa en el log y arranca igual (la clave de PROD no se cambia); en dev no avisa', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
     try {
       expect(() => validateEnv({ ...OK, NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(9) })).not.toThrow()

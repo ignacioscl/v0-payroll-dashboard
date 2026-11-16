@@ -35,7 +35,8 @@ Nest 10 no tiene `app.useSecurityHeaders()` (es de 12.1): los encabezados van co
   `src/commons/guards/routes.spec.ts`.
 - **Arranque (etapa 3)**: las variables se validan al arrancar (`src/config/env.validation.ts`, `validate` en
   `ConfigModule.forRoot`; `JWT_SECRET` obligatorio; en producción, con menos de 32 caracteres avisa en el log y arranca igual,
-  porque la de PROD tiene 9 y cambiarla deja afuera a todos — tarea `jwt-secret-corto-prod`, 16/11/2026; control:
+  porque la de PROD tiene 9 y cambiarla deja afuera a todos: no se cambia, y en PROD nunca se sube algo que afecte
+  a todos (Ignacio, 16/11/2026); control:
   `env.validation.spec.ts`; los `EMAIL_*` no entran). Body JSON hasta
   `JSON_BODY_LIMIT` (1 MB). `ExtraFieldsProbePipe` antes del ValidationPipe (medición de campos de más, 3.10: se borra
   al prender `forbidNonWhitelisted`). Controles: `src/config/env.validation.spec.ts`, `src/app.setup.spec.ts`.
