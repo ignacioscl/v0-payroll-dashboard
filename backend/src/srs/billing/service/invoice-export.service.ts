@@ -34,11 +34,11 @@ import {
   InvoiceExportPrepareBodyDto,
   InvoiceExportPrepareResponseDto,
   InvoiceExportStatusDto,
-  parseInvoiceExportEmails,
   type InvoiceExportMailResult,
   type InvoiceExportStoredFilters,
   type InvoiceExportType,
 } from '../dto/invoice-export.dto'
+import { EMAIL_LIST_MESSAGES, checkEmailList } from '../email-list'
 import { buildMultipart, phpRequest } from '../invoice-export-php-client'
 import { InvoiceRepository } from '../repository/invoice.repository'
 import { invoiceExportLabels, invoiceExportReportName, type InvoiceExportLabels } from '../invoice-export-labels'
@@ -312,10 +312,12 @@ export class InvoiceExportService {
   ): Promise<{ ticket: string }> {
     await this.assertAccess(ctx)
     this.filterOf(ctx, query)
-    const emails = parseInvoiceExportEmails(body.emailTo)
-    if (!emails) {
-      throw new BadRequestException('Enter one or more valid email addresses.')
+    // La misma regla que el diálogo (../email-list.ts, pareja de frontend/lib/validation/email-list.ts).
+    const checked = checkEmailList(body.emailTo)
+    if (!checked.ok) {
+      throw new BadRequestException(EMAIL_LIST_MESSAGES[checked.error])
     }
+    const emails = checked.emails
     const baseUrl = this.config.get<string>('srsApiUrl')?.trim()
     if (!baseUrl) {
       throw new HttpException('The email server is not configured (SRS_API_URL).', HttpStatus.INTERNAL_SERVER_ERROR)

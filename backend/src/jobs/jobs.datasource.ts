@@ -5,6 +5,7 @@ import { DataSourceOptions } from 'typeorm'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 import { resolveTypeOrmLogging } from '../db-logging'
+import { DB_CONNECT_TIMEOUT_MS } from '../db-timeouts'
 
 /**
  * Conexión a la base de los jobs (`srssui5_srs_jobs`): corridas, log y estado por período del
@@ -34,6 +35,7 @@ export const jobsDataSourceOptions: DataSourceOptions = {
   migrations: [],
   migrationsRun: false,
   timezone: 'Z',
+  connectTimeout: DB_CONNECT_TIMEOUT_MS,
   extra: {
     dateStrings: true,
     timezone: 'Z',

@@ -1,0 +1,48 @@
+---
+description: Base de seguridad del Nest — helmet, sin CORS, Swagger fuera de producción, un solo filtro, logs sin secretos, tiempos de MySQL y cierre limpio
+globs: v0-payroll-dashboard/backend/src/**/*.ts
+alwaysApply: false
+---
+
+# Base de seguridad del Nest (plans/plan-buenas-practicas-v0, etapa 2)
+
+Nest 10 no tiene `app.useSecurityHeaders()` (es de 12.1): los encabezados van con helmet
+(https://docs.nestjs.com/security/helmet).
+
+- **Arranque en `src/app.setup.ts` (`configureApp`)**: `main.ts` solo crea la app, llama `configureApp` y escucha.
+  helmet **antes de cualquier `app.use`**, con `frameAncestors 'none'` y `frameguard: deny`. Sin `cors` en
+  `NestFactory.create` (nadie llama al Nest desde un navegador). Swagger solo si `NODE_ENV !== 'production'`.
+  `enableShutdownHooks()`; Terminus con `gracefulShutdownTimeoutMs: SHUTDOWN_GRACE_MS` (`health.module.ts`) y
+  `stop_grace_period` en el docker-compose. Control: `src/app.setup.spec.ts`.
+- **Un solo filtro global**, `I18nErrorFilter`. Nest evalúa los filtros globales al revés: un `@Catch(Error)`
+  registrado último deja mudos a los demás. La respuesta **nunca** lleva el body del pedido. Un error de negocio
+  (`I18nError`, `DataError`, `HttpException` o con `httpStatus`/`status` numérico, como el `poolBusyError`) conserva su
+  mensaje; uno interno (`Error` suelto, `QueryFailedError`, corte de MySQL) sale 500 **sin `message`**. Todo 5xx va a
+  `appendErrorLine` (`commons/logs/error-log-file.ts`, archivo del servidor) y a Sentry, sin body, encabezados ni
+  query. Control: `src/app.setup.spec.ts`.
+- **Sentry**: `beforeBreadcrumb: () => null` y `beforeSend` que borra encabezados, cookies, data y breadcrumbs;
+  `sendDefaultPii: false`. Sin `SENTRY_DSN` no manda nada (tarea `sentry-v0`).
+- **Ningún log** (`console.*` ni `*.logger.*`) con tokens, encabezados, cookies, contraseñas, secretos, body, el
+  pedido entero o un usuario entero. Control: `src/commons/logs/no-secrets-in-logs.boundary.spec.ts` (parser de
+  TypeScript, mira la llamada entera aunque ocupe varias líneas).
+- **MySQL**: `connectTimeout: DB_CONNECT_TIMEOUT_MS` (`src/db-timeouts.ts`) en los tres datasources. El corte por
+  sentencia lo hace la base (120 s en PROD, `max_statement_time`): nunca `SET SESSION max_statement_time` más alto
+  ni `enableQueryTimeout` de TypeORM (solo corta del lado del cliente: la consulta sigue en la base con la conexión
+  ocupada). Control: `src/db-timeouts.spec.ts`.
+- **Guard global**: `SrsJwtGuard` es `APP_GUARD` (`srs-auth.module.ts`). Toda ruta pide login salvo `@Public()`
+  (`commons/decorator/public.decorator.ts`), **siempre por método**; hoy solo `GET /health` y `GET /health/jobs`. Ningún
+  controlador repite `@UseGuards(SrsJwtGuard)` (correría dos veces). Todo `@Param` con pipe o DTO. Control:
+  `src/commons/guards/routes.spec.ts`.
+- **Arranque (etapa 3)**: las variables se validan al arrancar (`src/config/env.validation.ts`, `validate` en
+  `ConfigModule.forRoot`; `JWT_SECRET` obligatorio; en producción, con menos de 32 caracteres avisa en el log y arranca igual,
+  porque la de PROD tiene 9 y cambiarla deja afuera a todos — tarea `jwt-secret-corto-prod`, 16/11/2026; control:
+  `env.validation.spec.ts`; los `EMAIL_*` no entran). Body JSON hasta
+  `JSON_BODY_LIMIT` (1 MB). `ExtraFieldsProbePipe` antes del ValidationPipe (medición de campos de más, 3.10: se borra
+  al prender `forbidNonWhitelisted`). Controles: `src/config/env.validation.spec.ts`, `src/app.setup.spec.ts`.
+- **Logs en JSON**: `LoggerSystem` escribe una línea JSON por evento (`bufferLogs` en `main.ts`); nada de `console.*`
+  (lint `no-console` en error, salvo CLI y scripts). Control: `src/commons/logs/logger.system.spec.ts`.
+- **`/api/health` mira la base** (`pingCheck`, 3 s; D9). Jobs y mail, solo en `/api/health/jobs`.
+- **Subidas**: tipo por contenido (`commons/upload/image-signature.ts`), tope en `FileInterceptor({ limits })`. Nada
+  sirve `public/` sin login (sin `ServeStaticModule`).
+- **Gate**: `npm run gate` (lint, typecheck, test:unit) y lo mismo dentro del `Dockerfile`: un error no llega al build.
+

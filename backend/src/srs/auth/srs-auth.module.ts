@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
 import { JwtModule } from '@nestjs/jwt'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 
@@ -18,7 +19,8 @@ import { SrsPermissionRepository } from './srs-permission.repository'
       useFactory: (config: ConfigService) => ({ secret: config.get<string>('jwtSecret') }),
     }),
   ],
-  providers: [SrsJwtGuard, SrsAuthContextService, SrsPermissionRepository],
+  // SrsJwtGuard es global: cierra toda ruta salvo las `@Public()` (plans/plan-buenas-practicas-v0, 3.5).
+  providers: [SrsJwtGuard, SrsAuthContextService, SrsPermissionRepository, { provide: APP_GUARD, useClass: SrsJwtGuard }],
   // JwtModule must be exported so SrsJwtGuard can inject JwtService in KPI modules.
   exports: [SrsJwtGuard, SrsAuthContextService, SrsPermissionRepository, JwtModule],
 })

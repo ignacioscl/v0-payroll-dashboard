@@ -1,0 +1,24 @@
+{
+  "_": "Casos compartidos de la lista de correos (pareja: frontend/lib/validation/email-list.ts <-> backend/src/srs/billing/email-list.ts). Los leen frontend/lib/validation/email-list.test.ts (vitest) y backend/src/srs/billing/email-list.spec.ts (jest). Una dirección: formato de correo y hasta 64 caracteres (columnas EMAIL_*, D22 de plans/plan-export-invoices-nest).",
+  "bad": [
+    { "value": "", "error": "required" },
+    { "value": " , ", "error": "required" },
+    { "value": "a@b", "error": "invalid" },
+    { "value": "hola", "error": "invalid" },
+    { "value": "a@b.com, mal", "error": "invalid" },
+    { "value": "@b.com", "error": "invalid" },
+    { "value": "a@b.com; c@d.com", "error": "separator" },
+    { "value": "a@b.com c@d.com", "error": "separator" },
+    { "value": "a@b.com\nc@d.com", "error": "separator" },
+    { "value": "a@b.com|c@d.com", "error": "separator" },
+    { "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@b.com", "error": "long" }
+  ],
+  "good": [
+    { "value": "a@b.com", "emails": ["a@b.com"] },
+    { "value": " a@b.com, A@B.com ,c@d.org,", "emails": ["a@b.com", "c@d.org"] },
+    { "value": "juan.perez+billing@auto-wax.co.uk", "emails": ["juan.perez+billing@auto-wax.co.uk"] },
+    { "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@b.com", "emails": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@b.com"] }
+  ],
+  "singleBad": ["a@b", "a@b.com, c@d.com", "a b@c.com"],
+  "singleGood": ["", "a@b.com"]
+}

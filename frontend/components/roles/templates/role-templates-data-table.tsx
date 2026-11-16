@@ -35,7 +35,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
@@ -210,7 +209,6 @@ export function RoleTemplatesDataTable({
           const r = row.original
           return (
             <div className="flex items-center justify-end gap-0.5">
-              <TooltipProvider delayDuration={300}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -229,7 +227,6 @@ export function RoleTemplatesDataTable({
                   </TooltipTrigger>
                   <TooltipContent side="top">{t('roleTemplates.permissions')}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

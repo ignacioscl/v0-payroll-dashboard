@@ -3,15 +3,18 @@
  * DTO del Nest acepta. Con una clave de más, GET /srs/expenses da 400 y la lista queda vacía aunque
  * las tarjetas (summary, sin orden) den bien.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(resolve(__dirname, path), 'utf8')
+const DTO = '../../../backend/src/srs/expenses/dto/expense-list-query.dto.ts'
+// Dentro de la imagen de Docker del front no está el back: el control corre en el gate local (pnpm run gate).
+const backPresent = existsSync(resolve(__dirname, DTO))
 
-describe('Expenses List: claves de orden', () => {
+describe.skipIf(!backPresent)('Expenses List: claves de orden', () => {
   it('cada sortKey del front está en EXPENSE_SORT_KEYS del Nest', () => {
-    const dto = read('../../../backend/src/srs/expenses/dto/expense-list-query.dto.ts')
+    const dto = read(DTO)
     const block = /EXPENSE_SORT_KEYS = \[([\s\S]*?)\]/.exec(dto)?.[1] ?? ''
     const allowed = [...block.matchAll(/'(\w+)'/g)].map((m) => m[1])
     expect(allowed.length).toBeGreaterThan(0)

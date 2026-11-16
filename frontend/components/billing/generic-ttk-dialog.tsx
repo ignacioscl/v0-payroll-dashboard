@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2, Search, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { SearchInput } from '@/components/shared/search-input'
 import {
   Table,
   TableBody,
@@ -82,15 +82,15 @@ export function GenericTtkDialog({
             {t('invoices.generic.ttkTitle')}
           </DialogTitle>
         </DialogHeader>
-        <div className="relative mb-3">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder={t('invoices.generic.ttkSearch')}
-            className="h-9 bg-card pl-8"
-          />
-        </div>
+        <SearchInput
+          value={term}
+          onValueChange={setTerm}
+          placeholder={t('invoices.generic.ttkSearch')}
+          aria-label={t('invoices.generic.ttkSearch')}
+          className="mb-3"
+          iconClassName="left-2.5 size-4"
+          inputClassName="h-9 bg-card pl-8"
+        />
         <div className="min-h-0 flex-1 overflow-auto">
           {query.isLoading ? (
             <div className="flex h-28 items-center justify-center text-muted-foreground">

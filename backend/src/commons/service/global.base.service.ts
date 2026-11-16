@@ -1,3 +1,4 @@
+import { ObjectLiteral } from 'typeorm'
 import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { DeepPartial, FindManyOptions, FindOneOptions, SaveOptions } from 'typeorm'
 
@@ -6,7 +7,7 @@ import { BaseRepository } from '../repository/base.repository'
 import { I18nError } from '../errors/i18n.error'
 import { PaginationDto, RequestPaginationDto } from '../pagination/Pagination.dto'
 
-export abstract class GlobalBaseService<T extends {}, R extends { id?: number }> {
+export abstract class GlobalBaseService<T extends ObjectLiteral, R extends { id?: number }> {
   protected abstract getRepository(): BaseRepository<T, R>
 
   async fetch(payload: R): Promise<PaginationDto<T>> {
@@ -50,7 +51,7 @@ export abstract class GlobalBaseService<T extends {}, R extends { id?: number }>
     return object
   }
 
-  public async findByIds(ids: number[]) {
+  public async findByIds(_ids: number[]) {
     /*return this.getRepository().findBy({
       id: In(ids),
     } as FindOptionsWhere<T>)*/

@@ -8,6 +8,8 @@ import type { ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { AppLink } from '@/components/shared/app-link'
+import { activateBoxLink, CARD_LINK_SELECTOR } from '@/lib/navigation/activate-box-link'
 import { useDismissibleHint } from '@/lib/hooks/use-dismissible-hint'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
@@ -30,8 +32,21 @@ interface KPICardProps {
   }
   variant?: KPICardVariant
   sparkline?: number[]
-  /** Si está presente, la tarjeta es clickeable y se comporta como botón. */
+  /**
+   * Si está presente, la tarjeta es clickeable y se comporta como botón (filtra, abre un detalle). Para ir a otra
+   * pantalla va `href`, no `onClick`.
+   */
   onClick?: () => void
+  /**
+   * La tarjeta lleva a otra pantalla: el título es un enlace real (`AppLink`) y el clic en el resto de la tarjeta pasa
+   * por él (`activateBoxLink`): Ctrl/Cmd o el botón del medio abren otra pestaña. Le gana a `onClick`.
+   */
+  href?: string
+  /**
+   * Corre solo cuando la navegación es en la misma pestaña (el `onNavigate` de `<Link>`): ahí se fijan los filtros del
+   * destino. Con Ctrl/Cmd + clic no corre, así la pestaña actual no cambia (plans/plan-buenas-practicas-v0, 4.4, D12).
+   */
+  onNavigate?: () => void
   /** Marca la tarjeta como seleccionada (ring + borde primary). */
   active?: boolean
   /** Reemplaza el value por un spinner. */
@@ -87,6 +102,8 @@ export function KPICard({
   variant = 'default',
   sparkline,
   onClick,
+  href,
+  onNavigate,
   active = false,
   loading = false,
   compact = false,
@@ -186,7 +203,29 @@ export function KPICard({
     return `M ${points.join(' L ')}`
   }
 
-  const isInteractive = typeof onClick === 'function'
+  const isLink = typeof href === 'string'
+  // Botón solo sin `href`: con enlace, el foco va al enlace y la tarjeta no es un botón (no queda un botón con un enlace
+  // adentro, ni un enlace con un botón).
+  const isButton = !isLink && typeof onClick === 'function'
+  const isInteractive = isLink || isButton
+  const onBoxClick = isLink
+    ? (e: React.MouseEvent<HTMLDivElement>) => {
+        activateBoxLink(e, CARD_LINK_SELECTOR)
+      }
+    : undefined
+
+  const titleNode = href !== undefined ? (
+    <AppLink
+      href={href}
+      onNavigate={onNavigate}
+      data-card-link=""
+      className="rounded-sm hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      {title}
+    </AppLink>
+  ) : (
+    title
+  )
 
   const inlineValueSpan = (
     <m.span
@@ -241,7 +280,7 @@ export function KPICard({
       <div className="min-w-[6.5rem] flex-1 border-l border-slate-400/20 pl-2.5">
         <div className="flex items-center gap-1">
           <p className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground sm:text-[11px]">
-            {title}
+            {titleNode}
           </p>
           {help ? (
             <Popover>
@@ -292,9 +331,11 @@ export function KPICard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      onClick={onClick}
+      data-slot="kpi-card"
+      onClick={isLink ? onBoxClick : onClick}
+      onAuxClick={onBoxClick}
       onKeyDown={
-        isInteractive
+        isButton
           ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
@@ -303,10 +344,10 @@ export function KPICard({
             }
           : undefined
       }
-      role={isInteractive ? 'button' : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      aria-pressed={isInteractive && expanded === undefined ? active : undefined}
-      aria-expanded={isInteractive ? expanded : undefined}
+      role={isButton ? 'button' : undefined}
+      tabIndex={isButton ? 0 : undefined}
+      aria-pressed={isButton && expanded === undefined ? active : undefined}
+      aria-expanded={isButton ? expanded : undefined}
       className={cn(
         'group relative overflow-hidden border transition-all duration-300',
         inline
@@ -325,7 +366,8 @@ export function KPICard({
             ? 'border-2 ring-2 ring-primary/60 border-primary shadow-lg'
             : cn('border', config.border),
         !active && config.glow,
-        isInteractive && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        isInteractive && 'cursor-pointer',
+        isButton && 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
         inactive && 'pointer-events-none opacity-45 grayscale',
         className,
       )}
@@ -364,7 +406,7 @@ export function KPICard({
                     : 'text-xs truncate font-medium',
               )}
             >
-              {title}
+              {titleNode}
             </p>
             {help ? (
               <Popover>

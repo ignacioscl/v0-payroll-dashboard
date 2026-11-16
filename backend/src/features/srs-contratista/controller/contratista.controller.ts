@@ -3,44 +3,61 @@ import { mkdir, unlink, writeFile } from 'fs/promises'
 import { extname, join } from 'path'
 
 import {
+  ArgumentsHost,
   BadRequestException,
   Body,
+  Catch,
+  ExceptionFilter,
   Controller,
   Delete,
   Get,
   Inject,
   NotFoundException,
+  PayloadTooLargeException,
   Post,
   Put,
   Req,
   Res,
   StreamableFile,
   UploadedFile,
-  UseGuards,
+  UseFilters,
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
+import { detectImage } from '../../../commons/upload/image-signature'
 import { UpdateBrandingDto } from '../dto/contratista.dto'
 import { ContratistaService } from '../service/contratista.service'
 
 /**
- * Where uploaded logos live. Same dir ServeStaticModule roots at, so the file also
- * exists on disk outside the image: docker-compose mounts ./uploads/branding here.
+ * Where uploaded logos live, on disk outside the image: docker-compose mounts ./uploads/branding here. Nothing serves
+ * this folder directly (ServeStaticModule is gone, plans/plan-buenas-practicas-v0 3.6): `getLogo` streams the file.
  * cwd is /app in the container and backend/ in dev — correct in both.
  */
 const LOGO_DIR = join(process.cwd(), 'public', 'branding')
 
-const ALLOWED_TYPES = new Map<string, string>([
-  ['image/png', '.png'],
-  ['image/jpeg', '.jpg'],
-  ['image/webp', '.webp'],
-  ['image/svg+xml', '.svg'],
+/** Types served back by extension. SVG is no longer accepted (D8); the ones already uploaded are served sandboxed. */
+const SERVED_TYPES = new Map<string, string>([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.svg', 'image/svg+xml'],
 ])
 
-const MAX_LOGO_BYTES = 1024 * 1024
+export const MAX_LOGO_BYTES = 1024 * 1024
+/** Texts of D1 (the screen also checks before uploading, translated). */
+export const LOGO_TYPE_MESSAGE = 'Only PNG, JPG or WEBP images are allowed.'
+export const LOGO_SIZE_MESSAGE = 'The logo is over 1 MB.'
+
+/** multer cuts the upload at MAX_LOGO_BYTES with «File too large»: same 413, with the text of D1. */
+@Catch(PayloadTooLargeException)
+class LogoTooLargeFilter implements ExceptionFilter {
+  catch(_exception: PayloadTooLargeException, host: ArgumentsHost) {
+    const response = host.switchToHttp().getResponse()
+    response.status(413).json({ statusCode: 413, message: LOGO_SIZE_MESSAGE })
+  }
+}
 
 interface UploadedLogo {
   originalname: string
@@ -48,8 +65,6 @@ interface UploadedLogo {
   size: number
   buffer: Buffer
 }
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/contratista')
 @ApiTags('SRS Contratista')
 @ApiBearerAuth()
@@ -76,25 +91,30 @@ export class ContratistaController {
     if (!branding.logoFile || !branding.logoIsV0) {
       throw new NotFoundException('No v0 logo set')
     }
-    const type = [...ALLOWED_TYPES.entries()].find(
-      ([, ext]) => ext === extname(branding.logoFile!).toLowerCase(),
-    )
+    const type = SERVED_TYPES.get(extname(branding.logoFile).toLowerCase())
     response.set({
-      'Content-Type': type?.[0] ?? 'application/octet-stream',
+      'Content-Type': type ?? 'application/octet-stream',
       'Cache-Control': 'private, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
+      // An SVG uploaded before D8 can carry script: opened directly, it runs in nothing.
+      ...(type === 'image/svg+xml'
+        ? { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" }
+        : {}),
     })
     return new StreamableFile(createReadStream(join(LOGO_DIR, branding.logoFile)))
   }
 
   @Post('branding/logo')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  // multer stops reading at MAX_LOGO_BYTES (the file is not kept whole in memory first).
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_LOGO_BYTES, files: 1 } }))
+  @UseFilters(LogoTooLargeFilter)
   async uploadLogo(@Req() request: any, @UploadedFile() file: UploadedLogo) {
     if (!file) throw new BadRequestException('No file uploaded')
 
-    const ext = ALLOWED_TYPES.get(file.mimetype)
-    if (!ext) throw new BadRequestException('Logo must be PNG, JPG, WEBP or SVG')
-    if (file.size > MAX_LOGO_BYTES) throw new BadRequestException('Logo must be under 1 MB')
+    // By content, not by what the browser declares.
+    const ext = detectImage(file.buffer)?.ext
+    if (!ext) throw new BadRequestException(LOGO_TYPE_MESSAGE)
 
     const previous = await this.service.getBranding(request.srsContext)
     const fileName = `${request.srsContext.idDealerProvider}-${Date.now()}${ext}`

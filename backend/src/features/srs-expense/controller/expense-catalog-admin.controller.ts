@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
 import { MergeCatalogItemDto } from 'src/features/srs-generic-data/dto/generic-data.dto'
 import { ExpenseCatalogAdminService } from '../service/expense-catalog-admin.service'
@@ -10,7 +9,7 @@ import { ExpenseCatalogAdminService } from '../service/expense-catalog-admin.ser
  * Expenses › Settings: borrar y unificar compañías y categorías. Vive con los gastos (dueño de EXP_EXPENSE) porque
  * mueve gastos y reglas; el listado y el alta siguen en ExpenseCatalogController. plans/plan-expenses-settings, §3.
  */
-@UseGuards(SrsJwtGuard, CompanyModuleGuard)
+@UseGuards(CompanyModuleGuard)
 @RequireCompanyModule('expenses')
 @Controller('/srs/expenses')
 @ApiTags('SRS Expenses - Catalog')

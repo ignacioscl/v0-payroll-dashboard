@@ -1,35 +1,33 @@
 ---
-description: Clickable UI (buttons, close X, icon actions) must use cursor-pointer on hover.
+description: Clickable UI shows the pointer (manito) — it comes from the base layer of app/globals.css, not class by class.
 globs: v0-payroll-dashboard/frontend/**/*.{ts,tsx,css}
 alwaysApply: false
 ---
 
-# Cursor pointer on clickable controls
+# La manito en todo lo clickeable
 
-Every interactive control that the user can click must show the **pointer** (hand) cursor on hover.
+Todo control que dispara una acción al hacer clic muestra la **manito** al pasar el mouse. Los deshabilitados, no.
 
-## Do
+## Cómo se hace
 
-- Put `cursor-pointer` on buttons, close/dismiss controls (`Sheet`/`Dialog` X), icon-only actions, **collapse/expand triggers** (group headers, expand-all / collapse-all), tabs triggers used as buttons, and custom `<button>` / `role="button"` elements.
-- Prefer baking it into shared primitives (`Button`, Sheet/Dialog close) so callers inherit it.
-- Disabled controls: `disabled:cursor-not-allowed` (and keep non-interactive).
+- **Va sola**: `app/globals.css`, dentro de `@layer base`, pone `cursor: pointer` en todo `button` y
+  `[role='button']` que no esté `:disabled` ni `aria-disabled='true'`. Es el bloque que da Tailwind 4
+  (https://tailwindcss.com/docs/upgrade-guide, «Buttons use the default cursor») y shadcn
+  (https://ui.shadcn.com/docs/tailwind-v4).
+- **No se agrega `cursor-pointer` a un `<button>`**: ya la tiene. (Los `cursor-pointer` viejos sobran pero no molestan;
+  no se salen a borrar.)
+- **Un `div` o `span` clickeable lleva `role="button"`** (con `tabIndex` y teclado) **o es un `<button>`**. Así recibe la
+  manito y se puede usar con el teclado. Las filas y cajas que llevan a otra pantalla son un enlace (`AppLink`, ver
+  `navigation.mdc`), que ya trae la manito.
+- **Para sacar la manito a propósito**, `cursor-default` en el elemento: una utilidad le gana a la capa base (p. ej. un
+  filtro que no se puede apagar, o una foto sin permiso).
+- Las opciones de menús y combos (`CommandItem`, `SelectItem`, ítems de `DropdownMenu`) quedan como las trae shadcn.
 
-## Do NOT
+## Control
 
-- Leave close buttons or ghost/icon buttons without `cursor-pointer` (default arrow looks broken).
-- Rely on browser default for `<button>` alone when Tailwind/`button` reset may leave `cursor: default`.
+e2e `e2e/cursor-pointer.spec.ts` (compu): recorre todo `button` y `[role=button]` visible y habilitado del login,
+Dashboard, Invoices, Roles y Expenses y falla con la lista de los que no muestran la manito. `lib/ui-guards.test.ts`
+comprueba que el bloque siga en `@layer base`.
 
-## Examples
-
-```tsx
-// ✅ Sheet / Dialog close
-<SheetPrimitive.Close className="… cursor-pointer …">
-
-// ✅ Custom icon button
-<button type="button" className="… cursor-pointer …">
-
-// ❌ Missing pointer
-<SheetPrimitive.Close className="absolute top-4 right-4 opacity-70 …">
-```
-
-`Button` (`components/ui/button.tsx`) already includes `cursor-pointer`. Raw Radix closes and one-off `<button>`s do **not** — always add it.
+*(15/11/2026, plans/plan-buenas-practicas-v0 5.4: la regla pedía `cursor-pointer` clase por clase y unos 34 botones
+no lo tenían. Unifica esta regla con la de la raíz, `.cursor/rules/clickable-cursor-pointer.mdc`, que ahora apunta acá.)*

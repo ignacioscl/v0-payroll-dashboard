@@ -104,6 +104,17 @@
      Cyan, so it is not the colour of any invoice type (amber = Generic,
      violet = TTK, the tenant accent = WO). */
   --partial-row-bg: #e0f2fe;
+
+  /*
+   * Capas de la pantalla, de abajo hacia arriba (5.6; https://tailwindcss.com/docs/z-index, `z-(--z-…)`). Tailwind 4
+   * no tiene un espacio de @theme para el z-index, por eso van acá. Lo que arma su propia pila dentro de un
+   * componente (celdas fijas de la tabla, el foco de un grupo de botones) sigue con números, con su comentario.
+   */
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-sidebar: 40;
+  --z-overlay: 50;
+  --z-alert: 60;
 }
 
 @theme inline {
@@ -162,6 +173,10 @@
   --color-table-header-foreground: var(--table-header-foreground);
 }
 
+/*
+ * Todo CSS propio va en una capa (plans/plan-buenas-practicas-v0, 5.6; https://tailwindcss.com/docs/adding-custom-styles).
+ * Fuera de capa quedan solo `:root` y `@theme`, como pide shadcn. Control: `lib/ui-guards.test.ts`.
+ */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -169,36 +184,51 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /*
+   * La manito en todo botón activo (5.4). Tailwind 4 dejó los botones con el cursor por defecto; este es el bloque
+   * que da la guía: https://tailwindcss.com/docs/upgrade-guide («Buttons use the default cursor») y
+   * https://ui.shadcn.com/docs/tailwind-v4. Un `cursor-default` puesto en la pantalla le gana (utilidad > base).
+   */
+  button:not(:disabled, [aria-disabled='true']),
+  [role='button']:not(:disabled, [aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  /* Barra de scroll angosta */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+@layer components {
+  /*
+   * Sonner: botón de cerrar gris en todo aviso (también con richColors). Sonner inyecta su CSS sin capa; un
+   * `!important` dentro de una capa le gana a uno sin capa, así que esto sigue mandando.
+   */
+  [data-sonner-toast] [data-close-button] {
+    background: var(--muted) !important;
+    border-color: var(--border) !important;
+    color: var(--muted-foreground) !important;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
-
-/* Sonner: neutral grey close button on every toast (mac-style), including richColors */
-[data-sonner-toast] [data-close-button] {
-  background: var(--muted) !important;
-  border-color: var(--border) !important;
-  color: var(--muted-foreground) !important;
-}
-
-[data-sonner-toast] [data-close-button]:hover {
-  background: var(--secondary) !important;
-  border-color: var(--border) !important;
-  color: var(--foreground) !important;
+  [data-sonner-toast] [data-close-button]:hover {
+    background: var(--secondary) !important;
+    border-color: var(--border) !important;
+    color: var(--foreground) !important;
+  }
 }

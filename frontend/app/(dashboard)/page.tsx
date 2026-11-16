@@ -1,8 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { AppLink } from '@/components/shared/app-link'
 import { format, parseISO } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
 import { m } from 'framer-motion'
@@ -206,7 +205,6 @@ const item = {
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
   const { t, locale } = useTranslation()
   const dateFnsLocale = locale === 'es' ? es : enUS
   const {
@@ -462,11 +460,14 @@ export default function DashboardPage() {
    * `errorStatus` es global y sobrevive a la navegación: sin fijarlo, un acceso
    * pensado para ver el estado actual abriría historial corregido (con *Only with
    * errors* marcada, `corrected` se convierte en `only_fixed`).
+   *
+   * Corre en el `onNavigate` del enlace de la tarjeta: solo cuando se navega en la
+   * misma pestaña. Con Ctrl/Cmd + clic la otra pestaña abre sin estos filtros y la
+   * actual no cambia (plans/plan-buenas-practicas-v0, 4.4, D12).
    */
-  const goToIssues = (issueType: IssueType, status: ErrorStatus = 'pending') => {
+  const setIssuesFilters = (issueType: IssueType, status: ErrorStatus = 'pending') => {
     setSelectedType(issueType)
     setErrorStatus(status)
-    router.push('/issues')
   }
 
   /**
@@ -478,14 +479,16 @@ export default function DashboardPage() {
    *   switch va explícito en la posición del Dashboard (U11).
    * - El estado en vivo se limpia: el ranking no lo aplica y Grouped sí, así que
    *   uno que quedó puesto haría que el destino no cierre contra el modal.
+   *
+   * La fila es un enlace a `/issues?view=grouped` y esto corre en su `onNavigate`:
+   * solo cuando se navega en la misma pestaña (4.4, D12).
    */
-  const openDealerInPunchReport = (idDealer: number) => {
+  const onDealerNavigate = (idDealer: number) => {
     setSelectedDealers([String(idDealer)])
     setSelectedType('only_flagged')
     setErrorStatus(errorStatus)
     setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
     setRankingOpen(false)
-    router.push('/issues?view=grouped')
   }
 
   const scopeReady = filtersHydrated && selectedDealers.length > 0
@@ -563,7 +566,8 @@ export default function DashboardPage() {
             variant={card.variant}
             loading={loading}
             inline
-            onClick={() => goToIssues(card.issueType, card.errorStatus ?? errorStatus)}
+            href="/issues"
+            onNavigate={() => setIssuesFilters(card.issueType, card.errorStatus ?? errorStatus)}
           />
         ))}
       </div>
@@ -890,18 +894,19 @@ export default function DashboardPage() {
                 </span>
               ) : null}
             </CardTitle>
-            <Link
+            <AppLink
               href="/issues"
               className="flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-              // "Lo que quedó sin resolver ayer": el deep-link fija los dos ejes.
-              onClick={() => {
+              // "Lo que quedó sin resolver ayer": el deep-link fija los dos ejes. En
+              // `onNavigate` y no en `onClick`: con Ctrl/Cmd + clic no toca la pestaña actual.
+              onNavigate={() => {
                 setSelectedType('only_flagged')
                 setErrorStatus('pending')
               }}
             >
               {t('common.viewAll')}
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </AppLink>
           </CardHeader>
           <CardContent className="min-w-0">
             <DashboardYesterdayIssuesTable />
@@ -919,7 +924,7 @@ export default function DashboardPage() {
         periodLabel={reportPeriodText}
         showCoverageNotice={isCorrected && showCorrectionsCoverageNotice}
         canAccessPunchReport={canAccessPunchReport}
-        onDealerClick={openDealerInPunchReport}
+        onDealerNavigate={onDealerNavigate}
         exportParams={rankingParams}
       />
       </m.div>

@@ -26,6 +26,7 @@ import { ExpenseStatusBadge } from '@/components/expenses/expense-status-badge'
 import {
   DataTable,
   DataTableColumnHeader,
+  MOBILE_WRAP_TEXT,
   useDataTableQuery,
   type DataTableColumnMeta,
   type DataTableServerAdapter,
@@ -40,7 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { EXPENSES_LIST_KEY, useExpenseRowAction, type ExpenseRowAction } from '@/hooks/use-expenses-list'
 import { useIsMobile } from '@/hooks/use-mobile'
 import {
@@ -89,6 +90,8 @@ export type ExpensesDataTableProps = {
 
 type Confirm = { row: ExpenseRow; action: ExpenseRowAction['action'] }
 
+const EXPENSES_PINNING = { left: [], right: ['actions'] }
+
 export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesDataTableProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -107,11 +110,9 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
     setPageIndex(0)
   }, [filters])
 
-  const columnPinning = React.useMemo(
-    () => (isMobile ? { left: [], right: [] } : { left: [], right: ['actions'] }),
-    [isMobile],
-  )
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
+  const columnPinning = EXPENSES_PINNING
+  const wrap = 'truncate'
 
   const openEdit = React.useCallback(
     (row: ExpenseRow) => {
@@ -238,7 +239,6 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
           if (!notes) return null
           if (isMobile) return <span className="block whitespace-normal break-words">{notes}</span>
           return (
-            <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="block cursor-default truncate">{notes}</span>
@@ -247,7 +247,6 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
                   {notes}
                 </TooltipContent>
               </Tooltip>
-            </TooltipProvider>
           )
         },
         meta: { label: t('expenses.colNotes') } satisfies DataTableColumnMeta<ExpenseRow>,
@@ -287,7 +286,6 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
           return (
             <div className="flex items-center justify-end gap-0.5">
               {canEdit ? (
-                <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span>{editButton}</span>
@@ -296,7 +294,6 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
                       {readOnly ? t('expenses.partialTooltip') : t('expenses.edit')}
                     </TooltipContent>
                   </Tooltip>
-                </TooltipProvider>
               ) : null}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -372,7 +369,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         },
         meta: {
           label: t('expenses.actions'),
-          pin: isMobile ? undefined : 'right',
+          pin: 'right',
           headerClassName: 'px-1',
           cellClassName: 'px-1',
         } satisfies DataTableColumnMeta<ExpenseRow>,
@@ -501,7 +498,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         }
         recordsCount={total}
         recordsCountLabel={t('expenses.expensesCount').toLowerCase()}
-        renderSubComponent={(row) => <GroupRows row={row.original} wrap={wrap} />}
+        renderSubComponent={(row) => <GroupRows row={row.original} wrap={MOBILE_WRAP_TEXT} />}
         getRowCanExpand={(row) => row.original.kind === 'group'}
         subComponentLayout="full"
         density="compact"

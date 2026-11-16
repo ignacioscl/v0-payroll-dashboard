@@ -7,12 +7,10 @@ import {
   Query,
   Req,
   Res,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import { PunchListService } from '../service/punch-list.service'
 import { PunchExportService } from '../service/punch-export.service'
@@ -23,8 +21,6 @@ import {
   PunchExportStatusDto,
   PunchExportTicketQueryDto,
 } from '../dto/punch-export.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/punch/list')
 @ApiTags('SRS Punch - Individual list (keyset)')
 @ApiBearerAuth()

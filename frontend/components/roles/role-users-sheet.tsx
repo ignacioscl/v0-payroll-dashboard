@@ -17,7 +17,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useRemoveUserFromRole, useRoleUsers } from '@/hooks/use-role-lookups'
@@ -77,7 +76,6 @@ export function RoleUsersSheet({ role, open, onOpenChange }: RoleUsersSheetProps
               {t('roles.usersEmpty')}
             </p>
           ) : (
-            <TooltipProvider delayDuration={300}>
               <ul className="space-y-2 py-4">
                 {/* Una fila por asignación: el mismo usuario sale una vez por dealer. */}
                 {query.data!.users.map((u) => (
@@ -127,7 +125,6 @@ export function RoleUsersSheet({ role, open, onOpenChange }: RoleUsersSheetProps
                   </li>
                 ))}
               </ul>
-            </TooltipProvider>
           )}
         </ScrollArea>
       </SheetContent>

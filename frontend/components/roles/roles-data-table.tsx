@@ -40,10 +40,8 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { useRolesListFetcher } from '@/hooks/use-roles-list'
 import { useRoleAction } from '@/hooks/use-role-mutations'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -113,14 +111,10 @@ export function RolesDataTable({
     action: 'inactivate' | 'activate' | 'delete'
   } | null>(null)
 
-  // En la compu el nombre queda fijo al correr la tabla; en celular ninguna columna va fija (data-table.mdc).
-  const isMobile = useIsMobile()
+  // En la compu el nombre queda fijo al correr la tabla; en celular el DataTable no fija nada (data-table.mdc).
   const columnPinning = React.useMemo(
-    () =>
-      isMobile
-        ? { left: [], right: [] }
-        : { left: [...(canEdit ? ['select'] : []), 'nombre'], right: ['actions'] },
-    [isMobile, canEdit],
+    () => ({ left: [...(canEdit ? ['select'] : []), 'nombre'], right: ['actions'] }),
+    [canEdit],
   )
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({})
@@ -193,7 +187,7 @@ export function RolesDataTable({
               ),
               meta: {
                 label: t('roles.selectRole'),
-                pin: isMobile ? undefined : 'left',
+                pin: 'left',
                 headerClassName: 'w-[40px] px-2',
                 cellClassName: 'px-2',
               } satisfies DataTableColumnMeta<RoleListRow>,
@@ -215,7 +209,7 @@ export function RolesDataTable({
         meta: {
           label: t('roles.colName'),
           sortKey: 'r.nombre',
-          pin: isMobile ? undefined : 'left',
+          pin: 'left',
         } satisfies DataTableColumnMeta<RoleListRow>,
       },
       {
@@ -347,7 +341,6 @@ export function RolesDataTable({
           const templated = Boolean(r.idTemplate && r.idTemplate > 0)
           return (
             <div className="flex items-center justify-end gap-0.5">
-              <TooltipProvider delayDuration={300}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -366,7 +359,6 @@ export function RolesDataTable({
                   </TooltipTrigger>
                   <TooltipContent side="top">{t('roles.permissions')}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
               {/* Activity está en todos los roles, con o sin template: el menú siempre se ve. */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -441,7 +433,7 @@ export function RolesDataTable({
         },
         meta: {
           label: t('roles.actions'),
-          pin: isMobile ? undefined : 'right',
+          pin: 'right',
           headerClassName: 'px-1',
           cellClassName: 'px-1',
         } satisfies DataTableColumnMeta<RoleListRow>,
@@ -449,7 +441,6 @@ export function RolesDataTable({
     ],
     [
       t,
-      isMobile,
       canEdit,
       canViewUsers,
       canManageTemplates,

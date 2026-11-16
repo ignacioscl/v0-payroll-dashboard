@@ -27,6 +27,11 @@ const SWATCHES = ['#26407F', '#2563eb', '#0891b2', '#15803d', '#6d28d9', '#b91c1
 
 const HEX = /^#[0-9a-fA-F]{6}$/
 
+
+/** Lo que acepta el Nest para el logo (contratista.controller.ts): sin SVG desde D8, hasta 1 MB. */
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+const MAX_LOGO_BYTES = 1024 * 1024
+
 export function VisualSettingsForm({ companyName }: { companyName: string }) {
   const { t } = useTranslation()
   const { data: branding, isLoading } = useProviderBranding()
@@ -59,6 +64,17 @@ export function VisualSettingsForm({ companyName }: { companyName: string }) {
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return
+    // Lo mismo que controla el Nest (tipo por contenido y 1 MB), dicho antes de subir y traducido.
+    if (!LOGO_TYPES.includes(file.type)) {
+      toast.error(t('visualSettings.logoTypeInvalid'))
+      if (fileInput.current) fileInput.current.value = ''
+      return
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      toast.error(t('visualSettings.logoTooBig'))
+      if (fileInput.current) fileInput.current.value = ''
+      return
+    }
     try {
       await uploadLogo.mutateAsync(file)
       toast.success(t('visualSettings.logoUpdated'))
@@ -134,7 +150,7 @@ export function VisualSettingsForm({ companyName }: { companyName: string }) {
               <input
                 ref={fileInput}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                accept={LOGO_TYPES.join(',')}
                 className="hidden"
                 onChange={(e) => void handleUpload(e.target.files?.[0])}
               />

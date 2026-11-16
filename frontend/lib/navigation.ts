@@ -20,6 +20,18 @@ import {
   CarFront,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
+import {
+  canAccessBillingInvoices,
+  canAccessBusinessKpis,
+  canAccessMonthlyClosing,
+  canAccessPayrollDashboard,
+  canAccessProductionReport,
+  canAccessWindowTintClosing,
+} from '@/lib/auth/payroll-access'
+import { canAccessDailyPunch, canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
+import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
+import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
+import type { SrsMeUser } from '@/lib/auth/types'
 
 export interface NavItemDef {
   nameKey: MessageKey
@@ -117,6 +129,13 @@ export const EXPENSES_NAV_HREFS = [
   '/expenses/recurring',
   '/expenses/settings',
 ] as const
+
+/**
+ * Pantallas que existen solo para dev: en producción no están en ningún módulo y quedan negadas, como lo no
+ * clasificado (plans/plan-buenas-practicas-v0, 4.6). Están acá para que `navigation.test.ts` pueda exigir que toda
+ * pantalla de `app/(dashboard)` esté clasificada.
+ */
+export const DEV_ONLY_HREFS = ['/components', '/reports/payroll-report'] as const
 
 export function isDevEnvironment() {
   return process.env.NODE_ENV === 'development'
@@ -280,4 +299,66 @@ export function getVisibleNavigation(options: {
       )
       .map((item) => localizeNavItem(item, t)),
   )
+}
+
+/**
+ * Qué ve un usuario en una pantalla del panel (plans/plan-buenas-practicas-v0, 4.6). Una sola función: la usa el guard
+ * del marco en cada cambio de dirección. Sin redirecciones: lo que no se permite se ve como «Access denied» dentro del
+ * marco y la dirección queda (D11). Al externo en `/` lo manda a Punch Report el `proxy.ts`, antes de dibujar.
+ * - `no-dashboard`: el rol no entra al panel (`access.noDashboardAccess`);
+ * - `no-modules`: en producción, ningún módulo habilitado (`access.needTtk`);
+ * - `no-module`: un módulo que la empresa no tiene, también en dev (el bypass de dev es solo para permisos);
+ * - `denied`: la pantalla no está permitida para el rol, o no está clasificada.
+ */
+export type ScreenAccess = 'allowed' | 'no-dashboard' | 'no-modules' | 'no-module' | 'denied'
+
+export function getScreenAccess(
+  pathname: string,
+  me: { user: SrsMeUser | null; permissionIds: readonly number[] },
+  options: { isDev: boolean },
+): ScreenAccess {
+  const { user } = me
+  const hasPermission = (id: number) => me.permissionIds.includes(id)
+  if (!canAccessPayrollDashboard(user)) return 'no-dashboard'
+
+  const access = {
+    ttk: canAccessDailyPunch(hasPermission, user?.isSystemAdmin),
+    prodKpis: canAccessBusinessKpis(user, hasPermission),
+    productionGoal: canAccessProductionReport(user, hasPermission),
+    billing: canAccessBillingInvoices(user, hasPermission),
+    roles: canViewRoles(hasPermission, user?.isSystemAdmin),
+    roleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
+    settings: canAccessSystemConfig(hasPermission, user?.isSystemAdmin),
+    expenses: canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses),
+    closing: canAccessMonthlyClosing(user, hasPermission),
+    tintClosing: canAccessWindowTintClosing(user, hasPermission),
+  }
+  const hasAnyModule = Object.values(access).some(Boolean)
+  if (!hasAnyModule) return options.isDev ? 'allowed' : 'no-modules'
+
+  const isExternal = Boolean(user?.isCompanyTypeCompany)
+  if (isExternal && pathname === '/') return 'denied'
+
+  const modules = {
+    companyHasExpenses: Boolean(user?.hasExpenses),
+    companyHasWindowTintClosing: Boolean(user?.hasWindowTintClosing),
+  }
+  if (isCompanyModuleBlockedPath(pathname, modules)) return 'no-module'
+  if (options.isDev) return 'allowed'
+
+  return isProdAllowedPath(
+    pathname,
+    access.prodKpis,
+    access.billing,
+    isExternal,
+    access.roles,
+    access.roleTemplates,
+    access.settings,
+    access.productionGoal,
+    access.expenses,
+    access.closing,
+    access.tintClosing,
+  )
+    ? 'allowed'
+    : 'denied'
 }

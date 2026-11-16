@@ -38,7 +38,6 @@ import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useGenericInvoiceConfig } from '@/hooks/use-generic-invoice'
@@ -1350,7 +1349,6 @@ export function InvoiceListTable({
   const showFooter = gateReady && !isError && rows.length > 0
 
   const toolbarTrailing = enableSelection ? (
-      <TooltipProvider delayDuration={250}>
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1420,7 +1418,6 @@ export function InvoiceListTable({
             </>
           ) : null}
         </div>
-      </TooltipProvider>
     ) : null
 
   // Selection action lives in the table header, next to the counter (data-table rule).

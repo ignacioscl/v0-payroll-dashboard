@@ -1,7 +1,6 @@
-import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { CollectionsKpiService } from '../service/collections-kpi.service'
@@ -12,8 +11,6 @@ import {
   OutstandingArDto,
   OutstandingQueryDto,
 } from '../dto/collections-kpi.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/collections')
 @ApiTags('SRS KPIs - Collections')
 @ApiBearerAuth()

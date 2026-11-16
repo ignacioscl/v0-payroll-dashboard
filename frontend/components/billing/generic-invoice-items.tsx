@@ -8,6 +8,7 @@ import { SearchableCombobox } from '@/components/shared/searchable-combobox'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -24,6 +25,7 @@ import {
   dividirYRedondear,
   lineCents,
 } from '@/lib/billing/generic-invoice-money'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import type { GenericCatalogItem } from '@/lib/srs-generic-invoices-api'
@@ -96,6 +98,10 @@ function parseUnitAmount(raw: string): number | null {
   return Math.round(n * 100) / 100
 }
 
+/** Los campos de la fila «Add item»; cada control lleva `data-field` o `name` con este nombre. */
+type DraftField = 'description' | 'qty' | 'unitAmount'
+type DraftErrors = Partial<Record<DraftField, string>>
+
 function toCustomCatalogItem(term: string): GenericCatalogItem {
   return { id: 0, name: term, price: null, canDelete: false }
 }
@@ -129,6 +135,7 @@ export function GenericInvoiceItems({
   const [debouncedDesc, setDebouncedDesc] = React.useState('')
   const [qty, setQty] = React.useState('')
   const [unitAmount, setUnitAmount] = React.useState('')
+  const [draftErrors, setDraftErrors] = React.useState<DraftErrors>({})
   const [pendingRemove, setPendingRemove] = React.useState<GenericItemDraft | null>(null)
   const [pendingCatalog, setPendingCatalog] = React.useState<GenericCatalogItem | null>(null)
   const draftSeq = React.useRef(1)
@@ -150,16 +157,24 @@ export function GenericInvoiceItems({
     onDraftDirtyChange?.(dirty)
   }, [descItem, descTerm, qty, unitAmount, onDraftDirtyChange])
 
+  const clearDraftError = (...fields: DraftField[]) =>
+    setDraftErrors((prev) => (fields.some((f) => prev[f]) ? { ...prev, ...Object.fromEntries(fields.map((f) => [f, undefined])) } : prev))
+
   const resetDraft = () => {
     setDescItem(null)
     setDescTerm('')
     setQty('')
     setUnitAmount('')
+    setDraftErrors({})
   }
 
   const fillFromCatalog = (item: GenericCatalogItem | null) => {
     setDescItem(item)
-    if (item?.price != null) setUnitAmount(String(item.price))
+    clearDraftError('description')
+    if (item?.price != null) {
+      setUnitAmount(String(item.price))
+      clearDraftError('unitAmount')
+    }
   }
 
   const nextFreeKey = () => {
@@ -169,33 +184,25 @@ export function GenericInvoiceItems({
   }
 
   const addItem = () => {
+    // Cada error bajo su campo y la pantalla al primero (regla «Todo form lleva la pantalla al campo que falta»).
     const description = (descItem?.name ?? descTerm).trim()
-    if (!description) {
-      toast.error(t('invoices.generic.descriptionRequired'))
-      return
-    }
-    if (description.length > 128) {
-      toast.error(t('invoices.generic.descriptionTooLong'))
-      return
+    const errors: DraftErrors = {}
+    if (!description) errors.description = t('invoices.generic.descriptionRequired')
+    else if (description.length > 128) errors.description = t('invoices.generic.descriptionTooLong')
+    else if (
+      items.some(
+        (row) =>
+          row.kind === 'free' && row.description.trim().toLowerCase() === description.toLowerCase(),
+      )
+    ) {
+      errors.description = t('invoices.generic.duplicateItem')
     }
     const parsedQty = parseQty(qty)
-    if (!parsedQty.ok) {
-      toast.error(t('invoices.generic.qtyInvalid'))
-      return
-    }
+    if (!parsedQty.ok) errors.qty = t('invoices.generic.qtyInvalid')
     const amount = parseUnitAmount(unitAmount)
-    if (amount === null) {
-      toast.error(t('invoices.generic.amountRequired'))
-      return
-    }
-    const dup = items.some(
-      (row) =>
-        row.kind === 'free' && row.description.trim().toLowerCase() === description.toLowerCase(),
-    )
-    if (dup) {
-      toast.error(t('invoices.generic.duplicateItem'))
-      return
-    }
+    if (amount === null) errors.unitAmount = t('invoices.generic.amountRequired')
+    setDraftErrors(errors)
+    if (focusFirstFieldError(errors) || !parsedQty.ok || amount === null) return
     onChange([
       ...items,
       {
@@ -241,6 +248,7 @@ export function GenericInvoiceItems({
     setDescTerm('')
     setQty(String(row.qty))
     setUnitAmount(String(row.unitAmount))
+    setDraftErrors({})
   }
 
   const onDraftKeyDown = (event: React.KeyboardEvent) => {
@@ -251,14 +259,17 @@ export function GenericInvoiceItems({
 
   return (
     <>
-      <div className="sticky top-0 z-10 grid gap-3 border-y border-border bg-muted px-6 py-4 md:grid-cols-[minmax(0,1fr)_7rem_8rem_auto] md:items-end">
-        <div className="space-y-1.5">
+      <div className="sticky top-0 z-10 grid gap-x-3 gap-y-1 border-y border-border bg-muted px-6 pt-4 pb-3 md:grid-cols-[minmax(0,1fr)_7rem_8rem_auto] md:items-start">
+        <div data-field="description" className="min-w-0 space-y-1.5">
           <Label className={EYEBROW}>{t('invoices.generic.description')}</Label>
           <SearchableCombobox<GenericCatalogItem>
             value={descItem}
             onChange={fillFromCatalog}
             searchTerm={descTerm}
-            onSearchTermChange={setDescTerm}
+            onSearchTermChange={(term) => {
+              setDescTerm(term)
+              clearDraftError('description')
+            }}
             items={catalog.data ?? []}
             isLoading={catalog.isFetching}
             getItemKey={(item) => (item.id > 0 ? item.id : `custom:${item.name}`)}
@@ -289,6 +300,7 @@ export function GenericInvoiceItems({
               </span>
             )}
           />
+          <FieldMessage message={draftErrors.description} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="generic-item-qty" className={EYEBROW}>
@@ -296,15 +308,21 @@ export function GenericInvoiceItems({
           </Label>
           <Input
             id="generic-item-qty"
+            name="qty"
             type="number"
             min={0.01}
             step="0.01"
             value={qty}
             disabled={disabled}
+            aria-invalid={draftErrors.qty ? true : undefined}
             className="bg-card text-right font-mono tabular-nums"
-            onChange={(e) => setQty(e.target.value)}
+            onChange={(e) => {
+              setQty(e.target.value)
+              clearDraftError('qty')
+            }}
             onKeyDown={onDraftKeyDown}
           />
+          <FieldMessage message={draftErrors.qty} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="generic-item-amount" className={EYEBROW}>
@@ -312,23 +330,35 @@ export function GenericInvoiceItems({
           </Label>
           <Input
             id="generic-item-amount"
+            name="unitAmount"
             type="number"
             min={-999999.99}
             max={999999.99}
             step="0.01"
             value={unitAmount}
             disabled={disabled}
+            aria-invalid={draftErrors.unitAmount ? true : undefined}
             className="bg-card text-right font-mono tabular-nums"
-            onChange={(e) => setUnitAmount(e.target.value)}
+            onChange={(e) => {
+              setUnitAmount(e.target.value)
+              clearDraftError('unitAmount')
+            }}
             onKeyDown={onDraftKeyDown}
           />
+          <FieldMessage message={draftErrors.unitAmount} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {toolbarExtra}
-          <Button type="button" disabled={disabled} onClick={addItem}>
-            <Plus />
-            {t('invoices.generic.addItem')}
-          </Button>
+        <div className="space-y-1.5">
+          {/* El alto de una etiqueta: con la fila en items-start, los botones quedan a la altura de los campos. */}
+          <span aria-hidden className={`${EYEBROW} hidden md:block`}>
+            {'\u00a0'}
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {toolbarExtra}
+            <Button type="button" disabled={disabled} onClick={addItem}>
+              <Plus />
+              {t('invoices.generic.addItem')}
+            </Button>
+          </div>
         </div>
       </div>
 

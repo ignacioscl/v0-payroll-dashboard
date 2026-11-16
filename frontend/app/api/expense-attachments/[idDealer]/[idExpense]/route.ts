@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { authorizeAttachmentAccess, denyAttachmentUpload, logAttachmentUpload, nodeTicketsUrl } from '@/lib/expense-attachments-server'
+import {
+  authorizeAttachmentAccess,
+  denyAttachmentUpload,
+  fetchNodeTickets,
+  logAttachmentUpload,
+  nodeTicketsUrl,
+} from '@/lib/expense-attachments-server'
+import { upstreamErrorResponse } from '@/lib/upstream-error'
+import { checkAttachmentUpload, readBodyWithLimit, ATTACHMENT_TOO_BIG_MESSAGE } from '@/lib/expense-attachments-validate'
 
 type RouteContext = { params: Promise<{ idDealer: string; idExpense: string }> }
 
@@ -32,14 +40,17 @@ function normalizeFileList(raw: unknown): string[] {
 /** GET: lista de adjuntos del gasto. */
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { idDealer, idExpense } = await context.params
-  const auth = await authorizeAttachmentAccess(idDealer, idExpense)
-  if ('error' in auth) return auth.error
-
-  const upstream = await fetch(nodeTicketsUrl(auth.idDealer, auth.idExpense), {
-    method: 'GET',
-    headers: { Authorization: auth.session.token },
-    cache: 'no-store',
-  })
+  let upstream: Response
+  try {
+    const auth = await authorizeAttachmentAccess(idDealer, idExpense)
+    if ('error' in auth) return auth.error
+    upstream = await fetchNodeTickets(nodeTicketsUrl(auth.idDealer, auth.idExpense), {
+      method: 'GET',
+      headers: { Authorization: auth.session.token },
+    })
+  } catch (err) {
+    return upstreamErrorResponse(err)
+  }
   if (upstream.status === 404) return NextResponse.json({ files: [] })
   if (!upstream.ok) {
     return NextResponse.json({ error: `Attachments (${upstream.status})` }, { status: 502 })
@@ -71,19 +82,29 @@ function uploadedFilename(raw: unknown): string | null {
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   const { idDealer, idExpense } = await context.params
-  const auth = await authorizeAttachmentAccess(idDealer, idExpense)
-  if ('error' in auth) return auth.error
-  const denied = await denyAttachmentUpload(auth.session, auth.idExpense)
-  if (denied) return denied
+  let auth: Awaited<ReturnType<typeof authorizeAttachmentAccess>>
+  let upstream: Response
+  try {
+    auth = await authorizeAttachmentAccess(idDealer, idExpense)
+    if ('error' in auth) return auth.error
+    const denied = await denyAttachmentUpload(auth.session, auth.idExpense)
+    if (denied) return denied
 
-  const contentType = request.headers.get('content-type') ?? 'application/json'
-  const body = await request.arrayBuffer()
-  const upstream = await fetch(nodeTicketsUrl(auth.idDealer, auth.idExpense), {
-    method: 'POST',
-    headers: { 'Content-Type': contentType, Authorization: auth.session.token },
-    body,
-    cache: 'no-store',
-  })
+    // Tope del transporte (aunque no venga Content-Length), después el archivo real y su tipo (3.14).
+    const contentType = request.headers.get('content-type') ?? 'application/json'
+    const read = await readBodyWithLimit(request)
+    if (!read.ok) return NextResponse.json({ error: ATTACHMENT_TOO_BIG_MESSAGE }, { status: 413 })
+    const check = await checkAttachmentUpload(contentType, read.bytes)
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status })
+    const body = read.bytes
+    upstream = await fetchNodeTickets(nodeTicketsUrl(auth.idDealer, auth.idExpense), {
+      method: 'POST',
+      headers: { 'Content-Type': contentType, Authorization: auth.session.token },
+      body,
+    })
+  } catch (err) {
+    return upstreamErrorResponse(err)
+  }
   const text = await upstream.text()
   if (!upstream.ok) {
     return new NextResponse(text || '{}', {

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -18,7 +17,6 @@ export const ROLES_GUIDE_URL = '/docs/SRS-PRO-Roles-Guide.pdf'
 export function RolesGuideButton() {
   const { t } = useTranslation()
   return (
-    <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button asChild size="sm" variant="outline" className="cursor-pointer gap-1.5">
@@ -30,6 +28,5 @@ export function RolesGuideButton() {
         </TooltipTrigger>
         <TooltipContent side="bottom">{t('roles.guideTooltip')}</TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   )
 }

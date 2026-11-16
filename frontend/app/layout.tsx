@@ -17,6 +17,9 @@ const michroma = Michroma({
 export const metadata: Metadata = {
   title: 'SRS Suite Pro',
   description: 'Payroll, billing and attendance management dashboard',
+  // Panel privado: que ningún buscador lo indexe (plans/plan-buenas-practicas-v0, 3.16). Sin robots.txt con Disallow,
+  // que impediría al buscador ver este noindex.
+  robots: { index: false, follow: false },
   icons: {
     icon: [
       { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },

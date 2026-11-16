@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+jest.mock('../logs/error-log-file', () => ({ appendErrorLine: jest.fn() }))
 import { I18nErrorFilter } from './i18n.error.filter'
 import { DB_POOL_BUSY, DB_POOL_BUSY_MESSAGE, poolBusyError } from '../../srs/srs-pool-acquire-timeout'
 

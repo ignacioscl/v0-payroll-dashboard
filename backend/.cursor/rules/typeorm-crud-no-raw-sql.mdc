@@ -18,7 +18,7 @@ alwaysApply: false
 | **Repository** | `extends BaseRepository` + `@InjectRepository(Entity)` **sin** segundo arg |
 | **Service** | `extends GlobalBaseService` + `getRepository()` |
 | **Mutaciones multi-tabla** | Service orquestador inyecta otros **services** + `@Transactional()` |
-| **Controller** | Thin; auth payroll: `SrsJwtGuard` en `/srs/...` si el FE manda JWT PHP |
+| **Controller** | Thin; en `/srs/...`. La auth la pone el guard global (`SrsJwtGuard` como `APP_GUARD`): sin `@UseGuards(SrsJwtGuard)`; una ruta sin login solo con `@Public()` por método (`nest-security-baseline.mdc`) |
 
 **No uses `SRS_CONNECTION` en features CRUD nuevos.** No está en `create-feature`. Misma DB; default alcanza.
 

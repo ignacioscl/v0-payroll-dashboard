@@ -1,14 +1,12 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { PieChart } from 'lucide-react'
 
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { DataTable, DataTableColumnHeader, type DataTableColumnMeta } from '@/components/shared/data-table'
 import { ServerXlsxExportButton } from '@/components/shared/server-xlsx-export-button'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { fmtAmount } from '@/lib/expenses/expense-format'
 import { toCents } from '@/lib/expenses/expense-rules'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -40,10 +38,9 @@ export function AnalyticsTable({
   removedIds?: ReadonlySet<number>
 }) {
   const { t } = useTranslation()
-  const router = useRouter()
-  const isMobile = useIsMobile()
   const columnPinning = React.useMemo(() => ({ left: [], right: [] }), [])
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular la tabla no corta el texto (DataTable, plans/plan-buenas-practicas-v0, 5.2).
+  const wrap = 'truncate'
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'total', desc: true }])
   const rows = React.useMemo(() => data?.rows ?? [], [data])
   const total = data?.total ?? '0'
@@ -114,13 +111,18 @@ export function AnalyticsTable({
     [t, nameLabel, wrap, total, removedIds],
   )
 
-  const onRowClick = (row: AnalyticsRow) => {
-    if (!params) return
+  /**
+   * La fila es un enlace a la lista de Expenses con sus filtros en la dirección (la lista los aplica y limpia la
+   * dirección): en otra pestaña (Ctrl/Cmd + clic o el botón del medio) también llegan (plans/plan-buenas-practicas-v0,
+   * 4.4).
+   */
+  const rowLink = (row: AnalyticsRow) => {
+    if (!params) return null
     const q = new URLSearchParams({ from: params.from, to: params.to, name: row.name })
     if (groupBy === 'category') q.set('idCategory', String(row.id))
     else if (groupBy === 'company') q.set('idCompany', String(row.id))
     else q.set('idDealer', String(row.id))
-    router.push(`/expenses?${q.toString()}`)
+    return { href: `/expenses?${q.toString()}` }
   }
 
   return (
@@ -133,7 +135,7 @@ export function AnalyticsTable({
       columnPinning={columnPinning}
       sorting={sorting}
       onSortingChange={setSorting}
-      onRowClick={onRowClick}
+      rowLink={rowLink}
       defaultPageSize={25}
       includeAllPageSize
       enableGlobalFilter={false}

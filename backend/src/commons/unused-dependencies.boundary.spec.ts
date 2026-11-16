@@ -29,9 +29,7 @@ const USED_WITHOUT_IMPORT: Record<string, string> = {
   eslint: 'script lint (.eslintrc.js)',
   '@typescript-eslint/eslint-plugin': 'plugin de .eslintrc.js',
   '@typescript-eslint/parser': 'parser de .eslintrc.js',
-  'eslint-config-prettier': 'lo pide plugin:prettier/recommended de .eslintrc.js',
-  'eslint-plugin-import': 'plugin:import de .eslintrc.js',
-  'eslint-plugin-prettier': 'plugin:prettier/recommended de .eslintrc.js',
+  'eslint-config-prettier': "extends 'prettier' de .eslintrc.js (apaga las reglas de formato)",
   prettier: 'script format (.prettierrc.js)',
 }
 

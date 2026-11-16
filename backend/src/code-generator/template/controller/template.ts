@@ -12,7 +12,6 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common'
 import {
   ApiBadRequestResponse,
@@ -27,14 +26,15 @@ import {
 } from '@nestjs/swagger'
 
 import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
-import { SrsJwtGuard } from 'src/srs/auth/srs-jwt.guard'
 import { DataErrorDto } from 'src/commons/errors/data.error.dto'
 import { TemplateService } from '../service/template'
 import { TemplateDto, TemplatePaginationDto, TemplateQueryDto, UpdateTemplateDto } from '../dto/template'
 import { Template } from '../entity/template'
 
-/** Auth de PRO: el JWT de PHP lo valida SrsJwtGuard, que deja el usuario en request.srsContext. */
-@UseGuards(SrsJwtGuard)
+/**
+ * Auth de PRO: el guard global (SrsJwtGuard como APP_GUARD) valida el JWT de PHP y deja el usuario en
+ * request.srsContext. Sin guard propio en el controlador: correría dos veces.
+ */
 @Controller('/srs/template')
 @ApiTags('Template')
 @ApiBearerAuth()

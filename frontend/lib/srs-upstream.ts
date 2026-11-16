@@ -4,8 +4,13 @@
  * (e.g. http://srs.com) or we fall back to node:http with Host from SRS_PUBLIC_URL.
  */
 
+import 'server-only'
+
 import http from 'node:http'
 import https from 'node:https'
+
+import { fetchWithHeadersTimeout, timeoutError } from '@/lib/upstream-fetch'
+import { SRS_PROXY_TIMEOUT_MS } from '@/lib/upstream-timeouts'
 
 export function getSrsApiBaseUrl(): string {
   const url = process.env.SRS_API_URL?.trim()
@@ -42,7 +47,8 @@ function buildUpstreamUrl(path: string): URL {
 function nodeHttpFetch(
   target: URL,
   hostHeader: string,
-  init?: RequestInit,
+  init: RequestInit | undefined,
+  timeoutMs: number,
 ): Promise<Response> {
   const method = init?.method ?? 'GET'
   const headers: Record<string, string> = {}
@@ -66,6 +72,8 @@ function nodeHttpFetch(
   const lib = target.protocol === 'https:' ? https : http
 
   return new Promise((resolve, reject) => {
+    // Hasta el evento `response` (los encabezados); el body no tiene corte propio. El `signal` de http.request
+    // rechaza con AbortError, no con TimeoutError: por eso el temporizador propio (se arma abajo, después del req).
     const req = lib.request(
       {
         protocol: target.protocol,
@@ -76,6 +84,7 @@ function nodeHttpFetch(
         headers,
       },
       (res) => {
+        clearTimeout(timer)
         const chunks: Buffer[] = []
         res.on('data', (chunk) => chunks.push(chunk))
         res.on('end', () => {
@@ -90,7 +99,21 @@ function nodeHttpFetch(
         })
       },
     )
-    req.on('error', reject)
+    const timer = setTimeout(() => {
+      const err = timeoutError(timeoutMs)
+      req.destroy(err)
+      reject(err)
+    }, timeoutMs)
+    const outer = init?.signal
+    if (outer) {
+      const onAbort = () => req.destroy(outer.reason)
+      if (outer.aborted) onAbort()
+      else outer.addEventListener('abort', onAbort, { once: true })
+    }
+    req.on('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
     if (body) {
       req.write(body)
     }
@@ -98,16 +121,20 @@ function nodeHttpFetch(
   })
 }
 
+/**
+ * `timeoutMs` cuenta hasta los encabezados (por defecto `SRS_PROXY_TIMEOUT_MS`); vencido, rechaza con `TimeoutError`.
+ */
 export async function fetchSrsUpstream(
   path: string,
   init?: RequestInit,
+  { timeoutMs = SRS_PROXY_TIMEOUT_MS }: { timeoutMs?: number } = {},
 ): Promise<Response> {
   const target = buildUpstreamUrl(path)
   const vhost = getSrsUpstreamHost()
 
   if (vhost && target.host !== vhost) {
-    return nodeHttpFetch(target, vhost, init)
+    return nodeHttpFetch(target, vhost, init, timeoutMs)
   }
 
-  return fetch(target.toString(), { ...init, cache: 'no-store' })
+  return fetchWithHeadersTimeout(target.toString(), { ...init, cache: 'no-store' }, timeoutMs)
 }

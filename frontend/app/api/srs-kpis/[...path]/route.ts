@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSrsSession } from '@/lib/auth/session'
 import { fetchBackend } from '@/lib/backend-upstream'
-import { proxyResponseBody } from '@/lib/proxy-response'
+import { proxyResponseBody, securityHeadersFrom } from '@/lib/proxy-response'
+import { upstreamErrorResponse } from '@/lib/upstream-error'
 
 type RouteContext = { params: Promise<{ path: string[] }> }
 
@@ -39,12 +40,18 @@ async function handle(request: NextRequest, context: RouteContext) {
   // plans/plan-export-invoices-nest). Same rule: only the session sets it, never the browser.
   headers['x-srs-company-type'] = session.user.isCompanyTypeCompany ? '1' : '0'
 
-  const upstream = await fetchBackend(target, session.token, {
-    method: request.method,
-    headers,
-    body: hasBody ? await request.arrayBuffer() : undefined,
-    signal: request.signal,
-  })
+  let upstream: Response
+  try {
+    upstream = await fetchBackend(target, session.token, {
+      method: request.method,
+      headers,
+      body: hasBody ? await request.arrayBuffer() : undefined,
+      signal: request.signal,
+    })
+  } catch (err) {
+    // El Nest no contestó a tiempo → 504; caído → 502, con mensaje (antes, 500 vacío).
+    return upstreamErrorResponse(err)
+  }
 
   const contentType = upstream.headers.get('content-type') ?? 'application/json'
   const contentDisposition = upstream.headers.get('content-disposition')
@@ -59,13 +66,14 @@ async function handle(request: NextRequest, context: RouteContext) {
     if (contentDisposition) out.set('Content-Disposition', contentDisposition)
     const contentLength = upstream.headers.get('content-length')
     if (contentLength) out.set('Content-Length', contentLength)
+    for (const [k, v] of Object.entries(securityHeadersFrom(upstream))) out.set(k, v)
     return new NextResponse(upstream.body, { status: upstream.status, headers: out })
   }
 
   const buf = await upstream.arrayBuffer()
   return new NextResponse(proxyResponseBody(upstream.status, buf), {
     status: upstream.status,
-    headers: { 'Content-Type': contentType },
+    headers: { 'Content-Type': contentType, ...securityHeadersFrom(upstream) },
   })
 }
 

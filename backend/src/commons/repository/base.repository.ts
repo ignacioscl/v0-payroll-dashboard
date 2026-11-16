@@ -1,17 +1,16 @@
-import { Repository, SelectQueryBuilder } from 'typeorm'
+import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm'
 import { PaginationDto } from '../pagination/Pagination.dto'
 import { I18nError } from '../errors/i18n.error'
 import { HttpStatus } from '@nestjs/common'
 
 export abstract class BaseRepository<
-  T extends {},
+  T extends ObjectLiteral,
   R extends { id?: number; orderBy?: { value: string; order: 'ASC' | 'DESC' }[] },
 > extends Repository<T> {
   abstract fetch(payload: R): Promise<PaginationDto<T>>
 
   public getOrderBy(query: SelectQueryBuilder<T>, payload: R) {
     if (payload.orderBy) {
-      console.log(payload.orderBy.toString())
       const jsonObject = JSON.parse(payload.orderBy.toString())
       jsonObject.forEach((o: any) => {
         query.orderBy(o.value, o.order)

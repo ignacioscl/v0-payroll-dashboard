@@ -57,14 +57,14 @@ docker inspect srs-payroll-dashboard --format '{{.HostConfig.RestartPolicy.Name}
 
    ```bash
    export PAYROLL_ENV_FILE=/ruta/custom/payroll-dashboard.env
-   docker compose up -d --build
+   DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
 
 ## Arranque
 
 ```bash
 cd v0-payroll-dashboard
-docker compose up -d --build
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
 
 App: `http://<servidor>:3010`
@@ -74,7 +74,7 @@ App: `http://<servidor>:3010`
 ```bash
 docker compose logs -f payroll-dashboard
 docker compose restart payroll-dashboard
-docker compose up -d --build   # tras cambios de código
+DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build   # tras cambios de código
 ```
 
 Tras cambiar solo `/opt/srs/payroll-dashboard.env`:

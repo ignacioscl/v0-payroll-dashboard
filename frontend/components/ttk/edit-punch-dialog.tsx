@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { FieldMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -32,6 +33,7 @@ import { getSrsErrorMessage } from '@/lib/srs/parse-srs-response'
 import { useTtkPunchDetail } from '@/hooks/use-ttk-punch-detail'
 import { useTtkEditPunch } from '@/hooks/use-ttk-edit-punch'
 import type { TtkPunchDetail, TtkEditPunchPayload } from '@/lib/ttk/ttk-edit-types'
+import { focusFirstFieldError } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { getPunchFieldLabel, getPunchFieldLabels } from '@/lib/i18n/label-helpers'
 import {
@@ -157,10 +159,11 @@ export function EditPunchDialog({
 
   const handleSubmit = async () => {
     if (!punchId) return
-    const { generalError, fieldErrors: errs } = validatePunchForm(form, t)
+    // Cada error bajo su campo y la pantalla al primero; el recuadro de abajo queda para el error del servidor.
+    const { fieldErrors: errs } = validatePunchForm(form, t)
     setFieldErrors(errs)
-    if (generalError) {
-      setValidationError(generalError)
+    if (focusFirstFieldError(errs)) {
+      setValidationError(null)
       return
     }
 
@@ -275,6 +278,7 @@ export function EditPunchDialog({
               handleSubmit()
             }}
             className="space-y-4"
+            noValidate
           >
             {renderTimeField('punchIn', <LogIn className="h-4 w-4 text-emerald-600" />, true)}
             {renderTimeField('breakStart', <Coffee className="h-4 w-4 text-amber-600" />)}
@@ -402,12 +406,7 @@ function TimeField({
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
-      {error && (
-        <p className="flex items-center gap-1 text-xs text-destructive">
-          <AlertTriangle className="h-3 w-3" />
-          {error}
-        </p>
-      )}
+      <FieldMessage message={error} />
       {noteValue !== undefined && onNoteChange && (
         <div className="space-y-1">
           <Label htmlFor={`${id}_note`} className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
@@ -416,6 +415,7 @@ function TimeField({
           </Label>
           <Input
             id={`${id}_note`}
+            name={`${id}Note`}
             type="text"
             placeholder={t('punch.whyChangedField', { field: label.toLowerCase() })}
             maxLength={254}
@@ -425,12 +425,7 @@ function TimeField({
             aria-invalid={Boolean(noteError)}
             className={cn('text-xs', noteError && 'border-destructive focus-visible:ring-destructive/30')}
           />
-          {noteError && (
-            <p className="flex items-center gap-1 text-[11px] text-destructive">
-              <AlertTriangle className="h-3 w-3" />
-              {noteError}
-            </p>
-          )}
+          <FieldMessage message={noteError} />
         </div>
       )}
     </div>

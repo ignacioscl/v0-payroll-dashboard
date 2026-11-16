@@ -9,17 +9,16 @@ import {
   Post,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../srs/auth/srs-jwt.guard'
 import { SrsContext } from '../srs/auth/srs-auth-context.service'
 import { SRS_ROL_ADMIN_GENERAL } from '../srs/shared/kpi/srs-kpi-dealer-filter'
 import { JobRunQueryDto, JobRunRequestDto } from '../features/job-run/dto/job-run.dto'
 import { JobRunService } from '../features/job-run/service/job-run.service'
 import { JobRunLogService } from '../features/job-run-log/service/job-run-log.service'
 import { JobRegistryService } from './job-registry.service'
+import { JobNameParamDto } from './dto/job-name-param.dto'
 import { JobRunnerService, JobRunOutcome } from './job-runner.service'
 import { ContratistaService } from '../features/srs-contratista/service/contratista.service'
 import { isJobsProd } from './jobs-env'
@@ -37,7 +36,6 @@ function assertAdminGeneral(ctx: SrsContext | undefined): void {
  * Responde en `/api/jobs` (curl, plan §8) y en `/api/srs/jobs` (la pantalla de v0 llega al Nest por
  * el proxy `/api/srs-kpis/*`, que solo reenvía a `/api/srs/*`).
  */
-@UseGuards(SrsJwtGuard)
 @Controller(['/jobs', '/srs/jobs'])
 @ApiTags('Jobs')
 @ApiBearerAuth()
@@ -103,10 +101,10 @@ export class JobsController {
   @Post('/:name/run')
   async run(
     @Req() request: any,
-    @Param('name') name: string,
+    @Param() params: JobNameParamDto,
     @Body() body: JobRunRequestDto,
   ): Promise<JobRunOutcome> {
     assertAdminGeneral(request.srsContext)
-    return this.runner.run(name, body?.payload ?? {}, 'api', { dryRun: body?.dryRun, force: body?.force })
+    return this.runner.run(params.name, body?.payload ?? {}, 'api', { dryRun: body?.dryRun, force: body?.force })
   }
 }

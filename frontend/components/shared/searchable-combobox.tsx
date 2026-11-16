@@ -1,12 +1,12 @@
 'use client'
 
 import * as React from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
 import { Check, ChevronsUpDown, Loader2, Search, Trash2, X } from 'lucide-react'
 import {
   Command,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
@@ -429,29 +429,17 @@ export function SearchableCombobox<T>({
         className={cn('min-w-[280px] overflow-hidden p-0 shadow-lg', popoverWidth)}
       >
         <Command shouldFilter={!serverSideSearch} className="bg-popover">
-          <div className="flex items-center gap-2 border-b border-border/70 px-3">
-            <Search className="size-4 shrink-0 text-muted-foreground" />
-            <CommandPrimitive.Input
-              ref={inputRef}
-              value={searchTerm}
-              onValueChange={onSearchTermChange}
-              onKeyDown={onSearchKeyDown}
-              placeholder={resolvedSearchPlaceholder}
-              className="flex h-10 w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => onSearchTermChange('')}
-                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label={t('combobox.clearSearch')}
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
+          <CommandInput
+            ref={inputRef}
+            value={searchTerm}
+            onValueChange={onSearchTermChange}
+            onKeyDown={onSearchKeyDown}
+            placeholder={resolvedSearchPlaceholder}
+            wrapperClassName="h-auto border-border/70"
+            className="h-10 rounded-none py-0"
+            autoComplete="off"
+            spellCheck={false}
+          />
 
           <CommandList ref={listRef} className={listMaxHeight}>
             {/* Prerequisite gate takes precedence over the pre-search hint */}

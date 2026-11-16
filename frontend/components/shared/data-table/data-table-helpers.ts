@@ -10,6 +10,19 @@ import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/reac
 /** TanStack pageSize sentinel → legacy DataTables `length: -1` (all rows). */
 export const DATA_TABLE_PAGE_SIZE_ALL = -1
 
+/**
+ * Celdas de texto del `DataTable` en celular (< 768 px): en varias líneas, sin «…», también el `truncate` que la
+ * pantalla ponga adentro (plans/plan-buenas-practicas-v0, 5.2). La tabla lo pone sola; las pantallas no.
+ */
+export const MOBILE_WRAP_CELL =
+  'max-md:whitespace-normal max-md:break-words max-md:[&_.truncate]:whitespace-normal max-md:[&.truncate]:whitespace-normal'
+
+/**
+ * Para el texto que una pantalla dibuja fuera de las celdas del `DataTable` (sub-tablas propias): en celular va en
+ * varias líneas; en la compu se corta con «…» como siempre.
+ */
+export const MOBILE_WRAP_TEXT = 'whitespace-normal break-words md:truncate'
+
 /* -------------------------------------------------------------------------- */
 /* Operator catalogues                                                         */
 /* -------------------------------------------------------------------------- */

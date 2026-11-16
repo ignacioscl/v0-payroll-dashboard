@@ -22,7 +22,6 @@ export function getColumnNameFromEx(errorMessage: string): string | null {
  * @returns YYYY-MM-DD
  */
 export function formatDate2String(date: Date): string {
-  console.log(date)
   const year = date.getFullYear()
   const month = (date.getMonth() + 1).toString().padStart(2, '0') // El mes se indexa desde 0, por lo que se suma 1
   const day = date.getDate().toString().padStart(2, '0')
@@ -99,8 +98,8 @@ export function isValidTimeBetween(from: string, to: string): boolean {
     return false;
   }
 
-  const [hourFrom, minutesFrom] = from.split(':').map(Number);
-  const [hourTo, minutesTo] = to.split(':').map(Number);
+  const [hourFrom] = from.split(':').map(Number);
+  const [hourTo] = to.split(':').map(Number);
 
   if (hourFrom > hourTo) {
     return false;

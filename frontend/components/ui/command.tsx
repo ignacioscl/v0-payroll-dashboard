@@ -2,8 +2,9 @@
 
 import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
-import { SearchIcon } from 'lucide-react'
+import { SearchIcon, X } from 'lucide-react'
 
+import { useTranslation } from '@/lib/i18n/locale-context'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -60,17 +61,37 @@ function CommandDialog({
   )
 }
 
+/**
+ * Cambio propio sobre la primitiva de shadcn (plans/plan-buenas-practicas-v0, 5.1): con `value` y
+ * `onValueChange`, y con texto, dibuja la X adentro a la derecha, que borra el texto y devuelve el cursor al
+ * campo. Es el único buscador de combo del repo (control: `lib/ui-guards.test.ts`); el de las pantallas es
+ * `SearchInput`.
+ */
 function CommandInput({
   className,
+  wrapperClassName,
+  ref,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & { wrapperClassName?: string }) {
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const setRefs = React.useCallback(
+    (node: HTMLInputElement | null) => {
+      inputRef.current = node
+      if (typeof ref === 'function') ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref],
+  )
+  const { value, onValueChange, disabled } = props
+  const { t } = useTranslation()
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
+      className={cn('flex h-9 items-center gap-2 border-b px-3', wrapperClassName)}
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
+        ref={setRefs}
         data-slot="command-input"
         className={cn(
           'placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50',
@@ -78,6 +99,19 @@ function CommandInput({
         )}
         {...props}
       />
+      {value && onValueChange && !disabled ? (
+        <button
+          type="button"
+          onClick={() => {
+            onValueChange('')
+            inputRef.current?.focus()
+          }}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label={t('common.clearSearch')}
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
     </div>
   )
 }

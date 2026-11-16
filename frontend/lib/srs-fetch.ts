@@ -1,9 +1,12 @@
+import 'server-only'
 import { forwardToSrs } from '@/lib/srs-proxy'
 
 export { srsProxyUrl } from '@/lib/srs-proxy-url'
 
 export type SrsFetchInit = RequestInit & {
   searchParams?: Record<string, string | number | undefined>
+  /** Hasta los encabezados; por defecto `SRS_PROXY_TIMEOUT_MS` (lib/upstream-timeouts.ts). */
+  timeoutMs?: number
 }
 
 /**
@@ -29,7 +32,8 @@ export async function srsFetch(path: string, init?: SrsFetchInit) {
   let body: ArrayBuffer | null = null
   if (hasBody && init?.body) {
     if (typeof init.body === 'string') {
-      body = new TextEncoder().encode(init.body).buffer
+      // Copia a un ArrayBuffer propio (el de TextEncoder se tipa como ArrayBufferLike).
+      body = new TextEncoder().encode(init.body).slice().buffer as ArrayBuffer
     } else if (init.body instanceof ArrayBuffer) {
       body = init.body
     } else {
@@ -45,6 +49,7 @@ export async function srsFetch(path: string, init?: SrsFetchInit) {
     body,
     contentType: headers.get('content-type'),
     accept: headers.get('accept'),
+    timeoutMs: init?.timeoutMs,
   })
 
   return response

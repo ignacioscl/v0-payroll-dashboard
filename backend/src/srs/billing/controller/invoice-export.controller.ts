@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Inject, Post, Query, Req, Res, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Post, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { InvoiceListQueryDto } from '../dto/invoice-list.dto'
 import {
   InvoiceExportMailBodyDto,
@@ -30,7 +29,6 @@ function phpTokenOf(request: any): string {
  * Export of Billing → Invoices (plans/plan-export-invoices-nest §2.1.2). The filters travel in
  * the query through the same InvoiceListQueryDto as the grid; `page`/`pageSize` are ignored.
  */
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/billing/invoices/export')
 @ApiTags('SRS Billing - Invoices export')
 @ApiBearerAuth()

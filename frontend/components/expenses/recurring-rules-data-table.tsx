@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { RULES_LIST_KEY, useDeleteRule } from '@/hooks/use-recurring-rules'
 import { downloadServerXlsx } from '@/lib/download-xlsx'
@@ -30,6 +30,8 @@ import { fmtAmount, fmtYmd, frequencyLabel, splitLabel } from '@/lib/expenses/ex
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { fetchRules, ruleDealersExportUrl, type RuleListResponse, type RuleRow } from '@/lib/srs-expenses-api'
 import { cn } from '@/lib/utils'
+
+const RULES_PINNING = { left: ['description'], right: ['actions'] }
 
 const rulesAdapter: DataTableServerAdapter<RuleRow, RuleListResponse> = {
   buildRequest: (ctx) => ({
@@ -65,11 +67,9 @@ export function RecurringRulesDataTable({
   const [confirmDelete, setConfirmDelete] = React.useState<RuleRow | null>(null)
   const [exporting, setExporting] = React.useState<number | null>(null)
 
-  const columnPinning = React.useMemo(
-    () => (isMobile ? { left: [], right: [] } : { left: ['description'], right: ['actions'] }),
-    [isMobile],
-  )
-  const wrap = isMobile ? 'whitespace-normal break-words' : 'truncate'
+  // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
+  const columnPinning = RULES_PINNING
+  const wrap = 'truncate'
 
   const exportDealers = React.useCallback(
     async (rule: RuleRow) => {
@@ -99,7 +99,6 @@ export function RecurringRulesDataTable({
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className={cn('min-w-0 font-medium', wrap)}>{row.original.description}</span>
                 {warnings.length && !isMobile ? (
-                  <TooltipProvider delayDuration={200}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button" className="inline-flex shrink-0 rounded-sm" aria-label={warnings.join(' ')}>
@@ -110,7 +109,6 @@ export function RecurringRulesDataTable({
                         {warnings.join('\n')}
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
                 ) : null}
               </span>
               {/* En celular no hay hover: el aviso va escrito debajo, como las notas en Expenses List. */}
@@ -127,8 +125,7 @@ export function RecurringRulesDataTable({
         },
         meta: {
           label: t('expenses.ruleDescription'),
-          // Fija en la compu; en celular ninguna columna fija (regla data-table).
-          pin: isMobile ? undefined : 'left',
+          pin: 'left',
         } satisfies DataTableColumnMeta<RuleRow>,
       },
       {
@@ -270,7 +267,7 @@ export function RecurringRulesDataTable({
         },
         meta: {
           label: t('expenses.actions'),
-          pin: isMobile ? undefined : 'right',
+          pin: 'right',
           headerClassName: 'px-1',
           cellClassName: 'px-1',
         } satisfies DataTableColumnMeta<RuleRow>,

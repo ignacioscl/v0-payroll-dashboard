@@ -9,7 +9,6 @@ import {
   Info,
   List,
   ListChecks,
-  Search,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
+import { SearchInput } from '@/components/shared/search-input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -33,7 +32,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
@@ -209,25 +207,19 @@ export function RoleTemplatePermissionsSheet({
         </SheetHeader>
 
         <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
-          <div className="relative">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={searchTerm}
-              className="pl-9"
-              placeholder={t('roles.searchPermissions')}
-              aria-label={t('roles.searchPermissions')}
-              onChange={(event) => {
-                setSearchState({
-                  templateId: id,
-                  value: event.target.value,
-                })
-              }}
-            />
-          </div>
+          <SearchInput
+            value={searchTerm}
+            iconClassName="left-3 size-4"
+            inputClassName="pl-9"
+            placeholder={t('roles.searchPermissions')}
+            aria-label={t('roles.searchPermissions')}
+            onValueChange={(value) => {
+              setSearchState({
+                templateId: id,
+                value,
+              })
+            }}
+          />
           {permissions.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {permissionGroups.length > 0 ? (
@@ -283,7 +275,6 @@ export function RoleTemplatePermissionsSheet({
                 : t('roles.noPermissionResults')}
             </p>
           ) : (
-            <TooltipProvider delayDuration={200}>
               <div className="space-y-2 py-3">
                 {permissionGroups.map((group) => {
                   const isOpen =
@@ -397,7 +388,6 @@ export function RoleTemplatePermissionsSheet({
                   )
                 })}
               </div>
-            </TooltipProvider>
           )}
         </ScrollArea>
       </SheetContent>

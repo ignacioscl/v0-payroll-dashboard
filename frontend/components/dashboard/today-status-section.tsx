@@ -3,7 +3,6 @@
 import { useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
-import { useRouter } from 'next/navigation'
 import { Activity, Coffee, LogOut } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { useTtkTodayStatus } from '@/hooks/use-ttk-today-status'
@@ -21,7 +20,6 @@ const CARD_ICONS: Record<TodayLiveStatus, React.ReactNode> = {
 }
 
 export function TodayStatusSection() {
-  const router = useRouter()
   const { t, locale } = useTranslation()
   const dateFnsLocale = locale === 'es' ? es : enUS
   const { setDateRange, setSelectedTodayLiveStatus, setSelectedType, setErrorStatus } =
@@ -52,7 +50,11 @@ export function TodayStatusSection() {
     [liveStatusLabels],
   )
 
-  const openPunchReport = (liveStatus: TodayLiveStatus) => {
+  /**
+   * Corre en el `onNavigate` del enlace de la tarjeta: solo al navegar en la misma pestaña. Con Ctrl/Cmd + clic la
+   * otra pestaña abre sin estos filtros y la actual no cambia (plans/plan-buenas-practicas-v0, 4.4, D12).
+   */
+  const setPunchReportFilters = (liveStatus: TodayLiveStatus) => {
     setSelectedType('all')
     // Fija los DOS ejes: con la tabla de verdad, `all` + `corrected` se convierte en
     // `only_fixed`, así que Working/Lunch/Out abriría historial corregido en vez
@@ -60,7 +62,6 @@ export function TodayStatusSection() {
     setErrorStatus('pending')
     setSelectedTodayLiveStatus(liveStatus)
     setDateRange(getTodayDateRange())
-    router.push('/issues')
   }
 
   return (
@@ -86,7 +87,8 @@ export function TodayStatusSection() {
             variant={card.variant}
             loading={loading}
             inline
-            onClick={() => openPunchReport(card.status)}
+            href="/issues"
+            onNavigate={() => setPunchReportFilters(card.status)}
           />
         ))}
       </div>

@@ -1,5 +1,7 @@
 export default () => ({
-  port: parseInt(process.env.PORT!, 10) ?? 8100,
+  // parseInt da NaN (nunca null) sin PORT: el `??` de antes no hacía nada. La validación (config/env.validation.ts)
+  // ya exige PORT; esto queda por si se lee fuera del Nest.
+  port: Number(process.env.PORT) || 3020,
   nodeEnv: process.env.NODE_ENV,
   sentryDSN: process.env.SENTRY_DSN,
   jwtSecret: process.env.JWT_SECRET,

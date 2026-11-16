@@ -106,7 +106,7 @@ test.describe.serial('Etapa 1 — pantallas de muestra fuera y lo pesado al usar
     const file = await download
     expect(file.suggestedFilename()).toMatch(/^income-by-dealer-\d.*\.xlsx$/)
     const wb = new ExcelJS.Workbook()
-    await wb.xlsx.load(await readFile((await file.path())!))
+    await wb.xlsx.readFile((await file.path())!)
     expect(wb.worksheets.map((w) => w.name)).toContain('Report Info')
     expect(wb.worksheets.length).toBeGreaterThan(1)
 

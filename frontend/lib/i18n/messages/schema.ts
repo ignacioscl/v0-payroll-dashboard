@@ -418,6 +418,10 @@ export interface Messages {
     actionEmailSuccess: string
     actionEmailError: string
     actionEmailInvalid: string
+    /** Lista de correos separada con otro signo (lib/validation/email-list.ts). */
+    emailListSeparator: string
+    /** Una dirección de más de 64 caracteres (lib/validation/email-list.ts). */
+    emailListTooLong: string
     emailQueueAdd: string
     emailQueueSuccess: string
     emailQueueError: string
@@ -444,6 +448,10 @@ export interface Messages {
     actionDiscountSuccess: string
     actionDiscountError: string
     actionDiscountInvalid: string
+    /** lib/billing/invoice-discount-rules.ts (D1, 3.17). */
+    actionDiscountNegative: string
+    actionDiscountDecimals: string
+    actionDiscountPercentOver100: string
     actionPoRoTitle: string
     actionPoRoField: string
     actionPoRoSuccess: string
@@ -765,6 +773,8 @@ export interface Messages {
     exportSuccess: string
     exportInProgress: string
     clearSearch: string
+    showPassword: string
+    hidePassword: string
     clearAll: string
     checkAll: string
     checkAllFiltered: string
@@ -1153,6 +1163,7 @@ export interface Messages {
     denied: string
     needTtk: string
     noDashboardAccess: string
+    noScreenAccess: string
   }
   layout: {
     openMenu: string
@@ -1703,6 +1714,8 @@ export interface Messages {
     scope: string
     logo: string
     logoHint: string
+    logoTypeInvalid: string
+    logoTooBig: string
     logoLegacy: string
     replace: string
     remove: string
@@ -1728,6 +1741,14 @@ export interface Messages {
     body: string
     tryAgain: string
   }
+  routeError: {
+    title: string
+    body: string
+  }
+  notFound: {
+    title: string
+    body: string
+  }
   employeeThumbnail: {
     title: string
     punchNumber: string
@@ -1751,7 +1772,6 @@ export interface Messages {
     ofTotal: string
     clearSelection: string
     deleteItem: string
-    clearSearch: string
     navigateHint: string
   }
   /** Expenses in Pro (plans/plan-expenses-pro/PLAN.md T9: the English texts are literal). */

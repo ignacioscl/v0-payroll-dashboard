@@ -3,10 +3,12 @@ import 'dotenv/config'
 
 import { DataSource, DataSourceOptions } from 'typeorm'
 import { resolveTypeOrmLogging } from './db-logging'
+import { DB_CONNECT_TIMEOUT_MS } from './db-timeouts'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 
 export const dataSourceOptions: DataSourceOptions = {
-  type: process.env.DB_CONNECTION as any,
+  // Mismo valor por defecto que srs.datasource.ts y jobs.datasource.ts (sin .env, p. ej. en el build de Docker).
+  type: (process.env.DB_CONNECTION?.trim() || 'mysql') as any,
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT ?? '8100'),
   username: process.env.DB_USERNAME,
@@ -18,13 +20,8 @@ export const dataSourceOptions: DataSourceOptions = {
   namingStrategy: new SnakeNamingStrategy(),
   migrations: [],
   migrationsRun: false, // NO NEGOCIABLE: no correr migraciones sobre la base
-  requestTimeout: 600000,
   timezone: 'Z', // Usar UTC para evitar problemas de zona horaria
-
-  options: {
-    encrypt: false, // Esto desactiva el uso de SSL
-    trustServerCertificate: true, // Esto indica al servidor que confíe en el certificado del servidor
-  },
+  connectTimeout: DB_CONNECT_TIMEOUT_MS,
   extra: {
     // Configuración adicional para manejo de fechas
     dateStrings: true,

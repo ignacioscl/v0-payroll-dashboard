@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+import { AppLink } from '@/components/shared/app-link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useSidebar } from '@/lib/sidebar-context'
@@ -36,7 +36,6 @@ import { brandingLogoUrl } from '@/lib/srs-provider-branding-api'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
@@ -103,6 +102,8 @@ function SidebarInner({
   const { user, hasPermission } = useSrsMe()
   const { t } = useTranslation()
   const [profileOpen, setProfileOpen] = useState(false)
+  const logoutForm = useRef<HTMLFormElement>(null)
+  const toPhpForm = useRef<HTMLFormElement>(null)
   /** Accordion: at most one parent group expanded (by href). */
   const [expandedGroupHref, setExpandedGroupHref] = useState<string | null>(null)
 
@@ -313,14 +314,14 @@ function SidebarInner({
             // Icon rail: parent link + optional child icon links (no accordion labels)
             if (effectiveCollapsed) {
               const linkContent = (
-                <Link
+                <AppLink
                   href={item.href}
                   onClick={onNavigate}
                   className={itemClassName}
                 >
                   {activeBar}
                   {iconEl}
-                </Link>
+                </AppLink>
               )
 
               return (
@@ -337,7 +338,7 @@ function SidebarInner({
                     return (
                       <Tooltip key={child.href}>
                         <TooltipTrigger asChild>
-                          <Link
+                          <AppLink
                             href={child.href}
                             onClick={onNavigate}
                             className={cn(
@@ -348,7 +349,7 @@ function SidebarInner({
                             )}
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
-                          </Link>
+                          </AppLink>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="font-medium">
                           {child.name}
@@ -362,7 +363,7 @@ function SidebarInner({
 
             if (!hasChildren) {
               return (
-                <Link
+                <AppLink
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
@@ -371,7 +372,7 @@ function SidebarInner({
                   {activeBar}
                   {iconEl}
                   {labelEl}
-                </Link>
+                </AppLink>
               )
             }
 
@@ -408,7 +409,7 @@ function SidebarInner({
                           const thisChildActive = pathname === child.href
                           const ChildIcon = child.icon
                           return (
-                            <Link
+                            <AppLink
                               key={child.href}
                               href={child.href}
                               onClick={onNavigate}
@@ -421,7 +422,7 @@ function SidebarInner({
                             >
                               <ChildIcon className="h-4 w-4 shrink-0" />
                               <span className="overflow-hidden whitespace-nowrap">{child.name}</span>
-                            </Link>
+                            </AppLink>
                           )
                         })}
                       </div>
@@ -487,24 +488,30 @@ function SidebarInner({
             </DropdownMenuItem>
             {user?.isSystemAdmin && (
               <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                <Link href="/settings/system" onClick={onNavigate}>
+                <AppLink href="/settings/system" onClick={onNavigate}>
                   <Settings2 className="h-4 w-4" />
                   <span>{t('sidebar.settings')}</span>
-                </Link>
+                </AppLink>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-              <a href="/api/sso/to-php">
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t('sidebar.backToLegacy')}</span>
-              </a>
+            {/* Volver al legacy y cerrar sesión cambian algo: van por POST (forms ocultos de abajo), nunca por un
+                link GET que otro sitio pueda disparar (plans/plan-buenas-practicas-v0, 3.12). Recargan el documento. */}
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer"
+              onSelect={(e) => {
+                e.preventDefault()
+                toPhpForm.current?.requestSubmit()
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>{t('sidebar.backToLegacy')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
               onSelect={(e) => {
                 e.preventDefault()
-                window.location.href = '/api/auth/logout'
+                logoutForm.current?.requestSubmit()
               }}
             >
               <LogOut className="h-4 w-4" />
@@ -512,6 +519,8 @@ function SidebarInner({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <form ref={toPhpForm} method="post" action="/api/sso/to-php" hidden />
+        <form ref={logoutForm} method="post" action="/api/auth/logout" hidden />
 
         <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
           <DialogContent aria-describedby={undefined} className="sm:max-w-md">
@@ -551,13 +560,13 @@ export function Sidebar() {
   const { t } = useTranslation()
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <>
       {/* Desktop sidebar — hidden on mobile */}
       <m.aside
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
+        className="fixed left-0 top-0 z-(--z-sidebar) h-screen border-r border-sidebar-border bg-sidebar bg-[image:var(--sidebar-gradient)] hidden md:block"
       >
         <SidebarInner />
       </m.aside>
@@ -575,6 +584,6 @@ export function Sidebar() {
           />
         </SheetContent>
       </Sheet>
-    </TooltipProvider>
+    </>
   )
 }

@@ -64,7 +64,7 @@ export function ServerXlsxExportButton({
       })
     } catch (e) {
       toast.error(t('common.exportFailed'), { id: toastId, duration: TOAST_DURATION_MS })
-      // eslint-disable-next-line no-console
+       
       console.error('[ServerXlsxExportButton]', e)
     } finally {
       setBusy(false)

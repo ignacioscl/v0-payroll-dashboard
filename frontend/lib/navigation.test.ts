@@ -9,7 +9,20 @@ import { canAccessMonthlyClosing, canAccessWindowTintClosing } from './auth/payr
 import { ROL_ACCION_CLOSING } from './auth/ttk-permissions'
 import type { SrsMeUser } from './auth/types'
 import type { NavItem } from './navigation'
-import { getVisibleNavigation, isCompanyModuleBlockedPath, isProdAllowedPath } from './navigation'
+import fs from 'node:fs'
+import path from 'node:path'
+import {
+  ALL_NAVIGATION,
+  DEV_ONLY_HREFS,
+  EXPENSES_NAV_HREFS,
+  getScreenAccess,
+  getVisibleNavigation,
+  isCompanyModuleBlockedPath,
+  isProdAllowedPath,
+  ROLES_NAV_HREFS,
+  SETTINGS_NAV_HREFS,
+} from './navigation'
+import { ROL_ACCION_INVOICES_MODULE_ACCESS, ROL_ACCION_TTK_ADMIN_HOURS } from './auth/ttk-permissions'
 
 const t = (key: string) => key
 
@@ -151,5 +164,77 @@ describe('getVisibleNavigation', () => {
     expect(mooi.some((h) => h.startsWith('/expenses'))).toBe(false)
     expect(mooi).not.toContain('/reports/window-tint-closing')
     expect(mooi).toContain('/roles')
+  })
+})
+
+// ---- Etapa 4.6: una sola función decide el acceso a una pantalla (P5) ----
+
+function dashboardRoutes(): string[] {
+  const base = path.join(__dirname, '..', 'app', '(dashboard)')
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name === 'page.tsx') {
+        const rel = path.relative(base, dir).split(path.sep).filter((s) => s && !/^\(.*\)$/.test(s))
+        out.push('/' + rel.join('/'))
+      }
+    }
+  }
+  walk(base)
+  return out
+}
+
+describe('toda pantalla está clasificada', () => {
+  it('cada ruta de app/(dashboard) está en un módulo del menú, en una lista de permisos o en DEV_ONLY_HREFS', () => {
+    const classified = [
+      ...ALL_NAVIGATION.flatMap((item) => [item.href, ...(item.children ?? []).map((c) => c.href)]).filter(
+        (href) => !(DEV_ONLY_HREFS as readonly string[]).includes(href),
+      ),
+      ...EXPENSES_NAV_HREFS,
+      ...ROLES_NAV_HREFS,
+      ...SETTINGS_NAV_HREFS,
+      ...DEV_ONLY_HREFS,
+    ]
+    const isClassified = (route: string) =>
+      classified.some((href) => route === href || (href !== '/' && route.startsWith(`${href}/`)))
+    const missing = dashboardRoutes().filter((route) => !isClassified(route))
+    expect(missing).toEqual([])
+  })
+
+  it('las pantallas de DEV_ONLY_HREFS en producción se niegan, aun para el admin', () => {
+    const admin = { user: user({ isSystemAdmin: true }), permissionIds: [] }
+    for (const href of DEV_ONLY_HREFS) {
+      expect(getScreenAccess(href, admin, { isDev: false }), href).toBe('denied')
+      expect(getScreenAccess(href, admin, { isDev: true }), href).toBe('allowed')
+    }
+  })
+})
+
+describe('getScreenAccess', () => {
+  const ttk = { user: user(), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
+
+  it('sin rol del panel → no-dashboard', () => {
+    expect(getScreenAccess('/', { user: user({ idRolSystemV2: null }), permissionIds: [] }, { isDev: false })).toBe('no-dashboard')
+  })
+  it('sin ningún módulo, en producción → no-modules', () => {
+    expect(getScreenAccess('/issues', { user: user(), permissionIds: [] }, { isDev: false })).toBe('no-modules')
+  })
+  it('sin el módulo de la empresa → no-module, también en dev', () => {
+    const admin = { user: user({ isSystemAdmin: true, hasExpenses: false }), permissionIds: [] }
+    expect(getScreenAccess('/expenses', admin, { isDev: false })).toBe('no-module')
+    expect(getScreenAccess('/expenses/analytics', admin, { isDev: true })).toBe('no-module')
+  })
+  it('sin el permiso de la pantalla → denied; con el permiso → allowed', () => {
+    expect(getScreenAccess('/billing/invoices', ttk, { isDev: false })).toBe('denied')
+    expect(getScreenAccess('/issues', ttk, { isDev: false })).toBe('allowed')
+    const billing = { user: user(), permissionIds: [ROL_ACCION_INVOICES_MODULE_ACCESS] }
+    expect(getScreenAccess('/billing/invoices', billing, { isDev: false })).toBe('allowed')
+  })
+  it('externo en / → denied (al externo lo manda a Punch Report el proxy); en /issues → allowed', () => {
+    const external = { user: user({ isCompanyTypeCompany: true }), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
+    expect(getScreenAccess('/', external, { isDev: false })).toBe('denied')
+    expect(getScreenAccess('/issues', external, { isDev: false })).toBe('allowed')
   })
 })

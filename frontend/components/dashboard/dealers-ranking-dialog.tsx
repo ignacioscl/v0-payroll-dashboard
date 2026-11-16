@@ -67,7 +67,12 @@ export type DealersRankingDialogProps = {
    * (DP1). Sin él el modal se ve igual, pero no exporta ni navega.
    */
   canAccessPunchReport: boolean
-  onDealerClick: (idDealer: number) => void
+  /**
+   * Fija los filtros de Punch Report para ese dealer. La fila es un enlace a
+   * `/issues?view=grouped` y esto corre en su `onNavigate`: solo al navegar en la
+   * misma pestaña (plans/plan-buenas-practicas-v0, 4.4, D12).
+   */
+  onDealerNavigate: (idDealer: number) => void
   /** Los filtros con que se pidió el ranking: el export manda exactamente éstos. */
   exportParams: DealerRankingQueryParams | null
 }
@@ -87,7 +92,7 @@ export function DealersRankingDialog({
   periodLabel,
   showCoverageNotice,
   canAccessPunchReport,
-  onDealerClick,
+  onDealerNavigate,
   exportParams,
 }: DealersRankingDialogProps) {
   const { t } = useTranslation()
@@ -243,8 +248,17 @@ export function DealersRankingDialog({
           // El export es del servidor (Report Info + Dealers + Employees): va en el pie.
           enableGlobalFilter={false}
           enableViewOptions={false}
-          // Sin permiso no se pasa: la fila no navega ni parece clickeable (DP1).
-          onRowClick={canAccessPunchReport ? (row) => onDealerClick(row.idDealer) : undefined}
+          // Sin permiso no se pasa: la fila no navega ni parece clickeable (DP1). Con
+          // permiso, el nombre del dealer es el enlace y el clic en la fila pasa por él.
+          rowLink={
+            canAccessPunchReport
+              ? (row) => ({
+                  href: '/issues?view=grouped',
+                  onNavigate: () => onDealerNavigate(row.idDealer),
+                })
+              : undefined
+          }
+          rowLinkColumnId="dealerName"
         />
 
         <DialogFooter>

@@ -1,8 +1,7 @@
-import { Controller, Get, Inject, Param, ParseIntPipe, Query, Req, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Param, ParseIntPipe, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { MonthlyClosingDealerDto, MonthlyClosingDto, MonthlyClosingQueryDto } from '../dto/monthly-closing.dto'
 import { MonthlyClosingService } from '../service/monthly-closing.service'
 
@@ -10,7 +9,6 @@ import { MonthlyClosingService } from '../service/monthly-closing.service'
  * Reports › Monthly Closing y Reports › Window Tint Closing (`scope=tint`). T4 de plans/plan-monthly-closing/PLAN.md.
  * `/export` va antes de `/dealer/:idDealer` solo por orden de lectura: las rutas no se pisan.
  */
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/reports/monthly-closing')
 @ApiTags('SRS Reports - Monthly Closing')
 @ApiBearerAuth()

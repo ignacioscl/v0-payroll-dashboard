@@ -26,7 +26,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
@@ -184,7 +183,6 @@ export function RoleTemplateRolesSheet({
             ) : roles.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('roleTemplates.roleEmpty')}</p>
             ) : (
-              <TooltipProvider delayDuration={300}>
                 <ul className="space-y-2">
                   {roles.map((role) => {
                     const estadoLabel =
@@ -267,7 +265,6 @@ export function RoleTemplateRolesSheet({
                     )
                   })}
                 </ul>
-              </TooltipProvider>
             )}
           </div>
         </SheetContent>

@@ -1,7 +1,6 @@
-import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 
-import { SrsJwtGuard } from '../../auth/srs-jwt.guard'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { BillingKpiService } from '../service/billing-kpi.service'
@@ -19,8 +18,6 @@ import {
   UnbilledAgingBucketDto,
   UnbilledDealerRowDto,
 } from '../dto/billing-kpi.dto'
-
-@UseGuards(SrsJwtGuard)
 @Controller('/srs/kpis/billing')
 @ApiTags('SRS KPIs - Billing')
 @ApiBearerAuth()

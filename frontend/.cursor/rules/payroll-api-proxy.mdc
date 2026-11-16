@@ -27,13 +27,17 @@ Crear `app/api/{recurso}/route.ts` solo cuando:
 - Hay que **normalizar** respuesta legacy PHP (ej. dealers → `{ dealers: [{ id, label }] }`).
 - **Exports** (XLSX, CSV, blobs) o respuestas no-JSON.
 - **Reportes** con agregación, filtros complejos o contrato estable para el UI.
-- Errores PHP/HTML deben convertirse a JSON claro (`readSrsJson`, mensajes útiles).
+- Errores PHP/HTML deben convertirse a JSON claro: `readUpstreamJson` (`lib/upstream-error.ts`) deja el detalle en el
+  log del servidor y al navegador el texto de D1; nunca el HTML ni el mensaje crudo del upstream.
 - Restricción de seguridad: no exponer un path PHP amplio al browser.
 
-BFF existentes (mantener):
+BFF existentes (los 12 `route.ts` de `app/api`, al 14/11/2026):
 
-- `/api/auth/session` — lee sesión local; no llama SRS.
+- `/api/auth/session`, `/api/auth/clear-session`, `/api/auth/logout` — sesión local; no llaman SRS.
+- `/api/auth/login` (login.php), `/api/auth/me` (me.php), `/api/sso/to-php` (adopt.php).
 - `/api/dealers` — normaliza contratistas/dealers.
+- `/api/srs/[...path]` — proxy genérico al PHP; `/api/srs-kpis/[...path]` — proxy al Nest; `/api/face/[...path]` — Face.
+- `/api/expense-attachments/[idDealer]/[idExpense]` y `…/[filename]` — adjuntos de Expenses (Nest + Node).
 
 Futuros candidatos BFF: `/api/reports/*`, `/api/exports/*`.
 
@@ -49,7 +53,21 @@ Futuros candidatos BFF: `/api/reports/*`, `/api/exports/*`.
 - Proxy genérico: `app/api/srs/[...path]/route.ts` + `lib/srs-proxy.ts`.
 - SSO exchange: `lib/srs-api.ts` directo a SRS (server-only, secret).
 - No llamar `SRS_API_URL` desde el browser.
-- Un proxy que reenvía el cuerpo del backend pasa por `proxyResponseBody` (`lib/proxy-response.ts`): `new NextResponse(buf, { status: 204 })` tira error y el browser recibe un 500 con el cambio ya hecho. *(02/11/2026: al borrar un gasto en Expenses.)*
+- `proxyResponseBody` (`lib/proxy-response.ts`) la usa `/api/srs-kpis` al reenviar el cuerpo del Nest:
+  `new NextResponse(buf, { status: 204 })` tira error y el browser recibe un 500 con el cambio ya hecho. Un proxy nuevo
+  que reenvía un cuerpo leído entero la usa también. *(02/11/2026: al borrar un gasto en Expenses.)*
+- **Tiempo máximo** (regla global «Todo pedido del servidor a otro servicio tiene tiempo máximo»;
+  plans/plan-buenas-practicas-v0, 2.6): todo pedido del servidor pasa por `fetchWithHeadersTimeout`
+  (`lib/upstream-fetch.ts`) con una constante de `lib/upstream-timeouts.ts`, por `fetchSrsUpstream`, `forwardToSrs`,
+  `srsFetch`, `fetchBackend`, `forwardToFace` o `fetchNodeTickets`. El corte es **hasta los encabezados**: nunca
+  `AbortSignal.timeout` pegado al `fetch`, que corta a mitad una descarga. Ningún `fetch(` suelto a otro servicio en
+  `app/api` ni en `lib/`.
+- Los proxies atrapan el error de red y responden con `upstreamErrorResponse` (`lib/upstream-error.ts`): **504** si no
+  contestó a tiempo, **502** si no se pudo conectar, con `{ error }` en el texto de D1. Nunca un 500 vacío.
+- `me.php` con 5xx (o colgado) tira `UpstreamUnavailableError`: nunca borra la sesión; lo atrapa `app/error.tsx`.
+- Lo controlan `lib/no-raw-server-fetch.test.ts` (ningún `fetch(` suelto en `app/api` ni en `lib/` del servidor),
+  `lib/upstream-timeouts.test.ts` (corta sin encabezados y no corta una descarga),
+  `lib/auth/verify-payroll-access.test.ts` y `lib/upstream-error.test.ts` (sin HTML del upstream).
 
 ## PHP (SRS)
 

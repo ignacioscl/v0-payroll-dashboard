@@ -1,0 +1,46 @@
+---
+description: Navegación del panel de v0 — cambiar de pantalla es instantáneo y el permiso se decide por pantalla
+globs: v0-payroll-dashboard/frontend/app/**, v0-payroll-dashboard/frontend/components/**, v0-payroll-dashboard/frontend/proxy.ts, v0-payroll-dashboard/frontend/lib/navigation.ts, v0-payroll-dashboard/frontend/lib/header-filters.ts
+alwaysApply: false
+---
+
+# Navegación del panel (plans/plan-buenas-practicas-v0, etapa 4)
+
+Regla global «Cambiar de pantalla es instantáneo». Doc: la de Next que trae el repo,
+`frontend/node_modules/next/dist/docs/01-app/` («Linking and navigating», `loading.js`, `proxy.js`).
+
+## Enlaces
+
+- Todo enlace interno es `AppLink` (`components/shared/app-link.tsx`), el único que importa `next/link`.
+  `<a>` solo para salir al legacy, adjuntos, descargas y la guía.
+- Una caja o fila que lleva a otra pantalla es enlace: `KPICard` con `href`/`onNavigate`, `DataTable` con `rowLink`
+  (`onRowClick` es para abrir un modal). Los filtros que fija el clic van en `onNavigate`, no en `onClick`, así
+  Ctrl/Cmd + clic abre otra pestaña sin tocar la actual.
+- `router.push` / `router.replace` solo después de una acción (ingresar, elegir un empleado, limpiar la dirección), en
+  la lista cerrada de `lib/links.test.ts`. Nada navega con `window.location`.
+- Controles: `lib/links.test.ts`, ESLint (`<a href="/…">` interno) y `e2e/box-links.spec.ts`.
+
+## Marco y esqueleto
+
+- Menú, barra y guard van en `app/(dashboard)/layout.tsx` → `MainLayout`. Ninguna `page.tsx` los dibuja.
+- Todo nivel con `layout.tsx`, y toda carpeta con más de una pantalla, tiene `loading.tsx` con `<ContentSkeleton />`
+  (`components/layout/content-skeleton.tsx`, hecho con `Skeleton`). Ningún `Suspense` con `fallback={null}` ni sin
+  fallback: el fallback es el esqueleto.
+- La barra elige sus filtros con la tabla de `lib/header-filters.ts` (una fila por ruta; nunca un `pathname ===` en
+  `header.tsx`). Un botón de una sola pantalla lo dibuja esa pantalla con `<HeaderActions>`
+  (`components/layout/header-actions.tsx`).
+- `/me` se pide una vez por carga del documento en el layout (`getPayrollMe`, con `cache`) y se siembra en la caché de
+  TanStack Query (`meQueryKey` de `lib/auth/me-query.ts`): el menú llega lleno.
+- Controles: `lib/app-structure.test.ts`, `lib/header-filters.test.ts` y `e2e/navigation.spec.ts` (sin documento nuevo
+  al hacer clic en el menú; con `E2E_BUILD=1`, el esqueleto antes de 300 ms).
+
+## Permiso por pantalla
+
+- `proxy.ts` hace solo la revisión rápida, con cookies y sin pedidos: sin sesión → `/login`; externo en `/` →
+  `/issues`. Corre en toda pantalla menos `api`, `auth`, `login` y estáticos: la lista sale de las carpetas. En `/api`
+  solo el chequeo de origen.
+- Qué ve cada usuario lo decide `getScreenAccess` (`lib/navigation.ts`), una sola función. Una pantalla nueva va en un
+  módulo de `lib/navigation.ts` o en `DEV_ONLY_HREFS`; lo no clasificado queda negado.
+- `ProdRouteGuard` no redirige: esqueleto mientras no está `/me`, después la pantalla o «Access denied» dentro del
+  marco, con la dirección igual.
+- Controles: `lib/proxy.test.ts` y `lib/navigation.test.ts` (toda ruta de `app/(dashboard)` clasificada).

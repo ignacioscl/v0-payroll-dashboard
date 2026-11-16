@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronDown, Filter, Lock, Search, X } from 'lucide-react'
+import { ChevronDown, Filter, Lock, X } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
@@ -26,6 +25,7 @@ import { InvoiceTypeFilter, type InvoiceTypeState } from '@/components/billing/i
 import { InvoiceAdvancedFilters } from '@/components/billing/invoice-advanced-filters'
 import { InvoiceDeletedFilter } from '@/components/billing/invoice-deleted-filter'
 import { LookupMultiSelect } from '@/components/shared/lookup-multi-select'
+import { SearchInput } from '@/components/shared/search-input'
 import { useInvoiceWorkerLookup } from '@/hooks/use-invoice-lookups'
 import type { RemovedDealersSwitchState } from '@/hooks/use-removed-dealers-available'
 import {
@@ -618,17 +618,15 @@ export function InvoiceFilterDeck({
                   <Label htmlFor="invoice-nro-search" className={FILTER_FIELD_LABEL}>
                     {t('invoices.filterInvoiceLabel')}
                   </Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="invoice-nro-search"
-                      value={searchInput}
-                      onChange={(e) => onSearchChange(e.target.value)}
-                      placeholder={t('invoices.filterInvoicePlaceholder')}
-                      className="h-8 pl-8 text-xs"
-                      disabled={disabled}
-                    />
-                  </div>
+                  <SearchInput
+                    id="invoice-nro-search"
+                    value={searchInput}
+                    onValueChange={onSearchChange}
+                    placeholder={t('invoices.filterInvoicePlaceholder')}
+                    iconClassName="left-2.5 h-3.5 w-3.5"
+                    inputClassName="h-8 pl-8 text-xs"
+                    disabled={disabled}
+                  />
                 </div>
 
                 {showEmployeeWorked ? (

@@ -9,8 +9,12 @@ alwaysApply: false
 Componente genérico para selects con búsqueda y selección única. Vive en
 `components/shared/searchable-combobox.tsx`.
 
-> ⚠️ Hay un re-export deprecado en `components/ui/searchable-combobox.tsx` —
-> **no usar**, migrar a `@/components/shared/searchable-combobox`.
+**El buscador de adentro es `CommandInput`** (`components/ui/command.tsx`), el mismo de los combos de varios valores:
+con texto muestra la X adentro, a la derecha, que borra la búsqueda (no lo elegido) y devuelve el cursor al campo. El
+buscador de las pantallas (tabla, campos sueltos) es `SearchInput` (`components/shared/search-input.tsx`), con la
+misma X. **No se arma otro buscador**: ni `CommandPrimitive.Input` fuera de `command.tsx` ni `type="search"` fuera de
+`search-input.tsx` (control: `lib/ui-guards.test.ts`; e2e `e2e/common-search.spec.ts`). *(15/11/2026,
+plans/plan-buenas-practicas-v0 5.1: regla global «Todo buscador tiene la X para borrar».)*
 
 ## Cuándo usar este componente
 
@@ -163,8 +167,7 @@ Notas:
 
 ## Reglas
 
-- Importar desde `@/components/shared/searchable-combobox`. **No** importar
-  desde `@/components/ui/searchable-combobox`.
+- Importar desde `@/components/shared/searchable-combobox`.
 - Mantener el contrato de paginación (`results / page / pageSize / total /
   hasMore`). Si el endpoint legacy no cumple, normalizar en un BFF
   (`app/api/<recurso>/route.ts`) según la regla `payroll-api-proxy.mdc`.

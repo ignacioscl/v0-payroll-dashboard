@@ -5,6 +5,7 @@ import { Header } from './header'
 import { TenantAccent } from '@/components/brand/tenant-accent'
 import { ProdRouteGuard } from './prod-route-guard'
 import { ScrollToTopButton } from './scroll-to-top-button'
+import { HeaderActionsProvider } from './header-actions'
 import { FilterProvider } from '@/lib/filter-context'
 import { SidebarProvider, useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
@@ -17,7 +18,7 @@ function MainContent({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar()
 
   return (
-    <>
+    <HeaderActionsProvider>
       <Sidebar />
       <Header />
       <main
@@ -32,7 +33,7 @@ function MainContent({ children }: { children: React.ReactNode }) {
           <div className="p-4 pb-32 md:p-6 md:pb-24">{children}</div>
         </ProdRouteGuard>
       </main>
-    </>
+    </HeaderActionsProvider>
   )
 }
 

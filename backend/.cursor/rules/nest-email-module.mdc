@@ -89,7 +89,7 @@ casilla de un usuario (rompe SPF/DKIM).
 Solo `src/commons/email/email.config.ts` lee las variables `EMAIL_*` (`loadEmailConfig(env, dir)`,
 función pura, sin tirar). Ningún otro archivo lee `EMAIL_*`, ni por `ConfigService` ni por `process.env`;
 `configuration.ts` no tiene claves de email. El módulo nunca tira en el boot: sin configuración en PROD
-queda `disabled` con `error` en el log y `/api/health/jobs` en 503 (`/api/health` no cambia).
+queda `disabled` con `error` en el log y `/api/health/jobs` en 503 (`/api/health` mira solo la base: el mail nunca entra ahí).
 
 ## Pruebas
 

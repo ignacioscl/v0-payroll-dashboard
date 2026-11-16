@@ -8,7 +8,7 @@ import { TemplateRepository } from './repository/template'
 import { TemplateService } from './service/template'
 
 @Module({
-  // SrsAuthModule: SrsJwtGuard del controlador (JwtService + SrsAuthContextService).
+  // SrsAuthModule: el guard global SrsJwtGuard (JwtService + SrsAuthContextService).
   imports: [SrsAuthModule, TypeOrmModule.forFeature([Template])],
   providers: [TemplateRepository, TemplateService],
   controllers: [TemplateController],

@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Save, X } from 'lucide-react'
-import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -35,6 +34,7 @@ import {
   useCreateRoleTemplate,
   useUpdateRoleTemplate,
 } from '@/hooks/use-role-template-mutations'
+import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import {
   createRoleTemplateFormSchema,
@@ -74,7 +74,8 @@ export function RoleTemplateFormDialog({
     [isEdit, t],
   )
 
-  const form = useForm<RoleTemplateFormValues>({
+  // Formulario común: al enviar con un error, la pantalla va al primer campo con problema (también el combo Type).
+  const { form, handleSubmit } = useFormWithFocus<RoleTemplateFormValues>({
     resolver: zodResolver(schema),
     defaultValues: emptyRoleTemplateFormValues,
     mode: 'onSubmit',
@@ -123,13 +124,13 @@ export function RoleTemplateFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
             {!isEdit ? (
               <FormField
                 control={form.control}
                 name="tipo"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem data-field="tipo">
                     <FormLabel>{t('roleTemplates.type')}</FormLabel>
                     <Select
                       value={field.value ?? ''}

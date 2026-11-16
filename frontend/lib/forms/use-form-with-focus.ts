@@ -77,6 +77,29 @@ export function focusFirstInvalidField(errors: FieldErrors, root: ParentNode = d
   return true
 }
 
+/**
+ * Para los formularios hechos a mano (sin react-hook-form): los errores en forma `{ campo: 'texto' }` (vacío o
+ * ausente = sin error). Cada control lleva `name` o `data-field` con ese nombre y el texto va bajo el campo
+ * (`FieldMessage`). Devuelve true si había algún error.
+ */
+export function focusFirstFieldError(
+  errors: Partial<Record<string, string | null | undefined>>,
+  root: ParentNode = document,
+): boolean {
+  const asFieldErrors: FieldErrors = {}
+  let any = false
+  for (const [field, message] of Object.entries(errors)) {
+    if (!message) continue
+    asFieldErrors[field] = { type: 'manual', message }
+    any = true
+  }
+  if (!any) return false
+  if (!focusFirstInvalidField(asFieldErrors, root) && process.env.NODE_ENV !== 'production') {
+    console.error('Form error on a field that is not on screen:', Object.keys(asFieldErrors), errors)
+  }
+  return true
+}
+
 export interface ServerValidationError {
   field: string
   message: string

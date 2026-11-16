@@ -1,0 +1,60 @@
+---
+description: Encabezados de seguridad, páginas de error, onRequestError, puertos y versión del deploy (v0)
+globs: v0-payroll-dashboard/frontend/next.config.mjs, v0-payroll-dashboard/frontend/app/**, v0-payroll-dashboard/frontend/instrumentation.ts, v0-payroll-dashboard/docker-compose.yml, v0-payroll-dashboard/frontend/Dockerfile
+alwaysApply: false
+---
+
+# Seguridad y errores del front (plans/plan-buenas-practicas-v0, etapa 2)
+
+## Encabezados
+
+- Van en `next.config.mjs` (`headers()` con `source: '/(.*)'`), nunca en una pantalla ni en un `route.ts`:
+  CSP **sin nonce** (doc de Next `02-guides/content-security-policy.md`, «Without Nonces»; el nonce obliga a que
+  todo sea dinámico) con `frame-ancestors 'none'`, `X-Frame-Options: DENY`, HSTS, `nosniff`, `Referrer-Policy` y
+  `Permissions-Policy`. `poweredByHeader: false`.
+- La CSP no tiene `upgrade-insecure-requests` (el local y los e2e corren en http) ni `'unsafe-eval'` fuera de
+  desarrollo. Si algo nuevo choca con la CSP, se agrega el origen puntual con su motivo en el plan; nunca `*`.
+- Control: `lib/security-headers.test.ts`, `e2e/security-and-errors.spec.ts` y, en el deploy,
+  `scripts/check-security-headers.sh`.
+
+## Páginas de error
+
+- `app/(dashboard)/error.tsx`: errores de una pantalla, dentro del marco. `app/error.tsx`: lo que tiran los layouts
+  (un `error.tsx` no atrapa el `layout.tsx` de su mismo segmento), sin el marco. Los dos con `unstable_retry`
+  (Next 16.2, `03-file-conventions/error.md`), nunca `reset` para reintentar.
+- `app/global-error.tsx` con su `<html>` y `<body>`, textos fijos en inglés (no hay providers).
+- `app/not-found.tsx` con «Back to dashboard».
+- Todas usan `components/layout/page-state.tsx` (`global-error` repite su marcado). Ninguna muestra el mensaje ni el
+  `digest` del error.
+
+## Errores del servidor
+
+- `instrumentation.ts` → `onRequestError` → `lib/observability/report-request-error.ts`: una línea JSON por error en
+  stderr y en `/app/logs/errors.log` (= `logs/front/errors.log` del host). **Nunca `request.headers`**: ahí viajan
+  las cookies de sesión. La ruta va sin query. Control: `lib/observability/report-request-error.test.ts`.
+
+## Infra
+
+- `docker-compose.yml`: puertos publicados solo en `127.0.0.1:`; `NEXT_DEPLOYMENT_ID: ${DEPLOYMENT_ID:-}` en el build
+  del front; `stop_grace_period` en el Nest; volúmenes `./logs/front` y `./logs/backend`.
+- `frontend/Dockerfile`: `ARG NEXT_DEPLOYMENT_ID` y `RUN test -n "$NEXT_DEPLOYMENT_ID"` antes del build. El deploy es
+  `DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build`.
+- Control: `lib/infra/docker-compose.test.ts`.
+
+## Etapa 3
+
+- **Cambios de sesión por POST**: cerrar sesión y «Back to legacy» son forms POST (303); el GET da 405.
+  `clear-session` solo redirige a `/login` o `/login?error=forbidden` (`lib/auth/safe-redirect.ts`).
+- **`proxy.ts`** (Next 16, ex `middleware`): en `/api` solo el chequeo de origen de los POST/PUT/DELETE
+  (`lib/security/same-origin.ts`). Solo revisiones rápidas.
+- **`SRS_LEGACY_ORIGINS`**: a dónde pueden ir el logout y el SSO (la cookie de usuario no está firmada) y orígenes que
+  suma `form-action`. Va en el `.env` del compose (build) y en `payroll-dashboard.env` (ejecución).
+- **`server-only`** arriba de todo módulo con secretos, cookies o pedidos a otro servicio. `next build` falla si uno
+  llega a un componente de cliente; en vitest es un alias vacío.
+- **Adjuntos**: tope del transporte y del archivo real, tipo por firma; al servir, solo PDF e imágenes `inline`
+  (`lib/expense-attachments-validate.ts`).
+- **`robots: noindex, nofollow`** en el layout raíz (sin `robots.txt` con Disallow).
+- **Gate**: `pnpm run gate` (lint, typecheck, test:unit, test:infra) y `pnpm run lint && pnpm run test:unit` dentro del
+  `Dockerfile`; `next build` valida tipos (sin `ignoreBuildErrors`). Controles en `lib/proxy.test.ts`,
+  `lib/gate/*.test.ts`, `lib/expense-attachments-upload.test.ts`.
+

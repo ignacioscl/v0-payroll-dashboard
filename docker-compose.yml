@@ -1,16 +1,27 @@
 # SRS Suite — orquestador. Levanta frontend (Next) + backend (NestJS) juntos.
 # PHP legacy, face API, etc. siguen en PM2/Apache en el host.
-# Un `docker compose up -d --build` deja los dos servicios en producción.
+# Deploy: `DEPLOYMENT_ID=$(git rev-parse --short HEAD) docker compose up -d --build` deja los dos servicios en
+# producción. Sin DEPLOYMENT_ID el build del front falla a propósito (plans/plan-buenas-practicas-v0, 2.11).
 
 services:
   payroll-dashboard:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Los tests del build leen shared/ (fuera del contexto). Pide Docker Compose 2.17 o más.
+      additional_contexts:
+        shared: ./shared
+      args:
+        # Identificador del deploy: una pestaña abierta con el JavaScript viejo se recarga sola en el próximo clic.
+        NEXT_DEPLOYMENT_ID: ${DEPLOYMENT_ID:-}
+        # Orígenes del legacy para la CSP form-action (se arma al compilar). Va en el .env del compose.
+        SRS_LEGACY_ORIGINS: ${SRS_LEGACY_ORIGINS:-}
     image: srs-payroll-dashboard:latest
     container_name: srs-payroll-dashboard
     ports:
-      - "3010:3010"
+      # Solo en 127.0.0.1 del server: Apache proxea a 127.0.0.1:3010. Sin la IP, Docker abre el puerto en
+      # todas las interfaces por iptables, aunque el firewall diga otra cosa.
+      - "127.0.0.1:3010:3010"
     environment:
       NODE_ENV: production
       PORT: "3010"
@@ -21,6 +32,9 @@ services:
     volumes:
       # Mismo archivo montado para que Next cargue .env.production al arrancar (opcional si usás env_file).
       - ${PAYROLL_ENV_FILE:-/opt/srs/payroll-dashboard.env}:/app/.env.production:ro
+      # Archivo de errores del servidor de Next (instrumentation.ts); sobrevive al deploy. La carpeta la crea
+      # Ignacio una vez, escribible por el usuario del contenedor (docker_prod.md).
+      - ./logs/front:/app/logs
     extra_hosts:
       # PHP en el host (PM2) o puerto 80 del compose php-dev (host.docker.internal:80).
       - "host.docker.internal:host-gateway"
@@ -54,11 +68,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Los tests del build leen shared/ (fuera del contexto). Pide Docker Compose 2.17 o más.
+      additional_contexts:
+        shared: ./shared
     image: srs-suite-backend:latest
     container_name: srs-suite-backend
     ports:
-      # Publicado en localhost del server; el browser solo lo alcanza si Apache lo proxea.
-      - "3020:3020"
+      # Solo en 127.0.0.1 del server (el front llega por la red de Docker, srs-backend:3020).
+      - "127.0.0.1:3020:3020"
     environment:
       NODE_ENV: production
       PORT: "3020"
@@ -67,9 +84,11 @@ services:
       - ${BACKEND_ENV_FILE:-/opt/srs/srs-backend.env}
     volumes:
       # Logos que el provider sube desde v0 (Settings > Visual). Viven en el repo,
-      # fuera de la imagen, para que sobrevivan al deploy. Los sirve ServeStaticModule
-      # en /branding/<archivo>. Ruta relativa: misma en prod y en dev.
+      # fuera de la imagen, para que sobrevivan al deploy. Nadie sirve esta carpeta directo: el logo lo
+      # devuelve GET /api/srs/contratista/branding/logo, con login. Ruta relativa: misma en prod y en dev.
       - ./uploads/branding:/app/public/branding
+      # Errores 5xx del Nest, una línea JSON cada uno (D2); sobrevive al deploy.
+      - ./logs/backend:/app/logs
     extra_hosts:
       # Para alcanzar MariaDB y demás servicios en el host.
       - "host.docker.internal:host-gateway"
@@ -78,6 +97,8 @@ services:
       # Mismo motivo que el front: sin Cloudflare y sin EAI_AGAIN (plan-export-invoices-nest §8.7).
       - "main.srssuite.com:192.249.114.194"
     restart: always
+    # Cierre limpio: el Nest termina los pedidos en curso antes de bajar (enableShutdownHooks + Terminus).
+    stop_grace_period: 30s
     healthcheck:
       test:
         [
