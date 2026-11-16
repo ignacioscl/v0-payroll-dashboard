@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { plainToInstance } from 'class-transformer'
 import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Matches, Max, Min, MinLength, validateSync } from 'class-validator'
 
@@ -82,6 +83,14 @@ class ProductionSecret {
   JWT_SECRET!: string
 }
 
+/**
+ * Un `JWT_SECRET` corto en producción **avisa en el log y arranca igual**: la clave es la misma `JWT_AUTH` del
+ * `config.php` del legacy, y la de PROD tiene 9 caracteres (16/11/2026). Cambiarla deja afuera a todos (legacy, v0 y
+ * app TTK), así que va como tarea aparte (`jwt-secret-corto-prod`, PLAN-GENERAL). Cuando esté cambiada, esto vuelve a
+ * frenar el arranque.
+ */
+const logger = new Logger('EnvValidation')
+
 /** `ConfigModule.forRoot({ validate })`: devuelve la config o tira con la lista de variables que fallan. */
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   const trimmed = Object.fromEntries(
@@ -89,8 +98,10 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   )
   const env = plainToInstance(EnvironmentVariables, trimmed, { enableImplicitConversion: true })
   const errors = validateSync(env, { skipMissingProperties: false })
-  if (trimmed.NODE_ENV === 'production') {
-    errors.push(...validateSync(plainToInstance(ProductionSecret, trimmed)))
+  if (trimmed.NODE_ENV === 'production' && typeof trimmed.JWT_SECRET === 'string' && trimmed.JWT_SECRET !== '') {
+    for (const e of validateSync(plainToInstance(ProductionSecret, trimmed))) {
+      logger.warn(`${e.property}: ${Object.values(e.constraints ?? {}).join(', ')} (tarea jwt-secret-corto-prod)`)
+    }
   }
   if (errors.length > 0) {
     const lines = errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)

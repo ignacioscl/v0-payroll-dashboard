@@ -5,6 +5,7 @@ import 'reflect-metadata'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'dotenv'
+import { Logger } from '@nestjs/common'
 
 import { validateEnv } from './env.validation'
 
@@ -32,9 +33,24 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...OK, DB_PORT: 'abc' })).toThrow(/DB_PORT/)
   })
 
-  it('en producción JWT_SECRET pide 32 caracteres; en dev no', () => {
-    expect(() => validateEnv({ ...OK, NODE_ENV: 'production', JWT_SECRET: 'corto' })).toThrow(/JWT_SECRET/)
-    expect(() => validateEnv({ ...OK, NODE_ENV: 'development', JWT_SECRET: 'corto' })).not.toThrow()
+  it('en producción un JWT_SECRET corto avisa en el log y arranca igual (tarea jwt-secret-corto-prod); en dev no avisa', () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    try {
+      expect(() => validateEnv({ ...OK, NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(9) })).not.toThrow()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0][0]).toMatch(/JWT_SECRET/)
+      warn.mockClear()
+      validateEnv({ ...OK, NODE_ENV: 'production' })
+      validateEnv({ ...OK, NODE_ENV: 'development', JWT_SECRET: 'corto' })
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('en producción sin JWT_SECRET sigue sin arrancar', () => {
+    const { JWT_SECRET: _omit, ...rest } = OK
+    expect(() => validateEnv({ ...rest, NODE_ENV: 'production' })).toThrow(/JWT_SECRET/)
   })
 
   it('los dos ejemplos de variables pasan (con valores de relleno en los secretos)', () => {
