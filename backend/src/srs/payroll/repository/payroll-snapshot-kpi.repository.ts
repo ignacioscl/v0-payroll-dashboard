@@ -61,6 +61,10 @@ const mapAgg = (r: any): SnapshotTypeAgg => ({
   empleados: num(r.empleados),
 })
 
+/** `AND p.id_usuario NOT IN (?, …)` para los empleados que se sacan; sin ninguno, nada. Los params van en el mismo orden. */
+const excludeEmployeesSql = (ids: readonly number[]): string =>
+  ids.length ? ` AND p.id_usuario NOT IN (${ids.map(() => '?').join(',')})` : ''
+
 /**
  * Lecturas de `PAYROLL_SNAPSHOT_DAY` para la tab Payroll Spend (SQL crudo de KPI). Tenant: toda
  * query filtra `p.id_contratista = ctx.idDealerProvider`; los dealers van por la lista del header y
@@ -358,13 +362,15 @@ export class PayrollSnapshotKpiRepository {
    * período, tipo, concepto) de los períodos pedidos (`periodo_desde IN`, usa `idx_psd_periodo`). El
    * service redondea como legacy: por dealer, período y columna. `includeWithoutDealer` suma las
    * filas con `id_dealer` NULL (idDealer null); `employeeIds` acota a esos empleados (el Window Tint
-   * Closing, T3 de plans/plan-reporte-tint/PLAN.md). Sin `employeeIds`, todos.
+   * Closing, T3 de plans/plan-reporte-tint/PLAN.md). Sin `employeeIds`, todos. `excludeEmployeeIds` saca a esos
+   * empleados en las dos ramas (los vendors del closing, plans/plan-monthly-closing-vendors T5); vacío = nadie.
    */
   async amountsByDealerPeriodType(
     filter: SrsKpiFilter,
     periodDesdes: string[],
     includeWithoutDealer: boolean,
     employeeIds: number[] | null = null,
+    excludeEmployeeIds: readonly number[] = [],
   ): Promise<{ idDealer: number | null; periodoDesde: string; idPaymentType: number; concepto: string; monto: number; tax: number }[]> {
     if (!periodDesdes.length || (employeeIds && !employeeIds.length)) return []
     const dealer = buildDealerRestrictionClause(
@@ -374,8 +380,10 @@ export class PayrollSnapshotKpiRepository {
       removedDealersProvider(filter),
     )
     const periods = periodDesdes.map(() => '?').join(',')
-    const emp = employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : ''
-    const empParams = employeeIds ?? []
+    const emp =
+      (employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : '') +
+      excludeEmployeesSql(excludeEmployeeIds)
+    const empParams = [...(employeeIds ?? []), ...excludeEmployeeIds]
     const rows = await this.srs.query(
       `SELECT p.id_dealer AS idDealer, DATE_FORMAT(p.periodo_desde, '%Y-%m-%d') AS periodoDesde,
               p.id_payment_type AS idPaymentType, p.concepto AS concepto,
@@ -416,16 +424,20 @@ export class PayrollSnapshotKpiRepository {
    * Monthly Closing: monto + tax sin redondear por (dealer, período, empleado), con el nombre y la
    * posición (`usuarios.id_position` → `datos_parametricos.nombre`). `dealer`: un id, 'all' (los del
    * filtro) o 'none' (las filas sin dealer). El service los lleva a centavos con el mayor resto.
+   * `excludeEmployeeIds`: como en amountsByDealerPeriodType.
    */
   async amountsByDealerEmployeeForPeriods(
     filter: SrsKpiFilter,
     periodDesdes: string[],
     dealer: number | 'all' | 'none',
     employeeIds: number[] | null = null,
+    excludeEmployeeIds: readonly number[] = [],
   ): Promise<{ idDealer: number | null; periodoDesde: string; periodoHasta: string; idUsuario: number; employee: string; position: string; amount: number }[]> {
     if (!periodDesdes.length || (employeeIds && !employeeIds.length)) return []
     const periods = periodDesdes.map(() => '?').join(',')
-    const emp = employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : ''
+    const emp =
+      (employeeIds ? ` AND p.id_usuario IN (${employeeIds.map(() => '?').join(',')})` : '') +
+      excludeEmployeesSql(excludeEmployeeIds)
     let dealerSql: string
     let dealerParams: unknown[]
     if (dealer === 'none') {
@@ -453,7 +465,7 @@ export class PayrollSnapshotKpiRepository {
        WHERE p.id_contratista = ? AND p.periodo_desde IN (${periods})${emp}
          ${dealerSql}
        GROUP BY p.id_dealer, p.periodo_desde, p.id_usuario`,
-      [filter.idDealerProvider, ...periodDesdes, ...(employeeIds ?? []), ...dealerParams],
+      [filter.idDealerProvider, ...periodDesdes, ...(employeeIds ?? []), ...excludeEmployeeIds, ...dealerParams],
     )
     return rows.map((r: any) => ({
       idDealer: r.idDealer === null ? null : num(r.idDealer),

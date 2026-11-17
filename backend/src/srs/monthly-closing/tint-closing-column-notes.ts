@@ -11,7 +11,7 @@ export const TINT_CLOSING_COLUMN_NOTES = {
   income:
     'Income: every service of the month\'s work orders assigned to a tinter (an employee with a role that has «tint» in its name and Piecework as payment type), by creation date, invoiced or not. With the invoice discount, without tax. Services without «tint» in their name and an amount other than $0 are shown in red. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.',
   payroll:
-    'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count.',
+    'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count. Employees marked as Vendor do not count.',
   expenses:
     "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
   profit: 'Profit/Loss: Income − Payroll − Expenses.',

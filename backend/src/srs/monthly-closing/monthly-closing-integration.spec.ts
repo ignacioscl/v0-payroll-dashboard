@@ -20,6 +20,9 @@ import { SRS_CONNECTION, srsDataSourceOptions } from 'src/srs/srs.datasource'
 import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
 import { SrsPermissionRepository } from 'src/srs/auth/srs-permission.repository'
 import { BillingKpiRepository } from 'src/srs/billing/repository/billing-kpi.repository'
+import { PayrollSnapshotKpiRepository } from 'src/srs/payroll/repository/payroll-snapshot-kpi.repository'
+import { PayrollKpiService } from 'src/srs/payroll/service/payroll-kpi.service'
+import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
 import { SrsMonthlyClosingModule } from './monthly-closing.module'
 import { MonthlyClosingService } from './service/monthly-closing.service'
 import type { MonthlyClosingDto } from './dto/monthly-closing.dto'
@@ -77,6 +80,37 @@ async function loadBook(buffer: Buffer): Promise<ExcelJS.Workbook> {
   return wb
 }
 
+/** El módulo del closing contra la base del .env, con el permiso 140 abierto (se prueba aparte). */
+async function compileClosingModule(): Promise<TestingModule> {
+  initializeTransactionalContext()
+  return Test.createTestingModule({
+    imports: [
+      ConfigModule.forRoot({ load: [configuration], isGlobal: true }),
+      TypeOrmModule.forRootAsync({
+        useFactory: () => dataSourceOptions,
+        dataSourceFactory: async (options) => addTransactionalDataSource(new DataSource(options ?? dataSourceOptions)),
+      }),
+      TypeOrmModule.forRootAsync({ name: SRS_CONNECTION, useFactory: () => srsDataSourceOptions }),
+      SrsMonthlyClosingModule,
+    ],
+  })
+    // El permiso 140 se prueba aparte (Admin Company pasa siempre); acá, empresa, alcance y plata.
+    .overrideProvider(SrsPermissionRepository)
+    .useValue({ userHasRolAccion: async () => true, assertRolAccion: async () => undefined })
+    .compile()
+}
+
+/** Los dealers activos de la empresa, como los manda el combo con «All dealers». */
+async function companyDealers(srs: DataSource, provider: number): Promise<string> {
+  const rows: { id: number }[] = await srs.query(
+    `SELECT c.id FROM CONTRATISTA c WHERE c.estado = 1 AND c.tipo_empresa = 1
+       AND EXISTS (SELECT 1 FROM DEALER_REL dr WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
+     ORDER BY c.id`,
+    [provider],
+  )
+  return rows.map((r) => r.id).join(',')
+}
+
 /** Suma en centavos de la columna `header` de una hoja (título en la fila 2, datos desde la 3). */
 function sheetColumnCents(wb: ExcelJS.Workbook, sheet: string, header: string, skipDealers: string[] = []): number {
   const ws = wb.getWorksheet(sheet)
@@ -102,32 +136,11 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
   const q = (month: string, scope?: 'all' | 'tint') => ({ month, idDealer: allDealers, scope })
 
   beforeAll(async () => {
-    initializeTransactionalContext()
-    moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({ load: [configuration], isGlobal: true }),
-        TypeOrmModule.forRootAsync({
-          useFactory: () => dataSourceOptions,
-          dataSourceFactory: async (options) => addTransactionalDataSource(new DataSource(options ?? dataSourceOptions)),
-        }),
-        TypeOrmModule.forRootAsync({ name: SRS_CONNECTION, useFactory: () => srsDataSourceOptions }),
-        SrsMonthlyClosingModule,
-      ],
-    })
-      // El permiso 140 se prueba aparte (Admin Company pasa siempre); acá, empresa, alcance y plata.
-      .overrideProvider(SrsPermissionRepository)
-      .useValue({ userHasRolAccion: async () => true, assertRolAccion: async () => undefined })
-      .compile()
+    moduleRef = await compileClosingModule()
     srs = moduleRef.get(`${SRS_CONNECTION}DataSource`) as DataSource
     service = moduleRef.get(MonthlyClosingService)
     billing = moduleRef.get(BillingKpiRepository)
-    const rows: { id: number }[] = await srs.query(
-      `SELECT c.id FROM CONTRATISTA c WHERE c.estado = 1 AND c.tipo_empresa = 1
-         AND EXISTS (SELECT 1 FROM DEALER_REL dr WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
-       ORDER BY c.id`,
-      [PROVIDER],
-    )
-    allDealers = rows.map((r) => r.id).join(',')
+    allDealers = await companyDealers(srs, PROVIDER)
   }, 60000)
 
   afterAll(async () => {
@@ -310,6 +323,195 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
     })
   })
 })
+
+/**
+ * plans/plan-monthly-closing-vendors (P4, P5, P7) contra la copia del 12/11, que ya tiene `usuarios.is_vendor`
+ * (migration 030). Solo lecturas: en la copia nadie está marcado, así que la marca se simula haciendo que
+ * `UsuarioSrsService.vendorIds` devuelva a Francol Services LLC (6985), el vendor del mail de Auto Wax. La consulta de
+ * `vendorIds` sí corre contra la copia (P7).
+ */
+const VENDORS_COPY = 'srssui5_srs_20261112'
+const vendorsReady = process.env.DB_DATABASE === VENDORS_COPY && process.env.DB_PORT === '3307'
+if (!vendorsReady) console.warn(`SKIPPED vendors de monthly-closing-integration.spec.ts: la base no es la copia local ${VENDORS_COPY}`)
+const describeVendors = vendorsReady ? describe : describe.skip
+
+const FRANCOL = 6985 // Francol Services LLC: Vendor Painter, todo octubre en Land Rover Ft Lauderdale
+const LAND_ROVER_FTL = 627
+const WITHOUT_DEALER_EMPLOYEE = 4892 // octubre: $4,000.00, todo en filas sin dealer
+/** Octubre 2026 en la copia del 12/11 (§1.1 del plan: SUM(monto + monto_tax) de PAYROLL_SNAPSHOT_DAY). */
+const OCT_LAND_ROVER_PAYROLL = 74312.21
+const OCT_FRANCOL = 14161
+const OCT_WITHOUT_DEALER = 10500
+
+describeVendors('Vendors fuera del Payroll del closing — copia del 12/11 (solo lectura)', () => {
+  let moduleRef: TestingModule
+  let srs: DataSource
+  let service: MonthlyClosingService
+  let usuarios: UsuarioSrsService
+  let payroll: PayrollSnapshotKpiRepository
+  let spend: PayrollKpiService
+  let allDealers: string
+  let base: MonthlyClosingDto
+  let withVendor: MonthlyClosingDto
+
+  const q = () => ({ month: '2026-10', idDealer: allDealers })
+  const asVendors = (ids: number[]) => jest.spyOn(usuarios, 'vendorIds').mockResolvedValue(ids)
+  const isFrancol = (employee: string) => /francol/i.test(employee)
+
+  beforeAll(async () => {
+    moduleRef = await compileClosingModule()
+    srs = moduleRef.get(`${SRS_CONNECTION}DataSource`) as DataSource
+    service = moduleRef.get(MonthlyClosingService)
+    usuarios = moduleRef.get(UsuarioSrsService, { strict: false })
+    payroll = moduleRef.get(PayrollSnapshotKpiRepository, { strict: false })
+    spend = moduleRef.get(PayrollKpiService, { strict: false })
+    allDealers = await companyDealers(srs, PROVIDER)
+    base = await service.getSummary(admin, q())
+    asVendors([FRANCOL])
+    withVendor = await service.getSummary(admin, q())
+    jest.restoreAllMocks()
+  }, 180000)
+
+  afterEach(() => jest.restoreAllMocks())
+
+  afterAll(async () => {
+    await moduleRef?.close()
+  })
+
+  describe('P7: quiénes son vendors, por empresa', () => {
+    it('la consulta corre contra la copia: hoy nadie está marcado, ni en Auto Wax ni en GC', async () => {
+      await expect(usuarios.vendorIds(PROVIDER)).resolves.toEqual([])
+      await expect(usuarios.vendorIds(GC_PROVIDER)).resolves.toEqual([])
+    })
+
+    it('el closing pide los vendors de la empresa de la sesión, en los dos scopes', async () => {
+      const spy = jest.spyOn(usuarios, 'vendorIds')
+      await (service as any).prepare(admin, { ...q(), scope: 'all' }, allDealers)
+      await (service as any).prepare(admin, { ...q(), scope: 'tint' }, allDealers)
+      const gcAdmin: SrsContext = { ...admin, idUsuario: 1, idDealerProvider: GC_PROVIDER }
+      const gcDealers = await companyDealers(srs, GC_PROVIDER)
+      await (service as any).prepare(gcAdmin, { month: '2026-10', idDealer: gcDealers }, gcDealers)
+      expect(spy.mock.calls).toEqual([[PROVIDER], [PROVIDER], [GC_PROVIDER]])
+    }, 60000)
+
+    it('un empleado de otra empresa en la lista no saca nada del closing de Auto Wax', async () => {
+      const [other]: { id: number }[] = await srs.query(
+        `SELECT u.id_usuario AS id FROM usuarios u WHERE u.id_contratista_owner = ? ORDER BY u.id_usuario LIMIT 1`,
+        [GC_PROVIDER],
+      )
+      asVendors([Number(other.id)])
+      expect(await service.getSummary(admin, q())).toEqual(base)
+    }, 120000)
+  })
+
+  describe('P4: octubre, Francol marcado vendor', () => {
+    it('Summary: Land Rover Ft Lauderdale baja $14,161.00 y Profit/Loss sube lo mismo; los demás dealers y Without dealer, igual', () => {
+      const before = base.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
+      const after = withVendor.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
+      expect(before.payroll).toBe(OCT_LAND_ROVER_PAYROLL)
+      expect(after.payroll).toBe(60151.21)
+      expect(toCents(before.payroll) - toCents(after.payroll)).toBe(toCents(OCT_FRANCOL))
+      expect(toCents(after.profit) - toCents(before.profit)).toBe(toCents(OCT_FRANCOL))
+      expect({ income: after.income, expenses: after.expenses }).toEqual({ income: before.income, expenses: before.expenses })
+
+      const others = (mc: MonthlyClosingDto) => mc.rows.filter((r) => r.dealerId !== LAND_ROVER_FTL)
+      expect(others(withVendor)).toEqual(others(base))
+      expect(base.withoutDealer?.payroll).toBe(OCT_WITHOUT_DEALER)
+      expect(withVendor.withoutDealer).toEqual(base.withoutDealer)
+      expect(toCents(base.total.payroll) - toCents(withVendor.total.payroll)).toBe(toCents(OCT_FRANCOL))
+      expect(withVendor.total.income).toBe(base.total.income)
+      expect(withVendor.total.expenses).toBe(base.total.expenses)
+    })
+
+    it('detalle del dealer: sin las filas de Francol, suma su fila; Income y Expenses iguales', async () => {
+      const before = await service.getDealer(admin, LAND_ROVER_FTL, q())
+      asVendors([FRANCOL])
+      const after = await service.getDealer(admin, LAND_ROVER_FTL, q())
+      expect(before.payroll.filter((l) => isFrancol(l.employee))).toHaveLength(2)
+      expect(sumCents(before.payroll.map((l) => l.amount))).toBe(toCents(OCT_LAND_ROVER_PAYROLL))
+      expect(after.payroll.some((l) => isFrancol(l.employee))).toBe(false)
+      expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(60151.21))
+      expect(after.payroll).toEqual(before.payroll.filter((l) => !isFrancol(l.employee)))
+      expect(after.income).toEqual(before.income)
+      expect(after.expenses).toEqual(before.expenses)
+    }, 120000)
+
+    it('Without dealer: el detalle no cambia', async () => {
+      const before = await service.getDealer(admin, 0, q())
+      asVendors([FRANCOL])
+      const after = await service.getDealer(admin, 0, q())
+      expect(after).toEqual(before)
+      expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(OCT_WITHOUT_DEALER))
+    }, 120000)
+
+    it('Excel: Summary y hoja Payroll sin Francol, iguales a la pantalla', async () => {
+      asVendors([FRANCOL])
+      const { res, buffer } = fakeResponse()
+      await service.export(admin, q(), res)
+      const wb = await loadBook(buffer())
+      const landRover = withVendor.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
+
+      const summary = sheetRows(wb, 'Summary')
+      expect(toCents(Number(summary.find((r) => r.Dealer === landRover.dealer)?.Payroll))).toBe(toCents(60151.21))
+
+      const payrollSheet = sheetRows(wb, 'Payroll')
+      expect(payrollSheet.some((r) => isFrancol(String(r.Employee)))).toBe(false)
+      const lrCents = payrollSheet
+        .filter((r) => r.Dealer === landRover.dealer)
+        .reduce((a, r) => a + toCents(Number(r.Amount)), 0)
+      expect(lrCents).toBe(toCents(60151.21))
+      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(
+        toCents(withVendor.total.payroll) + toCents(withVendor.withoutDealer!.payroll),
+      )
+    }, 300000)
+
+    it('repositorio: excludeEmployeeIds baja la suma de 627 en lo de Francol y la de Without dealer en lo del excluido', async () => {
+      const cc = await (service as any).prepare(admin, q(), String(LAND_ROVER_FTL))
+      const desdes: string[] = cc.periods.map((p: { desde: string }) => p.desde)
+      expect(desdes).toEqual(['2026-10-01', '2026-10-16'])
+      type Row = { idDealer: number | null; monto: number; tax: number }
+      const cents = (rows: Row[], dealer: number | null) =>
+        Math.round(rows.filter((r) => r.idDealer === dealer).reduce((a, r) => a + r.monto + r.tax, 0) * 100)
+      const all = await payroll.amountsByDealerPeriodType(cc.filter, desdes, true)
+      const without = await payroll.amountsByDealerPeriodType(cc.filter, desdes, true, null, [FRANCOL, WITHOUT_DEALER_EMPLOYEE])
+      expect(cents(all, LAND_ROVER_FTL) - cents(without, LAND_ROVER_FTL)).toBe(toCents(OCT_FRANCOL))
+      expect(cents(all, null)).toBe(toCents(OCT_WITHOUT_DEALER))
+      expect(cents(all, null) - cents(without, null)).toBe(toCents(4000))
+
+      const employees = await payroll.amountsByDealerEmployeeForPeriods(cc.filter, desdes, LAND_ROVER_FTL)
+      const employeesWithout = await payroll.amountsByDealerEmployeeForPeriods(cc.filter, desdes, LAND_ROVER_FTL, null, [FRANCOL])
+      expect(employees.some((e) => e.idUsuario === FRANCOL)).toBe(true)
+      expect(employeesWithout.some((e) => e.idUsuario === FRANCOL)).toBe(false)
+      expect(employeesWithout).toEqual(employees.filter((e) => e.idUsuario !== FRANCOL))
+    }, 120000)
+  })
+
+  it('P5: Payroll Spend no mira los vendors ni los métodos del closing, y da lo mismo', async () => {
+    const query = { fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', idDealer: allDealers }
+    const plain = await spend.getSpend(admin, query)
+    const vendorSpy = asVendors([FRANCOL])
+    const typeSpy = jest.spyOn(payroll, 'amountsByDealerPeriodType')
+    const employeeSpy = jest.spyOn(payroll, 'amountsByDealerEmployeeForPeriods')
+    const marked = await spend.getSpend(admin, query)
+    expect(vendorSpy).not.toHaveBeenCalled()
+    expect(typeSpy).not.toHaveBeenCalled()
+    expect(employeeSpy).not.toHaveBeenCalled()
+    expect(marked).toEqual(plain)
+  }, 180000)
+})
+
+/** Filas de datos de una hoja como objetos por título (título en la fila 2, datos desde la 3). */
+function sheetRows(wb: ExcelJS.Workbook, sheet: string): Record<string, unknown>[] {
+  const ws = wb.getWorksheet(sheet)
+  if (!ws) throw new Error(`sheet ${sheet} not found`)
+  const headers = (ws.getRow(2).values as unknown[]).slice(1).map(String)
+  const out: Record<string, unknown>[] = []
+  ws.eachRow((row, n) => {
+    if (n < 3) return
+    out.push(Object.fromEntries(headers.map((h, i) => [h, row.getCell(i + 1).value])))
+  })
+  return out
+}
 
 function fromTotal(dealers: number, withoutDealer: number): number {
   return (toCents(dealers) + toCents(withoutDealer)) / 100
