@@ -26,6 +26,8 @@ import { SrsPermissionRepository } from 'src/srs/auth/srs-permission.repository'
 import { BillingKpiRepository } from 'src/srs/billing/repository/billing-kpi.repository'
 import { PIECEWORK_TYPE_IDS } from 'src/srs/payroll/snapshot/payment-type-ids'
 import { THEME } from 'src/srs/shared/export/xlsx-theme'
+import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
+import type { MonthlyClosingDto } from './dto/monthly-closing.dto'
 import { SrsMonthlyClosingModule } from './monthly-closing.module'
 import { MonthlyClosingService } from './service/monthly-closing.service'
 import { isTintService, toCents } from './monthly-closing-math'
@@ -78,6 +80,35 @@ function fakeResponse(): { res: Response; buffer: () => Buffer } {
   return { res: res as unknown as Response, buffer: () => Buffer.concat(chunks) }
 }
 
+/** El módulo del closing contra la base del .env, con el permiso 140 abierto (se prueba en el otro spec). */
+async function compileClosingModule(): Promise<TestingModule> {
+  initializeTransactionalContext()
+  return Test.createTestingModule({
+    imports: [
+      ConfigModule.forRoot({ load: [configuration], isGlobal: true }),
+      TypeOrmModule.forRootAsync({
+        useFactory: () => dataSourceOptions,
+        dataSourceFactory: async (options) => addTransactionalDataSource(new DataSource(options ?? dataSourceOptions)),
+      }),
+      TypeOrmModule.forRootAsync({ name: SRS_CONNECTION, useFactory: () => srsDataSourceOptions }),
+      SrsMonthlyClosingModule,
+    ],
+  })
+    .overrideProvider(SrsPermissionRepository)
+    .useValue({ userHasRolAccion: async () => true, assertRolAccion: async () => undefined })
+    .compile()
+}
+
+async function companyDealers(srs: DataSource): Promise<string> {
+  const rows: { id: number }[] = await srs.query(
+    `SELECT c.id FROM CONTRATISTA c WHERE c.estado = 1 AND c.tipo_empresa = 1
+       AND EXISTS (SELECT 1 FROM DEALER_REL dr WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
+     ORDER BY c.id`,
+    [PROVIDER],
+  )
+  return rows.map((r) => r.id).join(',')
+}
+
 describeIf('Window Tint Closing — regla del tintero, contra la copia local (solo lectura)', () => {
   let moduleRef: TestingModule
   let srs: DataSource
@@ -103,31 +134,11 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
   }
 
   beforeAll(async () => {
-    initializeTransactionalContext()
-    moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({ load: [configuration], isGlobal: true }),
-        TypeOrmModule.forRootAsync({
-          useFactory: () => dataSourceOptions,
-          dataSourceFactory: async (options) => addTransactionalDataSource(new DataSource(options ?? dataSourceOptions)),
-        }),
-        TypeOrmModule.forRootAsync({ name: SRS_CONNECTION, useFactory: () => srsDataSourceOptions }),
-        SrsMonthlyClosingModule,
-      ],
-    })
-      .overrideProvider(SrsPermissionRepository)
-      .useValue({ userHasRolAccion: async () => true, assertRolAccion: async () => undefined })
-      .compile()
+    moduleRef = await compileClosingModule()
     srs = moduleRef.get(`${SRS_CONNECTION}DataSource`) as DataSource
     service = moduleRef.get(MonthlyClosingService)
     billing = moduleRef.get(BillingKpiRepository)
-    const rows: { id: number }[] = await srs.query(
-      `SELECT c.id FROM CONTRATISTA c WHERE c.estado = 1 AND c.tipo_empresa = 1
-         AND EXISTS (SELECT 1 FROM DEALER_REL dr WHERE dr.id_dealer_customer = c.id AND dr.id_dealer_provider = ?)
-       ORDER BY c.id`,
-      [PROVIDER],
-    )
-    allDealers = rows.map((r) => r.id).join(',')
+    allDealers = await companyDealers(srs)
     const t: { id: number }[] = await srs.query(TINTERS_SQL, [PROVIDER, PROVIDER, ...PIECEWORK_TYPE_IDS])
     tinters = t.map((r) => Number(r.id))
   }, 60000)
@@ -297,4 +308,84 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
       'Services without «tint» in their name and an amount other than $0, from work orders assigned to tinters',
     )
   }, 300000)
+})
+
+/**
+ * P6 de plans/plan-monthly-closing-vendors contra la copia del 12/11 (tiene `usuarios.is_vendor`, migration 030). Solo
+ * lecturas: nadie está marcado en la copia, así que la marca se simula haciendo que `UsuarioSrsService.vendorIds`
+ * devuelva al tintero. Un tintero vendor sigue definiendo el Income (sus WO) y sale solo del Payroll.
+ */
+const VENDORS_COPY = 'srssui5_srs_20261112'
+const vendorsReady = process.env.DB_DATABASE === VENDORS_COPY && process.env.DB_PORT === '3307'
+if (!vendorsReady) {
+  console.warn(`SKIPPED vendors de window-tint-closing-tinteros-integration.spec.ts: la base no es la copia local ${VENDORS_COPY}`)
+}
+const LEXUS_PALM_BEACH = 301
+/** Edesman Manolo Sales Morales: tintero (rol «tint» + Piecework); octubre, $1,035.00 de payroll en Lexus, 242 WO. */
+const TINTER = 5439
+const TINTER_OCT_LEXUS_PAYROLL = 1035
+
+;(vendorsReady ? describe : describe.skip)('Window Tint Closing — tintero marcado vendor, copia del 12/11 (solo lectura)', () => {
+  let moduleRef: TestingModule
+  let service: MonthlyClosingService
+  let usuarios: UsuarioSrsService
+  let allDealers: string
+  let base: MonthlyClosingDto
+  let withVendor: MonthlyClosingDto
+  let tinterName: string
+
+  const q = () => ({ month: '2026-10', idDealer: allDealers, scope: 'tint' as const })
+  const asVendors = (ids: number[]) => jest.spyOn(usuarios, 'vendorIds').mockResolvedValue(ids)
+
+  beforeAll(async () => {
+    moduleRef = await compileClosingModule()
+    const srs = moduleRef.get(`${SRS_CONNECTION}DataSource`) as DataSource
+    service = moduleRef.get(MonthlyClosingService)
+    usuarios = moduleRef.get(UsuarioSrsService, { strict: false })
+    allDealers = await companyDealers(srs)
+    const [u]: { nombre: string }[] = await srs.query(`SELECT nombre FROM usuarios WHERE id_usuario = ?`, [TINTER])
+    tinterName = u.nombre
+    base = await service.getSummary(admin, q())
+    asVendors([TINTER])
+    withVendor = await service.getSummary(admin, q())
+    jest.restoreAllMocks()
+  }, 180000)
+
+  afterEach(() => jest.restoreAllMocks())
+
+  afterAll(async () => {
+    await moduleRef?.close()
+  })
+
+  it('sigue siendo tintero (sus WO siguen en el Income) y es vendor (sale del Payroll)', async () => {
+    asVendors([TINTER])
+    const cc = await (service as any).prepare(admin, q(), allDealers)
+    expect(cc.employeeIds).toContain(TINTER)
+    expect(cc.vendorIds).toEqual([TINTER])
+  }, 60000)
+
+  it('Summary: Income y Vehicles iguales en todos los dealers; Lexus baja su payroll; los demás, igual', () => {
+    const strip = (mc: MonthlyClosingDto) => mc.rows.map(({ dealerId, income, vehicles, nonTint }) => ({ dealerId, income, vehicles, nonTint }))
+    expect(strip(withVendor)).toEqual(strip(base))
+    expect(withVendor.total.income).toBe(base.total.income)
+    const before = base.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
+    const after = withVendor.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
+    expect(toCents(before.payroll) - toCents(after.payroll)).toBe(toCents(TINTER_OCT_LEXUS_PAYROLL))
+    const others = (mc: MonthlyClosingDto) => mc.rows.filter((r) => r.dealerId !== LEXUS_PALM_BEACH)
+    expect(others(withVendor)).toEqual(others(base))
+    expect(toCents(base.total.payroll) - toCents(withVendor.total.payroll)).toBe(toCents(TINTER_OCT_LEXUS_PAYROLL))
+  })
+
+  it('detalle de Lexus: el Income y By service no cambian; el Payroll ya no tiene al tintero', async () => {
+    const before = await service.getDealer(admin, LEXUS_PALM_BEACH, q())
+    asVendors([TINTER])
+    const after = await service.getDealer(admin, LEXUS_PALM_BEACH, q())
+    expect(after.income).toEqual(before.income)
+    expect(after.byService).toEqual(before.byService)
+    expect(before.payroll.some((l) => l.employee === tinterName)).toBe(true)
+    expect(after.payroll.some((l) => l.employee === tinterName)).toBe(false)
+    expect(after.payroll).toEqual(before.payroll.filter((l) => l.employee !== tinterName))
+    const row = withVendor.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
+    expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(row.payroll))
+  }, 180000)
 })

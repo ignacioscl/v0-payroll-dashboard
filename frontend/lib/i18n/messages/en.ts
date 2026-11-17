@@ -1701,7 +1701,7 @@ export const en: Messages = {
       title: 'What each number counts',
       item1:
         'Income: same as the Closing Report (Work Orders by creation date, TTK and Generic invoices, discount included, no tax).',
-      item2: 'Payroll: the pay periods that end in the month.',
+      item2: 'Payroll: the pay periods that end in the month. Employees marked as Vendor do not count.',
       item3: 'Expenses: every expense dated in the month, approved or not; deleted expenses do not count.',
     },
     // PAIR of backend/src/srs/monthly-closing/tint-closing-column-notes.ts: the same text is the note on each
@@ -1714,7 +1714,7 @@ export const en: Messages = {
       item3:
         "Income: every service of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name and Piecework as payment type), by creation date, invoiced or not. With the invoice discount, without tax. Services without «tint» in their name and an amount other than $0 are shown in red. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
       item4:
-        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count.',
+        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count. Employees marked as Vendor do not count.',
       item5:
         "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
       item6: 'Profit/Loss: Income − Payroll − Expenses.',

@@ -1709,7 +1709,7 @@ export const es: Messages = {
       title: 'Qué cuenta cada número',
       item1:
         'Income: igual que el Closing Report (Work Orders por fecha de creación, invoices TTK y Generic, con descuento, sin tax).',
-      item2: 'Payroll: los períodos de pago que terminan en el mes.',
+      item2: 'Payroll: los períodos de pago que terminan en el mes. Los empleados marcados como Vendor no cuentan.',
       item3: 'Expenses: todos los gastos con fecha en el mes, aprobados o no; los borrados no cuentan.',
     },
     tintClosing: {
@@ -1720,7 +1720,7 @@ export const es: Messages = {
       item3:
         'Income: todos los servicios de las WO del mes asignadas a un tintero (un empleado con un rol que tiene «tint» en el nombre y Piecework como tipo de pago), por fecha de creación, facturadas o no. Con el descuento de la invoice, sin tax. Los servicios sin «tint» en el nombre y con importe distinto de $0 se muestran en rojo. Las líneas de invoices Generic con «tint» en la descripción también cuentan. Las invoices TTK no cuentan.',
       item4:
-        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre y Piecework como tipo de pago), con todos los tipos de pago, en los períodos de pago que terminan en el mes. Lo que se paga fuera de SRS no cuenta.',
+        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre y Piecework como tipo de pago), con todos los tipos de pago, en los períodos de pago que terminan en el mes. Lo que se paga fuera de SRS no cuenta. Los empleados marcados como Vendor no cuentan.',
       item5:
         'Expenses: los gastos del dealer de la categoría «Window Tint Film», con fecha en el mes, aprobados o no. Los borrados no cuentan.',
       item6: 'Profit/Loss: Income − Payroll − Expenses.',

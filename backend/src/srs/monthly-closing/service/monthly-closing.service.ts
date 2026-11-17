@@ -66,6 +66,11 @@ export interface ClosingContext {
    * Income (las asignadas a uno de ellos).
    */
   employeeIds: number[] | null
+  /**
+   * Los vendors de la empresa (UsuarioSrsService.vendorIds): su costo va en Expenses, así que salen del Payroll en los
+   * dos scopes (plans/plan-monthly-closing-vendors T5). No tocan el Income: un tintero vendor sigue en employeeIds.
+   */
+  vendorIds: number[]
   showWithoutDealer: boolean
 }
 
@@ -99,7 +104,7 @@ export interface ExpenseLine {
 /**
  * Monthly Closing y Window Tint Closing (plans/plan-monthly-closing/PLAN.md T4, plans/plan-reporte-tint/PLAN.md
  * T1–T5). No lee ninguna tabla por su cuenta: Income lo da billing, Payroll el snapshot, Expenses el dueño de
- * EXP_EXPENSE y los tinteros srs-usuario. La empresa sale siempre de la sesión.
+ * EXP_EXPENSE y los tinteros y los vendors srs-usuario. La empresa sale siempre de la sesión.
  */
 @Injectable()
 export class MonthlyClosingService {
@@ -248,9 +253,10 @@ export class MonthlyClosingService {
       filterDateDone: false,
       includeRemovedDealers: query.includeRemovedDealers,
     })
-    const [periods, employeeIds] = await Promise.all([
+    const [periods, employeeIds, vendorIds] = await Promise.all([
       periodsEndingInMonth(this.payrollSource, ctx.idDealerProvider, firstDay, lastDay),
       scope === 'tint' ? this.tintersOf(ctx.idDealerProvider) : Promise.resolve(null),
+      this.usuarios.vendorIds(ctx.idDealerProvider),
     ])
     return {
       scope,
@@ -271,6 +277,7 @@ export class MonthlyClosingService {
       },
       periods,
       employeeIds,
+      vendorIds,
       showWithoutDealer: filter.skipDealerRestriction,
     }
   }
@@ -302,7 +309,7 @@ export class MonthlyClosingService {
     const [incomeByDealer, tintLines, payrollRows, expenseRows, coverage] = await Promise.all([
       tint ? Promise.resolve(null) : this.billing.incomeByDealerForRange(cc.filter),
       tint ? this.incomeLines(cc) : Promise.resolve(null),
-      this.payroll.amountsByDealerPeriodType(cc.filter, periodDesdes, cc.showWithoutDealer, cc.employeeIds),
+      this.payroll.amountsByDealerPeriodType(cc.filter, periodDesdes, cc.showWithoutDealer, cc.employeeIds, cc.vendorIds),
       this.expenses.amountsByDealer(cc.expenseFilter),
       this.payroll.periodCoverage(cc.filter.idDealerProvider, periodDesdes),
     ])
@@ -443,8 +450,8 @@ export class MonthlyClosingService {
     const periodDesdes = cc.periods.map((p) => p.desde)
     const filter = typeof dealer === 'number' ? { ...cc.filter, dealerIds: [dealer] } : cc.filter
     const [employees, typeRows] = await Promise.all([
-      this.payroll.amountsByDealerEmployeeForPeriods(filter, periodDesdes, dealer, cc.employeeIds),
-      this.payroll.amountsByDealerPeriodType(filter, periodDesdes, dealer === 'none', cc.employeeIds),
+      this.payroll.amountsByDealerEmployeeForPeriods(filter, periodDesdes, dealer, cc.employeeIds, cc.vendorIds),
+      this.payroll.amountsByDealerPeriodType(filter, periodDesdes, dealer === 'none', cc.employeeIds, cc.vendorIds),
     ])
     const canonical = canonicalPayrollCents(
       dealer === 'none' ? typeRows.filter((r) => r.idDealer === null) : typeRows.filter((r) => r.idDealer !== null),
