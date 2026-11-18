@@ -1,6 +1,7 @@
 import type { SrsMeUser } from './types'
 import {
   ROL_ACCION_CLOSING,
+  ROL_ACCION_DUE_ON_BILLING,
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   ROL_ACCION_PRODUCTION_REPORT,
   ROL_ACCION_TTK_PAYROLL,
@@ -62,6 +63,19 @@ export function canAccessWindowTintClosing(
   hasPermission: (id: number) => boolean,
 ): boolean {
   return canAccessMonthlyClosing(user, hasPermission) && Boolean(user?.hasWindowTintClosing)
+}
+
+/**
+ * Reports › Open Invoices (`/reports/open-invoices` y sus fotos): Admin General, Admin Company o «Reports > Due On
+ * Billing» (123), el permiso del reporte de antigüedad de legacy (plans/plan-reporte-javier P3).
+ */
+export function canAccessOpenInvoices(
+  user: SrsMeUser | null | undefined,
+  hasPermission: (id: number) => boolean,
+): boolean {
+  if (!user) return false
+  if (user.isSystemAdmin) return true
+  return hasPermission(ROL_ACCION_DUE_ON_BILLING)
 }
 
 /** Tab Payroll Spend: montos de payroll, mismo permiso que el Payroll Excel Report de legacy (93). */

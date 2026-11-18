@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { SRS_CONNECTION } from '../srs.datasource'
 import { SrsAuthModule } from '../auth/srs-auth.module'
 import { SrsExportModule } from '../shared/export/srs-export.module'
+import { SrsPayrollModule } from '../payroll/srs-payroll.module'
+import { OpenInvoiceSnapshotModule } from '../../features/open-invoice-snapshot/open-invoice-snapshot.module'
 import { InvoiceStatement } from './entity/invoice-statement.srsentity'
 import { InvoiceStatementInvRel } from './entity/invoice-statement-inv-rel.srsentity'
 
@@ -20,11 +22,18 @@ import { InvoiceExportController } from './controller/invoice-export.controller'
 import { InvoiceExportService } from './service/invoice-export.service'
 import { InvoiceListExportController } from './controller/invoice-list-export.controller'
 import { InvoiceListExportService } from './service/invoice-list-export.service'
+import { OpenInvoicesRepository } from './repository/open-invoices.repository'
+import { OpenInvoicesCompareRepository } from './repository/open-invoices-compare.repository'
+import { OpenInvoicesService } from './service/open-invoices.service'
+import { OpenInvoicesCompareService } from './service/open-invoices-compare.service'
 
 @Module({
   imports: [
     SrsAuthModule,
     SrsExportModule,
+    // Open Invoices: «All» in Report Info (activeDealerIds) and the snapshot (plans/plan-reporte-javier T6).
+    SrsPayrollModule,
+    OpenInvoiceSnapshotModule,
     TypeOrmModule.forFeature([InvoiceStatement, InvoiceStatementInvRel], SRS_CONNECTION),
   ],
   providers: [
@@ -36,6 +45,10 @@ import { InvoiceListExportService } from './service/invoice-list-export.service'
     GenericInvoiceService,
     InvoiceExportService,
     InvoiceListExportService,
+    OpenInvoicesRepository,
+    OpenInvoicesCompareRepository,
+    OpenInvoicesService,
+    OpenInvoicesCompareService,
   ],
   // The export controllers go before InvoiceController so `/invoices/export` and
   // `/invoices/list-export` are never read as `/invoices/:id/...`.

@@ -8,6 +8,11 @@ export const ROL_ACCION_PRODUCTION_REPORT = 47
  * (plans/plan-monthly-closing T0). Mismo número en BE/srs/auth/srs-permission.repository.ts.
  */
 export const ROL_ACCION_CLOSING = 140
+/**
+ * «Reports > Due On Billing» (legacy show-rol-action-123, the aging report of legacy): Reports › Open Invoices
+ * (plans/plan-reporte-javier P3). Mismo número en BE/srs/auth/srs-permission.repository.ts.
+ */
+export const ROL_ACCION_DUE_ON_BILLING = 123
 /** Time Tracking > Payroll (legacy show-rol-action-93, Payroll Excel Report): montos de payroll. */
 export const ROL_ACCION_TTK_PAYROLL = 93
 /** Same gate as legacy Time Tracking menu (show-rol-action-65 / Daily Punch). */

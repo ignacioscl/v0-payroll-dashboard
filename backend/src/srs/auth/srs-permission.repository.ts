@@ -39,6 +39,12 @@ export const ROL_ACCION_PRODUCTION_REPORT = 47
  */
 export const ROL_ACCION_CLOSING = 140
 
+/**
+ * Reports > Due On Billing (legacy show-rol-action-123, the aging report of legacy): Reports › Open Invoices
+ * in PRO, its snapshots and the comparison (P3 of plans/plan-reporte-javier).
+ */
+export const ROL_ACCION_DUE_ON_BILLING = 123
+
 /** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 

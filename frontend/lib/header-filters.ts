@@ -29,6 +29,8 @@ const ROWS: { matches: (pathname: string) => boolean; filters: HeaderFilters }[]
   { matches: exactly('/reports/income-by-dealer'), filters: { search: true, district: false, date: 'year' } },
   { matches: exactly('/reports/monthly-closing'), filters: { search: true, district: false, date: 'month' } },
   { matches: exactly('/reports/window-tint-closing'), filters: { search: true, district: false, date: 'month' } },
+  // Open Invoices: la fecha «As of» va en la pantalla (un domingo), no en la barra (plans/plan-reporte-javier §4.3).
+  { matches: under('/reports/open-invoices'), filters: { search: true, district: false, date: null } },
 ]
 
 export function getHeaderFilters(pathname: string): HeaderFilters {

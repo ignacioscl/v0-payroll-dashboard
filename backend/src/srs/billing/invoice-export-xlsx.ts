@@ -18,6 +18,7 @@ import {
 } from './invoice-export-labels'
 import type { InvoiceExportWoLineRow } from './repository/invoice.repository'
 import { formatFullNroWithNroBilled } from './invoice-nro-billed'
+import { daysBetweenYmd, statementDepartmentLabel } from './open-invoice-aging'
 
 const EXCEL_MAX_ROWS = 1_048_576
 const STAMP_ROWS = 2
@@ -57,8 +58,8 @@ function woServiceNames(raw?: string): string {
  * and so does a Generic one since 10/18/2026 (§8.11, D37).
  */
 export function invoiceExportDepartment(row: InvoiceRowDto, labels: InvoiceExportLabels): string {
-  if (row.department) return row.department
-  return row.statementType === 5 || row.statementType === 6 ? labels.ttkDepartment : ''
+  // Shared with Reports › Open Invoices (plans/plan-reporte-javier T3); here a WO without one stays empty.
+  return statementDepartmentLabel(row.department, row.statementType, { ttkDepartment: labels.ttkDepartment, noDepartment: '' })
 }
 
 /** A cell that starts with "=" stays text: no cell of the file is a formula (§1.5). */
@@ -69,8 +70,6 @@ function safeText(value: string): string | { richText: { text: string }[] } {
 function money(value: number): number {
   return Math.round(value * 100) / 100
 }
-
-const DAY_MS = 86_400_000
 
 /** `YYYY-MM-DD` of a date in New York, the time zone of the stamp. */
 function nyYmd(date: Date): string {
@@ -95,12 +94,9 @@ export function invoiceExportDaysOldStart(row: InvoiceRowDto): string {
 }
 
 export function invoiceExportDaysOld(fechaCreate: string, generatedAt: Date): number | '' {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fechaCreate ?? '')
-  if (!m) return ''
-  const created = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  const [y, mo, d] = nyYmd(generatedAt).split('-').map(Number)
-  const today = Date.UTC(y, mo - 1, d)
-  return Math.max(0, Math.round((today - created) / DAY_MS))
+  if (!/^(\d{4})-(\d{2})-(\d{2})/.test(fechaCreate ?? '')) return ''
+  // Same day count as Reports › Open Invoices (daysBetweenYmd, plans/plan-reporte-javier T3).
+  return daysBetweenYmd(fechaCreate, nyYmd(generatedAt))
 }
 
 export type WriteInvoiceExportOptions = {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { Calendar } from 'lucide-react'
+import type { Matcher } from 'react-day-picker'
 import { enUS as enUSDayPicker, es as esDayPicker } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
@@ -23,6 +24,13 @@ interface DatePickerProps {
   /** Optional upper/lower bounds for the calendar. */
   fromDate?: Date
   toDate?: Date
+  /**
+   * Days that cannot be picked, on top of the bounds (e.g. anything but Sundays in Open Invoices,
+   * plans/plan-reporte-javier §4.3). Optional: the screens that do not pass it are unchanged.
+   */
+  disabledDays?: Matcher | Matcher[]
+  /** Hides «Clear» when the value is required (Open Invoices always has an «As of»). */
+  hideClear?: boolean
 }
 
 /**
@@ -36,6 +44,8 @@ export function DatePicker({
   disabled,
   fromDate,
   toDate,
+  disabledDays,
+  hideClear,
 }: DatePickerProps) {
   const { t, locale } = useTranslation()
   const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
@@ -94,23 +104,28 @@ export function DatePicker({
             defaultMonth={draft ?? value}
             locale={dayPickerLocale}
             disabled={
-              fromDate || toDate
+              fromDate || toDate || disabledDays
                 ? [
                     ...(fromDate ? [{ before: fromDate }] : []),
                     ...(toDate ? [{ after: toDate }] : []),
+                    ...(disabledDays ? (Array.isArray(disabledDays) ? disabledDays : [disabledDays]) : []),
                   ]
                 : undefined
             }
           />
           <div className="flex items-center justify-between border-t border-border px-3 py-2 gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={handleClear}
-            >
-              {t('common.clear')}
-            </Button>
+            {hideClear ? (
+              <span />
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={handleClear}
+              >
+                {t('common.clear')}
+              </Button>
+            )}
             <Button size="sm" onClick={handleApply} disabled={!draft}>
               {t('common.apply')}
             </Button>

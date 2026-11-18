@@ -5,8 +5,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { canAccessExpenses, ROL_ACCION_EXPENSES_APPROVE } from './auth/expenses-permissions'
-import { canAccessMonthlyClosing, canAccessWindowTintClosing } from './auth/payroll-access'
-import { ROL_ACCION_CLOSING } from './auth/ttk-permissions'
+import { canAccessMonthlyClosing, canAccessOpenInvoices, canAccessWindowTintClosing } from './auth/payroll-access'
+import { ROL_ACCION_CLOSING, ROL_ACCION_DUE_ON_BILLING } from './auth/ttk-permissions'
 import type { SrsMeUser } from './auth/types'
 import type { NavItem } from './navigation'
 import fs from 'node:fs'
@@ -236,5 +236,52 @@ describe('getScreenAccess', () => {
     const external = { user: user({ isCompanyTypeCompany: true }), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
     expect(getScreenAccess('/', external, { isDev: false })).toBe('denied')
     expect(getScreenAccess('/issues', external, { isDev: false })).toBe('allowed')
+  })
+})
+
+/**
+ * Reports › Open Invoices (plans/plan-reporte-javier §4.3, §7.3): «Reports > Due On Billing» (123) abre el reporte y sus
+ * fotos. Un rol con SOLO 123 ve el menú y la pantalla en producción (no «sin módulos»: hallazgo de la review 1).
+ */
+describe('Open Invoices (123)', () => {
+  const only123 = { user: user(), permissionIds: [ROL_ACCION_DUE_ON_BILLING] }
+  const without = { user: user(), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
+
+  it('un rol con solo 123 entra en producción, al reporte y a la comparación', () => {
+    expect(getScreenAccess('/reports/open-invoices', only123, { isDev: false })).toBe('allowed')
+    expect(getScreenAccess('/reports/open-invoices/snapshots/7', only123, { isDev: false })).toBe('allowed')
+    expect(getScreenAccess('/reports/monthly-closing', only123, { isDev: false })).toBe('denied')
+  })
+
+  it('sin 123 no entra; Admin General y Admin Company sí', () => {
+    expect(getScreenAccess('/reports/open-invoices', without, { isDev: false })).toBe('denied')
+    expect(canAccessOpenInvoices(user(), none)).toBe(false)
+    expect(canAccessOpenInvoices(user({ isSystemAdmin: true }), none)).toBe(true)
+  })
+
+  it('el menú de un rol con solo 123 trae Reports › Open Invoices y nada más', () => {
+    const items = getVisibleNavigation({
+      isDev: false,
+      canAccessTtk: false,
+      canAccessOpenInvoices: true,
+      companyModules: { companyHasExpenses: true, companyHasWindowTintClosing: true },
+      t,
+    })
+    expect(hrefs(items)).toEqual(['/reports/business-kpis', '/reports/open-invoices'])
+  })
+
+  it('sin 123 el menú no lo trae', () => {
+    const items = getVisibleNavigation({
+      isDev: false,
+      canAccessTtk: true,
+      companyModules: { companyHasExpenses: true, companyHasWindowTintClosing: true },
+      t,
+    })
+    expect(hrefs(items)).not.toContain('/reports/open-invoices')
+  })
+
+  it('isProdAllowedPath abre la ruta solo con la bandera de Open Invoices', () => {
+    expect(isProdAllowedPath('/reports/open-invoices', false, false, false, false, false, false, false, false, false, false, true)).toBe(true)
+    expect(isProdAllowedPath('/reports/open-invoices', false, false, false, false, false, false, false, false, false, false, false)).toBe(false)
   })
 })
