@@ -6,6 +6,7 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { ArrowLeft, History } from 'lucide-react'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { PageHeading } from '@/components/layout/page-heading'
+import { SnapshotDealers } from '@/components/reports/open-invoice-snapshots-dialog'
 import { AppLink } from '@/components/shared/app-link'
 import {
   DataTable,
@@ -173,7 +174,7 @@ export function OpenInvoiceCompareReport({ id }: { id: number }) {
   const subtitle = snap ? (
     <span className="tabular-nums">
       {t('openInvoices.generated')} {formatNyDateTime(snap.generatedAt)} · {t('openInvoices.by')} {snap.generatedBy} ·{' '}
-      {t('openInvoices.asOf')} {formatUsCalendarDate(snap.asOf)} · {t('dealer.labelPlural')}: {snap.dealers}
+      {t('openInvoices.asOf')} {formatUsCalendarDate(snap.asOf)} · {t('dealer.labelPlural')}: <SnapshotDealers snapshot={snap} />
     </span>
   ) : undefined
 

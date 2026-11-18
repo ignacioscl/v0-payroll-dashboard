@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { fmtMoney } from '@/lib/kpi-money'
@@ -20,6 +21,25 @@ import {
   OPEN_INVOICE_SNAPSHOTS_QUERY_KEY,
   type OpenInvoiceSnapshotHeader,
 } from '@/lib/srs-kpis-api'
+
+/**
+ * Los dealers de una foto: «All», el nombre si es uno, o el primero y la cantidad («AutoNation … (3)») con la lista
+ * entera en el tooltip, para que una foto de muchos dealers no ocupe media pantalla. El Excel lleva la lista entera.
+ */
+export function SnapshotDealers({ snapshot }: { snapshot: Pick<OpenInvoiceSnapshotHeader, 'dealers' | 'dealerNames'> }) {
+  const names = snapshot.dealerNames
+  if (!names || names.length <= 1) return <span className="whitespace-normal break-words">{snapshot.dealers}</span>
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-default whitespace-normal break-words">
+          {names[0]} <span className="text-muted-foreground">({names.length})</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{names.join(', ')}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 /**
  * «Snapshots» de Open Invoices (plans/plan-reporte-javier §1.5, §4.3): las fotos que guardó cada Excel, la más nueva
@@ -79,7 +99,7 @@ export function OpenInvoiceSnapshotsDialog({
         size: 220,
         enableSorting: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealer.labelPlural')} />,
-        cell: ({ row }) => <span className="whitespace-normal break-words">{row.original.dealers}</span>,
+        cell: ({ row }) => <SnapshotDealers snapshot={row.original} />,
         meta: { label: t('dealer.labelPlural') } satisfies DataTableColumnMeta<OpenInvoiceSnapshotHeader>,
       },
       {

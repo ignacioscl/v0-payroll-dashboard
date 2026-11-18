@@ -793,6 +793,8 @@ export type OpenInvoiceSnapshotHeader = {
   generatedBy: string
   asOf: string
   dealers: string
+  /** null = All. */
+  dealerNames: string[] | null
   includeRemovedDealers: boolean
   total: number
   rowCount: number

@@ -88,17 +88,12 @@ export class OpenInvoicesCompareService {
     return { header, dealers, total: cents / 100, rowCount }
   }
 
-  /** «All» when the snapshot was All; else the names of its filter that the user sees. */
-  private dealersLabel(
-    labels: OpenInvoicesExportLabels,
-    v: VisibleSnapshot,
-    names: Map<number, string>,
-  ): string {
-    if (v.header.dealerIds == null) return labels.all
+  /** null when the snapshot was All; else the names of its filter that the user sees. */
+  private dealerNamesOf(v: VisibleSnapshot, names: Map<number, string>): string[] | null {
+    if (v.header.dealerIds == null) return null
     // v.dealers = the snapshot's universe for Admin General / Admin Company, their dealers for anyone else.
     const seen = new Set(v.dealers)
-    const mine = v.header.dealerIds.filter((id) => seen.has(id))
-    return openInvoicesDealersValue(labels, mine.map((id) => names.get(id) ?? String(id)))
+    return v.header.dealerIds.filter((id) => seen.has(id)).map((id) => names.get(id) ?? String(id))
   }
 
   private async userNames(ids: readonly number[]): Promise<Map<number, string>> {
@@ -119,12 +114,14 @@ export class OpenInvoicesCompareService {
     ])
     const out: OpenInvoiceSnapshotHeaderDto[] = []
     for (const v of list) {
+      const dealerNames = this.dealerNamesOf(v, names)
       out.push({
         id: v.header.id,
         generatedAt: utcToIso(v.header.generatedAt),
         generatedBy: users.get(v.header.idUsuario) ?? String(v.header.idUsuario),
         asOf: v.header.asOf,
-        dealers: this.dealersLabel(labels, v, names),
+        dealers: openInvoicesDealersValue(labels, dealerNames),
+        dealerNames,
         includeRemovedDealers: v.header.includeRemoved,
         total: v.total,
         rowCount: v.rowCount,

@@ -97,6 +97,8 @@ export class OpenInvoiceSnapshotHeaderDto {
   @ApiProperty() generatedBy!: string
   @ApiProperty({ example: '2026-09-27' }) asOf!: string
   @ApiProperty({ description: '«All» or the names of the dealers of the filter (only the ones the user sees)' }) dealers!: string
+  @ApiProperty({ type: [String], nullable: true, description: 'null = All; else the dealers of the filter the user sees' })
+  dealerNames!: string[] | null
   @ApiProperty() includeRemovedDealers!: boolean
   @ApiProperty({ description: 'Total of the dealers the user sees' }) total!: number
   @ApiProperty({ description: 'Rows of the dealers the user sees' }) rowCount!: number
