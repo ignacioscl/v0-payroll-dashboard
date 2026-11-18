@@ -10,6 +10,7 @@ import { DateRangePicker } from '@/components/filters/date-range-picker'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { IncomeYearFilter } from '@/components/filters/income-year-filter'
 import { MonthFilter } from '@/components/filters/month-filter'
+import { SundayFilter } from '@/components/filters/sunday-filter'
 import { DistrictMultiSelect } from '@/components/filters/district-multi-select'
 import { getDefaultDateRange } from '@/lib/filters/date-range-presets'
 import { resolveOpenRange, type InvoiceDateMode } from '@/lib/filters/date-range-open-ends'
@@ -173,6 +174,8 @@ export function Header() {
               <IncomeYearFilter className="shrink-0" />
             ) : filters.date === 'month' ? (
               <MonthFilter className="shrink-0" />
+            ) : filters.date === 'sunday' ? (
+              <SundayFilter className="shrink-0" withLabel />
             ) : (
               <DateRangePicker
                 value={dateRange}
@@ -238,7 +241,11 @@ export function Header() {
             {filters.date ? (
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-muted-foreground">
-                  {filters.date === 'month' ? t('monthlyClosing.month') : t('filters.dateRange')}
+                  {filters.date === 'month'
+                    ? t('monthlyClosing.month')
+                    : filters.date === 'sunday'
+                      ? t('openInvoices.asOf')
+                      : t('filters.dateRange')}
                 </span>
                 {filters.date === 'invoice' ? (
                   <DateRangePicker {...invoiceRangeProps} className="w-full min-w-0" />
@@ -246,6 +253,8 @@ export function Header() {
                   <IncomeYearFilter />
                 ) : filters.date === 'month' ? (
                   <MonthFilter className="w-full" />
+                ) : filters.date === 'sunday' ? (
+                  <SundayFilter className="w-full" />
                 ) : (
                   <DateRangePicker
                     value={dateRange}

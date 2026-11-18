@@ -4,7 +4,6 @@ import * as React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { History, Hourglass } from 'lucide-react'
-import { DatePicker } from '@/components/filters/date-picker'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
 import { PageHeading } from '@/components/layout/page-heading'
@@ -22,13 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useFilters } from '@/lib/filter-context'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { fmtMoney } from '@/lib/kpi-money'
-import {
-  isValidAsOf,
-  lastSundayNyYmd,
-  localDateToYmd,
-  todayNyYmd,
-  ymdToLocalDate,
-} from '@/lib/reports/open-invoices-dates'
+import { isValidAsOf } from '@/lib/reports/open-invoices-dates'
 import {
   fetchOpenInvoices,
   OPEN_INVOICE_SNAPSHOTS_QUERY_KEY,
@@ -41,8 +34,6 @@ import { isSrsBusyError } from '@/lib/srs-busy-error'
 import { cn } from '@/lib/utils'
 
 const DEALER_PINNING = { left: ['dealer'] }
-/** Only Sundays can be picked (react-day-picker `dayOfWeek`: 0 = Sunday). */
-const NOT_SUNDAY = { dayOfWeek: [1, 2, 3, 4, 5, 6] }
 const MONEY_KEYS = ['current', 'd15', 'd30', 'd60', 'd90', 'total'] as const
 
 /**
@@ -54,8 +45,8 @@ export function OpenInvoicesReport() {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const queryClient = useQueryClient()
-  const { selectedDealers, filtersHydrated } = useFilters()
-  const [asOf, setAsOf] = React.useState(() => lastSundayNyYmd())
+  // «As of» viene del header (SundayFilter), como el mes de Monthly Closing.
+  const { selectedDealers, filtersHydrated, openInvoicesAsOf: asOf } = useFilters()
   const [snapshotsOpen, setSnapshotsOpen] = React.useState(false)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'dealer', desc: false }])
 
@@ -170,24 +161,11 @@ export function OpenInvoicesReport() {
         <p className="text-sm text-muted-foreground">{t('dealer.selectInHeaderToLoad')}</p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex items-center gap-3">
-          <span className="shrink-0 whitespace-nowrap text-sm">{t('openInvoices.asOf')}</span>
-          <DatePicker
-            className="w-full sm:w-auto"
-            value={ymdToLocalDate(asOf)}
-            onChange={(d) => {
-              if (d) setAsOf(localDateToYmd(d))
-            }}
-            toDate={ymdToLocalDate(todayNyYmd())}
-            disabledDays={NOT_SUNDAY}
-            hideClear
-          />
-        </div>
-        {removedDealers.visible ? (
+      {removedDealers.visible ? (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <RemovedDealersSwitch id="include-removed-dealers-open-invoices" state={removedDealers} disabled={!ready} />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {errorMessage && !report.isLoading ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
