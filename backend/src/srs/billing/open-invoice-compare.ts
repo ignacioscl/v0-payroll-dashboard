@@ -138,6 +138,8 @@ export function compareReasons(
   snapshotGeneratedAtUtc: string,
   texts: OpenInvoiceReasonTexts,
   formatDate: (ymd: string) => string,
+  /** Every payment active in the snapshot, of any invoice: a deleted one of these was deleted after the snapshot. */
+  snapshotAllPayments?: ReadonlySet<number>,
 ): string[] {
   const out: string[] = []
   // Reasons 2 and 3 only for an invoice the snapshot captured: one that was not in it (paid off or at $0 then) has no
@@ -151,6 +153,12 @@ export function compareReasons(
     }
     for (const p of facts?.payments ?? []) {
       if (p.estado === 0 && before.has(p.idBilling)) out.push(texts.paymentDeleted(p.checkNumber))
+    }
+  } else if (snapshotAllPayments) {
+    // Not in the snapshot (paid off then) and owes again: if one of its payments was active in the snapshot (on another
+    // invoice, same check) and is deleted today, it was deleted after the snapshot. Reason 2 stays out (CODE-review 2).
+    for (const p of facts?.payments ?? []) {
+      if (p.estado === 0 && snapshotAllPayments.has(p.idBilling)) out.push(texts.paymentDeleted(p.checkNumber))
     }
   }
   if (!inv.snapshot && facts?.fechaCreate && isAfterSnapshot(facts.fechaCreate, snapshotGeneratedAtUtc)) {

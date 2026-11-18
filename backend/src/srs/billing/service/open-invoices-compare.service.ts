@@ -211,6 +211,7 @@ export class OpenInvoicesCompareService {
     const missing = changed.map((c) => c.dealerId).filter((d) => !names.has(d))
     if (missing.length) for (const [k, n] of await this.repository.dealerNames(ctx.idDealerProvider, missing)) names.set(k, n)
     const [header] = await this.toHeaderDtos(ctx, labels, [v])
+    const allSnapshotPayments = new Set(Object.values(full.payments).flat())
 
     const rows = changed
       .map((c) => ({
@@ -223,7 +224,15 @@ export class OpenInvoicesCompareService {
         snapshot: c.snapshot,
         today: c.today,
         difference: c.differenceCents / 100,
-        why: compareReasons(c, facts.get(c.sid), full.payments[String(c.sid)], full.generatedAt, labels.reasons, ymdToUs),
+        why: compareReasons(
+          c,
+          facts.get(c.sid),
+          full.payments[String(c.sid)],
+          full.generatedAt,
+          labels.reasons,
+          ymdToUs,
+          allSnapshotPayments,
+        ),
       }))
       .sort((a, b) => a.dealer.localeCompare(b.dealer) || a.invoice.localeCompare(b.invoice, undefined, { numeric: true }))
     const snapCents = snapshotRows.reduce((s, r) => s + Math.round(r.amount * 100), 0)

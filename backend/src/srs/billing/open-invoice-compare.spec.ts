@@ -130,6 +130,19 @@ describe('compareReasons (§3.6)', () => {
     expect(compareReasons(c, facts, undefined, SNAP_AT, texts, fmt)).toEqual([texts.unknown])
   })
 
+  it('3 — not in the snapshot (paid off then) and reopened because a payment active in the snapshot (on another invoice) was deleted', () => {
+    const c = compareRows([], [row({ sid: 12, amount: 840 })])[0]
+    const facts = {
+      estado: 1,
+      fechaCreate: '2026-07-01 10:00:00',
+      payments: [
+        { idBilling: 29568, checkNumber: '87966', fechaAlta: '2026-07-20', estado: 0 },
+        { idBilling: 3, checkNumber: 'OLD-DEL', fechaAlta: '2026-07-10', estado: 0 },
+      ],
+    }
+    expect(compareReasons(c, facts, undefined, SNAP_AT, texts, fmt, new Set([29568]))).toEqual(['Payment deleted: check 87966'])
+  })
+
   it('8 — none of the above', () => {
     expect(compareReasons(paid, { estado: 1, fechaCreate: null, payments: [] }, [], SNAP_AT, texts, fmt)).toEqual([
       "The invoice or its payments changed; SRS doesn't keep the detail",
