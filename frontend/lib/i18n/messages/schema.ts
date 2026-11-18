@@ -1601,6 +1601,8 @@ export interface Messages {
     generated: string
     by: string
     compareWithToday: string
+    compareIntro: string
+    compareNoChanges: string
     inSnapshot: string
     today: string
     difference: string

@@ -1655,6 +1655,9 @@ export const es: Messages = {
     generated: "Generado",
     by: "Por",
     compareWithToday: "Comparar con hoy",
+    compareIntro:
+      "El reporte corrido hoy, con el mismo domingo y los mismos dealers, contra este Excel. Solo aparecen las invoices que cambiaron, con el motivo.",
+    compareNoChanges: "Sin cambios: hoy el reporte da lo mismo que esta foto, invoice por invoice.",
     inSnapshot: "En la foto",
     today: "Hoy",
     difference: "Diferencia",

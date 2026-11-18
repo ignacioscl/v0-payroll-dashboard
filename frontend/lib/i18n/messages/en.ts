@@ -1647,6 +1647,9 @@ export const en: Messages = {
     generated: "Generated",
     by: "By",
     compareWithToday: "Compare with today",
+    compareIntro:
+      "The report run today, with the same Sunday and dealers, against this Excel. Only the invoices that changed are listed, with the reason.",
+    compareNoChanges: "No changes: today the report gives the same as this snapshot, invoice by invoice.",
     inSnapshot: "In snapshot",
     today: "Today",
     difference: "Difference",

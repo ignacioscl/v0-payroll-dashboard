@@ -195,6 +195,8 @@ export function OpenInvoiceCompareReport({ id }: { id: number }) {
         titleAside={<ReportRulesNotice screen="openInvoicesCompare" />}
       />
 
+      <p className="text-sm text-muted-foreground">{t('openInvoices.compareIntro')}</p>
+
       {errorMessage && !compare.isLoading ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {errorMessage}
@@ -244,7 +246,11 @@ export function OpenInvoiceCompareReport({ id }: { id: number }) {
               </div>
             ) : undefined
           }
-          emptyState={data ? <p className="py-8 text-center text-sm text-muted-foreground">—</p> : undefined}
+          emptyState={
+            data ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">{t('openInvoices.compareNoChanges')}</p>
+            ) : undefined
+          }
         />
       </div>
     </div>
