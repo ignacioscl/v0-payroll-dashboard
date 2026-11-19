@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Loader2, MoreHorizontal } from 'lucide-react'
+import { EXPANDED_DETAIL_ROW_CLASS, EXPANDED_ROW_CLASS } from '@/components/shared/data-table/data-table'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -210,7 +211,7 @@ function ServicesTable({
                 return (
                   <React.Fragment key={inv.nro}>
                     <tr
-                      className="cursor-pointer border-t border-border/50 hover:bg-muted/40"
+                      className={cn('cursor-pointer border-t border-border/50 hover:bg-muted/40', open && EXPANDED_ROW_CLASS)}
                       data-testid="income-ttk-invoice"
                       onClick={() => setOpenInvoices((prev) => toggle(prev, inv.nro))}
                     >
@@ -242,7 +243,7 @@ function ServicesTable({
                     </tr>
                     {open
                       ? inv.employees.map((e) => (
-                          <tr key={e.employee} className="border-t border-border/30" data-testid="income-ttk-employee">
+                          <tr key={e.employee} className={cn('border-t border-border/30', EXPANDED_DETAIL_ROW_CLASS)} data-testid="income-ttk-employee">
                             <td colSpan={3} className="whitespace-normal break-words py-1 pl-7 pr-2 text-muted-foreground">
                               {e.employee}
                             </td>
@@ -313,7 +314,7 @@ function ServiceRow({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <tr
-          className="cursor-pointer border-t border-border/50 hover:bg-muted/40"
+          className={cn('cursor-pointer border-t border-border/50 hover:bg-muted/40', open && EXPANDED_ROW_CLASS)}
           data-testid="income-service-row"
           onClick={onToggle}
         >
@@ -385,7 +386,7 @@ function ServiceVehiclesRows({
   const query = useServiceVehicles(target)
   if (query.isLoading) {
     return (
-      <tr>
+      <tr className={EXPANDED_DETAIL_ROW_CLASS}>
         <td colSpan={4} className="py-3 text-center text-muted-foreground">
           <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />
         </td>
@@ -394,7 +395,7 @@ function ServiceVehiclesRows({
   }
   if (query.isError) {
     return (
-      <tr>
+      <tr className={EXPANDED_DETAIL_ROW_CLASS}>
         <td colSpan={4} className="py-2 pl-7 text-destructive">
           {isSrsBusyError(query.error) ? t('common.serverBusy') : t('common.failedToLoad')}
         </td>
@@ -416,21 +417,21 @@ function ServiceVehiclesRows({
       {shown.map((r) =>
         isMobile ? (
           <React.Fragment key={r.vin}>
-            <tr className="border-t border-border/30" data-testid="income-service-vehicle">
+            <tr className={cn('border-t border-border/30', EXPANDED_DETAIL_ROW_CLASS)} data-testid="income-service-vehicle">
               <td colSpan={3} className="whitespace-nowrap pl-7 pt-1 font-mono">
                 {r.vin}
                 {r.qty !== 1 ? <span className="ml-1 font-sans text-muted-foreground">×{fmtQty(r.qty)}</span> : null}
               </td>
               <td className={cn(num, 'pt-1')}>{fmtMoney(r.income)}</td>
             </tr>
-            <tr>
+            <tr className={EXPANDED_DETAIL_ROW_CLASS}>
               <td colSpan={4} className="whitespace-normal break-words pb-1 pl-7 pr-2 text-muted-foreground">
                 {desc(r)} · {wos(r)}
               </td>
             </tr>
           </React.Fragment>
         ) : (
-          <tr key={r.vin} className="border-t border-border/30" data-testid="income-service-vehicle">
+          <tr key={r.vin} className={cn('border-t border-border/30', EXPANDED_DETAIL_ROW_CLASS)} data-testid="income-service-vehicle">
             <td className="whitespace-normal break-words py-1 pl-7 pr-2">
               <span className="font-mono">{r.vin}</span> · {desc(r)}
               <div className="text-[11px] text-muted-foreground">{wos(r)}</div>
@@ -442,7 +443,7 @@ function ServiceVehiclesRows({
         ),
       )}
       {rows.length > VEHICLES_IN_ROW || isMobile ? (
-        <tr className="border-t border-border/30">
+        <tr className={cn('border-t border-border/30', EXPANDED_DETAIL_ROW_CLASS)}>
           <td colSpan={4} className="py-1.5 pl-7 text-muted-foreground">
             {rows.length > VEHICLES_IN_ROW
               ? `${t('incomeByDealer.showingVehicles', { shown: shown.length, total: rows.length })} · `

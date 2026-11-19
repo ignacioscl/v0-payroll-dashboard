@@ -58,8 +58,6 @@ export type RolesDataTableProps = {
   /** When set, list only the child roles of this role. */
   idRolParent?: number | null
   showInactive: boolean
-  /** With a dealer selected in the header: also list internal roles without dealer. */
-  includeNoDealer: boolean
   enabled: boolean
   canEdit: boolean
   canViewUsers: boolean
@@ -79,7 +77,6 @@ export function RolesDataTable({
   idTemplate = null,
   idRolParent = null,
   showInactive,
-  includeNoDealer,
   enabled,
   canEdit,
   canViewUsers,
@@ -123,12 +120,12 @@ export function RolesDataTable({
 
   React.useEffect(() => {
     setPageIndex(0)
-  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent])
 
   // Selection is per visible page, like legacy (getRolesChecked on the DataTable page).
   React.useEffect(() => {
     setRowSelection({})
-  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer, pageIndex, pageSize])
+  }, [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, pageIndex, pageSize])
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -458,16 +455,18 @@ export function RolesDataTable({
     () => ({
       type: typeFilter || undefined,
       show_inactive: showInactive ? 1 : 0,
-      ...(dealerKey ? { id_dealer: dealerKey, include_no_dealer: includeNoDealer ? 1 : 0 } : {}),
+      // Con un dealer elegido, también los roles de toda la compañía (sin dealer): antes había que prender un switch
+      // para verlos (reunión con Juan 18/11, tema 11).
+      ...(dealerKey ? { id_dealer: dealerKey, include_no_dealer: 1 } : {}),
       ...roleFilterParams(idTemplate, 'id_template', 'has_template'),
       ...roleFilterParams(idRolParent, 'id_rol_parent', 'has_parent'),
     }),
-    [typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer],
+    [typeFilter, showInactive, dealerKey, idTemplate, idRolParent],
   )
 
   const { rows, total, pageCount, isFetching, error } = useDataTableQuery({
     adapter: rolesAdapter,
-    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate, idRolParent, includeNoDealer],
+    queryKey: ['roles-list', typeFilter, showInactive, dealerKey, idTemplate, idRolParent],
     queryFn: fetchRoles,
     enabled,
     pageIndex,

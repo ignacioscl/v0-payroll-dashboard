@@ -31,7 +31,6 @@ export interface Messages {
     readOnlyHint: string
     autosaveHint: string
     showInactive: string
-    includeNoDealer: string
     type: string
     typeAll: string
     typeInternal: string
@@ -2015,6 +2014,7 @@ export interface Messages {
     yesChange: string
     enterDealerAmount: string
     dealersWithoutAmount: string
+    removeDealerFromSplit: string
     amountIsSum: string
     needs100: string
     manualOver100: string

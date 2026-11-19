@@ -153,11 +153,13 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
       mc = await service.getSummary(admin, q('2026-09'))
     }, 120000)
 
-    it('Total = suma de las filas al centavo; Without dealer fuera del Total', () => {
-      for (const key of ['income', 'payroll', 'expenses', 'profit'] as const) {
-        expect(toCents(mc.total[key])).toBe(sumCents(mc.rows.map((r) => r[key])))
-      }
+    it('Total = suma de las filas más Without dealer, al centavo (D9 de plan-reunion-juan-18-11)', () => {
       expect(mc.withoutDealer).not.toBeNull()
+      const wd = toCents(mc.withoutDealer!.payroll)
+      expect(toCents(mc.total.income)).toBe(sumCents(mc.rows.map((r) => r.income)))
+      expect(toCents(mc.total.expenses)).toBe(sumCents(mc.rows.map((r) => r.expenses)))
+      expect(toCents(mc.total.payroll)).toBe(sumCents(mc.rows.map((r) => r.payroll)) + wd)
+      expect(toCents(mc.total.profit)).toBe(sumCents(mc.rows.map((r) => r.profit)) - wd)
       expect(mc.periods.map((p) => [p.desde, p.hasta])).toEqual([
         ['2026-08-31', '2026-09-15'],
         ['2026-09-16', '2026-09-30'],
@@ -167,7 +169,7 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
     it('P7: Income = Closing de legacy; Payroll y Expenses = el SQL independiente', () => {
       expect(mc.total.income).toBe(SEP_INCOME)
       expect({
-        payroll: fromTotal(mc.total.payroll, mc.withoutDealer?.payroll ?? 0),
+        payroll: mc.total.payroll,
         lexus: mc.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)?.payroll,
         expenses: mc.total.expenses,
       }).toEqual({ payroll: SEP_PAYROLL_WITH_WITHOUT_DEALER, lexus: SEP_LEXUS_PAYROLL, expenses: SEP_EXPENSES })
@@ -213,7 +215,7 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
       const totals = ['Total', 'Without dealer']
       expect(sheetColumnCents(wb, 'Summary', 'Income', totals)).toBe(toCents(mc.total.income))
       expect(sheetColumnCents(wb, 'Income', 'Total')).toBe(toCents(mc.total.income))
-      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(toCents(mc.total.payroll) + toCents(mc.withoutDealer!.payroll))
+      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(toCents(mc.total.payroll))
       expect(sheetColumnCents(wb, 'Expenses', 'Amount')).toBe(toCents(mc.total.expenses))
       // MC no lleva notas en los títulos.
       expect(wb.getWorksheet('Summary')!.getRow(2).getCell(1).note).toBeUndefined()
@@ -460,9 +462,7 @@ describeVendors('Vendors fuera del Payroll del closing — copia del 12/11 (solo
         .filter((r) => r.Dealer === landRover.dealer)
         .reduce((a, r) => a + toCents(Number(r.Amount)), 0)
       expect(lrCents).toBe(toCents(60151.21))
-      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(
-        toCents(withVendor.total.payroll) + toCents(withVendor.withoutDealer!.payroll),
-      )
+      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(toCents(withVendor.total.payroll))
     }, 300000)
 
     it('repositorio: excludeEmployeeIds baja la suma de 627 en lo de Francol y la de Without dealer en lo del excluido', async () => {
@@ -513,6 +513,3 @@ function sheetRows(wb: ExcelJS.Workbook, sheet: string): Record<string, unknown>
   return out
 }
 
-function fromTotal(dealers: number, withoutDealer: number): number {
-  return (toCents(dealers) + toCents(withoutDealer)) / 100
-}

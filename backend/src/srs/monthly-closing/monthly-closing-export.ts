@@ -188,8 +188,9 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
   }
   const summaryRows: ClosingRowDto[] = [
     ...input.summary.rows,
-    input.summary.total,
+    // Without dealer antes del Total: el Total ya la incluye (plan-reunion-juan-18-11, D9).
     ...(input.summary.withoutDealer ? [input.summary.withoutDealer] : []),
+    input.summary.total,
   ]
   const byDealerName = <T>(rows: readonly T[], id: (r: T) => number | null) =>
     [...rows].sort((a, b) => dealer(id(a)).localeCompare(dealer(id(b))))

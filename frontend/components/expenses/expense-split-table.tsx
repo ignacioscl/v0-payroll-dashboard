@@ -1,10 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { Trash2 } from 'lucide-react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
+import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { amountOnBlur, fmtAmount } from '@/lib/expenses/expense-format'
 import { amountSplitTotal, currentSplitAmounts, type ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
@@ -18,7 +21,7 @@ import { cn } from '@/lib/utils'
  */
 export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
   const { t } = useTranslation()
-  const { control } = useFormContext<ExpenseFormValues>()
+  const { control, getValues, setValue } = useFormContext<ExpenseFormValues>()
   const { dealers } = useSrsDealers()
   const mode = useWatch({ control, name: 'mode' })
   const totalAmount = useWatch({ control, name: 'totalAmount' })
@@ -52,6 +55,18 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
     return { amounts: {}, total: sum, pctSum: null, missing }
   }, [mode, totalAmount, branchIds, branches])
 
+  /** Tacho de la fila: saca el dealer de la tabla y del combo Dealers; el reparto se recalcula solo. Sin confirmación:
+   * el gasto todavía no está grabado (reunión con Juan 18/11, tema 8). */
+  const removeDealer = (id: string) => {
+    setValue(
+      'branchIds',
+      (getValues('branchIds') ?? []).filter((x) => x !== id),
+      { shouldDirty: true, shouldValidate: true },
+    )
+    const { [id]: _removed, ...rest } = getValues('branches') ?? {}
+    setValue('branches', rest, { shouldDirty: true })
+  }
+
   const ids = branchIds ?? []
   if (mode === 'single' || ids.length === 0) return null
 
@@ -72,6 +87,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
               </th>
             ) : null}
             {showPreview ? <th className="w-32 px-3 py-2 text-right font-medium">{t('expenses.dealerAmount')}</th> : null}
+            <th className="w-10 px-1 py-2" aria-hidden />
           </tr>
         </thead>
         <tbody>
@@ -110,6 +126,24 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
                   {preview.amounts[id] ? fmtAmount(preview.amounts[id]) : '—'}
                 </td>
               ) : null}
+              <td className="px-1 py-1.5 text-right align-top">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 text-destructive"
+                      disabled={disabled}
+                      onClick={() => removeDealer(id)}
+                      aria-label={t('expenses.removeDealerFromSplit', { dealer: dealerName(id) })}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{t('expenses.removeDealerFromSplit', { dealer: dealerName(id) })}</TooltipContent>
+                </Tooltip>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -138,6 +172,7 @@ export function ExpenseSplitTable({ disabled }: { disabled?: boolean }) {
             {showPreview ? (
               <td className="px-3 py-2 text-right tabular-nums">{preview.total ? fmtAmount(preview.total) : '—'}</td>
             ) : null}
+            <td />
           </tr>
         </tfoot>
       </table>

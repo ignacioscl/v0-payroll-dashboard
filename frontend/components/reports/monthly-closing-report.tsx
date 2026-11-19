@@ -99,6 +99,9 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
     enabled: Boolean(params),
   })
   const data = report.data
+  // Hay resumen si hay dealers o si quien mira ve «Without dealer»: esa fila sale siempre, también en $0 y aunque los
+  // dealers elegidos no tengan movimientos (plan-reunion-juan-18-11, tema 5b).
+  const hasSummary = Boolean(data && (data.rows.length > 0 || data.withoutDealer))
   const rows = data?.rows ?? []
 
   // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
@@ -245,9 +248,17 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
       <PageHeading
         title={tint ? t('monthlyClosing.tintTitle') : t('monthlyClosing.title')}
         subtitle={
-          <span>
-            {monthValid ? <span className="font-medium">{closingMonthLabel(closingMonth)} · </span> : null}
-            {tint ? t('monthlyClosing.tintSubtitle') : t('monthlyClosing.subtitle')}
+          <span className="flex flex-col gap-1">
+            <span>
+              {monthValid ? <span className="font-medium">{closingMonthLabel(closingMonth)} · </span> : null}
+              {tint ? t('monthlyClosing.tintSubtitle') : t('monthlyClosing.subtitle')}
+            </span>
+            {/* Los pay periods del mes, arriba y a la vista: abajo de la tabla no se veían (reunión con Juan 18/11). */}
+            {data ? (
+              <span className="font-semibold text-foreground tabular-nums" data-testid="monthly-closing-pay-periods">
+                {periodsLine(data.periods, t)}
+              </span>
+            ) : null}
           </span>
         }
         icon={tint ? <CarFront /> : <CalendarCheck />}
@@ -298,7 +309,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
               url={params ? monthlyClosingExportUrl(params) : null}
               rowCount={rows.length}
               fallbackFileName={tint ? 'window_tint_closing.xlsx' : 'monthly_closing.xlsx'}
-              disabled={report.isFetching || rows.length === 0}
+              disabled={report.isFetching || !hasSummary}
             />
           }
           recordsCount={rows.length}
@@ -308,14 +319,15 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           }
           onRowClick={(row) => setOpenDealer({ dealerId: row.dealerId, dealer: row.dealer })}
           footer={
-            data && rows.length > 0 ? (
+            hasSummary && data ? (
               <div className="divide-y divide-border border-t border-border">
-                {totalsLine(data.total, t('monthlyClosing.total'))}
+                {/* Without dealer arriba del Total: el Total ya la incluye (plan-reunion-juan-18-11, D9). */}
                 {data.withoutDealer
                   ? totalsLine(data.withoutDealer, t('monthlyClosing.withoutDealer'), () =>
                       setOpenDealer({ dealerId: 0, dealer: t('monthlyClosing.withoutDealer') }),
                     )
                   : null}
+                {totalsLine(data.total, t('monthlyClosing.total'))}
               </div>
             ) : undefined
           }
@@ -335,8 +347,6 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           {t('monthlyClosing.nonTintDealersNote')}
         </p>
       ) : null}
-
-      {data ? <p className="text-sm text-muted-foreground tabular-nums">{periodsLine(data.periods, t)}</p> : null}
 
       {params ? (
         <MonthlyClosingDealerDialog dealer={openDealer} onClose={() => setOpenDealer(null)} params={params} />
