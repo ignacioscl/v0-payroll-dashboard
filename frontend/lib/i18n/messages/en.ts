@@ -9,6 +9,7 @@ export const en: Messages = {
     incomeByDealer: 'Income by Dealer',
     monthlyClosing: 'Monthly Closing',
     windowTintClosing: 'Window Tint Closing',
+    openInvoices: "Open Invoices",
     reports: 'Reports',
     billing: 'Billing',
     invoices: 'Invoices',
@@ -1634,6 +1635,30 @@ export const en: Messages = {
     colCategory: 'Category',
     colNotes: 'Notes',
   },
+  // Reports › Open Invoices (plans/plan-reporte-javier §4.3): texts approved by Ignacio (27/10 and P5, 28/10).
+  openInvoices: {
+    title: "Open Invoices",
+    asOf: "As of",
+    current: "Current",
+    department: "Department",
+    total: "Total",
+    snapshots: "Snapshots",
+    snapshot: "Snapshot",
+    generated: "Generated",
+    by: "By",
+    compareWithToday: "Compare with today",
+    compareIntro:
+      "The report run today, with the same Sunday and dealers, against this Excel. Only the invoices that changed are listed, with the reason.",
+    compareNoChanges: "No changes: today the report gives the same as this snapshot, invoice by invoice.",
+    inSnapshot: "In snapshot",
+    today: "Today",
+    difference: "Difference",
+    why: "Why",
+    col15: "15+",
+    col30: "30+",
+    col60: "60+",
+    col90: "90+",
+  },
   reportRules: {
     billing: {
       title: 'What Income counts',
@@ -1719,6 +1744,39 @@ export const en: Messages = {
         "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
       item6: 'Profit/Loss: Income − Payroll − Expenses.',
       item7: '%: Profit/Loss divided by Income. Shows «—» when Income is $0.',
+    },
+    // PAIR of backend/src/srs/billing/open-invoices-export-labels.ts (Report Info of the Excel): approved word by word
+    // (plans/plan-reporte-javier §2 and P5); open-invoices-labels.spec.ts compares them.
+    openInvoices: {
+      title: "What this report counts",
+      item1:
+        "Work Order invoices created on or before the «As of» Sunday, and TTK and Generic invoices whose DATE TO is on or before that Sunday. Deleted invoices are not included.",
+      item2:
+        "Amounts are what is still owed when you run the report: every payment entered in SRS up to that moment is already taken off.",
+      item3:
+        "Days are counted up to the day you run the report: Work Order invoices from the day the invoice was created; TTK and Generic invoices from DATE TO.",
+      item4:
+        "Columns: Current 0–14 days, 15+ 15–29, 30+ 30–59, 60+ 60–89, 90+ 90 or more. Each invoice is in one column only, and Total is the sum of the five.",
+      item5:
+        "Current is the dealer's payment term («Payment Due On» in the dealer; Net 15 if it has none). From that day the invoice goes to the column of its age.",
+      item6:
+        "Department is the department of each service, so an invoice with services of two departments is split between them. TTK and Generic invoices show under «Timesheets», one row per position: the position the employee had the day they punched, with its name in SRS. Generic lines with no punch show as «Timesheets · Generic».",
+      item7:
+        "Amounts include discount and tax: a partially paid invoice counts only its unpaid part.",
+      item8:
+        "Every Excel export saves a snapshot of what it shows. «Snapshots» compares it with today, invoice by invoice.",
+    },
+    // Comparison of a snapshot with today (P5).
+    openInvoicesCompare: {
+      title: "What this comparison shows",
+      item1:
+        "The snapshot is what the Excel showed when it was exported. «Today» is the same report, with the same As of and dealers, run now.",
+      item2:
+        "Only invoices that changed are listed: amount, column or department.",
+      item3:
+        "«Why» shows what SRS records: payments entered or deleted, invoices deleted or created after the snapshot, Payment Due On changes and days passed.",
+      item4:
+        "If an invoice's lines or payment lines were edited, SRS doesn't keep the detail, and «Why» says so.",
     },
   },
   systemConfig: {

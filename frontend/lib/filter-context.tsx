@@ -23,6 +23,7 @@ import {
 import { DEFAULT_ERROR_STATUS, type ErrorStatus } from '@/lib/ttk/error-status'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 import { defaultClosingMonth } from '@/lib/reports/monthly-closing-month'
+import { lastSundayNyYmd } from '@/lib/reports/open-invoices-dates'
 
 interface FilterContextType {
   search: string
@@ -122,6 +123,12 @@ interface FilterContextType {
    */
   closingMonth: string
   setClosingMonth: (value: string) => void
+  /**
+   * Open Invoices: el domingo «As of» del header (`YYYY-MM-DD`), en vez del calendario de rango. Por defecto el último
+   * domingo de New York (plans/plan-reporte-javier §4.3).
+   */
+  openInvoicesAsOf: string
+  setOpenInvoicesAsOf: (value: string) => void
   /** True after client mount + cookie restore (safe for dealer-dependent UI). */
   filtersHydrated: boolean
   clearFilters: () => void
@@ -169,6 +176,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [incomeYearMode, setIncomeYearMode] = useState(false)
   const [incomeYears, setIncomeYears] = useState<number[]>([])
   const [closingMonth, setClosingMonth] = useState<string>(() => defaultClosingMonth())
+  const [openInvoicesAsOf, setOpenInvoicesAsOf] = useState<string>(() => lastSundayNyYmd())
   const [filtersHydrated, setFiltersHydrated] = useState(false)
 
   const showDefaultDateRange = useCallback((value: DateRange | undefined) => {
@@ -278,6 +286,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setInvoiceDateMode('range')
     setInvoiceIgnorePeriod(false)
     setClosingMonth(defaultClosingMonth())
+    setOpenInvoicesAsOf(lastSundayNyYmd())
   }
 
   return (
@@ -327,6 +336,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setIncomeYears,
       closingMonth,
       setClosingMonth,
+      openInvoicesAsOf,
+      setOpenInvoicesAsOf,
       filtersHydrated,
       clearFilters
     }}>

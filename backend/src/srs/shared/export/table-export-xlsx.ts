@@ -3,15 +3,18 @@ import ExcelJS from 'exceljs'
 import { writeReportInfoSheet, type ReportInfoRow } from './report-info-sheet'
 import { THEME, applyHeaderRow, styleDataRow, thinBorder } from './xlsx-theme'
 
-/** How a column is written: text as is, numbers as numbers (money with cents, percent with one decimal). */
-export type TableExportColumnKind = 'text' | 'int' | 'money' | 'pct'
+/**
+ * How a column is written: text as is, numbers as numbers (money with cents, percent with one decimal),
+ * dates as native Excel dates (value from ymdToExcelDate; rule export-date-format).
+ */
+export type TableExportColumnKind = 'text' | 'int' | 'money' | 'pct' | 'date'
 
 export type TableExportColumn<T> = {
   header: string
   width: number
   kind: TableExportColumnKind
   /** `null` leaves the cell empty (e.g. Goal of a dealer without goal). */
-  value: (row: T) => string | number | null
+  value: (row: T) => string | number | Date | null
   /**
    * What the column counts, as an Excel note on its header (the red corner; read on hover). Optional:
    * without it the header is as before. plans/plan-reporte-tint/PLAN.md T5 (D5).
@@ -31,6 +34,8 @@ export type TableExportSheet<T> = {
    * (plans/plan-window-tint-closing-tint-y-servicios T5, D3). Without it every row is as before.
    */
   rowTone?: (row: T) => 'warn' | undefined
+  /** Optional: 'bold' writes that row in bold (a TOTAL row at the end, plans/plan-reporte-javier T5). */
+  rowWeight?: (row: T) => 'bold' | undefined
 }
 
 export type TableExportWorkbookOptions<T> = {
@@ -57,6 +62,7 @@ const NUM_FMT: Record<TableExportColumnKind, string | undefined> = {
   int: undefined,
   money: '#,##0.00',
   pct: '0.0',
+  date: 'mm/dd/yyyy',
 }
 
 /**
@@ -109,11 +115,12 @@ function writeDataSheet<T>(workbook: ExcelJS.Workbook, opts: TableExportSheet<T>
     const excelRow = sheet.addRow(opts.columns.map((c) => c.value(row)))
     styleDataRow(excelRow, colCount, index % 2 === 1)
     const warn = opts.rowTone?.(row) === 'warn'
+    const bold = opts.rowWeight?.(row) === 'bold'
     opts.columns.forEach((c, i) => {
       const cell = excelRow.getCell(i + 1)
       const fmt = NUM_FMT[c.kind]
       if (fmt) cell.numFmt = fmt
-      if (warn) cell.font = { color: { argb: THEME.warnFg } }
+      if (warn || bold) cell.font = { ...(warn ? { color: { argb: THEME.warnFg } } : {}), ...(bold ? { bold: true } : {}) }
     })
   })
 }

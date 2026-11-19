@@ -49,6 +49,7 @@ import {
   canAccessBusinessKpis,
   canAccessBillingInvoices,
   canAccessMonthlyClosing,
+  canAccessOpenInvoices,
   canAccessProductionReport,
   canAccessWindowTintClosing,
 } from '@/lib/auth/payroll-access'
@@ -123,6 +124,7 @@ function SidebarInner({
     canAccessExpenses: canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses),
     canAccessMonthlyClosing: canAccessMonthlyClosing(user, hasPermission),
     canAccessWindowTintClosing: canAccessWindowTintClosing(user, hasPermission),
+    canAccessOpenInvoices: canAccessOpenInvoices(user, hasPermission),
     companyModules: {
       companyHasExpenses: Boolean(user?.hasExpenses),
       companyHasWindowTintClosing: Boolean(user?.hasWindowTintClosing),

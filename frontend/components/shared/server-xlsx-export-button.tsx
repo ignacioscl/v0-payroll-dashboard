@@ -26,6 +26,8 @@ type ServerXlsxExportButtonProps = {
   rowCount: number
   fallbackFileName: string
   disabled?: boolean
+  /** Called after the file downloaded (Open Invoices refreshes its snapshot list, plans/plan-reporte-javier §4.3). */
+  onExported?: () => void
 }
 
 /**
@@ -37,6 +39,7 @@ export function ServerXlsxExportButton({
   rowCount,
   fallbackFileName,
   disabled,
+  onExported,
 }: ServerXlsxExportButtonProps) {
   const { t } = useTranslation()
   const [busy, setBusy] = React.useState(false)
@@ -62,6 +65,7 @@ export function ServerXlsxExportButton({
         id: toastId,
         duration: TOAST_DURATION_MS,
       })
+      onExported?.()
     } catch (e) {
       toast.error(t('common.exportFailed'), { id: toastId, duration: TOAST_DURATION_MS })
        

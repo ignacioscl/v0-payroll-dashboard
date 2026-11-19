@@ -27,6 +27,10 @@ describe('getHeaderFilters', () => {
     expect(getHeaderFilters('/reports/monthly-closing').date).toBe('month')
     expect(getHeaderFilters('/reports/window-tint-closing').date).toBe('month')
   })
+  it('Open Invoices: el domingo «As of» en la barra; la comparación de una foto, sin fecha', () => {
+    expect(getHeaderFilters('/reports/open-invoices').date).toBe('sunday')
+    expect(getHeaderFilters('/reports/open-invoices/snapshots/7').date).toBeNull()
+  })
   it('el resto: buscador y rango, sin distrito ni tope', () => {
     for (const p of ['/', '/reports/business-kpis', '/reports/production-vs-goal', '/settings/system', '/components']) {
       expect(getHeaderFilters(p), p).toEqual({ search: true, district: false, date: 'range' })

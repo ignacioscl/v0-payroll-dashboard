@@ -1,0 +1,26 @@
+---
+description: Todo reporte o pantalla con totales lleva su ReportRulesNotice con las reglas exactas de su query, y su Excel las mismas líneas en Report Info
+globs: v0-payroll-dashboard/frontend/app/(dashboard)/reports/**,v0-payroll-dashboard/frontend/app/(dashboard)/billing/**
+alwaysApply: false
+---
+
+# El cartel de reglas de cada reporte
+
+**Todo reporte o pantalla con totales lleva su `ReportRulesNotice`** arriba (`titleAside` de `PageHeading`), con
+exactamente las reglas que aplica su query: qué entra, desde qué fecha, cómo se valoriza (tax, descuento), qué se agrupa
+y qué no. Cada línea del cartel tiene que coincidir con el código que la hace cumplir: un cambio en la query que cambia
+una regla cambia el cartel en el mismo cambio, y al revés. Los textos EN/ES se aprueban palabra por palabra antes de
+construir. El Excel del mismo reporte lleva las mismas líneas en Report Info.
+
+## Cómo se arma
+
+- Textos en `reportRules.<pantalla>.title` / `.itemN` de `lib/i18n/messages/en.ts`, `es.ts` y `schema.ts`, y la
+  cantidad de líneas en `ITEM_COUNT` de `components/shared/report-rules-notice.tsx`.
+- Si el Excel lo arma Nest, las mismas líneas van en sus labels del backend y **una spec compara las dos copias** (no hay
+  import cruzado entre front y back). Ejemplos: `backend/src/srs/billing/open-invoices-labels.spec.ts` (Open Invoices,
+  EN y ES) y `backend/src/srs/monthly-closing/tint-closing-column-notes.spec.ts` (Window Tint Closing).
+
+## Origen
+
+Carteles del 24/10/2026 (`plans/plan-totales-income-centavos/INFORME-implementacion.md`, E3) y
+`plans/plan-reporte-javier/PLAN.md` §4.5 (17/11/2026, Reports › Open Invoices).

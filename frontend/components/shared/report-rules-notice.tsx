@@ -19,6 +19,10 @@ const ITEM_COUNT: Record<ReportRulesScreen, number> = {
   monthlyClosing: 3,
   // One line per column of Window Tint Closing (D5 of plans/plan-reporte-tint).
   tintClosing: 7,
+  // Lines 1–7 (27/10) and 8, the snapshot (P5, 28/10) of plans/plan-reporte-javier §2.
+  openInvoices: 8,
+  // The comparison of a snapshot with today (P5).
+  openInvoicesCompare: 4,
 }
 
 /**

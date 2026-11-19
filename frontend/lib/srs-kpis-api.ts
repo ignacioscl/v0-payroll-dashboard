@@ -759,3 +759,105 @@ export async function fetchMonthlyClosingDealer(
 /** Excel armado por Nest: Report Info, Summary, (By service), Income, Payroll y Expenses. */
 export const monthlyClosingExportUrl = (params: MonthlyClosingQueryParams) =>
   `/api/srs-kpis/reports/monthly-closing/export${monthlyClosingQuery(params)}`
+
+/* ── Reports › Open Invoices (plans/plan-reporte-javier §4.3) ─────────────────────────────── */
+
+export type OpenInvoiceBucket = 'current' | 'd15' | 'd30' | 'd60' | 'd90'
+
+export type OpenInvoicesQueryParams = {
+  /** «As of» Sunday, `YYYY-MM-DD`. */
+  asOf: string
+  idDealer: string
+  includeRemovedDealers?: boolean
+}
+
+export type OpenInvoiceMoney = { current: number; d15: number; d30: number; d60: number; d90: number; total: number }
+
+export type OpenInvoiceRow = OpenInvoiceMoney & {
+  dealerId: number
+  dealer: string
+  removed: boolean
+  department: string
+}
+
+export type OpenInvoicesData = {
+  asOf: string
+  generatedAt: string
+  rows: OpenInvoiceRow[]
+  totals: OpenInvoiceMoney
+}
+
+export type OpenInvoiceSnapshotHeader = {
+  id: number
+  generatedAt: string
+  generatedBy: string
+  asOf: string
+  dealers: string
+  /** null = All. */
+  dealerNames: string[] | null
+  includeRemovedDealers: boolean
+  total: number
+  rowCount: number
+}
+
+export type OpenInvoiceSnapshotPage = {
+  results: OpenInvoiceSnapshotHeader[]
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+export type OpenInvoiceCompareSide = { amount: number; bucket: OpenInvoiceBucket | null }
+
+export type OpenInvoiceCompareRow = {
+  sid: number
+  dealerId: number
+  dealer: string
+  removed: boolean
+  invoice: string
+  department: string
+  snapshot: OpenInvoiceCompareSide | null
+  today: OpenInvoiceCompareSide | null
+  difference: number
+  why: string[]
+}
+
+export type OpenInvoiceCompareData = {
+  snapshot: OpenInvoiceSnapshotHeader
+  comparedAt: string
+  rows: OpenInvoiceCompareRow[]
+  totals: { snapshot: number; today: number; difference: number }
+}
+
+function openInvoicesQuery(params: OpenInvoicesQueryParams): string {
+  const qs = new URLSearchParams({ asOf: params.asOf, idDealer: params.idDealer })
+  if (params.includeRemovedDealers) qs.set('includeRemovedDealers', 'true')
+  return `?${qs.toString()}`
+}
+
+export async function fetchOpenInvoices(params: OpenInvoicesQueryParams): Promise<OpenInvoicesData> {
+  const res = await fetch(`/api/srs-kpis/kpis/billing/open-invoices${openInvoicesQuery(params)}`, { cache: 'no-store' })
+  return readNestJson<OpenInvoicesData>(res, `billing/open-invoices (${res.status})`)
+}
+
+/** Excel armado por Nest: Report Info, Summary e Invoices. Guarda la foto de lo que sale (T6). */
+export const openInvoicesExportUrl = (params: OpenInvoicesQueryParams) =>
+  `/api/srs-kpis/kpis/billing/open-invoices/export${openInvoicesQuery(params)}`
+
+export async function fetchOpenInvoiceSnapshots(page: number, pageSize: number): Promise<OpenInvoiceSnapshotPage> {
+  const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  const res = await fetch(`/api/srs-kpis/kpis/billing/open-invoices/snapshots?${qs.toString()}`, { cache: 'no-store' })
+  return readNestJson<OpenInvoiceSnapshotPage>(res, `billing/open-invoices/snapshots (${res.status})`)
+}
+
+export async function fetchOpenInvoiceSnapshotCompare(id: number): Promise<OpenInvoiceCompareData> {
+  const res = await fetch(`/api/srs-kpis/kpis/billing/open-invoices/snapshots/${id}/compare`, { cache: 'no-store' })
+  return readNestJson<OpenInvoiceCompareData>(res, `billing/open-invoices/snapshots/compare (${res.status})`)
+}
+
+export const openInvoiceSnapshotCompareExportUrl = (id: number) =>
+  `/api/srs-kpis/kpis/billing/open-invoices/snapshots/${id}/compare/export`
+
+/** Query key of the snapshot list: the Export invalidates it so the new snapshot shows (§4.3). */
+export const OPEN_INVOICE_SNAPSHOTS_QUERY_KEY = ['srs-report', 'open-invoice-snapshots'] as const

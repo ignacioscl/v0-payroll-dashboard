@@ -1,9 +1,19 @@
-import { Controller, Get, Inject, Query, Req } from '@nestjs/common'
+import { Controller, Get, Inject, Param, ParseIntPipe, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import type { Response } from 'express'
 
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 
 import { BillingKpiService } from '../service/billing-kpi.service'
+import { OpenInvoicesService } from '../service/open-invoices.service'
+import { OpenInvoicesCompareService } from '../service/open-invoices-compare.service'
+import {
+  OpenInvoiceCompareDto,
+  OpenInvoiceSnapshotPageDto,
+  OpenInvoiceSnapshotsQueryDto,
+  OpenInvoicesDto,
+  OpenInvoicesQueryDto,
+} from '../dto/open-invoices.dto'
 import {
   BillingKpiDto,
   BillingPeriodCollectionKpiDto,
@@ -22,7 +32,11 @@ import {
 @ApiTags('SRS KPIs - Billing')
 @ApiBearerAuth()
 export class BillingKpiController {
-  constructor(@Inject(BillingKpiService) private readonly service: BillingKpiService) {}
+  constructor(
+    @Inject(BillingKpiService) private readonly service: BillingKpiService,
+    @Inject(OpenInvoicesService) private readonly openInvoices: OpenInvoicesService,
+    @Inject(OpenInvoicesCompareService) private readonly openInvoicesCompare: OpenInvoicesCompareService,
+  ) {}
 
   @Get('/')
   @ApiOkResponse({ type: BillingKpiDto })
@@ -103,5 +117,55 @@ export class BillingKpiController {
     @Query() query: SrsKpiQueryDto,
   ): Promise<BillingPeriodCollectionKpiDto> {
     return this.service.getPeriodCollectionKpis(request.srsContext, query)
+  }
+
+  /** Reports › Open Invoices (plans/plan-reporte-javier T4): dealer × department by age, As of a Sunday. */
+  @Get('/open-invoices')
+  @ApiOkResponse({ type: OpenInvoicesDto })
+  async getOpenInvoices(@Req() request: any, @Query() query: OpenInvoicesQueryDto): Promise<OpenInvoicesDto> {
+    return this.openInvoices.getReport(request.srsContext, query)
+  }
+
+  /** Excel of Open Invoices (T5); saves the snapshot of what it shows first (T6). */
+  @Get('/open-invoices/export')
+  @ApiOkResponse({ description: 'XLSX: Report Info + Summary + Invoices' })
+  async exportOpenInvoices(
+    @Req() request: any,
+    @Query() query: OpenInvoicesQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.openInvoices.export(request.srsContext, query, res)
+  }
+
+  /** Snapshots of Open Invoices, newest first, cut to the dealers of the user (T7). */
+  @Get('/open-invoices/snapshots')
+  @ApiOkResponse({ type: OpenInvoiceSnapshotPageDto })
+  async listOpenInvoiceSnapshots(
+    @Req() request: any,
+    @Query() query: OpenInvoiceSnapshotsQueryDto,
+  ): Promise<OpenInvoiceSnapshotPageDto> {
+    return this.openInvoicesCompare.list(request.srsContext, query)
+  }
+
+  /** A snapshot compared with today, invoice by invoice, with the reason of each change (T7). */
+  @Get('/open-invoices/snapshots/:id/compare')
+  @ApiOkResponse({ type: OpenInvoiceCompareDto })
+  async compareOpenInvoiceSnapshot(
+    @Req() request: any,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<OpenInvoiceCompareDto> {
+    const { labels: _labels, ...dto } = await this.openInvoicesCompare.compare(request.srsContext, id)
+    return dto
+  }
+
+  /** Excel of the comparison: Report Info + Changes (T7). */
+  @Get('/open-invoices/snapshots/:id/compare/export')
+  @ApiOkResponse({ description: 'XLSX: Report Info + Changes' })
+  async exportOpenInvoiceSnapshotCompare(
+    @Req() request: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.openInvoicesCompare.compareExport(request.srsContext, id, res)
   }
 }

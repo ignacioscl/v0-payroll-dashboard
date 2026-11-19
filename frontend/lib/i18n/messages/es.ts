@@ -9,6 +9,7 @@ export const es: Messages = {
     incomeByDealer: 'Ingresos por sucursal',
     monthlyClosing: 'Monthly Closing',
     windowTintClosing: 'Window Tint Closing',
+    openInvoices: "Invoices abiertas",
     reports: 'Reports',
     billing: 'Facturación',
     invoices: 'Facturas',
@@ -1642,6 +1643,30 @@ export const es: Messages = {
     colCategory: 'Category',
     colNotes: 'Notes',
   },
+  // Reports › Open Invoices (plans/plan-reporte-javier §4.3): texts approved by Ignacio (27/10 and P5, 28/10).
+  openInvoices: {
+    title: "Invoices abiertas",
+    asOf: "Al",
+    current: "Current",
+    department: "Departamento",
+    total: "Total",
+    snapshots: "Fotos",
+    snapshot: "Foto",
+    generated: "Generado",
+    by: "Por",
+    compareWithToday: "Comparar con hoy",
+    compareIntro:
+      "El reporte corrido hoy, con el mismo domingo y los mismos dealers, contra este Excel. Solo aparecen las invoices que cambiaron, con el motivo.",
+    compareNoChanges: "Sin cambios: hoy el reporte da lo mismo que esta foto, invoice por invoice.",
+    inSnapshot: "En la foto",
+    today: "Hoy",
+    difference: "Diferencia",
+    why: "Motivo",
+    col15: "15+",
+    col30: "30+",
+    col60: "60+",
+    col90: "90+",
+  },
   reportRules: {
     billing: {
       title: 'Qué cuenta Ingresos',
@@ -1725,6 +1750,39 @@ export const es: Messages = {
         'Expenses: los gastos del dealer de la categoría «Window Tint Film», con fecha en el mes, aprobados o no. Los borrados no cuentan.',
       item6: 'Profit/Loss: Income − Payroll − Expenses.',
       item7: '%: Profit/Loss dividido por Income. Muestra «—» cuando el Income es $0.',
+    },
+    // PAIR of backend/src/srs/billing/open-invoices-export-labels.ts (Report Info of the Excel): approved word by word
+    // (plans/plan-reporte-javier §2 and P5); open-invoices-labels.spec.ts compares them.
+    openInvoices: {
+      title: "Qué cuenta este reporte",
+      item1:
+        "Las invoices de Work Orders creadas hasta el domingo «As of», y las TTK y Generic con DATE TO hasta ese domingo. Las invoices borradas no entran.",
+      item2:
+        "Los importes son lo que falta cobrar en el momento en que se corre el reporte: todo pago cargado en SRS hasta ese momento ya está descontado.",
+      item3:
+        "Los días se cuentan hasta el día en que se corre el reporte: las invoices de Work Orders desde el día en que se creó la invoice; las TTK y Generic desde DATE TO.",
+      item4:
+        "Columnas: Current 0–14 días, 15+ 15–29, 30+ 30–59, 60+ 60–89, 90+ 90 o más. Cada invoice está en una sola columna, y Total es la suma de las cinco.",
+      item5:
+        "Current es el plazo de pago del dealer («Payment Due On» en el dealer; Net 15 si no tiene). Desde ese día la invoice pasa a la columna de su antigüedad.",
+      item6:
+        "El departamento es el de cada servicio, así que una invoice con servicios de dos departamentos se reparte entre los dos. Las invoices TTK y Generic van bajo «Timesheets», una fila por puesto: el puesto que tenía el empleado el día que ponchó, con su nombre en SRS. Las líneas de Generic sin ponchada van como «Timesheets · Generic».",
+      item7:
+        "Los importes llevan descuento y tax: una invoice pagada en parte cuenta solo lo que falta.",
+      item8:
+        "Cada vez que se baja el Excel se guarda una foto de lo que muestra. «Snapshots» la compara con hoy, invoice por invoice.",
+    },
+    // Comparison of a snapshot with today (P5).
+    openInvoicesCompare: {
+      title: "Qué muestra esta comparación",
+      item1:
+        "La foto es lo que mostró el Excel cuando se bajó. «Hoy» es el mismo reporte, con el mismo As of y los mismos dealers, corrido ahora.",
+      item2:
+        "Solo aparecen las invoices que cambiaron: importe, columna o departamento.",
+      item3:
+        "«Motivo» muestra lo que SRS registra: pagos cargados o borrados, invoices borradas o creadas después de la foto, cambios del Payment Due On y los días que pasaron.",
+      item4:
+        "Si se editaron las líneas de una invoice o de un pago, SRS no guarda el detalle, y «Motivo» lo dice.",
     },
   },
   systemConfig: {

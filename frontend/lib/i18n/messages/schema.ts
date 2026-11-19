@@ -8,6 +8,7 @@ export interface Messages {
     incomeByDealer: string
     monthlyClosing: string
     windowTintClosing: string
+    openInvoices: string
     reports: string
     billing: string
     invoices: string
@@ -1589,6 +1590,28 @@ export interface Messages {
     colCategory: string
     colNotes: string
   }
+  openInvoices: {
+    title: string
+    asOf: string
+    current: string
+    department: string
+    total: string
+    snapshots: string
+    snapshot: string
+    generated: string
+    by: string
+    compareWithToday: string
+    compareIntro: string
+    compareNoChanges: string
+    inSnapshot: string
+    today: string
+    difference: string
+    why: string
+    col15: string
+    col30: string
+    col60: string
+    col90: string
+  }
   reportRules: {
     billing: {
       title: string
@@ -1645,6 +1668,24 @@ export interface Messages {
       item5: string
       item6: string
       item7: string
+    }
+    openInvoices: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+      item5: string
+      item6: string
+      item7: string
+      item8: string
+    }
+    openInvoicesCompare: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
     }
   }
   systemConfig: {
