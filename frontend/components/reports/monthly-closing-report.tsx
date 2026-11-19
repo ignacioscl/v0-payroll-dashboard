@@ -207,19 +207,25 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         : t('common.failedToLoad')
     : null
 
-  /** Total y Without dealer: una línea cada uno, con las columnas de la tabla como etiqueta. */
-  const totalsLine = (row: ClosingRow, label: string, onClick?: () => void) => {
-    const items: [string, React.ReactNode][] = [
-      ...(tint ? [[t('monthlyClosing.colVehicles'), (row.vehicles ?? 0).toLocaleString()] as [string, React.ReactNode]] : []),
-      [t('monthlyClosing.colIncome'), fmtMoney(row.income)],
-      [t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)],
-      [t('monthlyClosing.colExpenses'), fmtMoney(row.expenses)],
-      [t('monthlyClosing.colProfit'), profitCell(row.profit)],
-      [t('monthlyClosing.colPct'), pctLabel(row.pct)],
-      ...(!tint && row.accident
-        ? [[t('monthlyClosing.colAccident'), fmtMoney(row.accident)] as [string, React.ReactNode]]
-        : []),
-    ]
+  /**
+   * Total y Without dealer: una línea cada uno, con las columnas de la tabla como etiqueta. Without dealer muestra
+   * solo Payroll: Income y Expenses no pueden quedar sin dealer, y su Profit/Loss sería el mismo sueldo con signo
+   * menos (plan-reunion-juan-18-11, 19/11). Igual en el Summary del Excel (`closingSummaryColumns`).
+   */
+  const totalsLine = (row: ClosingRow, label: string, onClick?: () => void, payrollOnly = false) => {
+    const items: [string, React.ReactNode][] = payrollOnly
+      ? [[t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)]]
+      : [
+          ...(tint ? [[t('monthlyClosing.colVehicles'), (row.vehicles ?? 0).toLocaleString()] as [string, React.ReactNode]] : []),
+          [t('monthlyClosing.colIncome'), fmtMoney(row.income)],
+          [t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)],
+          [t('monthlyClosing.colExpenses'), fmtMoney(row.expenses)],
+          [t('monthlyClosing.colProfit'), profitCell(row.profit)],
+          [t('monthlyClosing.colPct'), pctLabel(row.pct)],
+          ...(!tint && row.accident
+            ? [[t('monthlyClosing.colAccident'), fmtMoney(row.accident)] as [string, React.ReactNode]]
+            : []),
+        ]
     const content = (
       <>
         <span className="font-semibold">{label}</span>
@@ -323,8 +329,11 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
               <div className="divide-y divide-border border-t border-border">
                 {/* Without dealer arriba del Total: el Total ya la incluye (plan-reunion-juan-18-11, D9). */}
                 {data.withoutDealer
-                  ? totalsLine(data.withoutDealer, t('monthlyClosing.withoutDealer'), () =>
-                      setOpenDealer({ dealerId: 0, dealer: t('monthlyClosing.withoutDealer') }),
+                  ? totalsLine(
+                      data.withoutDealer,
+                      t('monthlyClosing.withoutDealer'),
+                      () => setOpenDealer({ dealerId: 0, dealer: t('monthlyClosing.withoutDealer') }),
+                      true,
                     )
                   : null}
                 {totalsLine(data.total, t('monthlyClosing.total'))}

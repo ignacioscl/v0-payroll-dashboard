@@ -154,18 +154,35 @@ export function closingSummaryColumns(
     value: (r) => (r.dealerId > 0 && isRemoved(r.dealerId) ? `${r.dealer} ${REMOVED_SUFFIX}` : r.dealer),
     note: notes?.dealer,
   }
+  // «Without dealer» (dealerId 0) solo tiene Payroll: Income y Expenses no pueden quedar sin dealer, y su Profit/Loss
+  // sería el mismo sueldo con signo menos. El resto de sus celdas va vacío (plan-reunion-juan-18-11, 19/11).
+  const payrollOnly = (r: ClosingRowDto) => r.dealerId === 0
   const money = (header: string, key: 'income' | 'payroll' | 'expenses' | 'profit', note?: string) =>
-    ({ header, width: 16, kind: 'money', value: (r) => r[key], note }) as TableExportColumn<ClosingRowDto>
+    ({
+      header,
+      width: 16,
+      kind: 'money',
+      value: (r) => (key !== 'payroll' && payrollOnly(r) ? null : r[key]),
+      note,
+    }) as TableExportColumn<ClosingRowDto>
   return [
     dealer,
     ...(tint
-      ? [{ header: 'Vehicles', width: 12, kind: 'int', value: (r) => r.vehicles, note: notes?.vehicles } as TableExportColumn<ClosingRowDto>]
+      ? [
+          {
+            header: 'Vehicles',
+            width: 12,
+            kind: 'int',
+            value: (r) => (payrollOnly(r) ? null : r.vehicles),
+            note: notes?.vehicles,
+          } as TableExportColumn<ClosingRowDto>,
+        ]
       : []),
     money('Income', 'income', notes?.income),
     money('Payroll', 'payroll', notes?.payroll),
     money('Expenses', 'expenses', notes?.expenses),
     money('Profit/Loss', 'profit', notes?.profit),
-    { header: '%', width: 10, kind: 'pct', value: (r) => r.pct, note: notes?.pct },
+    { header: '%', width: 10, kind: 'pct', value: (r) => (payrollOnly(r) ? null : r.pct), note: notes?.pct },
     ...(tint
       ? []
       : [
@@ -173,7 +190,7 @@ export function closingSummaryColumns(
             header: 'Accident',
             width: 14,
             kind: 'money',
-            value: (r) => (r.accident ? r.accident : null),
+            value: (r) => (r.accident && !payrollOnly(r) ? r.accident : null),
           } as TableExportColumn<ClosingRowDto>,
         ]),
   ]
