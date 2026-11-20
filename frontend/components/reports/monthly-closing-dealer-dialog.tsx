@@ -19,8 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -36,17 +34,6 @@ import {
 } from '@/lib/srs-kpis-api'
 
 type Tab = 'income' | 'byService' | 'payroll' | 'expenses'
-
-/**
- * Window Tint Closing: la fila de un servicio sin «tint» y con importe va en el color de error
- * (plan-window-tint-closing-tint-y-servicios; `warn` lo decide el backend con isNonTintWarning).
- */
-const nonTintRowClass = (row: { warn: boolean | null }) => (row.warn ? 'text-destructive' : undefined)
-
-/** «Filas en rojo primero»: las en rojo arriba, el resto en el mismo orden (sort estable). */
-function redRowsFirst<T extends { warn: boolean | null }>(rows: T[], on: boolean): T[] {
-  return on ? [...rows].sort((a, b) => Number(b.warn === true) - Number(a.warn === true)) : rows
-}
 
 /** Suma en centavos enteros, como el backend: el total de la solapa = la columna de la fila. */
 function sumCents(amounts: number[]): number {
@@ -94,13 +81,13 @@ function moneyColumn<T>(key: keyof T & string, title: string): ColumnDef<T> {
 /**
  * Detalle de un dealer del Monthly Closing (MC §5.4.3) y del Window Tint Closing (tint §5.2): Income, Payroll y
  * Expenses del mes, cada solapa suma la columna de la fila. Precedente: dealers-ranking-dialog.tsx. El tint suma
- * By service (las filas del dealer de la solapa del Excel) y marca en rojo los servicios sin «tint».
+ * By service (las filas del dealer de la solapa del Excel); solo trae servicios con «tint» (reunión con Juan 18/11,
+ * tema 6).
  */
 export function MonthlyClosingDealerDialog({ dealer, onClose, params }: MonthlyClosingDealerDialogProps) {
   const { t } = useTranslation()
   const withoutDealer = dealer?.dealerId === 0
   const [tab, setTab] = React.useState<Tab>('income')
-  const [redFirst, setRedFirst] = React.useState(false)
   React.useEffect(() => {
     setTab(withoutDealer ? 'payroll' : 'income')
   }, [dealer?.dealerId, withoutDealer])
@@ -193,23 +180,8 @@ export function MonthlyClosingDealerDialog({ dealer, onClose, params }: MonthlyC
   const empty = (key: 'emptyIncome' | 'emptyByService' | 'emptyPayroll' | 'emptyExpenses') => (
     <p className="py-8 text-center text-sm text-muted-foreground">{t(`monthlyClosing.${key}`)}</p>
   )
-  const byService = redRowsFirst(data?.byService ?? [], redFirst)
-  const incomeRows = redRowsFirst(data?.income ?? [], redFirst)
-  // Mismo patrón que «Show inactive» de Expenses Settings: Switch + Label en el extremo derecho de la barra de la tabla.
-  const redFirstToggle = (id: string) => (
-    <div className="mr-3 flex items-center gap-2">
-      <Switch id={id} className="cursor-pointer" checked={redFirst} onCheckedChange={setRedFirst} />
-      <Label htmlFor={id} className="cursor-pointer text-sm font-normal">
-        {t('monthlyClosing.redFirst')}
-      </Label>
-    </div>
-  )
-  const nonTintNote = (rows: { warn: boolean | null }[]) =>
-    rows.some((r) => r.warn === true) ? (
-      <p className="mt-2 text-sm text-destructive" data-testid="monthly-closing-non-tint-rows-note">
-        {t('monthlyClosing.nonTintRowsNote')}
-      </p>
-    ) : null
+  const byService = data?.byService ?? []
+  const incomeRows = data?.income ?? []
   const tableProps = {
     isLoading: detail.isFetching,
     defaultPageSize: DATA_TABLE_PAGE_SIZE_ALL,
@@ -266,11 +238,8 @@ export function MonthlyClosingDealerDialog({ dealer, onClose, params }: MonthlyC
                 getRowId={(_, i) => String(i)}
                 emptyState={empty('emptyIncome')}
                 footer={data && data.income.length > 0 ? totalBar(sumCents(data.income.map((l) => l.total))) : undefined}
-                getRowClassName={nonTintRowClass}
-                toolbarTrailing={tint ? redFirstToggle('monthly-closing-income-red-first') : undefined}
                 {...tableProps}
               />
-              {tint ? nonTintNote(data?.income ?? []) : null}
             </TabsContent>
           ) : null}
           {tint && !withoutDealer ? (
@@ -282,11 +251,8 @@ export function MonthlyClosingDealerDialog({ dealer, onClose, params }: MonthlyC
                 getRowId={(_, i) => String(i)}
                 emptyState={empty('emptyByService')}
                 footer={byService.length > 0 ? totalBar(sumCents(byService.map((r) => r.amount))) : undefined}
-                getRowClassName={nonTintRowClass}
-                toolbarTrailing={redFirstToggle('monthly-closing-by-service-red-first')}
                 {...tableProps}
               />
-              {nonTintNote(byService)}
             </TabsContent>
           ) : null}
           <TabsContent value="payroll" className="min-w-0">

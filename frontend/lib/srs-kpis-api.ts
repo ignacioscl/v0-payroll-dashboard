@@ -667,8 +667,6 @@ export interface ClosingRow {
   pct: number | null
   /** Monthly Closing only. */
   accident: number | null
-  /** Window Tint Closing only: the Income has services without «tint» in their name (row in red). */
-  nonTint: boolean | null
 }
 
 export interface MonthlyClosingData {
@@ -690,8 +688,6 @@ export interface ClosingIncomeLine {
   total: number
   /** Window Tint Closing only: «tint» in the service name; null in Monthly Closing. */
   tint: boolean | null
-  /** Window Tint Closing only: row in red (no «tint» and an amount other than $0); null in Monthly Closing. */
-  warn: boolean | null
 }
 
 /** By service of the dealer (Window Tint Closing): the same rows as the «By service» sheet of the Excel. */
@@ -703,8 +699,6 @@ export interface ClosingServiceRow {
   amount: number
   /** «tint» in the service name. */
   tint: boolean
-  /** Row in red: no «tint» and an amount other than $0. */
-  warn: boolean
 }
 
 export interface ClosingPayrollLine {

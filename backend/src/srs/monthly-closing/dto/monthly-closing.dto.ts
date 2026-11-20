@@ -58,10 +58,6 @@ export class ClosingRowDto {
   @ApiProperty() profit!: number
   @ApiPropertyOptional({ description: 'Profit ÷ Income, one decimal; null with Income $0' }) pct!: number | null
   @ApiPropertyOptional({ description: 'Monthly Closing only: Accident expenses' }) accident!: number | null
-  @ApiPropertyOptional({
-    description: 'Window Tint Closing only: the Income has services without «tint» in their name (row in red); null in Monthly Closing',
-  })
-  nonTint!: boolean | null
 }
 
 export class MonthlyClosingDto {
@@ -84,10 +80,6 @@ export class ClosingIncomeLineDto {
   @ApiProperty() total!: number
   @ApiPropertyOptional({ description: 'Window Tint Closing only: «tint» in the service name; null in Monthly Closing' })
   tint!: boolean | null
-  @ApiPropertyOptional({
-    description: 'Window Tint Closing only: row in red (no «tint» in the name and amount other than $0); null in Monthly Closing',
-  })
-  warn!: boolean | null
 }
 
 /** By service del modal: las filas del dealer de la solapa «By service» del Excel (groupByService). */
@@ -97,7 +89,6 @@ export class ClosingServiceRowDto {
   @ApiProperty({ description: 'Sum of the Qty of the service' }) vehicles!: number
   @ApiProperty() amount!: number
   @ApiProperty({ description: '«tint» in the service name' }) tint!: boolean
-  @ApiProperty({ description: 'Row in red: no «tint» in the name and amount other than $0' }) warn!: boolean
 }
 
 export class ClosingPayrollLineDto {

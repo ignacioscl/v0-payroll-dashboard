@@ -12,7 +12,6 @@ import { BillingKpiRepository } from '../../billing/repository/billing-kpi.repos
 import type { ClosingLineDto } from '../../billing/dto/billing-kpi.dto'
 import { PayrollSnapshotKpiRepository } from '../../payroll/repository/payroll-snapshot-kpi.repository'
 import { PayrollSourceRepository } from '../../payroll/snapshot/payroll-source.repository'
-import { PIECEWORK_TYPE_IDS } from '../../payroll/snapshot/payment-type-ids'
 import { periodsEndingInMonth } from '../../payroll/snapshot/payroll-month-periods'
 import type { PayrollPeriod } from '../../payroll/snapshot/payroll-snapshot.types'
 import { ExpenseReportRepository } from '../../expenses/repository/expense-report.repository'
@@ -39,10 +38,10 @@ import { MONTHLY_CLOSING_MONTH_ERROR, isValidClosingMonth, monthBounds } from '.
 import {
   TINT_EXPENSE_CATEGORY,
   TINT_ROLE_FRAGMENT,
+  TINT_SERVICE_FRAGMENT,
   canonicalPayrollCents,
   fromCents,
   groupByService,
-  isNonTintWarning,
   isTintClosingLine,
   isTintService,
   largestRemainderCents,
@@ -85,11 +84,21 @@ export interface PayrollEmployeeLine {
 
 export interface IncomeLine extends ClosingLineDto {
   cents: number
-  /** Window Tint Closing: «tint» en el nombre del servicio (suma Vehicles); null en el Monthly Closing. */
+  /** Window Tint Closing: «tint» en el nombre del servicio (siempre true: solo entran esos); null en el Monthly Closing. */
   tint: boolean | null
-  /** Window Tint Closing: va en rojo (isNonTintWarning: sin «tint» y con importe); null en el Monthly Closing. */
-  warn: boolean | null
 }
+
+/**
+ * Window Tint Closing (tema 6, D10): el piecework de los servicios sin «tint» que el snapshot le contó a cada tintero.
+ * `byKey`: centavos por `dealer|período` (payrollKey), con el tax; `byEmployee`: monto + tax por
+ * `dealer|período|empleado`, en dólares, como amountsByDealerEmployeeForPeriods.
+ */
+export interface NonTintDeduction {
+  byKey: Map<string, number>
+  byEmployee: Map<string, number>
+}
+
+const NO_DEDUCTION: NonTintDeduction = { byKey: new Map(), byEmployee: new Map() }
 
 export interface ExpenseLine {
   date: string
@@ -160,7 +169,6 @@ export class MonthlyClosingService {
         qty: l.qty,
         total: fromCents(l.cents),
         tint: l.tint,
-        warn: l.warn,
       })),
       byService:
         cc.scope === 'tint'
@@ -170,7 +178,6 @@ export class MonthlyClosingService {
               vehicles: r.vehicles,
               amount: fromCents(r.cents),
               tint: r.tint,
-              warn: r.warn,
             }))
           : null,
       payroll: payroll.map(toPayrollDto),
@@ -283,13 +290,67 @@ export class MonthlyClosingService {
   }
 
   /**
-   * Regla única de «tintero» (plans/plan-window-tint-closing-tint-y-servicios T1): empleado de la empresa con un rol
-   * que tiene «tint» en el nombre (srs-usuario) y Piecework o Piecework by % en su ficha (payroll). La usan el
-   * Income (WO asignadas) y el Payroll.
+   * Regla única de «tintero» (reunión con Juan 18/11, D14): empleado de la empresa con un rol que tiene «tint» en el
+   * nombre (srs-usuario), sin mirar su tipo de pago. Es la misma regla del Payroll Report del legacy
+   * (PayrollTintsPieceworkDao::TINT_ROLE_NAME_LIKE). La usan el Income (WO asignadas), el Payroll y «Without dealer».
    */
   private async tintersOf(idDealerProvider: number): Promise<number[]> {
-    const withRole = await this.usuarios.idsWithRoleNameLike(idDealerProvider, TINT_ROLE_FRAGMENT)
-    return this.payroll.employeeIdsWithPaymentTypes(withRole, PIECEWORK_TYPE_IDS)
+    const ids = await this.usuarios.idsWithRoleNameLike(idDealerProvider, TINT_ROLE_FRAGMENT)
+    return [...new Set(ids)].sort((a, b) => a - b)
+  }
+
+  private readonly deductions = new WeakMap<ClosingContext, Promise<NonTintDeduction>>()
+
+  /**
+   * Window Tint Closing (tema 6, D10): lo que se le resta al Payroll de cada tintero, por dealer y período: el
+   * piecework de sus servicios sin «tint» (PayrollSourceRepository.nonTintPieceworkRows), con el tax como lo calcula
+   * el snapshot. Solo los días que el snapshot ya calculó (periodCoverage); un día sin calcular no se resta. Los
+   * vendors no están en el Payroll, así que tampoco se les resta. Una vez por pedido.
+   */
+  private nonTintDeduction(cc: ClosingContext): Promise<NonTintDeduction> {
+    if (cc.scope !== 'tint' || !cc.employeeIds?.length || !cc.periods.length) return Promise.resolve(NO_DEDUCTION)
+    let pending = this.deductions.get(cc)
+    if (!pending) {
+      pending = this.computeNonTintDeduction(cc, cc.employeeIds)
+      this.deductions.set(cc, pending)
+    }
+    return pending
+  }
+
+  private async computeNonTintDeduction(cc: ClosingContext, tinters: number[]): Promise<NonTintDeduction> {
+    const idProvider = cc.filter.idDealerProvider
+    const vendors = new Set(cc.vendorIds)
+    const employees = tinters.filter((id) => !vendors.has(id))
+    if (!employees.length) return NO_DEDUCTION
+    const [provider, coverage] = await Promise.all([
+      this.payrollSource.getProvider(idProvider),
+      this.payroll.periodCoverage(idProvider, cc.periods.map((p) => p.desde)),
+    ])
+    const taxPct = provider && provider.payrollTaxPct > 0 ? provider.payrollTaxPct : 0
+    const perPeriod = await Promise.all(
+      cc.periods.map(async (p) => {
+        const covered = coverage.get(p.desde)
+        if (!covered) return []
+        const until = covered < p.hasta ? covered : p.hasta
+        const rows = await this.payrollSource.nonTintPieceworkRows(idProvider, employees, p.desde, until, TINT_SERVICE_FRAGMENT)
+        return rows.map((r) => ({ ...r, periodoDesde: p.desde }))
+      }),
+    )
+    const monto = new Map<string, number>()
+    const tax = new Map<string, number>()
+    const byEmployee = new Map<string, number>()
+    for (const r of perPeriod.flat()) {
+      const key = payrollKey(r.idDealer, r.periodoDesde)
+      // Solo los empleados con payroll_tax = 1 pagan el % de la empresa, como en el snapshot (payroll-period.calculator).
+      const t = r.payrollTax === 1 && taxPct > 0 ? (r.piecework * taxPct) / 100 : 0
+      monto.set(key, (monto.get(key) ?? 0) + r.piecework)
+      tax.set(key, (tax.get(key) ?? 0) + t)
+      const ek = `${key}|${r.idUsuario}`
+      byEmployee.set(ek, (byEmployee.get(ek) ?? 0) + r.piecework + t)
+    }
+    const byKey = new Map<string, number>()
+    for (const [key, m] of monto) byKey.set(key, toCents(m) + toCents(tax.get(key) ?? 0))
+    return { byKey, byEmployee }
   }
 
   /** Un dealer se abre solo si es de la empresa y, para un usuario restringido, RESTRICTION_DEALER_V2 lo deja ver. */
@@ -306,20 +367,21 @@ export class MonthlyClosingService {
   private async summary(cc: ClosingContext): Promise<Omit<MonthlyClosingDto, 'scope' | 'month'>> {
     const periodDesdes = cc.periods.map((p) => p.desde)
     const tint = cc.scope === 'tint'
-    const [incomeByDealer, tintLines, payrollRows, expenseRows, coverage] = await Promise.all([
+    const [incomeByDealer, tintLines, payrollRows, expenseRows, coverage, deduction] = await Promise.all([
       tint ? Promise.resolve(null) : this.billing.incomeByDealerForRange(cc.filter),
       tint ? this.incomeLines(cc) : Promise.resolve(null),
       this.payroll.amountsByDealerPeriodType(cc.filter, periodDesdes, cc.showWithoutDealer, cc.employeeIds, cc.vendorIds),
       this.expenses.amountsByDealer(cc.expenseFilter),
       this.payroll.periodCoverage(cc.filter.idDealerProvider, periodDesdes),
+      this.nonTintDeduction(cc),
     ])
 
-    type Acc = { income: number; payroll: number; expenses: number; accident: number; vehicles: number; nonTint: boolean }
+    type Acc = { income: number; payroll: number; expenses: number; accident: number; vehicles: number }
     const acc = new Map<number, Acc>()
     const at = (id: number): Acc => {
       let a = acc.get(id)
       if (!a) {
-        a = { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0, nonTint: false }
+        a = { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0 }
         acc.set(id, a)
       }
       return a
@@ -329,13 +391,12 @@ export class MonthlyClosingService {
       for (const l of tintLines) {
         const a = at(l.dealerId)
         a.income += l.cents
-        // Vehicles: solo los servicios de tint (un PDI en la misma WO no es otro auto).
-        if (l.tint) a.vehicles += l.qty
-        if (l.warn) a.nonTint = true
+        // Vehicles: la Qty de los servicios de tint (los únicos que entran).
+        a.vehicles += l.qty
       }
     }
     let withoutDealerCents = 0
-    for (const [key, cents] of canonicalPayrollCents(payrollRows)) {
+    for (const [key, cents] of tintPayrollCents(canonicalPayrollCents(payrollRows), deduction)) {
       const [dealer] = key.split('|')
       if (dealer === 'none') withoutDealerCents += cents
       else at(Number(dealer)).payroll += cents
@@ -370,7 +431,6 @@ export class MonthlyClosingService {
         profit: fromCents(profit),
         pct: profitPct(profit, a.income),
         accident: tint ? null : fromCents(a.accident),
-        nonTint: tint ? a.nonTint : null,
       }
     }
     const rows = ids
@@ -385,7 +445,6 @@ export class MonthlyClosingService {
           expenses: t.expenses + a.expenses,
           accident: t.accident + a.accident,
           vehicles: t.vehicles + a.vehicles,
-          nonTint: t.nonTint || a.nonTint,
         }
       },
       // Quien ve «Without dealer» la tiene también en el Total: si no, el Total del Payroll y su Profit/Loss
@@ -396,7 +455,6 @@ export class MonthlyClosingService {
         expenses: 0,
         accident: 0,
         vehicles: 0,
-        nonTint: false,
       },
     )
     // La fila sale siempre para quien la ve, también en $0: así se sabe que no hubo sueldos sin dealer (D15).
@@ -409,11 +467,9 @@ export class MonthlyClosingService {
               expenses: 0,
               accident: 0,
               vehicles: 0,
-              nonTint: false,
             }),
             vehicles: null,
             accident: null,
-            nonTint: null,
           }
         : null
 
@@ -426,23 +482,19 @@ export class MonthlyClosingService {
   }
 
   /**
-   * Líneas del Closing del filtro. En el alcance tint: las WO asignadas a un tintero (todos sus servicios) y lo que
-   * deja isTintClosingLine; cada línea lleva si su servicio dice «tint».
+   * Líneas del Closing del filtro. En el alcance tint: de las WO asignadas a un tintero, solo los servicios con
+   * «tint», y lo demás que deja isTintClosingLine (tema 6).
    */
   async incomeLines(cc: ClosingContext): Promise<IncomeLine[]> {
     const tint = cc.scope === 'tint'
     const lines = await this.billing.incomeLinesForRange(cc.filter, tint ? { assignedTo: cc.employeeIds ?? [] } : {})
     return lines
       .filter((l) => !tint || isTintClosingLine(l))
-      .map((l) => {
-        const cents = toCents(l.amount)
-        return {
-          ...l,
-          cents,
-          tint: tint ? isTintService(l.service) : null,
-          warn: tint ? isNonTintWarning({ service: l.service, cents }) : null,
-        }
-      })
+      .map((l) => ({
+        ...l,
+        cents: toCents(l.amount),
+        tint: tint ? isTintService(l.service) : null,
+      }))
       .sort(
         (a, b) =>
           a.dealerId - b.dealerId ||
@@ -459,13 +511,22 @@ export class MonthlyClosingService {
   async payrollLines(cc: ClosingContext, dealer: number | 'all' | 'none'): Promise<PayrollEmployeeLine[]> {
     const periodDesdes = cc.periods.map((p) => p.desde)
     const filter = typeof dealer === 'number' ? { ...cc.filter, dealerIds: [dealer] } : cc.filter
-    const [employees, typeRows] = await Promise.all([
+    const [rawEmployees, typeRows, deduction] = await Promise.all([
       this.payroll.amountsByDealerEmployeeForPeriods(filter, periodDesdes, dealer, cc.employeeIds, cc.vendorIds),
       this.payroll.amountsByDealerPeriodType(filter, periodDesdes, dealer === 'none', cc.employeeIds, cc.vendorIds),
+      dealer === 'none' ? Promise.resolve(NO_DEDUCTION) : this.nonTintDeduction(cc),
     ])
-    const canonical = canonicalPayrollCents(
-      dealer === 'none' ? typeRows.filter((r) => r.idDealer === null) : typeRows.filter((r) => r.idDealer !== null),
+    const canonical = tintPayrollCents(
+      canonicalPayrollCents(
+        dealer === 'none' ? typeRows.filter((r) => r.idDealer === null) : typeRows.filter((r) => r.idDealer !== null),
+      ),
+      deduction,
     )
+    // Window Tint Closing: a cada tintero se le resta lo de sus servicios sin «tint», con piso en 0 (tema 6).
+    const employees = rawEmployees.map((e) => {
+      const minus = deduction.byEmployee.get(`${payrollKey(e.idDealer, e.periodoDesde)}|${e.idUsuario}`) ?? 0
+      return minus ? { ...e, amount: Math.max(0, e.amount - minus) } : e
+    })
     const groups = new Map<string, typeof employees>()
     for (const e of employees) {
       const key = payrollKey(e.idDealer, e.periodoDesde)
@@ -507,6 +568,17 @@ export class MonthlyClosingService {
       }))
       .sort((a, b) => a.dealer.localeCompare(b.dealer) || a.date.localeCompare(b.date))
   }
+}
+
+/**
+ * Importe canónico de cada `dealer|período` menos el piecework de servicios sin «tint» (Window Tint Closing, tema
+ * 6), con piso en 0. Sin descuento (Monthly Closing o «Without dealer»), devuelve el mismo mapa.
+ */
+export function tintPayrollCents(canonical: Map<string, number>, deduction: NonTintDeduction): Map<string, number> {
+  if (!deduction.byKey.size) return canonical
+  const out = new Map<string, number>()
+  for (const [key, cents] of canonical) out.set(key, Math.max(0, cents - (deduction.byKey.get(key) ?? 0)))
+  return out
 }
 
 function toPayrollDto(p: PayrollEmployeeLine) {

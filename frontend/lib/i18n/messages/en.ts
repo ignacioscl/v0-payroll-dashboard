@@ -1615,11 +1615,6 @@ export const en: Messages = {
     emptyByService: 'No services in this month.',
     emptyPayroll: 'No payroll in this month.',
     emptyExpenses: 'No expenses in this month.',
-    nonTintDealersNote:
-      'Dealers in red include services without «tint» in their name, from work orders assigned to tinters. Click the dealer to see them.',
-    nonTintRowsNote: 'Rows in red are services without «tint» in their name, from work orders assigned to tinters.',
-    nonTintIconLabel: 'Includes services without «tint» in their name',
-    redFirst: 'Rows in red first',
     colInvoice: '#Invoice',
     colDateFrom: 'Date From',
     colDateTo: 'Date To',
@@ -1739,9 +1734,9 @@ export const en: Messages = {
       item2:
         'Vehicles: how many window tint services («tint» in the name) the dealer had in the month on work orders assigned to tinters (each service counts its Qty; one service = one vehicle).',
       item3:
-        "Income: every service of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name and Piecework as payment type), by creation date, invoiced or not. With the invoice discount, without tax. Services without «tint» in their name and an amount other than $0 are shown in red. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
+        "Income: only the services with «tint» in their name, of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name), by creation date, invoiced or not. With the invoice discount, without tax. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
       item4:
-        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name and Piecework as payment type), with every payment type, in the pay periods that end in the month. What is paid outside SRS does not count. Employees marked as Vendor do not count. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
+        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name), with every payment type, in the pay periods that end in the month, without the piecework of services that do not have «tint» in their name. What is paid outside SRS does not count. Employees marked as Vendor do not count. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
       item5:
         "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
       item6: 'Profit/Loss: Income − Payroll − Expenses.',

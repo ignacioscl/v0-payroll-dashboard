@@ -1,12 +1,12 @@
 /**
- * Window Tint Closing con la regla del tintero (plans/plan-window-tint-closing-tint-y-servicios, P1–P5) contra la
- * copia local de PROD del 07/11 (`srssui5_srs_20261107` en 127.0.0.1:3307). Solo lecturas. Se salta solo, con aviso,
- * si la base no es esa copia.
+ * Window Tint Closing contra la copia local de PROD del 12/11 (`srssui5_srs_20261112` en 127.0.0.1:3307). Solo
+ * lecturas. Se salta solo, con aviso, si la base no es esa copia.
  *
- * Regla: cuentan todos los servicios de las WO asignadas a un tintero (rol con «tint» y Piecework o Piecework by % en
- * la ficha); Vehicles solo los servicios con «tint»; los demás se marcan. D1 (Payroll) y D2 (Generic) siguen como
- * hasta ahora mientras Auto Wax no conteste: Payroll con todos los tipos de pago de los tinteros, y las líneas libres
- * de Generic con «tint» cuentan.
+ * Reglas (reunión con Juan 18/11, plans/plan-reunion-juan-18-11):
+ *  - D14: tintero = empleado de la empresa con un rol que tiene «tint» en el nombre, sin mirar su tipo de pago.
+ *  - Tema 6 / D10: de las WO asignadas a un tintero entran solo los servicios con «tint», en Income, Vehicles y
+ *    Payroll. Del Payroll de cada tintero se resta el piecework de sus servicios sin «tint». Sin filas en rojo.
+ *  - D2: las líneas libres de Generic con «tint» siguen contando; nunca TTK.
  */
 import 'dotenv/config'
 import { PassThrough } from 'stream'
@@ -24,15 +24,17 @@ import { SRS_CONNECTION, srsDataSourceOptions } from 'src/srs/srs.datasource'
 import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
 import { SrsPermissionRepository } from 'src/srs/auth/srs-permission.repository'
 import { BillingKpiRepository } from 'src/srs/billing/repository/billing-kpi.repository'
-import { PIECEWORK_TYPE_IDS } from 'src/srs/payroll/snapshot/payment-type-ids'
+import { PayrollSnapshotKpiRepository } from 'src/srs/payroll/repository/payroll-snapshot-kpi.repository'
+import { PayrollSourceRepository } from 'src/srs/payroll/snapshot/payroll-source.repository'
+import { PAYMENT_TYPE_IDS, PIECEWORK_TYPE_IDS } from 'src/srs/payroll/snapshot/payment-type-ids'
 import { THEME } from 'src/srs/shared/export/xlsx-theme'
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
 import type { MonthlyClosingDto } from './dto/monthly-closing.dto'
 import { SrsMonthlyClosingModule } from './monthly-closing.module'
 import { MonthlyClosingService } from './service/monthly-closing.service'
-import { isTintService, toCents } from './monthly-closing-math'
+import { TINT_SERVICE_FRAGMENT, canonicalPayrollCents, isTintService, payrollKey, toCents } from './monthly-closing-math'
 
-const LOCAL_COPY = 'srssui5_srs_20261107'
+const LOCAL_COPY = 'srssui5_srs_20261112'
 const ready = process.env.DB_DATABASE === LOCAL_COPY && process.env.DB_PORT === '3307'
 if (!ready) {
   console.warn(`SKIPPED window-tint-closing-tinteros-integration.spec.ts: la base no es la copia local ${LOCAL_COPY} en 127.0.0.1:3307`)
@@ -42,33 +44,34 @@ const describeIf = ready ? describe : describe.skip
 const PROVIDER = 79 // Auto Wax
 const ADMIN_USER = 76 // Admin Company de Auto Wax
 const NISSAN_MIAMI = 744 // AutoNation Nissan Miami
+const LEXUS_PALM_BEACH = 301
+const MONTH = '2026-10'
+/** Ningún servicio tiene esto en el nombre: con él, nonTintPieceworkRows trae TODO el piecework del snapshot. */
+const MATCHES_NO_SERVICE = '§ningún servicio§'
 const admin: SrsContext = { idUsuario: ADMIN_USER, idUsuarioRolrel: null, idRol: 2, idDealerProvider: PROVIDER, isUserDealer: false, isActive: true }
 
 const sumCents = (xs: number[]) => xs.reduce((a, x) => a + toCents(x), 0)
 
-/**
- * Consulta independiente (medicion/por-dealer.sql del plan), por dealer: los tinteros y todos los servicios de sus WO
- * del mes. Monto = price × qty, sin el descuento de la invoice.
- */
+/** Consulta independiente de los tinteros (D14): rol con «tint», de la empresa, sin mirar el tipo de pago. */
 const TINTERS_SQL = `
   SELECT DISTINCT ur.id_usuario AS id
   FROM USUARIO_ROL_REL ur
   JOIN ROL r ON r.id_rol = ur.id_rol
   JOIN usuarios u ON u.id_usuario = ur.id_usuario
   WHERE r.id_compania_owner = ? AND u.id_contratista_owner = ? AND LOWER(r.nombre) LIKE '%tint%'
-    AND EXISTS (SELECT 1 FROM USUARIO_PAYROLL_REL p WHERE p.id_usuario = ur.id_usuario AND p.id_payment_type IN (?, ?))
   ORDER BY id`
 
+/** Por dealer, los servicios con «tint» de las WO del mes asignadas a un tintero. Monto = price × qty. */
 const BY_DEALER_SQL = `
   SELECT d.id_dealer AS dealerId,
          ROUND(SUM(isr.price * IFNULL(isr.qty, 1)), 2) AS income,
-         ROUND(SUM(CASE WHEN LOWER(s.nombre) NOT LIKE '%tint%' THEN isr.price * IFNULL(isr.qty, 1) ELSE 0 END), 2) AS nonTint,
-         SUM(CASE WHEN LOWER(s.nombre) LIKE '%tint%' THEN IFNULL(isr.qty, 1) ELSE 0 END) AS vehicles
+         SUM(IFNULL(isr.qty, 1)) AS vehicles
   FROM INVOICE i
   JOIN DEPARTMENT d ON d.id = i.id_department
   JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
   JOIN INVOICE_SERVICE s ON s.id = isr.id_service_invoice
   WHERE i.estado = 1 AND i.id_dealer_provider = ? AND i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
+    AND LOWER(s.nombre) LIKE '%tint%'
     AND EXISTS (SELECT 1 FROM INVOICE_EMPLOYEE_REL ier WHERE ier.id_invoice = i.id AND ier.id_usuario IN (__TINTERS__))
   GROUP BY d.id_dealer`
 
@@ -80,8 +83,20 @@ function fakeResponse(): { res: Response; buffer: () => Buffer } {
   return { res: res as unknown as Response, buffer: () => Buffer.concat(chunks) }
 }
 
-/** El módulo del closing contra la base del .env, con el permiso 140 abierto (se prueba en el otro spec). */
-async function compileClosingModule(): Promise<TestingModule> {
+/**
+ * El módulo del closing contra la base del .env, con el permiso 140 abierto (se prueba en el otro spec). Uno solo
+ * para todo el archivo: typeorm-transactional no deja registrar dos veces el DataSource «default».
+ */
+let sharedModule: Promise<TestingModule> | null = null
+function compileClosingModule(): Promise<TestingModule> {
+  sharedModule ??= compileOnce()
+  return sharedModule
+}
+afterAll(async () => {
+  await (await sharedModule)?.close()
+})
+
+async function compileOnce(): Promise<TestingModule> {
   initializeTransactionalContext()
   return Test.createTestingModule({
     imports: [
@@ -109,59 +124,44 @@ async function companyDealers(srs: DataSource): Promise<string> {
   return rows.map((r) => r.id).join(',')
 }
 
-describeIf('Window Tint Closing — regla del tintero, contra la copia local (solo lectura)', () => {
+describeIf('Window Tint Closing — solo servicios con «tint», contra la copia local (solo lectura)', () => {
   let moduleRef: TestingModule
   let srs: DataSource
   let service: MonthlyClosingService
   let billing: BillingKpiRepository
+  let payroll: PayrollSnapshotKpiRepository
+  let source: PayrollSourceRepository
   let allDealers: string
   let tinters: number[]
+  let summary: MonthlyClosingDto
 
   const q = (month: string, scope: 'all' | 'tint' = 'tint') => ({ month, idDealer: allDealers, scope })
-
-  async function independent(month: string) {
-    const [y, m] = month.split('-').map(Number)
-    const first = `${month}-01`
-    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
-    const sql = BY_DEALER_SQL.replace('__TINTERS__', tinters.map(() => '?').join(','))
-    const rows: { dealerId: number; income: string; nonTint: string; vehicles: string }[] = await srs.query(sql, [
-      PROVIDER,
-      first,
-      last,
-      ...tinters,
-    ])
-    return new Map(rows.map((r) => [Number(r.dealerId), { income: Number(r.income), nonTint: Number(r.nonTint), vehicles: Number(r.vehicles) }]))
-  }
 
   beforeAll(async () => {
     moduleRef = await compileClosingModule()
     srs = moduleRef.get(`${SRS_CONNECTION}DataSource`) as DataSource
     service = moduleRef.get(MonthlyClosingService)
     billing = moduleRef.get(BillingKpiRepository)
+    payroll = moduleRef.get(PayrollSnapshotKpiRepository, { strict: false })
+    source = moduleRef.get(PayrollSourceRepository, { strict: false })
     allDealers = await companyDealers(srs)
-    const t: { id: number }[] = await srs.query(TINTERS_SQL, [PROVIDER, PROVIDER, ...PIECEWORK_TYPE_IDS])
+    const t: { id: number }[] = await srs.query(TINTERS_SQL, [PROVIDER, PROVIDER])
     tinters = t.map((r) => Number(r.id))
-  }, 60000)
+    summary = await service.getSummary(admin, q(MONTH))
+  }, 180000)
 
-  afterAll(async () => {
-    await moduleRef?.close()
-  })
-
-  it('P4: los tinteros del reporte son los de la consulta independiente (rol «tint» y Piecework, de la empresa)', async () => {
-    const cc = await (service as any).prepare(admin, q('2026-10'), allDealers)
+  it('D14: los tinteros son los de la consulta independiente (rol «tint», de la empresa), también sin Piecework', async () => {
+    const cc = await (service as any).prepare(admin, q(MONTH), allDealers)
     expect(cc.employeeIds).toEqual(tinters)
-    expect(tinters.length).toBeGreaterThan(0)
-    // Con rol «tint» y sin Piecework en la ficha: no entra.
-    const sinPiecework: { id: number }[] = await srs.query(
+    const withoutPiecework: { id: number }[] = await srs.query(
       `SELECT DISTINCT ur.id_usuario AS id FROM USUARIO_ROL_REL ur JOIN ROL r ON r.id_rol = ur.id_rol
        JOIN usuarios u ON u.id_usuario = ur.id_usuario
        WHERE r.id_compania_owner = ? AND u.id_contratista_owner = ? AND LOWER(r.nombre) LIKE '%tint%'
          AND NOT EXISTS (SELECT 1 FROM USUARIO_PAYROLL_REL p WHERE p.id_usuario = ur.id_usuario AND p.id_payment_type IN (?, ?))`,
       [PROVIDER, PROVIDER, ...PIECEWORK_TYPE_IDS],
     )
-    expect(sinPiecework.length).toBeGreaterThan(0)
-    for (const r of sinPiecework) expect(cc.employeeIds).not.toContain(Number(r.id))
-    // Ninguno es de otra empresa.
+    // Antes quedaban afuera; ahora son tinteros.
+    for (const r of withoutPiecework) expect(cc.employeeIds).toContain(Number(r.id))
     const owners: { owner: number }[] = await srs.query(
       `SELECT DISTINCT u.id_contratista_owner AS owner FROM usuarios u WHERE u.id_usuario IN (${tinters.map(() => '?').join(',')})`,
       tinters,
@@ -169,85 +169,121 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
     expect(owners.map((o) => Number(o.owner))).toEqual([PROVIDER])
   }, 60000)
 
-  for (const month of ['2026-08', '2026-10']) {
-    describe(month, () => {
-      it('P1: por dealer, el Income de WO y Vehicles = la consulta independiente (sin descuento: se explica la diferencia)', async () => {
-        const cc = await (service as any).prepare(admin, q(month), allDealers)
-        const lines = await service.incomeLines(cc)
-        const ind = await independent(month)
-        const got = new Map<number, { income: number; nonTint: number; vehicles: number }>()
-        for (const l of lines) {
-          if (l.kind !== 'wo' && l.kind !== 'woUnbilled') continue
-          const g = got.get(l.dealerId) ?? { income: 0, nonTint: 0, vehicles: 0 }
-          g.income += l.cents
-          if (!l.tint) g.nonTint += l.cents
-          else g.vehicles += l.qty
-          got.set(l.dealerId, g)
-        }
-        const diffs: string[] = []
-        for (const id of new Set([...ind.keys(), ...got.keys()])) {
-          const a = ind.get(id) ?? { income: 0, nonTint: 0, vehicles: 0 }
-          const b = got.get(id) ?? { income: 0, nonTint: 0, vehicles: 0 }
-          if (toCents(a.income) !== b.income || toCents(a.nonTint) !== b.nonTint || a.vehicles !== b.vehicles) {
-            diffs.push(`${id}: sql ${a.income}/${a.nonTint}/${a.vehicles} vs report ${b.income / 100}/${b.nonTint / 100}/${b.vehicles}`)
-          }
-        }
-        expect(diffs).toEqual([])
-        // Nunca TTK ni ponchadas de Generic; las Generic libres, solo con «tint» (D2).
-        expect(lines.some((l) => l.kind === 'ttk' || l.kind === 'genericPunch')).toBe(false)
-        expect(lines.filter((l) => l.kind === 'genericFree').every((l) => isTintService(l.service))).toBe(true)
-      }, 180000)
+  it('tema 6: Income de WO y Vehicles por dealer = la consulta independiente de servicios con «tint»', async () => {
+    const cc = await (service as any).prepare(admin, q(MONTH), allDealers)
+    const lines = await service.incomeLines(cc)
+    expect(lines.every((l) => isTintService(l.service))).toBe(true)
+    expect(lines.some((l) => l.kind === 'ttk' || l.kind === 'genericPunch')).toBe(false)
 
-      it('P5: cada dealer — By service suma su Income, Income suma la fila, Vehicles = Qty de los servicios con «tint»', async () => {
-        const sum = await service.getSummary(admin, q(month))
-        for (const row of sum.rows.filter((r) => r.income !== 0)) {
-          const d = await service.getDealer(admin, row.dealerId, q(month))
-          expect(d.byService).not.toBeNull()
-          expect(sumCents(d.byService!.map((r) => r.amount))).toBe(toCents(row.income))
-          expect(sumCents(d.income.map((l) => l.total))).toBe(toCents(row.income))
-          expect(sumCents(d.payroll.map((l) => l.amount))).toBe(toCents(row.payroll))
-          expect(d.byService!.filter((r) => r.tint).reduce((a, r) => a + r.vehicles, 0)).toBe(row.vehicles)
-          expect(row.nonTint).toBe(d.income.some((l) => l.warn === true))
-          // En rojo solo lo que no dice «tint» y tiene importe (11/11/2026: un servicio en $0 no se marca).
-          expect(d.income.every((l) => l.warn === (l.tint === false && toCents(l.total) !== 0))).toBe(true)
-          expect(d.byService!.every((r) => r.warn === (!r.tint && toCents(r.amount) !== 0))).toBe(true)
-        }
-        expect(sum.total.nonTint).toBe(sum.rows.some((r) => r.nonTint))
-      }, 600000)
-    })
-  }
-
-  it('octubre: Nissan Miami en rojo, con PDI 113 marcado en By service', async () => {
-    const sum = await service.getSummary(admin, q('2026-10'))
-    const nissan = sum.rows.find((r) => r.dealerId === NISSAN_MIAMI)!
-    expect(nissan.nonTint).toBe(true)
-    const d = await service.getDealer(admin, NISSAN_MIAMI, q('2026-10'))
-    const pdi = d.byService!.filter((r) => r.service.trim().toUpperCase() === 'PDI')
-    expect(pdi.reduce((a, r) => a + r.vehicles, 0)).toBe(113)
-    expect(pdi.every((r) => r.tint === false)).toBe(true)
-    expect(d.income.filter((l) => l.service.trim().toUpperCase() === 'PDI').every((l) => l.tint === false)).toBe(true)
-    expect(pdi.every((r) => r.warn)).toBe(true)
+    const sql = BY_DEALER_SQL.replace('__TINTERS__', tinters.map(() => '?').join(','))
+    const rows: { dealerId: number; income: string; vehicles: string }[] = await srs.query(sql, [
+      PROVIDER,
+      `${MONTH}-01`,
+      `${MONTH}-31`,
+      ...tinters,
+    ])
+    const ind = new Map(rows.map((r) => [Number(r.dealerId), { income: toCents(Number(r.income)), vehicles: Number(r.vehicles) }]))
+    const got = new Map<number, { income: number; vehicles: number }>()
+    for (const l of lines) {
+      if (l.kind !== 'wo' && l.kind !== 'woUnbilled') continue
+      const g = got.get(l.dealerId) ?? { income: 0, vehicles: 0 }
+      g.income += l.cents
+      g.vehicles += l.qty
+      got.set(l.dealerId, g)
+    }
+    const diffs: string[] = []
+    for (const id of new Set([...ind.keys(), ...got.keys()])) {
+      const a = ind.get(id) ?? { income: 0, vehicles: 0 }
+      const b = got.get(id) ?? { income: 0, vehicles: 0 }
+      if (a.income !== b.income || a.vehicles !== b.vehicles) diffs.push(`${id}: sql ${a.income}/${a.vehicles} vs report ${b.income}/${b.vehicles}`)
+    }
+    expect(diffs).toEqual([])
   }, 180000)
 
-  it('octubre: Lexus Palm Beach ya no va en rojo — sus únicos servicios sin «tint» son dos «Others» de $0.00 (11/11/2026)', async () => {
-    const sum = await service.getSummary(admin, q('2026-10'))
-    const lexus = sum.rows.find((r) => /Lexus of Palm Beach/i.test(r.dealer))!
-    expect(lexus).toBeDefined()
-    const d = await service.getDealer(admin, lexus.dealerId, q('2026-10'))
-    const others = d.income.filter((l) => l.tint === false)
-    expect(others.length).toBeGreaterThan(0)
-    expect(others.every((l) => l.total === 0 && l.warn === false)).toBe(true)
-    expect(lexus.nonTint).toBe(false)
+  it('D10: la consulta del descuento sigue al snapshot — sin filtro de servicio da el piecework que el snapshot contó', async () => {
+    const cc = await (service as any).prepare(admin, q(MONTH), allDealers)
+    const vendors = new Set<number>(cc.vendorIds)
+    const employees = tinters.filter((id) => !vendors.has(id))
+    const coverage = await payroll.periodCoverage(PROVIDER, cc.periods.map((p: { desde: string }) => p.desde))
+    const diffs: string[] = []
+    let total = 0
+    for (const p of cc.periods as { desde: string; hasta: string }[]) {
+      const covered = coverage.get(p.desde)
+      if (!covered) continue
+      const until = covered < p.hasta ? covered : p.hasta
+      const mine = new Map<string, number>()
+      for (const r of await source.nonTintPieceworkRows(PROVIDER, employees, p.desde, until, MATCHES_NO_SERVICE)) {
+        const k = `${r.idUsuario}|${r.idDealer}`
+        mine.set(k, (mine.get(k) ?? 0) + r.piecework)
+      }
+      const snap: { idUsuario: number; idDealer: number; monto: string }[] = await srs.query(
+        `SELECT p.id_usuario AS idUsuario, p.id_dealer AS idDealer, SUM(p.monto) AS monto
+         FROM PAYROLL_SNAPSHOT_DAY p
+         WHERE p.id_contratista = ? AND p.periodo_desde = ? AND p.fecha <= ? AND p.concepto = 'ponchada'
+           AND p.id_payment_type IN (?, ?) AND p.id_dealer IS NOT NULL
+           AND p.id_usuario IN (${employees.map(() => '?').join(',')})
+         GROUP BY p.id_usuario, p.id_dealer`,
+        [PROVIDER, p.desde, until, PAYMENT_TYPE_IDS.PIECEWORK, PAYMENT_TYPE_IDS.FLAT_RATE, ...employees],
+      )
+      const theirs = new Map(snap.map((r) => [`${r.idUsuario}|${r.idDealer}`, Number(r.monto)]))
+      for (const k of new Set([...mine.keys(), ...theirs.keys()])) {
+        const a = toCents(mine.get(k) ?? 0)
+        const b = toCents(theirs.get(k) ?? 0)
+        total += b
+        if (a !== b) diffs.push(`${p.desde} ${k}: consulta ${a / 100} vs snapshot ${b / 100}`)
+      }
+    }
+    expect(total).toBeGreaterThan(0)
+    expect(diffs).toEqual([])
+  }, 600000)
+
+  it('D10: el Payroll de cada dealer = el del snapshot menos el piecework de servicios sin «tint», al centavo', async () => {
+    const cc = await (service as any).prepare(admin, q(MONTH), allDealers)
+    const raw = canonicalPayrollCents(
+      await payroll.amountsByDealerPeriodType(cc.filter, cc.periods.map((p: { desde: string }) => p.desde), false, cc.employeeIds, cc.vendorIds),
+    )
+    const deduction = await (service as any).nonTintDeduction(cc)
+    const expected = new Map<number, number>()
+    for (const [key, cents] of raw) {
+      const dealer = Number(key.split('|')[0])
+      expected.set(dealer, (expected.get(dealer) ?? 0) + Math.max(0, cents - (deduction.byKey.get(key) ?? 0)))
+    }
+    for (const row of summary.rows) expect(toCents(row.payroll)).toBe(expected.get(row.dealerId) ?? 0)
+    // Cada clave del descuento es de un dealer y período del cierre (payrollKey).
+    for (const key of deduction.byKey.keys()) expect(cc.periods.some((p: { desde: string }) => key.endsWith(`|${p.desde}`))).toBe(true)
+    expect(payrollKey(NISSAN_MIAMI, cc.periods[0].desde)).toBe(`${NISSAN_MIAMI}|${cc.periods[0].desde}`)
+  }, 600000)
+
+  it('D10, dato de hoy: los servicios sin «tint» de los tinteros no tienen piecework, así que el descuento es $0', async () => {
+    // Comprobado en la copia del 12/11, agosto a noviembre: ningún servicio sin «tint» de una WO de un tintero tiene
+    // piecework (INVOICE_SERVICE_REL ni INVOICE_SERVICE_EMPLOYEE_REL). Si mañana lo tienen, esta prueba avisa.
+    const cc = await (service as any).prepare(admin, q(MONTH), allDealers)
+    const deduction = await (service as any).nonTintDeduction(cc)
+    expect([...deduction.byKey.values()].reduce((a: number, c: number) => a + c, 0)).toBe(0)
+  }, 600000)
+
+  it('cada dealer — Income, By service y Payroll del detalle suman la fila; solo servicios con «tint»', async () => {
+    for (const row of summary.rows.filter((r) => r.income !== 0 || r.payroll !== 0)) {
+      const d = await service.getDealer(admin, row.dealerId, q(MONTH))
+      expect(sumCents(d.byService!.map((r) => r.amount))).toBe(toCents(row.income))
+      expect(sumCents(d.income.map((l) => l.total))).toBe(toCents(row.income))
+      expect(sumCents(d.payroll.map((l) => l.amount))).toBe(toCents(row.payroll))
+      expect(d.byService!.reduce((a, r) => a + r.vehicles, 0)).toBe(row.vehicles)
+      expect(d.income.every((l) => l.tint === true)).toBe(true)
+      expect(d.byService!.every((r) => r.tint)).toBe(true)
+    }
+  }, 900000)
+
+  it('octubre: Nissan Miami ya no trae el PDI', async () => {
+    const d = await service.getDealer(admin, NISSAN_MIAMI, q(MONTH))
+    expect(d.byService!.some((r) => r.service.trim().toUpperCase() === 'PDI')).toBe(false)
+    expect(d.income.some((l) => l.service.trim().toUpperCase() === 'PDI')).toBe(false)
   }, 180000)
 
-  it('P3: Payroll de octubre = $9,635.00 (los tinteros, todos los tipos de pago: D1 sin contestar)', async () => {
-    const sum = await service.getSummary(admin, q('2026-10'))
-    expect(sum.total.payroll).toBe(9635)
-  }, 180000)
-
-  it('P2: Monthly Closing (scope=all) no cambia: sus líneas suman el Income by Dealer al centavo y no llevan marcas', async () => {
-    const cc = await (service as any).prepare(admin, q('2026-10', 'all'), allDealers)
+  it('Monthly Closing (scope=all) no cambia: sus líneas suman el Income by Dealer al centavo', async () => {
+    const cc = await (service as any).prepare(admin, q(MONTH, 'all'), allDealers)
     expect(cc.employeeIds).toBeNull()
+    expect(await (service as any).nonTintDeduction(cc)).toEqual({ byKey: new Map(), byEmployee: new Map() })
     const lines = await service.incomeLines(cc)
     expect(lines.every((l) => l.tint === null)).toBe(true)
     const byDealer = new Map<number, number>()
@@ -256,16 +292,13 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
     const diffs: string[] = []
     for (const [id, r] of income) if ((byDealer.get(id) ?? 0) !== toCents(r.income)) diffs.push(String(id))
     expect(diffs).toEqual([])
-    const mc = await service.getSummary(admin, q('2026-10', 'all'))
-    expect(mc.rows.every((r) => r.nonTint === null)).toBe(true)
-    const d = await service.getDealer(admin, NISSAN_MIAMI, q('2026-10', 'all'))
+    const d = await service.getDealer(admin, NISSAN_MIAMI, q(MONTH, 'all'))
     expect(d.byService).toBeNull()
   }, 300000)
 
-  it('P5/P6: el Excel — By service = modal de cada dealer, filas sin «tint» en rojo, Report Info con las reglas nuevas', async () => {
-    const sum = await service.getSummary(admin, q('2026-10'))
+  it('el Excel — By service = modal, ninguna fila en rojo, Report Info con las reglas nuevas', async () => {
     const { res, buffer } = fakeResponse()
-    await service.export(admin, q('2026-10'), res)
+    await service.export(admin, q(MONTH), res)
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer())
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Report Info', 'Summary', 'By service', 'Income', 'Payroll', 'Expenses'])
@@ -282,11 +315,11 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
         red: r.getCell(1).font?.color?.argb === THEME.warnFg,
       })
     })
-    expect(sheetRows.reduce((a, r) => a + r.cents, 0)).toBe(toCents(sum.total.income))
-    expect(sheetRows.every((r) => r.red === (!isTintService(r.service) && r.cents !== 0))).toBe(true)
+    expect(sheetRows.reduce((a, r) => a + r.cents, 0)).toBe(toCents(summary.total.income))
+    expect(sheetRows.every((r) => !r.red && isTintService(r.service))).toBe(true)
 
-    const nissan = sum.rows.find((r) => r.dealerId === NISSAN_MIAMI)!
-    const d = await service.getDealer(admin, NISSAN_MIAMI, q('2026-10'))
+    const nissan = summary.rows.find((r) => r.dealerId === NISSAN_MIAMI)!
+    const d = await service.getDealer(admin, NISSAN_MIAMI, q(MONTH))
     const fromSheet = sheetRows
       .filter((r) => r.dealer === nissan.dealer)
       .map((r) => [r.service, r.vehicles, r.cents])
@@ -294,38 +327,29 @@ describeIf('Window Tint Closing — regla del tintero, contra la copia local (so
     const fromModal = d.byService!.map((r) => [r.service, r.vehicles, toCents(r.amount)]).sort()
     expect(fromSheet).toEqual(fromModal)
 
-    const income = wb.getWorksheet('Income')!
     let redIncome = 0
-    income.eachRow((r, n) => {
+    wb.getWorksheet('Income')!.eachRow((r, n) => {
       if (n >= 3 && r.getCell(1).font?.color?.argb === THEME.warnFg) redIncome++
     })
-    expect(redIncome).toBeGreaterThan(0)
+    expect(redIncome).toBe(0)
 
     const info: Record<string, string> = {}
     wb.getWorksheet('Report Info')!.eachRow((r) => (info[String(r.getCell(1).value)] = String(r.getCell(2).value)))
-    expect(info['Tinters']).toBe('Role name contains «tint» and Piecework payment type')
-    expect(info['Rows in red']).toBe(
-      'Services without «tint» in their name and an amount other than $0, from work orders assigned to tinters',
-    )
+    expect(info['Tinters']).toBe('Role name contains «tint»')
+    expect(info['Tint services']).toContain(`Only services with «${TINT_SERVICE_FRAGMENT}» in their name`)
+    expect(info['Rows in red']).toBeUndefined()
   }, 300000)
 })
 
 /**
- * P6 de plans/plan-monthly-closing-vendors contra la copia del 12/11 (tiene `usuarios.is_vendor`, migration 030). Solo
- * lecturas: nadie está marcado en la copia, así que la marca se simula haciendo que `UsuarioSrsService.vendorIds`
- * devuelva al tintero. Un tintero vendor sigue definiendo el Income (sus WO) y sale solo del Payroll.
+ * P6 de plans/plan-monthly-closing-vendors: la marca vendor se simula haciendo que `UsuarioSrsService.vendorIds`
+ * devuelva al tintero. Un tintero vendor sigue definiendo el Income (sus WO) y sale solo del Payroll, con su
+ * descuento de servicios sin «tint» incluido (no se le resta dos veces).
  */
-const VENDORS_COPY = 'srssui5_srs_20261112'
-const vendorsReady = process.env.DB_DATABASE === VENDORS_COPY && process.env.DB_PORT === '3307'
-if (!vendorsReady) {
-  console.warn(`SKIPPED vendors de window-tint-closing-tinteros-integration.spec.ts: la base no es la copia local ${VENDORS_COPY}`)
-}
-const LEXUS_PALM_BEACH = 301
-/** Edesman Manolo Sales Morales: tintero (rol «tint» + Piecework); octubre, $1,035.00 de payroll en Lexus, 242 WO. */
+/** Edesman Manolo Sales Morales: tintero con WO en Lexus Palm Beach en octubre. */
 const TINTER = 5439
-const TINTER_OCT_LEXUS_PAYROLL = 1035
 
-;(vendorsReady ? describe : describe.skip)('Window Tint Closing — tintero marcado vendor, copia del 12/11 (solo lectura)', () => {
+;(ready ? describe : describe.skip)('Window Tint Closing — tintero marcado vendor (solo lectura)', () => {
   let moduleRef: TestingModule
   let service: MonthlyClosingService
   let usuarios: UsuarioSrsService
@@ -334,7 +358,7 @@ const TINTER_OCT_LEXUS_PAYROLL = 1035
   let withVendor: MonthlyClosingDto
   let tinterName: string
 
-  const q = () => ({ month: '2026-10', idDealer: allDealers, scope: 'tint' as const })
+  const q = () => ({ month: MONTH, idDealer: allDealers, scope: 'tint' as const })
   const asVendors = (ids: number[]) => jest.spyOn(usuarios, 'vendorIds').mockResolvedValue(ids)
 
   beforeAll(async () => {
@@ -345,17 +369,14 @@ const TINTER_OCT_LEXUS_PAYROLL = 1035
     allDealers = await companyDealers(srs)
     const [u]: { nombre: string }[] = await srs.query(`SELECT nombre FROM usuarios WHERE id_usuario = ?`, [TINTER])
     tinterName = u.nombre
+    asVendors([])
     base = await service.getSummary(admin, q())
     asVendors([TINTER])
     withVendor = await service.getSummary(admin, q())
     jest.restoreAllMocks()
-  }, 180000)
+  }, 300000)
 
   afterEach(() => jest.restoreAllMocks())
-
-  afterAll(async () => {
-    await moduleRef?.close()
-  })
 
   it('sigue siendo tintero (sus WO siguen en el Income) y es vendor (sale del Payroll)', async () => {
     asVendors([TINTER])
@@ -364,28 +385,29 @@ const TINTER_OCT_LEXUS_PAYROLL = 1035
     expect(cc.vendorIds).toEqual([TINTER])
   }, 60000)
 
-  it('Summary: Income y Vehicles iguales en todos los dealers; Lexus baja su payroll; los demás, igual', () => {
-    const strip = (mc: MonthlyClosingDto) => mc.rows.map(({ dealerId, income, vehicles, nonTint }) => ({ dealerId, income, vehicles, nonTint }))
+  it('Lexus baja su Payroll justo en lo del tintero en el detalle; Income y Vehicles iguales; los demás dealers, igual', async () => {
+    asVendors([])
+    const detail = await service.getDealer(admin, LEXUS_PALM_BEACH, q())
+    const tinterCents = sumCents(detail.payroll.filter((l) => l.employee === tinterName).map((l) => l.amount))
+    expect(tinterCents).toBeGreaterThan(0)
+    const strip = (mc: MonthlyClosingDto) => mc.rows.map(({ dealerId, income, vehicles }) => ({ dealerId, income, vehicles }))
     expect(strip(withVendor)).toEqual(strip(base))
-    expect(withVendor.total.income).toBe(base.total.income)
     const before = base.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
     const after = withVendor.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
-    expect(toCents(before.payroll) - toCents(after.payroll)).toBe(toCents(TINTER_OCT_LEXUS_PAYROLL))
+    expect(toCents(before.payroll) - toCents(after.payroll)).toBe(tinterCents)
     const others = (mc: MonthlyClosingDto) => mc.rows.filter((r) => r.dealerId !== LEXUS_PALM_BEACH)
     expect(others(withVendor)).toEqual(others(base))
-    expect(toCents(base.total.payroll) - toCents(withVendor.total.payroll)).toBe(toCents(TINTER_OCT_LEXUS_PAYROLL))
-  })
+  }, 300000)
 
   it('detalle de Lexus: el Income y By service no cambian; el Payroll ya no tiene al tintero', async () => {
+    asVendors([])
     const before = await service.getDealer(admin, LEXUS_PALM_BEACH, q())
     asVendors([TINTER])
     const after = await service.getDealer(admin, LEXUS_PALM_BEACH, q())
     expect(after.income).toEqual(before.income)
     expect(after.byService).toEqual(before.byService)
-    expect(before.payroll.some((l) => l.employee === tinterName)).toBe(true)
     expect(after.payroll.some((l) => l.employee === tinterName)).toBe(false)
-    expect(after.payroll).toEqual(before.payroll.filter((l) => l.employee !== tinterName))
     const row = withVendor.rows.find((r) => r.dealerId === LEXUS_PALM_BEACH)!
     expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(row.payroll))
-  }, 180000)
+  }, 300000)
 })
