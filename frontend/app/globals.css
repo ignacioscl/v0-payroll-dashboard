@@ -105,6 +105,11 @@
      violet = TTK, the tenant accent = WO). */
   --partial-row-bg: #e0f2fe;
 
+  /* Fila abierta de una tabla y su detalle (reunión con Juan 18/11, tema 12): con el color de la empresa, para que se
+     distingan del resto. Opacos, por las celdas fijadas. */
+  --expanded-row-bg: color-mix(in srgb, var(--client-accent) 22%, var(--card));
+  --expanded-detail-bg: color-mix(in srgb, var(--client-accent) 5%, var(--card));
+
   /*
    * Capas de la pantalla, de abajo hacia arriba (5.6; https://tailwindcss.com/docs/z-index, `z-(--z-…)`). Tailwind 4
    * no tiene un espacio de @theme para el z-index, por eso van acá. Lo que arma su propia pila dentro de un

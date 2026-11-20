@@ -56,7 +56,9 @@ export default function RolesPage() {
   const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
   const [parentFilter, setParentFilter] = useState<RoleParentOption | null>(null)
   const [showInactive, setShowInactive] = useState(false)
-  const [includeNoDealer, setIncludeNoDealer] = useState(false)
+  // Prendido por defecto: con un dealer elegido se ven también los roles de toda la compañía; el switch queda para
+  // ocultarlos (reunión con Juan 18/11, tema 11).
+  const [includeNoDealer, setIncludeNoDealer] = useState(true)
   const { selectedDealers } = useFilters()
   const hasDealer = selectedDealers.length > 0
   const [permRole, setPermRole] = useState<RoleListRow | null>(null)

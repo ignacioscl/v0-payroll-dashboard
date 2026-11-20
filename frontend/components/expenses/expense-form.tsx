@@ -428,10 +428,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
                             value={field.value}
                             onChange={(next) => {
                               field.onChange(next)
-                              // Entradas de los dealers que entran, sin pisar las que ya estaban.
-                              const current = form.getValues('branches')
-                              const merged = { ...current }
-                              for (const id of next) if (!merged[id]) merged[id] = { percentage: '', amount: '' }
+                              // Entradas de los dealers que entran, sin pisar las que ya estaban; las de los que
+                              // salen se borran, igual que con el tacho de la tabla (tema 8 de plan-reunion-juan-18-11).
+                              const current = form.getValues('branches') ?? {}
+                              const merged: typeof current = {}
+                              for (const id of next) merged[id] = current[id] ?? { percentage: '', amount: '' }
                               form.setValue('branches', merged)
                             }}
                             loading={dealersLoading}

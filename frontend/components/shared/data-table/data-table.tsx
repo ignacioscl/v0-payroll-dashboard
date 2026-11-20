@@ -98,6 +98,17 @@ export interface DataTableColumnMeta<TData> {
 /** Visual treatment for the header row. */
 export type DataTableHeaderVariant = 'colored' | 'subtle'
 
+/**
+ * Fila abierta y su detalle (reunión con Juan 18/11, tema 12): la fila con fondo del color de la empresa y en negrita;
+ * el detalle con fondo propio y una raya del mismo color a la izquierda. Los usan también las tablas que abren filas
+ * por su cuenta (p. ej. los niveles internos de Income by Dealer), para que se vean igual.
+ */
+export const EXPANDED_ROW_CLASS = '[--dt-row-bg:var(--expanded-row-bg)] bg-[var(--expanded-row-bg)] font-semibold'
+export const EXPANDED_DETAIL_CLASS = 'bg-[var(--expanded-detail-bg)] border-l-4 border-l-primary'
+/** Lo mismo para cada `<tr>` del detalle en una tabla hecha a mano: fondo en la fila y raya en su primera celda. */
+export const EXPANDED_DETAIL_ROW_CLASS =
+  'bg-[var(--expanded-detail-bg)] [&>td:first-child]:border-l-4 [&>td:first-child]:border-l-primary'
+
 /* -------------------------------------------------------------------------- */
 /* Persistence helpers                                                         */
 /* -------------------------------------------------------------------------- */
@@ -1045,8 +1056,8 @@ export function DataTable<TData, TValue = unknown>({
           'border-b border-border/50 transition-colors',
           baseBg,
           getRowClassName?.(row.original, index),
-          isExpanded && 'bg-accent/30',
           (link || onRowClick) && 'cursor-pointer hover:bg-accent/40',
+          isExpanded && EXPANDED_ROW_CLASS,
         )}
       >
         {visibleCells.map((cell) => {
@@ -1110,7 +1121,7 @@ export function DataTable<TData, TValue = unknown>({
       </TableRow>
       {renderSubComponent && isExpanded ? (
         <TableRow className="border-b border-border/50 hover:bg-transparent">
-          <TableCell colSpan={visibleColCount} className="overflow-visible bg-muted/20 p-0">
+          <TableCell colSpan={visibleColCount} className={cn('overflow-visible p-0', EXPANDED_DETAIL_CLASS)}>
             {/* Sticky so drilldown stays in view while the wide main table scrolls horizontally.
                 z-[1] = banda del BODY: por encima de las celdas sin pin y a la par de las
                 pinneadas, pero DEBAJO de la cabecera (2 no pinneada / 4 pinneada). Con z-[2]

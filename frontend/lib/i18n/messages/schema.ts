@@ -2015,6 +2015,7 @@ export interface Messages {
     yesChange: string
     enterDealerAmount: string
     dealersWithoutAmount: string
+    removeDealerFromSplit: string
     amountIsSum: string
     needs100: string
     manualOver100: string

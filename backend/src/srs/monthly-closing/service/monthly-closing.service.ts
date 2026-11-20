@@ -388,10 +388,20 @@ export class MonthlyClosingService {
           nonTint: t.nonTint || a.nonTint,
         }
       },
-      { income: 0, payroll: 0, expenses: 0, accident: 0, vehicles: 0, nonTint: false },
+      // Quien ve «Without dealer» la tiene también en el Total: si no, el Total del Payroll y su Profit/Loss
+      // quedaban sin esos sueldos (reunión con Juan 18/11, D9: era un bug).
+      {
+        income: 0,
+        payroll: cc.showWithoutDealer ? withoutDealerCents : 0,
+        expenses: 0,
+        accident: 0,
+        vehicles: 0,
+        nonTint: false,
+      },
     )
+    // La fila sale siempre para quien la ve, también en $0: así se sabe que no hubo sueldos sin dealer (D15).
     const withoutDealer =
-      cc.showWithoutDealer && withoutDealerCents !== 0
+      cc.showWithoutDealer
         ? {
             ...toRow(0, 'Without dealer', {
               income: 0,

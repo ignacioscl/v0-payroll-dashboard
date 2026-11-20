@@ -99,6 +99,9 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
     enabled: Boolean(params),
   })
   const data = report.data
+  // Hay resumen si hay dealers o si quien mira ve «Without dealer»: esa fila sale siempre, también en $0 y aunque los
+  // dealers elegidos no tengan movimientos (plan-reunion-juan-18-11, tema 5b).
+  const hasSummary = Boolean(data && (data.rows.length > 0 || data.withoutDealer))
   const rows = data?.rows ?? []
 
   // En celular el DataTable no fija ni corta (plans/plan-buenas-practicas-v0, 5.2).
@@ -204,19 +207,25 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         : t('common.failedToLoad')
     : null
 
-  /** Total y Without dealer: una línea cada uno, con las columnas de la tabla como etiqueta. */
-  const totalsLine = (row: ClosingRow, label: string, onClick?: () => void) => {
-    const items: [string, React.ReactNode][] = [
-      ...(tint ? [[t('monthlyClosing.colVehicles'), (row.vehicles ?? 0).toLocaleString()] as [string, React.ReactNode]] : []),
-      [t('monthlyClosing.colIncome'), fmtMoney(row.income)],
-      [t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)],
-      [t('monthlyClosing.colExpenses'), fmtMoney(row.expenses)],
-      [t('monthlyClosing.colProfit'), profitCell(row.profit)],
-      [t('monthlyClosing.colPct'), pctLabel(row.pct)],
-      ...(!tint && row.accident
-        ? [[t('monthlyClosing.colAccident'), fmtMoney(row.accident)] as [string, React.ReactNode]]
-        : []),
-    ]
+  /**
+   * Total y Without dealer: una línea cada uno, con las columnas de la tabla como etiqueta. Without dealer muestra
+   * solo Payroll: Income y Expenses no pueden quedar sin dealer, y su Profit/Loss sería el mismo sueldo con signo
+   * menos (plan-reunion-juan-18-11, 19/11). Igual en el Summary del Excel (`closingSummaryColumns`).
+   */
+  const totalsLine = (row: ClosingRow, label: string, onClick?: () => void, payrollOnly = false) => {
+    const items: [string, React.ReactNode][] = payrollOnly
+      ? [[t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)]]
+      : [
+          ...(tint ? [[t('monthlyClosing.colVehicles'), (row.vehicles ?? 0).toLocaleString()] as [string, React.ReactNode]] : []),
+          [t('monthlyClosing.colIncome'), fmtMoney(row.income)],
+          [t('monthlyClosing.colPayroll'), fmtMoney(row.payroll)],
+          [t('monthlyClosing.colExpenses'), fmtMoney(row.expenses)],
+          [t('monthlyClosing.colProfit'), profitCell(row.profit)],
+          [t('monthlyClosing.colPct'), pctLabel(row.pct)],
+          ...(!tint && row.accident
+            ? [[t('monthlyClosing.colAccident'), fmtMoney(row.accident)] as [string, React.ReactNode]]
+            : []),
+        ]
     const content = (
       <>
         <span className="font-semibold">{label}</span>
@@ -245,9 +254,17 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
       <PageHeading
         title={tint ? t('monthlyClosing.tintTitle') : t('monthlyClosing.title')}
         subtitle={
-          <span>
-            {monthValid ? <span className="font-medium">{closingMonthLabel(closingMonth)} · </span> : null}
-            {tint ? t('monthlyClosing.tintSubtitle') : t('monthlyClosing.subtitle')}
+          <span className="flex flex-col gap-1">
+            <span>
+              {monthValid ? <span className="font-medium">{closingMonthLabel(closingMonth)} · </span> : null}
+              {tint ? t('monthlyClosing.tintSubtitle') : t('monthlyClosing.subtitle')}
+            </span>
+            {/* Los pay periods del mes, arriba y a la vista: abajo de la tabla no se veían (reunión con Juan 18/11). */}
+            {data ? (
+              <span className="font-semibold text-foreground tabular-nums" data-testid="monthly-closing-pay-periods">
+                {periodsLine(data.periods, t)}
+              </span>
+            ) : null}
           </span>
         }
         icon={tint ? <CarFront /> : <CalendarCheck />}
@@ -298,7 +315,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
               url={params ? monthlyClosingExportUrl(params) : null}
               rowCount={rows.length}
               fallbackFileName={tint ? 'window_tint_closing.xlsx' : 'monthly_closing.xlsx'}
-              disabled={report.isFetching || rows.length === 0}
+              disabled={report.isFetching || !hasSummary}
             />
           }
           recordsCount={rows.length}
@@ -308,14 +325,18 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           }
           onRowClick={(row) => setOpenDealer({ dealerId: row.dealerId, dealer: row.dealer })}
           footer={
-            data && rows.length > 0 ? (
+            hasSummary && data ? (
               <div className="divide-y divide-border border-t border-border">
-                {totalsLine(data.total, t('monthlyClosing.total'))}
+                {/* Without dealer arriba del Total: el Total ya la incluye (plan-reunion-juan-18-11, D9). */}
                 {data.withoutDealer
-                  ? totalsLine(data.withoutDealer, t('monthlyClosing.withoutDealer'), () =>
-                      setOpenDealer({ dealerId: 0, dealer: t('monthlyClosing.withoutDealer') }),
+                  ? totalsLine(
+                      data.withoutDealer,
+                      t('monthlyClosing.withoutDealer'),
+                      () => setOpenDealer({ dealerId: 0, dealer: t('monthlyClosing.withoutDealer') }),
+                      true,
                     )
                   : null}
+                {totalsLine(data.total, t('monthlyClosing.total'))}
               </div>
             ) : undefined
           }
@@ -335,8 +356,6 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           {t('monthlyClosing.nonTintDealersNote')}
         </p>
       ) : null}
-
-      {data ? <p className="text-sm text-muted-foreground tabular-nums">{periodsLine(data.periods, t)}</p> : null}
 
       {params ? (
         <MonthlyClosingDealerDialog dealer={openDealer} onClose={() => setOpenDealer(null)} params={params} />
