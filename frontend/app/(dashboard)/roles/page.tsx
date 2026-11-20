@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
+import { useFilters } from '@/lib/filter-context'
 import {
   canEditRoles,
   canManageRoleTemplates,
@@ -55,6 +56,11 @@ export default function RolesPage() {
   const [templateFilter, setTemplateFilter] = useState<RoleTemplateFilterOption | null>(null)
   const [parentFilter, setParentFilter] = useState<RoleParentOption | null>(null)
   const [showInactive, setShowInactive] = useState(false)
+  // Prendido por defecto: con un dealer elegido se ven también los roles de toda la compañía; el switch queda para
+  // ocultarlos (reunión con Juan 18/11, tema 11).
+  const [includeNoDealer, setIncludeNoDealer] = useState(true)
+  const { selectedDealers } = useFilters()
+  const hasDealer = selectedDealers.length > 0
   const [permRole, setPermRole] = useState<RoleListRow | null>(null)
   const [permOpen, setPermOpen] = useState(false)
   const [formRole, setFormRole] = useState<RoleListRow | null>(null)
@@ -186,6 +192,18 @@ export default function RolesPage() {
           </Label>
         </div>
 
+        {hasDealer ? (
+          <div className="flex items-center gap-2 pb-1">
+            <Switch
+              id="roles-include-no-dealer"
+              checked={includeNoDealer}
+              onCheckedChange={setIncludeNoDealer}
+            />
+            <Label htmlFor="roles-include-no-dealer" className="text-sm font-normal">
+              {t('roles.includeNoDealer')}
+            </Label>
+          </div>
+        ) : null}
       </div>
 
       <RolesDataTable
@@ -193,6 +211,7 @@ export default function RolesPage() {
         idTemplate={templateFilter?.id ?? null}
         idRolParent={parentFilter?.id ?? null}
         showInactive={showInactive}
+        includeNoDealer={includeNoDealer}
         enabled={!loading && canView}
         canEdit={canEdit}
         canViewUsers={canViewUsers}

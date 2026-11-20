@@ -31,6 +31,7 @@ export interface Messages {
     readOnlyHint: string
     autosaveHint: string
     showInactive: string
+    includeNoDealer: string
     type: string
     typeAll: string
     typeInternal: string
