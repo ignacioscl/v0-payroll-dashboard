@@ -61,21 +61,15 @@ export function largestRemainderCents<T extends { amount: number; employee: stri
 }
 
 /**
- * Servicio de tint: «tint» en el nombre. En el Window Tint Closing ya no decide qué entra al Income (eso lo
- * decide el tintero asignado a la WO, plans/plan-window-tint-closing-tint-y-servicios T2): decide qué suma
- * Vehicles y qué fila se marca en rojo.
+ * Lo que el Window Tint Closing busca en el nombre del servicio, del rol y de la categoría (D3, D4). El servicio
+ * se compara en el código (isTintService) y en el SQL del descuento de payroll (nonTintPieceworkRows, con LIKE sin
+ * distinguir mayúsculas): las dos puntas usan este mismo texto.
  */
-export function isTintService(service: string): boolean {
-  return /tint/i.test(service)
-}
+export const TINT_SERVICE_FRAGMENT = 'tint'
 
-/**
- * Regla única de qué va en rojo en el Window Tint Closing (fila del dealer, detalle, By service y Excel): un
- * servicio sin «tint» en el nombre y con importe. Un servicio en $0 no se marca (Ignacio, 11/11/2026: Lexus Palm
- * Beach quedaba en rojo solo por dos «Others» de $0.00).
- */
-export function isNonTintWarning(line: { service: string; cents: number }): boolean {
-  return !isTintService(line.service) && line.cents !== 0
+/** Servicio de tint: «tint» en el nombre, sin importar mayúsculas. Decide qué entra al Window Tint Closing. */
+export function isTintService(service: string): boolean {
+  return service.toLowerCase().includes(TINT_SERVICE_FRAGMENT)
 }
 
 /**
@@ -85,16 +79,17 @@ export function isNonTintWarning(line: { service: string; cents: number }): bool
 export const TINT_GENERIC_FREE_COUNTS = true
 
 /**
- * Regla única de qué línea del Closing entra al Window Tint Closing. Las WO (facturadas o no) ya vienen acotadas
- * a las asignadas a un tintero (incomeLinesForRange con assignedTo), así que entran todas, digan «tint» o no.
- * Las libres de una Generic, solo con «tint» (D2). Nunca TTK ni las ponchadas de una Generic.
+ * Regla única de qué línea del Closing entra al Window Tint Closing (reunión con Juan 18/11, tema 6 y D10): solo
+ * los servicios que dicen «tint». Las WO (facturadas o no) ya vienen acotadas a las asignadas a un tintero
+ * (incomeLinesForRange con assignedTo); de ellas entran solo los servicios con «tint». Las libres de una Generic,
+ * solo con «tint» (D2). Nunca TTK ni las ponchadas de una Generic.
  */
 export function isTintClosingLine(line: { kind: ClosingLineKind; service: string }): boolean {
-  if (line.kind === 'wo' || line.kind === 'woUnbilled') return true
+  if (line.kind === 'wo' || line.kind === 'woUnbilled') return isTintService(line.service)
   return TINT_GENERIC_FREE_COUNTS && line.kind === 'genericFree' && isTintService(line.service)
 }
 
-/** Lo que el Window Tint Closing busca en el nombre del rol y de la categoría (D3, D4). */
+/** Lo que el Window Tint Closing busca en el nombre del rol (D14: tintero = rol con «tint»). */
 export const TINT_ROLE_FRAGMENT = 'tint'
 export const TINT_EXPENSE_CATEGORY = 'window tint film'
 
@@ -102,13 +97,11 @@ export interface ByServiceRow {
   dealerId: number
   department: string
   service: string
-  /** Suma de la Qty de ese servicio, diga «tint» o no (M1 de la review v1). */
+  /** Suma de la Qty de ese servicio. */
   vehicles: number
   cents: number
-  /** El servicio tiene «tint» en el nombre (decide qué suma Vehicles). */
+  /** El servicio tiene «tint» en el nombre. En el Window Tint Closing siempre es true (isTintClosingLine). */
   tint: boolean
-  /** Va en rojo: sin «tint» y con importe (isNonTintWarning sobre el total del servicio). */
-  warn: boolean
 }
 
 /**
@@ -128,13 +121,11 @@ export function groupByService<L extends { dealerId: number; department: string;
       vehicles: 0,
       cents: 0,
       tint: isTintService(l.service),
-      warn: false,
     }
     row.vehicles += l.qty
     row.cents += l.cents
     map.set(key, row)
   }
-  for (const row of map.values()) row.warn = isNonTintWarning(row)
   return [...map.values()].sort(
     (a, b) => a.dealerId - b.dealerId || a.department.localeCompare(b.department) || a.service.localeCompare(b.service),
   )

@@ -1152,6 +1152,7 @@ export interface Messages {
     usernameEmail: string
     usernamePlaceholder: string
     password: string
+    passwordPlaceholder: string
     signingIn: string
     signIn: string
     noAccess: string
@@ -1566,14 +1567,6 @@ export interface Messages {
     emptyByService: string
     emptyPayroll: string
     emptyExpenses: string
-    /** Window Tint Closing: nota debajo de la tabla cuando algún dealer va en rojo. */
-    nonTintDealersNote: string
-    /** Window Tint Closing: nota debajo de Income y By service del modal. */
-    nonTintRowsNote: string
-    /** Texto accesible del ícono de la fila en rojo. */
-    nonTintIconLabel: string
-    /** Window Tint Closing: el switch de Income y By service del modal que pone primero las filas en rojo. */
-    redFirst: string
     colInvoice: string
     colDateFrom: string
     colDateTo: string

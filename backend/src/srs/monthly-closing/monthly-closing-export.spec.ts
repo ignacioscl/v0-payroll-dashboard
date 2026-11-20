@@ -13,7 +13,6 @@ const row = (dealerId: number, dealer: string): ClosingRowDto =>
     pct: 50,
     accident: 20,
     vehicles: 3,
-    nonTint: false,
   }) as unknown as ClosingRowDto
 
 const values = (scope: 'all' | 'tint', r: ClosingRowDto) =>

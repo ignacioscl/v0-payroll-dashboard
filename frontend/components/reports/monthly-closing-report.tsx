@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { CalendarCheck, CarFront, TriangleAlert } from 'lucide-react'
+import { CalendarCheck, CarFront } from 'lucide-react'
 import { MonthlyClosingDealerDialog } from '@/components/reports/monthly-closing-dealer-dialog'
 import { RemovedDealerBadge } from '@/components/filters/removed-dealer-badge'
 import { RemovedDealersSwitch } from '@/components/filters/removed-dealers-switch'
@@ -112,13 +112,7 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
       accessorKey: key,
       size: 150,
       header: ({ column }) => <DataTableColumnHeader column={column} title={title} />,
-      // Window Tint Closing: el Income con servicios sin «tint» va en el color de error, como el dealer.
-      cell: ({ row }) =>
-        key === 'income' && row.original.nonTint ? (
-          <span className="text-destructive">{fmtMoney(row.original[key])}</span>
-        ) : (
-          fmtMoney(row.original[key])
-        ),
+      cell: ({ row }) => fmtMoney(row.original[key]),
       meta: { label: title, numeric: true } satisfies DataTableColumnMeta<ClosingRow>,
     })
     const list: ColumnDef<ClosingRow>[] = [
@@ -127,27 +121,14 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
         size: 320,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealer.label')} />,
         // Misma celda que Production vs Goal (production-dealer-table.tsx); en celular el DataTable no la corta.
-        // Window Tint Closing: con servicios sin «tint», en rojo con ⚠.
         cell: ({ row }) => {
-          const nonTint = row.original.nonTint === true
-          const removed = removedIds.has(row.original.dealerId)
-          if (!removed && !nonTint) {
+          if (!removedIds.has(row.original.dealerId)) {
             return <span className="block truncate font-medium">{row.original.dealer}</span>
           }
           return (
-            <span
-              className={cn('flex min-w-0 gap-2', isMobile ? 'flex-wrap items-start' : 'items-center', nonTint && 'text-destructive')}
-            >
-              {nonTint ? (
-                <TriangleAlert
-                  className={cn('size-4 shrink-0', isMobile && 'mt-0.5')}
-                  role="img"
-                  aria-label={t('monthlyClosing.nonTintIconLabel')}
-                  data-testid="monthly-closing-non-tint-icon"
-                />
-              ) : null}
+            <span className={cn('flex min-w-0 gap-2', isMobile ? 'flex-wrap items-start' : 'items-center')}>
               <span className="truncate font-medium">{row.original.dealer}</span>
-              {removed ? <RemovedDealerBadge /> : null}
+              <RemovedDealerBadge />
             </span>
           )
         },
@@ -350,12 +331,6 @@ export function MonthlyClosingReport({ scope }: { scope: ClosingScope }) {
           }
         />
       </div>
-
-      {tint && rows.some((r) => r.nonTint) ? (
-        <p className="text-xs text-destructive" data-testid="monthly-closing-non-tint-dealers-note">
-          {t('monthlyClosing.nonTintDealersNote')}
-        </p>
-      ) : null}
 
       {params ? (
         <MonthlyClosingDealerDialog dealer={openDealer} onClose={() => setOpenDealer(null)} params={params} />

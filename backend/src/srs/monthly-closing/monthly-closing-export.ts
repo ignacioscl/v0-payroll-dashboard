@@ -81,8 +81,6 @@ export interface ClosingWorkbookInput {
     cents: number
     /** Window Tint Closing: «tint» en el servicio; null en el Monthly Closing. */
     tint: boolean | null
-    /** Window Tint Closing: fila en rojo (isNonTintWarning); null en el Monthly Closing. */
-    warn: boolean | null
   }[]
   payroll: readonly {
     idDealer: number | null
@@ -127,13 +125,10 @@ export function buildClosingReportInfo(input: ClosingWorkbookInput): ReportInfoR
       ? [
           {
             field: 'Tint services',
-            value: 'All services of work orders assigned to tinters; services without «tint» in their name are marked',
+            value:
+              'Only services with «tint» in their name, from work orders assigned to tinters. Payroll leaves out the piecework of the other services.',
           },
-          { field: 'Tinters', value: 'Role name contains «tint» and Piecework payment type' },
-          {
-            field: 'Rows in red',
-            value: 'Services without «tint» in their name and an amount other than $0, from work orders assigned to tinters',
-          },
+          { field: 'Tinters', value: 'Role name contains «tint»' },
           { field: 'Expense category', value: 'Window Tint Film' },
         ]
       : []),
@@ -242,7 +237,6 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
           a.department.localeCompare(b.department) ||
           a.service.localeCompare(b.service),
       ),
-      rowTone: (r) => (r.warn ? 'warn' : undefined),
     }
     sheets.push(byService as TableExportSheet<unknown>)
   }
@@ -262,7 +256,6 @@ export function buildClosingWorkbook(input: ClosingWorkbookInput): ExcelJS.Workb
       { header: 'Total', width: 14, kind: 'money', value: (r) => fromCents(r.cents) },
     ],
     rows: byDealerName(input.income, (r) => r.dealerId),
-    ...(input.scope === 'tint' ? { rowTone: (r: Income) => (r.warn ? ('warn' as const) : undefined) } : {}),
   }
   const payroll: TableExportSheet<Payroll> = {
     name: 'Payroll',

@@ -1165,6 +1165,7 @@ export const es: Messages = {
     usernameEmail: 'Usuario / Correo',
     usernamePlaceholder: 'usted@empresa.com',
     password: 'Contraseña',
+    passwordPlaceholder: 'Su contraseña',
     signingIn: 'Iniciando sesión…',
     signIn: 'Iniciar sesión',
     noAccess: 'No tiene acceso al panel de nómina.',
@@ -1622,11 +1623,6 @@ export const es: Messages = {
     emptyByService: 'No hay servicios en este mes.',
     emptyPayroll: 'No hay payroll en este mes.',
     emptyExpenses: 'No hay expenses en este mes.',
-    nonTintDealersNote:
-      'Los dealers en rojo incluyen servicios sin «tint» en el nombre, de WO asignadas a tinteros. Hacé click en el dealer para verlos.',
-    nonTintRowsNote: 'Las filas en rojo son servicios sin «tint» en el nombre, de WO asignadas a tinteros.',
-    nonTintIconLabel: 'Incluye servicios sin «tint» en el nombre',
-    redFirst: 'Filas en rojo primero',
     colInvoice: '#Invoice',
     colDateFrom: 'Date From',
     colDateTo: 'Date To',
@@ -1744,9 +1740,9 @@ export const es: Messages = {
       item2:
         'Vehicles: cuántos servicios de tint («tint» en el nombre) tuvo el dealer en el mes en WO asignadas a tinteros (cada servicio suma su Qty; un servicio = un vehículo).',
       item3:
-        'Income: todos los servicios de las WO del mes asignadas a un tintero (un empleado con un rol que tiene «tint» en el nombre y Piecework como tipo de pago), por fecha de creación, facturadas o no. Con el descuento de la invoice, sin tax. Los servicios sin «tint» en el nombre y con importe distinto de $0 se muestran en rojo. Las líneas de invoices Generic con «tint» en la descripción también cuentan. Las invoices TTK no cuentan.',
+        'Income: solo los servicios con «tint» en el nombre, de las WO del mes asignadas a un tintero (un empleado con un rol que tiene «tint» en el nombre), por fecha de creación, facturadas o no. Con el descuento de la invoice, sin tax. Las líneas de invoices Generic con «tint» en la descripción también cuentan. Las invoices TTK no cuentan.',
       item4:
-        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre y Piecework como tipo de pago), con todos los tipos de pago, en los períodos de pago que terminan en el mes. Lo que se paga fuera de SRS no cuenta. Los empleados marcados como Vendor no cuentan. Los sueldos de tinteros sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
+        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre), con todos los tipos de pago, en los períodos de pago que terminan en el mes, sin el piecework de los servicios que no tienen «tint» en el nombre. Lo que se paga fuera de SRS no cuenta. Los empleados marcados como Vendor no cuentan. Los sueldos de tinteros sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
       item5:
         'Expenses: los gastos del dealer de la categoría «Window Tint Film», con fecha en el mes, aprobados o no. Los borrados no cuentan.',
       item6: 'Profit/Loss: Income − Payroll − Expenses.',

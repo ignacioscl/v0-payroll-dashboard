@@ -223,6 +223,121 @@ export class PayrollSourceRepository {
   }
 
   /**
+   * Window Tint Closing (reunión con Juan 18/11, tema 6 y D10): la parte del piecework que el snapshot le contó a
+   * cada empleado de `employeeIds` por los servicios SIN `serviceFragment` en el nombre, por (empleado, dealer, día)
+   * de [desde, hasta]. Sigue los dos caminos con que el snapshot cuenta piecework, con la misma función por WO y
+   * servicio (`GET_PIECEWORK_EMPLOYEES_BY_WO`, la que suma `GET_PIECEWORK_BY_EMPL_DATERANGE_PROV`):
+   *  - una fila por ponchada Piecework o Flat Rate (getPunchRows: la función se calcula por ponchada);
+   *  - una fila por día de WO sin ponchada en ese dealer (getPieceworkDayRows, mismas condiciones).
+   * El cierre resta esto del Payroll de cada tintero: así queda solo lo de los servicios con «tint».
+   */
+  async nonTintPieceworkRows(
+    idContratista: number,
+    employeeIds: readonly number[],
+    desde: string,
+    hasta: string,
+    serviceFragment: string,
+  ): Promise<PieceworkDaySourceRow[]> {
+    if (!employeeIds.length) return []
+    const ids = employeeIds.map(() => '?').join(',')
+    const notLike = `%${serviceFragment.toLowerCase()}%`
+    // Piecework de los servicios sin el texto, del empleado, en las WO del departamento del dealer, del día: el cuerpo
+    // de GET_PIECEWORK_BY_EMPL_DATERANGE_PROV (filter_wo_completed = 0) con el filtro por nombre de servicio.
+    const nonTint = (user: string, dealer: string, day: string) =>
+      `(SELECT IFNULL(SUM(IFNULL(GET_PIECEWORK_EMPLOYEES_BY_WO(i.id, _is.id, iser.piecework, 0, i.date_last_chg_workflow, i.fecha_alta, ier.id_usuario, 1), 0)), 0)
+        FROM INVOICE i
+        INNER JOIN DEPARTMENT dp ON dp.id = i.id_department AND dp.id_dealer = ${dealer}
+        INNER JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+        INNER JOIN INVOICE_SERVICE _is ON _is.id = isr.id_service_invoice
+        INNER JOIN INVOICE_EMPLOYEE_REL ier ON ier.id_invoice = i.id
+        LEFT JOIN INVOICE_SERVICE_EMPLOYEE_REL iser
+               ON iser.id_invoice = i.id AND iser.id_invoice_service = _is.id AND iser.id_employee = ier.id_usuario
+        WHERE i.estado = 1
+          AND i.id_dealer_provider = ?
+          AND ier.id_usuario = ${user}
+          AND i.fecha_alta >= DATE(${day}) AND i.fecha_alta <= DATE_ADD(DATE(${day}), INTERVAL 1 DAY)
+          AND LOWER(IFNULL(_is.nombre, '')) NOT LIKE ?)`
+    const [punchRows, dayRows] = await Promise.all([
+      this.srs.query(
+        `SELECT tew.id_author AS idUsuario, tew.id_dealer AS idDealer,
+                DATE_FORMAT(tew.punch_in, '%Y-%m-%d') AS fecha, u.payroll_tax AS payrollTax,
+                ${nonTint('tew.id_author', 'tew.id_dealer', 'tew.punch_in')} AS piecework
+         FROM TTK_EMPLOYEE_WORK tew
+         INNER JOIN usuarios u ON u.id_usuario = tew.id_author
+         WHERE tew.id_dealer_provider = ?
+           AND tew.estado = 1
+           AND tew.punch_in >= ?
+           AND tew.punch_in < DATE_ADD(?, INTERVAL 1 DAY)
+           AND tew.id_payment_type IN (?, ?)
+           AND tew.id_author IN (${ids})`,
+        [
+          idContratista,
+          notLike,
+          idContratista,
+          desde,
+          hasta,
+          PAYMENT_TYPE_IDS.PIECEWORK,
+          PAYMENT_TYPE_IDS.FLAT_RATE,
+          ...employeeIds,
+        ],
+      ),
+      this.srs.query(
+        `SELECT x.idUsuario, x.idDealer, x.fecha, x.payrollTax,
+                ${nonTint('x.idUsuario', 'x.idDealer', 'x.fecha')} AS piecework
+         FROM (
+           SELECT ier.id_usuario AS idUsuario,
+                  d.id_dealer AS idDealer,
+                  DATE_FORMAT(i.fecha_alta, '%Y-%m-%d') AS fecha,
+                  MAX(u.payroll_tax) AS payrollTax
+           FROM INVOICE i
+           INNER JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+           INNER JOIN INVOICE_SERVICE _is ON _is.id = isr.id_service_invoice
+           INNER JOIN INVOICE_EMPLOYEE_REL ier
+                   ON ier.id_invoice = i.id
+                  AND EXISTS (
+                    SELECT lupr.id FROM USUARIO_PAYROLL_REL lupr
+                    WHERE lupr.id_usuario = ier.id_usuario AND lupr.id_payment_type IN (?, ?)
+                  )
+           INNER JOIN DEPARTMENT d ON d.id = i.id_department
+           INNER JOIN usuarios u ON u.id_usuario = ier.id_usuario
+           WHERE i.id_dealer_provider = ?
+             AND i.fecha_alta >= ?
+             AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)
+             AND ier.id_usuario IN (${ids})
+             AND NOT EXISTS (
+               SELECT tew.id FROM TTK_EMPLOYEE_WORK tew
+               WHERE tew.punch_in BETWEEN DATE(i.fecha_alta) AND DATE_ADD(DATE(i.fecha_alta), INTERVAL 1 DAY)
+                 AND tew.id_author = ier.id_usuario
+                 AND tew.id_dealer = d.id_dealer
+             )
+           GROUP BY d.id_dealer, ier.id_usuario, DATE(i.fecha_alta)
+         ) x`,
+        [
+          idContratista,
+          notLike,
+          PAYMENT_TYPE_IDS.PIECEWORK,
+          PAYMENT_TYPE_IDS.PIECEWORK_BY_PERCENT,
+          idContratista,
+          desde,
+          hasta,
+          ...employeeIds,
+        ],
+      ),
+    ])
+    return [...punchRows, ...dayRows]
+      .map(
+        (r: any): PieceworkDaySourceRow => ({
+          idUsuario: num(r.idUsuario),
+          idDealer: num(r.idDealer),
+          fecha: String(r.fecha),
+          payrollTax: numOrNull(r.payrollTax),
+          piecework: num(r.piecework),
+        }),
+      )
+      .filter((r) => r.piecework !== 0)
+  }
+
+  /**
    * Fichas de salario y comisión vigentes el PRIMER día del período (la condición de legacy,
    * DAO:364-367, solo mira `fecha_desde`). A diferencia de legacy, entran también las fichas sin
    * dealer (`id_dealer NULL`): van al snapshot como «Without dealer» (decisión G).

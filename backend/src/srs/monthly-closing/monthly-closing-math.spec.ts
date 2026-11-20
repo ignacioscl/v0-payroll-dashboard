@@ -9,14 +9,13 @@ import {
   canonicalPayrollCents,
   TINT_GENERIC_FREE_COUNTS,
   groupByService,
-  isNonTintWarning,
   isTintClosingLine,
   isTintService,
   largestRemainderCents,
   profitPct,
 } from './monthly-closing-math'
 import { closingExportPrefix, closingMonthLabel, closingPeriodLabel } from './monthly-closing-export'
-import { periodStatus } from './service/monthly-closing.service'
+import { periodStatus, tintPayrollCents } from './service/monthly-closing.service'
 
 describe('Monthly Closing — mes (P4, pareja de frontend/lib/reports/monthly-closing-month.ts)', () => {
   const now = new Date('2026-11-04T15:00:00Z')
@@ -127,37 +126,54 @@ describe('Window Tint Closing — qué línea entra, servicio de tint y By servi
     expect(isTintService('PDI')).toBe(false)
   })
 
-  it('WO de un tintero entra entera, diga «tint» o no; Generic libre solo con «tint»; nunca TTK ni ponchadas', () => {
+  it('de la WO de un tintero entran solo los servicios con «tint» (tema 6); Generic libre solo con «tint»; nunca TTK ni ponchadas', () => {
     expect(isTintClosingLine({ kind: 'wo', service: 'Window Tint Full' })).toBe(true)
-    expect(isTintClosingLine({ kind: 'wo', service: 'PDI' })).toBe(true)
-    expect(isTintClosingLine({ kind: 'woUnbilled', service: 'Detail' })).toBe(true)
+    expect(isTintClosingLine({ kind: 'wo', service: 'PDI' })).toBe(false)
+    expect(isTintClosingLine({ kind: 'woUnbilled', service: 'Detail' })).toBe(false)
+    expect(isTintClosingLine({ kind: 'woUnbilled', service: 'TINT front' })).toBe(true)
     expect(isTintClosingLine({ kind: 'genericFree', service: 'Tinting flat' })).toBe(TINT_GENERIC_FREE_COUNTS)
     expect(isTintClosingLine({ kind: 'genericFree', service: 'Detail' })).toBe(false)
     expect(isTintClosingLine({ kind: 'ttk', service: 'Peluche Window Tinting LLC' })).toBe(false)
     expect(isTintClosingLine({ kind: 'genericPunch', service: 'Peluche Window Tinting LLC' })).toBe(false)
   })
 
-  it('By service agrupa por dealer, departamento y servicio; un servicio sin «tint» conserva su Qty y va marcado', () => {
+  it('Payroll (D10): a cada dealer y período se le resta el piecework de servicios sin «tint», con piso en 0', () => {
+    const canonical = new Map([
+      ['744|2026-10-01', 100000],
+      ['744|2026-10-16', 5000],
+      ['301|2026-10-01', 20000],
+      ['none|2026-10-01', 7000],
+    ])
+    const deduction = {
+      byKey: new Map([
+        ['744|2026-10-01', 12550],
+        ['744|2026-10-16', 9000],
+      ]),
+      byEmployee: new Map<string, number>(),
+    }
+    expect(tintPayrollCents(canonical, deduction)).toEqual(
+      new Map([
+        ['744|2026-10-01', 87450],
+        ['744|2026-10-16', 0],
+        ['301|2026-10-01', 20000],
+        ['none|2026-10-01', 7000],
+      ]),
+    )
+    // Sin descuento (Monthly Closing), el mismo mapa.
+    expect(tintPayrollCents(canonical, { byKey: new Map(), byEmployee: new Map() })).toBe(canonical)
+  })
+
+  it('By service agrupa por dealer, departamento y servicio', () => {
     const lines = [
       { dealerId: 1, department: 'Used', service: 'Tint', qty: 1, cents: 7000 },
       { dealerId: 1, department: 'New', service: 'Tint', qty: 1, cents: 8000 },
       { dealerId: 1, department: 'New', service: 'Tint', qty: 2, cents: 16000 },
-      { dealerId: 1, department: 'New', service: 'PDI', qty: 113, cents: 621500 },
+      { dealerId: 1, department: 'New', service: 'Window Tint - 2 Doors', qty: 1, cents: 9000 },
     ]
     expect(groupByService(lines)).toEqual([
-      { dealerId: 1, department: 'New', service: 'PDI', vehicles: 113, cents: 621500, tint: false, warn: true },
-      { dealerId: 1, department: 'New', service: 'Tint', vehicles: 3, cents: 24000, tint: true, warn: false },
-      { dealerId: 1, department: 'Used', service: 'Tint', vehicles: 1, cents: 7000, tint: true, warn: false },
-    ])
-  })
-
-  it('en rojo: sin «tint» y con importe; un servicio en $0 no se marca (11/11/2026)', () => {
-    expect(isNonTintWarning({ service: 'PDI', cents: 5500 })).toBe(true)
-    expect(isNonTintWarning({ service: 'Others', cents: 0 })).toBe(false)
-    expect(isNonTintWarning({ service: 'Window Tint - 2 Doors', cents: 8000 })).toBe(false)
-    expect(isNonTintWarning({ service: 'Credit', cents: -1000 })).toBe(true)
-    expect(groupByService([{ dealerId: 1, department: 'Sales', service: 'Others', qty: 2, cents: 0 }])).toEqual([
-      { dealerId: 1, department: 'Sales', service: 'Others', vehicles: 2, cents: 0, tint: false, warn: false },
+      { dealerId: 1, department: 'New', service: 'Tint', vehicles: 3, cents: 24000, tint: true },
+      { dealerId: 1, department: 'New', service: 'Window Tint - 2 Doors', vehicles: 1, cents: 9000, tint: true },
+      { dealerId: 1, department: 'Used', service: 'Tint', vehicles: 1, cents: 7000, tint: true },
     ])
   })
 })

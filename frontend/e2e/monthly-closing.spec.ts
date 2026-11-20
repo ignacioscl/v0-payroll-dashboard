@@ -145,10 +145,10 @@ test.describe.serial('Monthly Closing — full path', () => {
   })
 
   /**
-   * plans/plan-window-tint-closing-tint-y-servicios P9: el dealer con servicios sin «tint» en rojo con ⚠ y la nota →
-   * su detalle: Income con filas en rojo y By service con el mismo total que la fila → cerrar → Export.
+   * Reunión con Juan 18/11, tema 6: el Window Tint Closing trae solo servicios con «tint», sin filas en rojo. Un dealer
+   * → su detalle: Income y By service solo con «tint» y el mismo total que la fila; Payroll suma la fila → Export.
    */
-  test('Window Tint Closing: dealers in red, the note, By service in the detail and the Excel', async ({ page, isMobile }) => {
+  test('Window Tint Closing: only «tint» services, By service in the detail and the Excel', async ({ page, isMobile }) => {
     await openReport(page, 'Window Tint Closing')
     await pickDealersAndMonth(page, 'October 2026')
     await waitForClosingData(page)
@@ -160,37 +160,41 @@ test.describe.serial('Monthly Closing — full path', () => {
 
     await main.getByRole('button', { name: 'What each column counts' }).click()
     await expect(page.locator('[data-radix-popper-content-wrapper] li')).toHaveCount(7)
-    await expect(page.getByText(/^Income: every service of the month's work orders assigned to a tinter/)).toBeVisible()
+    await expect(page.getByText(/^Income: only the services with «tint» in their name/)).toBeVisible()
+    await expect(page.getByText(/without the piecework of services that do not have «tint» in their name/)).toBeVisible()
     await page.keyboard.press('Escape')
 
-    // Fila en rojo con ⚠ y la nota debajo de la tabla.
-    const redRow = main.locator('tbody tr').filter({ has: page.getByTestId('monthly-closing-non-tint-icon') }).first()
-    await expect(redRow).toBeVisible()
-    await expect(main.getByTestId('monthly-closing-non-tint-dealers-note')).toHaveText(
-      'Dealers in red include services without «tint» in their name, from work orders assigned to tinters. Click the dealer to see them.',
-    )
-    const [dealer, , income] = (await redRow.locator('td').allInnerTexts()).map((c) => c.trim())
-    await redRow.click()
+    // Ya no hay dealers en rojo ni la nota.
+    await expect(main.locator('tbody tr .text-destructive')).toHaveCount(0)
+
+    // Un dealer fijo con Income y Payroll (el primero de la lista puede tener Payroll $0, y su solapa no trae Total).
+    // Nissan Miami es el que antes traía PDI en el Income.
+    const row = main.locator('tbody tr').filter({ hasText: 'AutoNation Nissan Miami' })
+    const [dealer, , income, payroll] = (await row.locator('td').allInnerTexts()).map((c) => c.trim())
+    await row.click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: `${dealer} — October 2026` })).toBeVisible()
     await expect(dialog.getByRole('tab')).toHaveText(['Income', 'By service', 'Payroll', 'Expenses'])
+    const activePanel = dialog.locator('[role="tabpanel"][data-state="active"]')
+    const servicesHaveTint = async (column: number) => {
+      const services = await activePanel.locator(`tbody tr td:nth-child(${column})`).allInnerTexts()
+      expect(services.length).toBeGreaterThan(0)
+      expect(services.filter((s) => !/tint/i.test(s))).toEqual([])
+    }
 
     await openTab(dialog, 'Income')
     expect(await tabTotal(dialog)).toBe(income)
-    const activePanel = dialog.locator('[role="tabpanel"][data-state="active"]')
-    await expect(activePanel.locator('tbody tr.text-destructive').first()).toBeVisible()
-    await expect(activePanel.getByTestId('monthly-closing-non-tint-rows-note')).toBeVisible()
-    // «Rows in red first»: la primera fila pasa a ser una en rojo, y el total no cambia.
-    await activePanel.getByRole('switch', { name: 'Rows in red first' }).click()
-    await expect(activePanel.locator('tbody tr').first()).toHaveClass(/text-destructive/)
-    expect(await tabTotal(dialog)).toBe(income)
+    await servicesHaveTint(5)
+    await expect(activePanel.locator('tbody tr.text-destructive')).toHaveCount(0)
 
     await openTab(dialog, 'By service')
     await expect(activePanel.getByRole('columnheader')).toHaveText([/Department/, /Service/, /Vehicles/, /Amount/])
     expect(await tabTotal(dialog)).toBe(income)
-    await expect(activePanel.locator('tbody tr.text-destructive').first()).toBeVisible()
-    await expect(activePanel.getByTestId('monthly-closing-non-tint-rows-note')).toBeVisible()
+    await servicesHaveTint(2)
+
+    await openTab(dialog, 'Payroll')
+    expect(await tabTotal(dialog)).toBe(payroll)
     await noHorizontalScroll(page)
     await dialog.getByRole('button', { name: 'Close' }).last().click()
     await expect(dialog).toBeHidden()
