@@ -208,7 +208,7 @@ export function LoginForm({ phpLoginUrl }: LoginFormProps) {
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   }
                   autoComplete="current-password"
-                  placeholder="••••••••"
+                  placeholder={t('auth.passwordPlaceholder')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

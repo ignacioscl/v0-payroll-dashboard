@@ -1165,6 +1165,7 @@ export const es: Messages = {
     usernameEmail: 'Usuario / Correo',
     usernamePlaceholder: 'usted@empresa.com',
     password: 'Contraseña',
+    passwordPlaceholder: 'Su contraseña',
     signingIn: 'Iniciando sesión…',
     signIn: 'Iniciar sesión',
     noAccess: 'No tiene acceso al panel de nómina.',

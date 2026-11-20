@@ -1152,6 +1152,7 @@ export interface Messages {
     usernameEmail: string
     usernamePlaceholder: string
     password: string
+    passwordPlaceholder: string
     signingIn: string
     signIn: string
     noAccess: string

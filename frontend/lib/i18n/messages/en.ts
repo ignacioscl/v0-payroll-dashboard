@@ -1161,6 +1161,7 @@ export const en: Messages = {
     usernameEmail: 'Username / Email',
     usernamePlaceholder: 'you@company.com',
     password: 'Password',
+    passwordPlaceholder: 'Your password',
     signingIn: 'Signing in…',
     signIn: 'Sign in',
     noAccess: 'You do not have access to the payroll dashboard.',
