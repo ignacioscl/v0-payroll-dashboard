@@ -166,6 +166,8 @@ export function RecurringPastPeriodsDialog({
             }
           />
         ) : null}
+        {/* Para qué sirve la pantalla, siempre (pedido de Ignacio, 21/11): en gris chico, como las ayudas de los forms. */}
+        <p className="text-xs text-muted-foreground">{t('expenses.pastPeriodsAbout')}</p>
       </div>
     </FormDialog>
   )

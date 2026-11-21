@@ -2001,6 +2001,7 @@ export interface Messages {
     generatePastExpenses: string
     pastPeriodsTitle: string
     pastPeriodsHint: string
+    pastPeriodsAbout: string
     pastPeriodsNone: string
     pastPeriodsProblem: string
     pastPeriodsGenerate: string

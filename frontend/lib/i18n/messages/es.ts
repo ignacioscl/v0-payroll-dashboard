@@ -2094,6 +2094,8 @@ export const es: Messages = {
     pastPeriodsTitle: 'Períodos pasados',
     pastPeriodsHint:
       'Este gasto recurrente empezó antes de hoy. Estos son los gastos de los {periods} períodos pasados que todavía no generó: {n} gastos, uno por dealer y período, pendientes de aprobación. Los gastos cargados a mano no se tienen en cuenta.',
+    pastPeriodsAbout:
+      'Un gasto recurrente crea sus gastos cada día de corrida de hoy en adelante. Si su fecha de inicio es anterior, los días de corrida que ya pasaron quedan sin gasto: esta pantalla los crea, uno por dealer, hasta ayer (el de hoy se crea solo). Un día de corrida que ya tiene un gasto de este gasto recurrente no se vuelve a crear.',
     pastPeriodsNone: 'No hay períodos pasados sin un gasto de este gasto recurrente.',
     pastPeriodsProblem: 'Los gastos no se pueden generar: {problem}. Corregí los dealers o el Monto y probá de nuevo.',
     pastPeriodsGenerate: 'Generar {n} gastos',

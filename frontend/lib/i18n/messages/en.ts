@@ -2088,6 +2088,8 @@ export const en: Messages = {
     pastPeriodsTitle: 'Past periods',
     pastPeriodsHint:
       'This recurring expense started before today. These are the expenses of the {periods} past periods that it has not generated yet: {n} expenses, one per dealer and period, pending approval. Expenses loaded by hand are not taken into account.',
+    pastPeriodsAbout:
+      "A recurring expense creates its expenses on each run day from today on. If its start date is earlier, the run days that already passed are left without an expense: this screen creates them, one per dealer, up to yesterday (today's is created automatically). A run day that already has an expense of this recurring expense is not created again.",
     pastPeriodsNone: 'There are no past periods without an expense of this recurring expense.',
     pastPeriodsProblem: "The expenses can't be generated: {problem}. Fix the dealers or the Amount and try again.",
     pastPeriodsGenerate: 'Generate {n} expenses',
