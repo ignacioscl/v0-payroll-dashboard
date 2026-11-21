@@ -102,12 +102,17 @@ export function RecurringRuleForm({
         const saved = await updateMut.mutateAsync({ id: rule.id, payload: recurringFormValuesToUpdatePayload(values, rule) })
         toast.success(t('expenses.toastRuleSaved'))
         // Tema 1 de plan-reunion-juan-18-11: con dealers e inicio anterior a hoy, «Past periods» si hay gastos que generar.
+        // El modal de la regla se cierra al grabar, como todo form; si se abre «Past periods», al cerrarse ese.
         if (canAdd && saved.dealersCount > 0 && saved.startDate < todayNy) {
           const past = await queryClient
             .fetchQuery({ queryKey: rulePastPeriodsKey(rule.id), queryFn: () => fetchRulePastPeriods(rule.id), staleTime: 0 })
             .catch(() => null)
-          if (past && past.expenses > 0) setPastPeriodsOpen(true)
+          if (past && past.expenses > 0) {
+            setPastPeriodsOpen(true)
+            return
+          }
         }
+        onClose()
       } else {
         const created = await createMut.mutateAsync(recurringFormValuesToCreatePayload(values))
         toast.success(t('expenses.toastRuleSaved'))
@@ -362,7 +367,11 @@ export function RecurringRuleForm({
         pending={splitMut.isPending}
         onConfirm={() => void runSplitChange()}
       />
-      <RecurringPastPeriodsDialog rule={pastPeriodsOpen && rule ? rule : null} onClose={() => setPastPeriodsOpen(false)} />
+      <RecurringPastPeriodsDialog rule={pastPeriodsOpen && rule ? rule : null} onClose={() => {
+          setPastPeriodsOpen(false)
+          onClose()
+        }}
+      />
     </Form>
     </FormDialog>
   )

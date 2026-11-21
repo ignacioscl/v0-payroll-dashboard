@@ -108,7 +108,14 @@ test.describe.serial('Expenses — past periods of a recurring expense and Dupli
     await noHorizontalScroll(page)
     await dialog.getByRole('button', { name: `Generate ${runs * 2} expenses` }).click()
     await expect(page.getByText(`${runs * 2} expenses generated, pending approval.`)).toBeVisible()
-    await page.keyboard.press('Escape')
+    // Al cerrarse «Past periods» se cierra también el modal de la regla (como todo form después de grabar).
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    // Grabar otra vez la regla, sin nada que generar: el modal se cierra.
+    await page.getByRole('row').filter({ hasText: RULE }).first().getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Rule saved.').first()).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
 
     // Otra vez desde el menú: ya no queda nada (no duplica).
     await page.goto('/expenses/recurring')
