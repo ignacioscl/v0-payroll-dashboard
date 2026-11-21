@@ -190,8 +190,16 @@ describe('duplicateExpenseFormValues: «Duplicate» (tema 9, D12)', () => {
       description: 'Film',
       receiptNumber: 'R-1',
       notes: 'nota',
-      author: { id: 9, nombre: 'Juan' },
     })
+  })
+
+  it('lo cargó el mismo autor: la copia queda a nombre de quien duplica (sin «Assign to employee»)', () => {
+    expect(duplicateExpenseFormValues(original, '2026-11-03').author).toBeNull()
+  })
+
+  it('estaba asignado a otro empleado: se copia la asignación', () => {
+    const onBehalf = { ...original, createdBy: { id: 1, name: 'Admin' } }
+    expect(duplicateExpenseFormValues(onBehalf, '2026-11-03').author).toEqual({ id: 9, nombre: 'Juan' })
   })
 
   it('sin elegir la fecha no se puede grabar', () => {

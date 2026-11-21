@@ -343,9 +343,15 @@ export function expenseFormValuesFromDetail(detail: ExpenseDetail, todayNy: stri
 /**
  * «Duplicate» de Expenses List (tema 9 de plan-reunion-juan-18-11, D12): el alta con los datos del gasto, la fecha en
  * blanco (el form la exige) y sin la regla recurrente, porque la copia es un gasto cargado a mano.
+ *
+ * «Assign to employee» se copia solo si el original estaba asignado a otro (autor ≠ quien lo cargó). Si lo cargó el
+ * mismo autor, la copia queda a nombre de quien duplica, como cualquier alta: copiar ese autor lo mandaba como
+ * asignación y el Nest lo rechazaba cuando no es empleado de esos dealers (p. ej. un Admin Company sin dealers).
  */
 export function duplicateExpenseFormValues(detail: ExpenseDetail, todayNy: string): ExpenseFormValues {
-  return { ...expenseFormValuesFromDetail(detail, todayNy), ticketDate: '', idExpRepetitive: null }
+  const values = expenseFormValuesFromDetail(detail, todayNy)
+  const assigned = detail.author && detail.createdBy && detail.author.id !== detail.createdBy.id
+  return { ...values, ticketDate: '', idExpRepetitive: null, author: assigned ? values.author : null }
 }
 
 /** «Generate expense from this recurring expense»: el formulario de alta con los datos de la regla. */
