@@ -572,3 +572,25 @@ export function removeRuleAssign(id: number, idAssign: number, allowAnyTotal: bo
 }
 
 export const ruleDealersExportUrl = (id: number) => `${EXPENSES_BASE_URL}/recurring/${id}/dealers/export`
+
+/** «Past periods» de una regla (tema 1 de plan-reunion-juan-18-11), pareja de `recurring-past-periods.service.ts`. */
+export interface RulePastPeriods {
+  periods: { date: string; rows: { dealer: NamedRef; amount: string }[]; total: string }[]
+  /** Gastos que se graban al confirmar: uno por dealer y período. */
+  expenses: number
+  total: string
+  /** Por qué el reparto no se puede generar; null si se puede. */
+  problem: string | null
+}
+
+export function fetchRulePastPeriods(id: number): Promise<RulePastPeriods> {
+  return requestJson(`${EXPENSES_BASE_URL}/recurring/${id}/past-periods`, { method: 'GET' }, 'Failed to load the past periods')
+}
+
+export function generateRulePastPeriods(id: number): Promise<RulePastPeriods> {
+  return requestJson(
+    `${EXPENSES_BASE_URL}/recurring/${id}/past-periods`,
+    { method: 'POST' },
+    'Failed to generate the expenses',
+  )
+}

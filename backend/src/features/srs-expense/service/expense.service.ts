@@ -24,6 +24,10 @@ export class ExpenseService extends GlobalBaseService<Expense, ExpenseQueryDto> 
     return this.repository.findByGroup(idExpGroup, idDetailer, estado)
   }
 
+  ruleTicketDates(idExpRepetitive: number, idDetailer: number) {
+    return this.repository.ruleTicketDates(idExpRepetitive, idDetailer)
+  }
+
   findOwnedByIds(ids: number[], idDetailer: number) {
     return this.repository.findOwnedByIds(ids, idDetailer)
   }

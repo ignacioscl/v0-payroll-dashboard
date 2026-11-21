@@ -1,4 +1,4 @@
-import { estimatedMonthlyCents, isRunDay, nextRun, ruleWarnings, runsInNextDays } from './recurring-schedule'
+import { estimatedMonthlyCents, isRunDay, nextRun, pastRunDays, pastRuns, ruleWarnings, runsInNextDays } from './recurring-schedule'
 import { addDays, monthRange, previousPeriod } from './expense-period'
 
 const monthly = { frequency: 1, weekDay: null, startDate: '2026-10-16', endDate: null, status: 1 }
@@ -98,5 +98,45 @@ describe('expense-period (fechas por componentes, sin zona horaria)', () => {
   it('monthRange: el mes de la fecha', () => {
     expect(monthRange('2026-11-02')).toEqual({ from: '2026-11-01', to: '2026-11-30' })
     expect(monthRange('2026-02-10')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+  })
+})
+
+describe('pastRuns (tema 1 de plan-reunion-juan-18-11: gastos de los períodos ya pasados)', () => {
+  const monthly = { frequency: 1, startDate: '2026-08-15', status: 1, amount: '100.00', splitType: 1 }
+  const assigns = [
+    { id: 1, percentage: null, automatic: 1 },
+    { id: 2, percentage: null, automatic: 1 },
+    { id: 3, percentage: null, automatic: 1 },
+  ]
+
+  it('mensual: los días 1 desde el inicio hasta ayer; hoy no entra (lo genera el cron)', () => {
+    expect(pastRunDays(monthly, '2026-11-01')).toEqual(['2026-09-01', '2026-10-01'])
+    expect(pastRunDays(monthly, '2026-11-02')).toEqual(['2026-09-01', '2026-10-01', '2026-11-01'])
+  })
+
+  it('semanal y con End date: solo hasta el fin de la regla', () => {
+    const weekly = { frequency: 2, weekDay: 1, startDate: '2026-10-01', endDate: '2026-10-20', status: 1 }
+    expect(pastRunDays(weekly, '2026-11-20')).toEqual(['2026-10-05', '2026-10-12', '2026-10-19'])
+  })
+
+  it('reparte como el cron (el centavo que sobra al de mayor %) y saltea los días que ya tienen gasto de la regla', () => {
+    const { runs, problem } = pastRuns(monthly, assigns, '2026-11-20', new Set(['2026-09-01']))
+    expect(problem).toBeNull()
+    expect(runs.map((r) => r.date)).toEqual(['2026-10-01', '2026-11-01'])
+    expect(runs[0].rows).toEqual([
+      { idAssign: 1, amount: '33.33' },
+      { idAssign: 2, amount: '33.33' },
+      { idAssign: 3, amount: '33.34' },
+    ])
+  })
+
+  it('un reparto que el cron no genera: el mismo problema y ninguna corrida', () => {
+    const broken = [{ id: 1, percentage: '60', automatic: 0 }, { id: 2, percentage: '30', automatic: 0 }]
+    expect(pastRuns(monthly, broken, '2026-11-20', new Set())).toEqual({ runs: [], problem: 'percents add up to 90.00%' })
+    expect(pastRuns(monthly, [], '2026-11-20', new Set())).toEqual({ runs: [], problem: 'no dealers' })
+  })
+
+  it('sin períodos pendientes no hay problema que mostrar', () => {
+    expect(pastRuns({ ...monthly, startDate: '2026-11-10' }, [], '2026-11-20', new Set())).toEqual({ runs: [], problem: null })
   })
 })

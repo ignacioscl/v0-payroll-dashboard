@@ -178,6 +178,19 @@ test.describe.serial('Expenses — full path (F7)', () => {
     const file = await download
     expect(file.suggestedFilename()).toMatch(/\.xlsx$/)
     await noHorizontalScroll(page)
+
+    // «Don't block changes» solo en By percent: en By fixed amount no hay 100% que cerrar (21/11).
+    const dontBlock = page.getByText("Don't block changes")
+    await expect(dontBlock).toBeVisible()
+    await page.locator('#rule-split-fixed').click()
+    await page.getByRole('button', { name: 'Yes, change it' }).click()
+    await expect(page.locator('#rule-split-fixed')).toBeChecked()
+    await expect(dontBlock).toHaveCount(0)
+    // Vuelve a By percent: la prueba siguiente genera un gasto By percentage desde esta regla.
+    await page.locator('#rule-split-fixed').click()
+    await page.getByRole('button', { name: 'Yes, change it' }).click()
+    await expect(page.locator('#rule-split-fixed')).not.toBeChecked()
+    await expect(dontBlock).toBeVisible()
   })
 
   test('Add Expense By amount: amounts typed by hand keep the cents and the Total adds what was entered', async ({ page }) => {
@@ -257,7 +270,16 @@ test.describe.serial('Expenses — full path (F7)', () => {
     }
     await analyticsLink.click()
     await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
-    await expect(page.getByRole('row').filter({ hasText: CATEGORY }).first()).toBeVisible()
+    // La tabla pagina de a 25 por Total: con más categorías en el rango, la de este archivo puede quedar en la segunda
+    // página (20/11: 39 categorías en la base local). Se pasa a 100 filas.
+    await page.getByRole('combobox').filter({ hasText: /^25$/ }).click()
+    await page.getByRole('option', { name: '100', exact: true }).click()
+    // La tabla dibuja solo las filas cercanas a lo que se ve, y la categoría de este archivo ($110.50) empata con las
+    // de corridas anteriores y queda al final (21/11: 58 categorías, se dibujaban 32). Se scrollea hasta que aparece.
+    const categoryRow = page.getByRole('row').filter({ hasText: CATEGORY }).first()
+    await page.getByRole('row').nth(1).hover()
+    for (let i = 0; i < 30 && !(await categoryRow.isVisible().catch(() => false)); i++) await page.mouse.wheel(0, 500)
+    await expect(categoryRow).toBeVisible()
     const analyticsTotal = (await page.getByText('Total Expenses').locator('..').locator('..').innerText()).trim()
     const money = (s: string) => /\$[\d,]+\.\d{2}/.exec(s)?.[0]
     expect(money(analyticsTotal)).toBe(money(listTotal))
@@ -288,6 +310,7 @@ test.describe.serial('Expenses — full path (F7)', () => {
     await page.goto('/expenses')
     const deleteRow = async (text: string): Promise<boolean> => {
       const row = page.getByRole('row').filter({ hasText: text }).first()
+      await row.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => undefined)
       if (!(await row.isVisible().catch(() => false))) return false
       await row.getByRole('button', { name: 'Actions' }).click()
       await page.getByRole('menuitem', { name: 'Delete' }).click()
@@ -313,6 +336,9 @@ test.describe.serial('Expenses — full path (F7)', () => {
     {
       await page.goto('/expenses/recurring')
       const row = page.getByRole('row').filter({ hasText: RULE }).first()
+      // Se espera a que la tabla traiga la regla: con `isVisible()` solo, la tabla todavía cargaba y la regla quedaba
+      // sin borrar (20/11: 12 reglas «e2e-…» sueltas en la base local).
+      await row.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => undefined)
       if (await row.isVisible().catch(() => false)) {
         await row.getByRole('button', { name: 'Actions' }).click()
         await page.getByRole('menuitem', { name: 'Delete' }).click()
@@ -328,6 +354,7 @@ test.describe.serial('Expenses — full path (F7)', () => {
       await page.getByRole('tab', { name: tab }).click()
       await page.getByPlaceholder(/search/i).fill(name)
       const row = page.getByRole('row').filter({ hasText: name }).first()
+      await row.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => undefined)
       if (await row.isVisible().catch(() => false)) {
         await row.getByRole('switch').click()
         await page.getByRole('button', { name: 'Yes, change it' }).click()

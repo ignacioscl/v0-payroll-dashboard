@@ -5,6 +5,7 @@ import {
   SPLIT_BY_FIXED_AMOUNT,
   checkRun,
   dealersWithoutFixed,
+  splitAmount,
   type AssignLike,
 } from 'src/features/srs-expense/rules/expense-rules'
 import { addDays, dayOfMonth, weekDayOf } from './expense-period'
@@ -51,6 +52,50 @@ export function nextRun(rule: RuleSchedule, today: string): string | null {
     }
   }
   return null
+}
+
+/**
+ * Las corridas que ya pasaron (tema 1 de plan-reunion-juan-18-11): los días de corrida desde `start_date` hasta ayer,
+ * o hasta `end_date` si es antes. Hoy no entra: lo genera el cron.
+ */
+export function pastRunDays(rule: RuleSchedule, today: string): string[] {
+  const start = rule.startDate.slice(0, 10)
+  const yesterday = addDays(today, -1)
+  const last = rule.endDate && rule.endDate.slice(0, 10) < yesterday ? rule.endDate.slice(0, 10) : yesterday
+  const days: string[] = []
+  for (let day = start; day <= last; day = addDays(day, 1)) {
+    if (isRunDay(rule, day)) days.push(day)
+  }
+  return days
+}
+
+/** Una corrida pasada: su día y el importe de cada dealer, con el mismo reparto que el cron. */
+export interface PastRun {
+  date: string
+  rows: { idAssign: number; amount: string }[]
+}
+
+/**
+ * Lo que generan las corridas pasadas que todavía no tienen gasto de la regla (`doneDays`: los `ticket_date` de sus
+ * gastos activos), así confirmar dos veces no duplica; los gastos cargados a mano no cuentan (D2). Si el reparto no se
+ * puede generar devuelve el mismo problema que `checkRun` le da al cron, y ninguna corrida.
+ */
+export function pastRuns(
+  rule: RuleSchedule & { amount?: string | number | null; splitType: number },
+  assigns: readonly AssignLike[],
+  today: string,
+  doneDays: ReadonlySet<string>,
+): { runs: PastRun[]; problem: string | null } {
+  const days = pastRunDays(rule, today).filter((d) => !doneDays.has(d))
+  if (!days.length) return { runs: [], problem: null }
+  if (!assigns.length) return { runs: [], problem: 'no dealers' }
+  const problem = checkRun(rule.amount ?? null, assigns, rule.splitType)
+  if (problem) return { runs: [], problem }
+  const amounts = splitAmount(rule.amount ?? null, assigns, rule.splitType)
+  const rows = assigns
+    .filter((a) => String(a.id) in amounts)
+    .map((a) => ({ idAssign: Number(a.id), amount: amounts[String(a.id)] }))
+  return { runs: days.map((date) => ({ date, rows })), problem: null }
 }
 
 /** Cuántas corridas tiene la regla en `today + 1 .. today + days`. */

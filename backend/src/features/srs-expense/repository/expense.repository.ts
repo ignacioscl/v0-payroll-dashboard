@@ -39,6 +39,21 @@ export class ExpenseRepository extends BaseRepository<Expense, ExpenseQueryDto> 
     })
   }
 
+  /**
+   * Los `ticket_date` de los gastos activos que generó una regla recurrente (tema 1 de plan-reunion-juan-18-11): esas
+   * corridas ya están hechas. Acotado por `id_detailer` (tenant).
+   */
+  async ruleTicketDates(idExpRepetitive: number, idDetailer: number): Promise<Set<string>> {
+    const rows: { d: string }[] = await this.createQueryBuilder('e')
+      .select("DATE_FORMAT(e.ticket_date, '%Y-%m-%d')", 'd')
+      .distinct(true)
+      .where('e.idExpRepetitive = :rule', { rule: idExpRepetitive })
+      .andWhere('e.idDetailer = :det', { det: idDetailer })
+      .andWhere('e.estado = 1')
+      .getRawMany()
+    return new Set(rows.map((r) => r.d))
+  }
+
   findOwnedByIds(ids: number[], idDetailer: number): Promise<Expense[]> {
     if (!ids.length) return Promise.resolve([])
     return this.find({ where: { id: In(ids), idDetailer }, order: { id: 'ASC' } })

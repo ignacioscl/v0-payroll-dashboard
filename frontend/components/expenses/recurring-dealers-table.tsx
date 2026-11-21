@@ -196,12 +196,16 @@ export function RecurringDealersTable({ rule }: { rule: RuleDetail }) {
           {t('expenses.dealers')} ({rule.assigns.length})
         </h2>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Switch id="rule-allow-any-total" checked={allowAnyTotal} onCheckedChange={setAllowAnyTotal} className="cursor-pointer" />
-            <Label htmlFor="rule-allow-any-total" className="cursor-pointer text-sm">
-              {t('expenses.dontBlock')}
-            </Label>
-          </div>
+          {/* Solo By percent: deja grabar aunque los Manual pasen de 100. En By fixed amount no hay 100% que cerrar (el
+              Nest no lo mira), así que no se muestra. Pedido de Ignacio, 21/11. */}
+          {!isFixed ? (
+            <div className="flex items-center gap-2">
+              <Switch id="rule-allow-any-total" checked={allowAnyTotal} onCheckedChange={setAllowAnyTotal} className="cursor-pointer" />
+              <Label htmlFor="rule-allow-any-total" className="cursor-pointer text-sm">
+                {t('expenses.dontBlock')}
+              </Label>
+            </div>
+          ) : null}
           <Button type="button" variant="outline" size="sm" disabled={exporting || rule.assigns.length === 0} onClick={() => void exportDealers()}>
             {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4 text-emerald-600" />}
             {t('expenses.exportDealers')}

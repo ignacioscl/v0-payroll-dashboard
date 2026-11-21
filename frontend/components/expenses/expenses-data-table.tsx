@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Eye,
   History,
   MoreHorizontal,
@@ -86,13 +87,15 @@ export type ExpensesDataTableProps = {
   filters: ExpenseListFilters | null
   canApprove: boolean
   canEdit: boolean
+  /** Permiso de alta (110): «Duplicate» (tema 9 de plan-reunion-juan-18-11). */
+  canAdd: boolean
 }
 
 type Confirm = { row: ExpenseRow; action: ExpenseRowAction['action'] }
 
 const EXPENSES_PINNING = { left: [], right: ['actions'] }
 
-export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesDataTableProps) {
+export function ExpensesDataTable({ filters, canApprove, canEdit, canAdd }: ExpensesDataTableProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const rowAction = useExpenseRowAction()
@@ -315,6 +318,20 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
                     <Paperclip className="size-4" />
                     {t('expenses.attachment')}
                   </DropdownMenuItem>
+                  {canAdd ? (
+                    // Un grupo que se ve solo en parte no se copia: faltarían los dealers que no se ven.
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      disabled={readOnly}
+                      onClick={() => {
+                        const id = rowDetailId(r)
+                        if (id != null) setEditTarget({ kind: 'new', fromExpenseId: id })
+                      }}
+                    >
+                      <Copy className="size-4" />
+                      {t('expenses.duplicate')}
+                    </DropdownMenuItem>
+                  ) : null}
                   {(canApprove || canEdit) && !r.deleted ? <DropdownMenuSeparator /> : null}
                   {canApprove && !r.deleted ? (
                     <>
@@ -375,7 +392,7 @@ export function ExpensesDataTable({ filters, canApprove, canEdit }: ExpensesData
         } satisfies DataTableColumnMeta<ExpenseRow>,
       },
     ],
-    [t, isMobile, wrap, canApprove, canEdit, openEdit],
+    [t, isMobile, wrap, canApprove, canEdit, canAdd, openEdit],
   )
 
   const extra = React.useMemo(() => {

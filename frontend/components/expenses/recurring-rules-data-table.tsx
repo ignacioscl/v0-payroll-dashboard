@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { AlertTriangle, FileSpreadsheet, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarClock, FileSpreadsheet, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -50,12 +50,15 @@ export function RecurringRulesDataTable({
   onCards,
   onEdit,
   onGenerateExpense,
+  onGeneratePast,
 }: {
   enabled: boolean
   onCards?: (cards: RuleListResponse['cards']) => void
   onEdit: (id: number) => void
   /** «Generate expense from this recurring expense»: Add Expense precargado con la regla. Sin él, no se muestra. */
   onGenerateExpense?: (ruleId: number) => void
+  /** «Generate past expenses» (tema 1 de plan-reunion-juan-18-11): el modal «Past periods». Sin él, no se muestra. */
+  onGeneratePast?: (rule: { id: number; description: string }) => void
 }) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -248,6 +251,15 @@ export function RecurringRulesDataTable({
                       {t('expenses.generateExpenseFromRule')}
                     </DropdownMenuItem>
                   ) : null}
+                  {onGeneratePast ? (
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => onGeneratePast({ id: r.id, description: r.description })}
+                    >
+                      <CalendarClock className="size-4" />
+                      {t('expenses.generatePastExpenses')}
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem className="cursor-pointer" disabled={exporting === r.id} onClick={() => void exportDealers(r)}>
                     <FileSpreadsheet className="size-4" />
                     {t('expenses.exportDealers')}
@@ -273,7 +285,7 @@ export function RecurringRulesDataTable({
         } satisfies DataTableColumnMeta<RuleRow>,
       },
     ],
-    [t, wrap, isMobile, onEdit, onGenerateExpense, exporting, exportDealers],
+    [t, wrap, isMobile, onEdit, onGenerateExpense, onGeneratePast, exporting, exportDealers],
   )
 
   const [cards, setCards] = React.useState<RuleListResponse['cards'] | null>(null)

@@ -5,6 +5,7 @@ import { CalendarClock, Plus, Repeat, Sigma } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
+import { RecurringPastPeriodsDialog } from '@/components/expenses/recurring-past-periods-dialog'
 import { RecurringRuleDialog, type RecurringRuleTarget } from '@/components/expenses/recurring-rule-dialog'
 import { RecurringRulesDataTable } from '@/components/expenses/recurring-rules-data-table'
 import { AccessDenied } from '@/components/layout/access-denied'
@@ -24,6 +25,7 @@ export default function RecurringExpensesPage() {
   const [cards, setCards] = React.useState<RuleListResponse['cards'] | null>(null)
   const [ruleTarget, setRuleTarget] = React.useState<RecurringRuleTarget | null>(null)
   const [expenseTarget, setExpenseTarget] = React.useState<ExpenseFormTarget | null>(null)
+  const [pastRule, setPastRule] = React.useState<{ id: number; description: string } | null>(null)
 
   if (!loading && !canAccess) return <AccessDenied message={t('expenses.noAccess')} />
 
@@ -51,8 +53,10 @@ export default function RecurringExpensesPage() {
         onCards={setCards}
         onEdit={(id) => setRuleTarget({ kind: 'edit', id })}
         onGenerateExpense={canAdd ? (ruleId) => setExpenseTarget({ kind: 'new', fromRuleId: ruleId }) : undefined}
+        onGeneratePast={canAdd ? setPastRule : undefined}
       />
       <RecurringRuleDialog target={ruleTarget} onClose={() => setRuleTarget(null)} />
+      <RecurringPastPeriodsDialog rule={pastRule} onClose={() => setPastRule(null)} />
       <ExpenseFormDialog target={expenseTarget} onClose={() => setExpenseTarget(null)} />
     </div>
   )
