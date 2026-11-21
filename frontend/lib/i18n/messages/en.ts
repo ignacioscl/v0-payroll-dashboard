@@ -2079,6 +2079,20 @@ export const en: Messages = {
     generateExpenseFromRule: 'Generate expense from this recurring expense',
     generatedFromRule:
       'This expense is pre-filled with the recurring expense «{name}». Choose the date and check the amounts: when you save, the expense is created with what is loaded here.',
+    duplicate: 'Duplicate',
+    duplicatedFrom:
+      'Copy of the expense of {date} · {company} · {amount}. Choose the receipt date: when you save, a new expense is created, pending approval.',
+    copyAttachments: 'Copy attachments ({n})',
+    copyAttachmentsFailed: 'The attachments of the original expense could not be copied. Nothing was saved: try again.',
+    generatePastExpenses: 'Generate past expenses',
+    pastPeriodsTitle: 'Past periods',
+    pastPeriodsHint:
+      'This recurring expense started before today. These are the expenses of the {periods} past periods that it has not generated yet: {n} expenses, one per dealer and period, pending approval. Expenses loaded by hand are not taken into account.',
+    pastPeriodsNone: 'There are no past periods without an expense of this recurring expense.',
+    pastPeriodsProblem: "The expenses can't be generated: {problem}. Fix the dealers or the Amount and try again.",
+    pastPeriodsGenerate: 'Generate {n} expenses',
+    pastPeriodsSkip: 'Skip',
+    pastPeriodsGenerated: '{n} expenses generated, pending approval.',
     deleteRuleTitle: 'Delete this rule?',
     deleteRuleHint: 'The expenses it already created are kept.',
     removeDealerTitle: 'Remove {dealer} from this rule?',

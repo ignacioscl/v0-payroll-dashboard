@@ -122,13 +122,15 @@ describe('Todo controller de /srs/expenses tiene el check «Expenses»', () => {
     }
   }
 
-  it('encuentra los cinco de hoy', () => {
+  it('encuentra los seis de hoy', () => {
     expect(expenseControllers.map((c) => c.name).sort()).toEqual([
       'ExpenseCatalogAdminController',
       'ExpenseCatalogController',
       'ExpenseController',
       'ExpenseReportController',
       'RecurringExpenseController',
+      // «Past periods» de una regla (tema 1 de plan-reunion-juan-18-11).
+      'RecurringPastPeriodsController',
     ])
   })
 

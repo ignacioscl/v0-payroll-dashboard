@@ -340,7 +340,13 @@ export function expenseFormValuesFromDetail(detail: ExpenseDetail, todayNy: stri
     branches,
   }
 }
-
+/**
+ * «Duplicate» de Expenses List (tema 9 de plan-reunion-juan-18-11, D12): el alta con los datos del gasto, la fecha en
+ * blanco (el form la exige) y sin la regla recurrente, porque la copia es un gasto cargado a mano.
+ */
+export function duplicateExpenseFormValues(detail: ExpenseDetail, todayNy: string): ExpenseFormValues {
+  return { ...expenseFormValuesFromDetail(detail, todayNy), ticketDate: '', idExpRepetitive: null }
+}
 
 /** «Generate expense from this recurring expense»: el formulario de alta con los datos de la regla. */
 export function applyRuleToExpenseForm(values: ExpenseFormValues, rule: RuleDetail): ExpenseFormValues {

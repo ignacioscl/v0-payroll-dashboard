@@ -2,11 +2,12 @@
 
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Building2, Equal, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
+import { AlertTriangle, Building2, Copy, Equal, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { AttachmentPicker } from '@/components/expenses/attachment-picker'
+import { useExpenseAttachments } from '@/components/expenses/expense-attachment-dialog'
 import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
@@ -15,18 +16,20 @@ import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { OptionTile } from '@/components/shared/option-tile'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses-list'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
 import { FormDialog, FormSection } from '@/components/layout/form-dialog'
-import { uploadAttachment } from '@/lib/expense-attachments'
-import { amountOnBlur, rowAttachmentLocation, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
+import { downloadAttachmentAsFile, uploadAttachment } from '@/lib/expense-attachments'
+import { amountOnBlur, fmtAmount, fmtYmd, rowAmount, rowAttachmentLocation, toYmd, ymdToDate } from '@/lib/expenses/expense-format'
 import {
   applyRuleToExpenseForm,
   carrySplitToMode,
   createExpenseFormSchema,
+  duplicateExpenseFormValues,
   emptyExpenseFormValues,
   expenseFormValuesFromDetail,
   expenseFormValuesToPayload,
@@ -50,6 +53,8 @@ export type ExpenseFormProps = {
   onClose: () => void
   /** Alta desde «Generate expense from this recurring expense»: la regla con la que se precarga. */
   fromRule?: RuleDetail
+  /** Alta desde «Duplicate» (tema 9 de plan-reunion-juan-18-11): el gasto que se copia. */
+  duplicateOf?: ExpenseDetail
   /** Permiso 117: combo «Assign to employee». */
   canAssign: boolean
   /** Nombre del usuario que carga (sin 117 el gasto queda a su nombre). */
@@ -69,7 +74,7 @@ function mapServerField(field: string): string {
   return field
 }
 
-export function ExpenseForm({ title, description, onClose, detail, fromRule, canAssign, userName }: ExpenseFormProps) {
+export function ExpenseForm({ title, description, onClose, detail, fromRule, duplicateOf, canAssign, userName }: ExpenseFormProps) {
   const { t } = useTranslation()
   const { dateRange, setDateRange, setSelectedDealers } = useFilters()
   const { dealers, loading: dealersLoading } = useSrsDealers()
@@ -108,9 +113,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
     resolver: zodResolver(schema),
     defaultValues: detail
       ? expenseFormValuesFromDetail(detail, todayNy)
-      : fromRule
-        ? applyRuleToExpenseForm(emptyExpenseFormValues(todayNy), fromRule)
-        : emptyExpenseFormValues(todayNy),
+      : duplicateOf
+        ? duplicateExpenseFormValues(duplicateOf, todayNy)
+        : fromRule
+          ? applyRuleToExpenseForm(emptyExpenseFormValues(todayNy), fromRule)
+          : emptyExpenseFormValues(todayNy),
     mode: 'onSubmit',
   })
 
@@ -119,11 +126,19 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
   const branchIds = useWatch({ control: form.control, name: 'branchIds' })
   const dealersCsv = mode === 'single' ? idDealer : (branchIds ?? []).join(',')
 
-  const [files, setFiles] = React.useState<File[]>([])
+  const [newFiles, setFiles] = React.useState<File[]>([])
   /** Gasto grabado cuya subida de adjuntos falló: queda «Retry upload» (T4). */
   const [pendingUpload, setPendingUpload] = React.useState<{ target: UploadTarget; files: File[] } | null>(null)
   const [uploading, setUploading] = React.useState(false)
-  const busy = createMut.isPending || updateMut.isPending || uploading
+
+  // Duplicate: los adjuntos del original, para ofrecer copiarlos (D12).
+  const originalAttachments = duplicateOf?.hasAttachment ? rowAttachmentLocation(duplicateOf) : null
+  const attachmentsQuery = useExpenseAttachments(originalAttachments)
+  const originalFiles = originalAttachments ? (attachmentsQuery.data ?? []) : []
+  const [copyAttachments, setCopyAttachments] = React.useState(true)
+  const [copying, setCopying] = React.useState(false)
+
+  const busy = createMut.isPending || updateMut.isPending || uploading || copying
 
   const finish = React.useCallback(
     (values: ExpenseFormValues) => {
@@ -160,7 +175,26 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
     return failed
   }
 
+  /** Duplicate con «Copy attachments»: se bajan antes de grabar, así una falla no deja un gasto sin sus adjuntos. */
+  const copiedFiles = async (): Promise<File[] | null> => {
+    if (!originalAttachments || !copyAttachments || originalFiles.length === 0) return []
+    setCopying(true)
+    try {
+      return await Promise.all(
+        originalFiles.map((name) => downloadAttachmentAsFile(originalAttachments.idDealer, originalAttachments.idExpense, name)),
+      )
+    } catch {
+      toast.error(t('expenses.copyAttachmentsFailed'))
+      return null
+    } finally {
+      setCopying(false)
+    }
+  }
+
   const onSubmit = async (values: ExpenseFormValues) => {
+    const copies = await copiedFiles()
+    if (copies === null) return
+    const files = [...copies, ...newFiles]
     try {
       let saved: ExpenseDetail
       if (detail) {
@@ -279,6 +313,18 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
     >
     <Form {...form}>
       <form id={FORM_ID} className="flex min-w-0 flex-col gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {duplicateOf ? (
+          <Alert>
+            <Copy className="size-4" />
+            <AlertTitle className="line-clamp-none">
+              {t('expenses.duplicatedFrom', {
+                date: fmtYmd(duplicateOf.ticketDate),
+                company: duplicateOf.company.name,
+                amount: fmtAmount(rowAmount(duplicateOf)),
+              })}
+            </AlertTitle>
+          </Alert>
+        ) : null}
         {fromRule ? (
           <Alert>
             <Repeat className="size-4" />
@@ -581,7 +627,17 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, can
           />
           <div className="min-w-0 md:col-span-2">
             <div className="mb-2 text-sm font-medium">{t('expenses.attachment')}</div>
-            <AttachmentPicker files={files} onChange={setFiles} disabled={busy || locked || Boolean(pendingUpload)} />
+            <AttachmentPicker files={newFiles} onChange={setFiles} disabled={busy || locked || Boolean(pendingUpload)} />
+            {originalFiles.length > 0 ? (
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={copyAttachments}
+                  onCheckedChange={(v) => setCopyAttachments(v === true)}
+                  disabled={busy || Boolean(pendingUpload)}
+                />
+                {t('expenses.copyAttachments', { n: originalFiles.length })}
+              </label>
+            ) : null}
           </div>
         </FormSection>
       </form>

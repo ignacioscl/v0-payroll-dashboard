@@ -15,7 +15,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { useQueryClient } from '@tanstack/react-query'
+
+import { RecurringPastPeriodsDialog, rulePastPeriodsKey } from '@/components/expenses/recurring-past-periods-dialog'
 import { useChangeRuleSplit, useCreateRule, useUpdateRule } from '@/hooks/use-recurring-rules'
+import { canAddExpenses } from '@/lib/auth/expenses-permissions'
+import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { amountOnBlur, WEEK_DAY_KEYS } from '@/lib/expenses/expense-format'
 import { EXPENSE_LIMITS, todayInNewYork } from '@/lib/expenses/expense-rules'
 import {
@@ -28,7 +33,7 @@ import {
 } from '@/lib/expenses/recurring-form-schema'
 import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { isExpensesApiError, type RuleDetail } from '@/lib/srs-expenses-api'
+import { fetchRulePastPeriods, isExpensesApiError, type RuleDetail } from '@/lib/srs-expenses-api'
 
 const FORM_ID = 'recurring-rule-form'
 
@@ -54,6 +59,10 @@ export function RecurringRuleForm({
   const updateMut = useUpdateRule()
   const splitMut = useChangeRuleSplit()
   const todayNy = React.useMemo(() => todayInNewYork(), [])
+  const queryClient = useQueryClient()
+  const { user, hasPermission } = useSrsMe()
+  const canAdd = canAddExpenses(hasPermission, user?.isSystemAdmin)
+  const [pastPeriodsOpen, setPastPeriodsOpen] = React.useState(false)
 
   const schema = React.useMemo(
     () =>
@@ -90,8 +99,15 @@ export function RecurringRuleForm({
   const onSubmit = async (values: RecurringFormValues) => {
     try {
       if (rule) {
-        await updateMut.mutateAsync({ id: rule.id, payload: recurringFormValuesToUpdatePayload(values, rule) })
+        const saved = await updateMut.mutateAsync({ id: rule.id, payload: recurringFormValuesToUpdatePayload(values, rule) })
         toast.success(t('expenses.toastRuleSaved'))
+        // Tema 1 de plan-reunion-juan-18-11: con dealers e inicio anterior a hoy, «Past periods» si hay gastos que generar.
+        if (canAdd && saved.dealersCount > 0 && saved.startDate < todayNy) {
+          const past = await queryClient
+            .fetchQuery({ queryKey: rulePastPeriodsKey(rule.id), queryFn: () => fetchRulePastPeriods(rule.id), staleTime: 0 })
+            .catch(() => null)
+          if (past && past.expenses > 0) setPastPeriodsOpen(true)
+        }
       } else {
         const created = await createMut.mutateAsync(recurringFormValuesToCreatePayload(values))
         toast.success(t('expenses.toastRuleSaved'))
@@ -346,6 +362,7 @@ export function RecurringRuleForm({
         pending={splitMut.isPending}
         onConfirm={() => void runSplitChange()}
       />
+      <RecurringPastPeriodsDialog rule={pastPeriodsOpen && rule ? rule : null} onClose={() => setPastPeriodsOpen(false)} />
     </Form>
     </FormDialog>
   )

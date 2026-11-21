@@ -31,6 +31,28 @@ export async function listAttachments(idDealer: number, idExpense: number): Prom
   return body.files ?? []
 }
 
+/** Tipo del adjunto por su nombre, cuando el bucket no lo manda: el Node guarda `.jpg` o `.pdf`. */
+export function attachmentTypeFromName(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop() ?? ''
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'png') return 'image/png'
+  if (ext === 'gif') return 'image/gif'
+  if (ext === 'webp') return 'image/webp'
+  return 'image/jpeg'
+}
+
+/**
+ * «Duplicate» con «Copy attachments» (tema 9 de plan-reunion-juan-18-11): baja el adjunto del gasto original como
+ * `File`, para subirlo al gasto nuevo con `uploadAttachment`. No hay endpoint de copia en el Node.
+ */
+export async function downloadAttachmentAsFile(idDealer: number, idExpense: number, filename: string): Promise<File> {
+  const res = await fetch(attachmentFileUrl(idDealer, idExpense, filename), { cache: 'no-store' })
+  if (!res.ok) throw new Error(`Failed to download ${filename} (${res.status})`)
+  const blob = await res.blob()
+  const type = attachmentKind(new File([], filename, { type: blob.type })) ? blob.type : attachmentTypeFromName(filename)
+  return new File([blob], filename, { type })
+}
+
 /**
  * La lista con el archivo recién subido. El Node memoiza el listado 10 s (`memoizedlistGSBucketFolder`),
  * así que volver a pedirlo justo después de subir puede devolver la lista sin el archivo.

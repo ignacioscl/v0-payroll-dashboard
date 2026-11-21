@@ -2085,6 +2085,20 @@ export const es: Messages = {
     generateExpenseFromRule: 'Generar gasto desde este gasto recurrente',
     generatedFromRule:
       'Este gasto viene precargado con el gasto recurrente «{name}». Elegí la fecha y revisá los montos: al guardar, el gasto se crea con lo que está cargado acá.',
+    duplicate: 'Duplicar',
+    duplicatedFrom:
+      'Copia del gasto del {date} · {company} · {amount}. Elegí la fecha del recibo: al guardar se crea un gasto nuevo, pendiente de aprobación.',
+    copyAttachments: 'Copiar adjuntos ({n})',
+    copyAttachmentsFailed: 'No se pudieron copiar los adjuntos del gasto original. No se guardó nada: probá de nuevo.',
+    generatePastExpenses: 'Generar gastos de períodos pasados',
+    pastPeriodsTitle: 'Períodos pasados',
+    pastPeriodsHint:
+      'Este gasto recurrente empezó antes de hoy. Estos son los gastos de los {periods} períodos pasados que todavía no generó: {n} gastos, uno por dealer y período, pendientes de aprobación. Los gastos cargados a mano no se tienen en cuenta.',
+    pastPeriodsNone: 'No hay períodos pasados sin un gasto de este gasto recurrente.',
+    pastPeriodsProblem: 'Los gastos no se pueden generar: {problem}. Corregí los dealers o el Monto y probá de nuevo.',
+    pastPeriodsGenerate: 'Generar {n} gastos',
+    pastPeriodsSkip: 'Omitir',
+    pastPeriodsGenerated: '{n} gastos generados, pendientes de aprobación.',
     deleteRuleTitle: '¿Eliminar esta regla?',
     deleteRuleHint: 'Los gastos que ya creó se conservan.',
     removeDealerTitle: '¿Quitar {dealer} de esta regla?',

@@ -8,9 +8,11 @@ import {
   carrySplitToMode,
   createExpenseFormSchema,
   currentSplitAmounts,
+  duplicateExpenseFormValues,
   emptyExpenseFormValues,
   type ExpenseFormValues,
 } from './expense-form-schema'
+import type { ExpenseSingleRow } from '@/lib/srs-expenses-api'
 
 const m = {
   errDate: 'date',
@@ -151,5 +153,48 @@ describe('carrySplitToMode: el modo nuevo arranca con el reparto que se veía', 
       branches: { '199': { percentage: '44', amount: '' }, '200': { percentage: '', amount: '' } },
     })
     expect(carrySplitToMode(percent, 'amount')).toBeNull()
+  })
+})
+
+describe('duplicateExpenseFormValues: «Duplicate» (tema 9, D12)', () => {
+  const original: ExpenseSingleRow = {
+    kind: 'single',
+    id: 10,
+    ticketDate: '2026-10-20',
+    company: { id: 3, name: 'Tint Film Co' },
+    category: { id: 4, name: 'Window Tint Film' },
+    dealer: { id: 744, name: 'Lexus' },
+    amount: '125.50',
+    author: { id: 9, name: 'Juan' },
+    createdBy: { id: 9, name: 'Juan' },
+    status: 'approved',
+    description: 'Film',
+    receiptNumber: 'R-1',
+    notes: 'nota',
+    deleted: false,
+    hasLog: false,
+    hasAttachment: true,
+    idExpRepetitive: 55,
+  }
+
+  it('copia todo menos la fecha (en blanco) y la regla recurrente', () => {
+    const v = duplicateExpenseFormValues(original, '2026-11-03')
+    expect(v.ticketDate).toBe('')
+    expect(v.idExpRepetitive).toBeNull()
+    expect(v).toMatchObject({
+      mode: 'single',
+      idDealer: '744',
+      totalAmount: '125.50',
+      company: { id: 3, name: 'Tint Film Co' },
+      category: { id: 4, name: 'Window Tint Film' },
+      description: 'Film',
+      receiptNumber: 'R-1',
+      notes: 'nota',
+      author: { id: 9, nombre: 'Juan' },
+    })
+  })
+
+  it('sin elegir la fecha no se puede grabar', () => {
+    expect(issues(duplicateExpenseFormValues(original, '2026-11-03'))).toEqual(['ticketDate: date'])
   })
 })

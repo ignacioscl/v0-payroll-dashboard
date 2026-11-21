@@ -1994,6 +1994,18 @@ export interface Messages {
     exportDealers: string
     generateExpenseFromRule: string
     generatedFromRule: string
+    duplicate: string
+    duplicatedFrom: string
+    copyAttachments: string
+    copyAttachmentsFailed: string
+    generatePastExpenses: string
+    pastPeriodsTitle: string
+    pastPeriodsHint: string
+    pastPeriodsNone: string
+    pastPeriodsProblem: string
+    pastPeriodsGenerate: string
+    pastPeriodsSkip: string
+    pastPeriodsGenerated: string
     deleteRuleTitle: string
     deleteRuleHint: string
     removeDealerTitle: string

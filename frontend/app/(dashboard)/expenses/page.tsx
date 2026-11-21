@@ -290,7 +290,7 @@ function ExpensesListPage() {
         />
       </div>
 
-      <ExpensesDataTable filters={filters} canApprove={canApprove} canEdit={canEdit} />
+      <ExpensesDataTable filters={filters} canApprove={canApprove} canEdit={canEdit} canAdd={canAdd} />
 
       <ExpenseFormDialog target={formTarget} onClose={() => setFormTarget(null)} />
     </div>
