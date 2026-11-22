@@ -8,6 +8,8 @@ export const ROL_ACCION_EXPENSES_APPROVE = 111
 export const ROL_ACCION_EXPENSES_ON_BEHALF = 117
 /** `Expenses > Allow edit expense` — edit, delete and restore. */
 export const ROL_ACCION_EXPENSES_EDIT = 118
+/** `Expenses > Add Piecework expense` (migration 032): the Piecework type of Add Expense. */
+export const ROL_ACCION_EXPENSES_PIECEWORK = 147
 
 type HasPermission = (id: number) => boolean
 
@@ -38,6 +40,14 @@ export function canApproveExpenses(hasPermission: HasPermission, isSystemAdmin?:
 /** Edit, Delete and Restore (118). */
 export function canEditExpenses(hasPermission: HasPermission, isSystemAdmin?: boolean): boolean {
   return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_EXPENSES_EDIT)
+}
+
+/**
+ * «Type: Piecework» in Add Expense (147; reunión con Juan 18/11, temas 3 y 4): the work orders of a vendor as an
+ * expense. The Nest checks it too.
+ */
+export function canAddPieceworkExpenses(hasPermission: HasPermission, isSystemAdmin?: boolean): boolean {
+  return Boolean(isSystemAdmin) || hasPermission(ROL_ACCION_EXPENSES_PIECEWORK)
 }
 
 /** «Assign to employee» combo (117). */

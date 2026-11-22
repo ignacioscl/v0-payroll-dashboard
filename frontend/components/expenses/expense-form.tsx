@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Building2, Copy, Equal, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
+import { AlertTriangle, Building2, Copy, Equal, Hammer, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -11,6 +11,8 @@ import { useExpenseAttachments } from '@/components/expenses/expense-attachment-
 import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
+import { ExpensePieceworkFields } from '@/components/expenses/expense-piecework-fields'
+import { selectedDealerIds } from '@/lib/expenses/expense-piecework'
 import { ExpenseSplitTable } from '@/components/expenses/expense-split-table'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { OptionTile } from '@/components/shared/option-tile'
@@ -19,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses-list'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
@@ -41,7 +44,7 @@ import { dealersToShowSaved, savedDealerIds } from '@/lib/expenses/expense-saved
 import { useFilters } from '@/lib/filter-context'
 import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { isExpensesApiError, type ExpenseDetail, type ExpenseMode, type RuleDetail } from '@/lib/srs-expenses-api'
+import { isExpensesApiError, type ExpenseDetail, type ExpenseMode, type PieceworkWorkOrder, type RuleDetail } from '@/lib/srs-expenses-api'
 
 const FORM_ID = 'expense-form'
 
@@ -57,6 +60,8 @@ export type ExpenseFormProps = {
   duplicateOf?: ExpenseDetail
   /** Permiso 117: combo «Assign to employee». */
   canAssign: boolean
+  /** Permiso 147 (temas 3 y 4 de plan-reunion-juan-18-11): el campo «Type» con Piecework, solo en el alta. */
+  canPiecework?: boolean
   /** Nombre del usuario que carga (sin 117 el gasto queda a su nombre). */
   userName?: string | null
 }
@@ -69,12 +74,23 @@ function mapServerField(field: string): string {
   if (field === 'newCategoryName' || field === 'idCategory') return 'category'
   if (field === 'idAuthor') return 'author'
   if (field === 'branches') return 'branchIds'
+  if (field === 'invoiceIds' || field === 'pieceworkVendorId') return field
   const m = /^branches\[(\d+)\]\.(percentage|amount)$/.exec(field) ?? /^branches\.(\d+)\.(percentage|amount)$/.exec(field)
   if (m) return `branches.${m[1]}.${m[2]}`
   return field
 }
 
-export function ExpenseForm({ title, description, onClose, detail, fromRule, duplicateOf, canAssign, userName }: ExpenseFormProps) {
+export function ExpenseForm({
+  title,
+  description,
+  onClose,
+  detail,
+  fromRule,
+  duplicateOf,
+  canAssign,
+  canPiecework = false,
+  userName,
+}: ExpenseFormProps) {
   const { t } = useTranslation()
   const { dateRange, setDateRange, setSelectedDealers } = useFilters()
   const { dealers, loading: dealersLoading } = useSrsDealers()
@@ -86,7 +102,9 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
   // Bloqueos de edición (F3).
   const readOnlyGroup = detail?.kind === 'group' && detail.readOnly
   const approvedSingle = detail?.kind === 'single' && detail.status === 'approved'
-  const textOnly = detail?.kind === 'group' && detail.approvedCount > 0 && !readOnlyGroup
+  // Expense Piecework: solo los textos (monto, WO y fecha no cambian: se borra y se carga de nuevo).
+  const pieceworkDetail = Boolean(detail?.piecework) && !readOnlyGroup && !approvedSingle
+  const textOnly = (detail?.kind === 'group' && detail.approvedCount > 0 && !readOnlyGroup) || pieceworkDetail
   const locked = readOnlyGroup || approvedSingle
   const branchLocked = detail?.kind === 'single' && detail.hasAttachment
 
@@ -104,6 +122,8 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
           errChooseCompany: t('expenses.errChooseCompany'),
           errChooseCategory: t('expenses.errChooseCategory'),
           errUpTo: t('expenses.errUpTo'),
+          errChooseVendor: t('expenses.errChooseVendor'),
+          errChooseWorkOrders: t('expenses.errChooseWorkOrders'),
         },
       ),
     [t, todayNy, textOnly],
@@ -122,6 +142,10 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
   })
 
   const mode = useWatch({ control: form.control, name: 'mode' })
+  const kind = useWatch({ control: form.control, name: 'kind' })
+  const isPiecework = kind === 'piecework'
+  /** La lista de WO que se ve (Piecework), para saber los dealers del gasto al grabar. */
+  const [pieceworkWorkOrders, setPieceworkWorkOrders] = React.useState<PieceworkWorkOrder[]>([])
   const idDealer = useWatch({ control: form.control, name: 'idDealer' })
   const branchIds = useWatch({ control: form.control, name: 'branchIds' })
   const dealersCsv = mode === 'single' ? idDealer : (branchIds ?? []).join(',')
@@ -222,7 +246,12 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
         }
       }
       toast.success(t('expenses.toastSaved'))
-      finish(values)
+      // Piecework: los dealers son los de las WO marcadas (el header los muestra, como en un gasto repartido).
+      finish(
+        values.kind === 'piecework'
+          ? { ...values, mode: 'amount', branchIds: selectedDealerIds(values.invoiceIds, pieceworkWorkOrders) }
+          : values,
+      )
     } catch (err) {
       setUploading(false)
       if (isExpensesApiError(err) && applyServerErrors(err.validationErrors, mapServerField)) return
@@ -341,11 +370,52 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
             <AlertTriangle className="size-4" />
             <AlertTitle>{t('expenses.errApproved')}</AlertTitle>
           </Alert>
+        ) : pieceworkDetail ? (
+          <Alert>
+            <Hammer className="size-4" />
+            <AlertTitle className="line-clamp-none">{t('expenses.pieceworkLocked')}</AlertTitle>
+          </Alert>
         ) : textOnly ? (
           <Alert>
             <AlertTriangle className="size-4" />
             <AlertTitle>{t('expenses.approvedRowsLockSplit')}</AlertTitle>
           </Alert>
+        ) : null}
+
+        {canPiecework && !isEdit ? (
+          <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="kind"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="exp-kind">{t('expenses.type')}</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v)
+                      form.clearErrors()
+                    }}
+                    disabled={busy}
+                  >
+                    <FormControl>
+                      <SelectTrigger id="exp-kind" className="w-full cursor-pointer" data-field="kind">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="regular" className="cursor-pointer">{t('expenses.typeRegular')}</SelectItem>
+                      <SelectItem value="piecework" className="cursor-pointer">{t('expenses.typePiecework')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <p className="pt-0 text-xs text-muted-foreground md:pt-7">
+              {isPiecework ? t('expenses.typePieceworkHint') : t('expenses.typeRegularHint')}
+            </p>
+          </FormSection>
         ) : null}
 
         {pendingUpload ? (
@@ -362,6 +432,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
           </Alert>
         ) : null}
 
+        {isPiecework ? (
+          <FormSection title={t('expenses.typePiecework')} icon={Hammer} className="space-y-3">
+            <ExpensePieceworkFields disabled={busy} todayNy={todayNy} onWorkOrders={setPieceworkWorkOrders} />
+          </FormSection>
+        ) : (
         <FormSection title={t('expenses.branches')} icon={Building2} className="space-y-3">
           <div className="grid gap-1.5 sm:grid-cols-2">
             <OptionTile
@@ -526,8 +601,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
             </div>
           )}
         </FormSection>
+        )}
 
         <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+          {!isPiecework ? (
+          <>
           <FormField
             control={form.control}
             name="ticketDate"
@@ -586,6 +664,8 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
               </FormItem>
             )}
           />
+          </>
+          ) : null}
           <FormField
             control={form.control}
             name="description"

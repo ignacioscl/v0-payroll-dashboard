@@ -63,16 +63,16 @@ export class UsuarioSrsRepository extends BaseRepository<UsuarioSrs, UsuarioSrsQ
   }
 
   /**
-   * Empleados de la empresa marcados «Vendor» en su ficha (`usuarios.is_vendor`, migration 030): su costo va en
-   * Expenses, así que Monthly Closing y Window Tint Closing no los cuentan en Payroll (plans/plan-monthly-closing-
-   * vendors T4). Sin mirar `estado` ni `is_inactive`, como idsWithRoleNameLike: un vendor borrado con piecework en el
-   * período también se saca.
+   * Los vendors activos de la empresa con su nombre (combo «Vendor» de la expense Piecework, plans/plan-reunion-juan-
+   * 18-11 tema 4). Un vendor borrado no se ofrece.
    */
-  async vendorIds(idCompania: number): Promise<number[]> {
-    const rows: { id: unknown }[] = await this.query(
-      `SELECT u.id_usuario AS id FROM usuarios u WHERE u.id_contratista_owner = ? AND u.is_vendor = 1`,
+  async activeVendors(idCompania: number): Promise<{ id: number; name: string }[]> {
+    const rows: { id: unknown; name: unknown }[] = await this.query(
+      `SELECT u.id_usuario AS id, u.nombre AS name FROM usuarios u
+        WHERE u.id_contratista_owner = ? AND u.is_vendor = 1 AND u.estado = 1
+        ORDER BY u.nombre`,
       [idCompania],
     )
-    return rows.map((r) => Number(r.id)).sort((a, b) => a - b)
+    return rows.map((r) => ({ id: Number(r.id), name: String(r.name ?? '') }))
   }
 }

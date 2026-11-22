@@ -318,8 +318,9 @@ export function ExpensesDataTable({ filters, canApprove, canEdit, canAdd }: Expe
                     <Paperclip className="size-4" />
                     {t('expenses.attachment')}
                   </DropdownMenuItem>
-                  {canAdd ? (
-                    // Un grupo que se ve solo en parte no se copia: faltarían los dealers que no se ven.
+                  {canAdd && !r.piecework ? (
+                    // Un grupo que se ve solo en parte no se copia: faltarían los dealers que no se ven. Una expense
+                    // Piecework tampoco: sus WO no se pueden repetir (tema 9 de plan-reunion-juan-18-11).
                     <DropdownMenuItem
                       className="cursor-pointer"
                       disabled={readOnly}

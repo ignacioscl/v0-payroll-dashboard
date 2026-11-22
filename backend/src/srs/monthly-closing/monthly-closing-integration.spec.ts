@@ -22,6 +22,7 @@ import { SrsPermissionRepository } from 'src/srs/auth/srs-permission.repository'
 import { BillingKpiRepository } from 'src/srs/billing/repository/billing-kpi.repository'
 import { PayrollSnapshotKpiRepository } from 'src/srs/payroll/repository/payroll-snapshot-kpi.repository'
 import { PayrollKpiService } from 'src/srs/payroll/service/payroll-kpi.service'
+import { ExpenseReportRepository } from 'src/srs/expenses/repository/expense-report.repository'
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
 import { SrsMonthlyClosingModule } from './monthly-closing.module'
 import { MonthlyClosingService } from './service/monthly-closing.service'
@@ -327,37 +328,43 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
 })
 
 /**
- * plans/plan-monthly-closing-vendors (P4, P5, P7) contra la copia del 12/11, que ya tiene `usuarios.is_vendor`
- * (migration 030). Solo lecturas: en la copia nadie está marcado, así que la marca se simula haciendo que
- * `UsuarioSrsService.vendorIds` devuelva a Francol Services LLC (6985), el vendor del mail de Auto Wax. La consulta de
- * `vendorIds` sí corre contra la copia (P7).
+ * Vendors en el closing (plans/plan-reunion-juan-18-11, tema 4, D6) contra la copia del 12/11, que tiene
+ * `usuarios.is_vendor` (migration 030) y EXP_EXPENSE_PIECEWORK_WO (migration 032). Ya no se excluye a nadie: el vendor
+ * cuenta en el Payroll como cualquier empleado, y solo lo que está en una expense Piecework activa sale del Payroll y
+ * entra en Expenses. Esto último, con escrituras y su limpieza, lo prueba
+ * src/features/srs-expense/expense-piecework-integration.spec.ts. Acá, solo lecturas: el Payroll de Francol Services
+ * LLC (6985, vendor de Auto Wax) sigue en Land Rover Ft Lauderdale, menos lo que ya esté en una expense Piecework activa
+ * de la copia (se lee con SQL independiente: sin ninguna, entero).
  */
 const VENDORS_COPY = 'srssui5_srs_20261112'
 const vendorsReady = process.env.DB_DATABASE === VENDORS_COPY && process.env.DB_PORT === '3307'
 if (!vendorsReady) console.warn(`SKIPPED vendors de monthly-closing-integration.spec.ts: la base no es la copia local ${VENDORS_COPY}`)
 const describeVendors = vendorsReady ? describe : describe.skip
 
-const FRANCOL = 6985 // Francol Services LLC: Vendor Painter, todo octubre en Land Rover Ft Lauderdale
+const FRANCOL = 6985 // Francol Services LLC: vendor (is_vendor = 1), todo octubre en Land Rover Ft Lauderdale
 const LAND_ROVER_FTL = 627
-const WITHOUT_DEALER_EMPLOYEE = 4892 // octubre: $4,000.00, todo en filas sin dealer
-/** Octubre 2026 en la copia del 12/11 (§1.1 del plan: SUM(monto + monto_tax) de PAYROLL_SNAPSHOT_DAY). */
+/** Octubre 2026 en la copia del 12/11 (SUM(monto + monto_tax) de PAYROLL_SNAPSHOT_DAY), con Francol adentro. */
 const OCT_LAND_ROVER_PAYROLL = 74312.21
 const OCT_FRANCOL = 14161
 const OCT_WITHOUT_DEALER = 10500
 
-describeVendors('Vendors fuera del Payroll del closing — copia del 12/11 (solo lectura)', () => {
+describeVendors('Vendors en el Payroll del closing — copia del 12/11 (solo lectura)', () => {
   let moduleRef: TestingModule
   let srs: DataSource
   let service: MonthlyClosingService
   let usuarios: UsuarioSrsService
   let payroll: PayrollSnapshotKpiRepository
+  let expenses: ExpenseReportRepository
   let spend: PayrollKpiService
   let allDealers: string
-  let base: MonthlyClosingDto
-  let withVendor: MonthlyClosingDto
+  let mc: MonthlyClosingDto
+  /** Lo de expenses Piecework activas en los pay periods de octubre, por `dealer|período`, en centavos (SQL propio). */
+  let inExpenses: Map<string, number>
+  /** Land Rover y Francol en Land Rover, ya sin eso. */
+  let landRoverCents: number
+  let francolCents: number
 
   const q = () => ({ month: '2026-10', idDealer: allDealers })
-  const asVendors = (ids: number[]) => jest.spyOn(usuarios, 'vendorIds').mockResolvedValue(ids)
   const isFrancol = (employee: string) => /francol/i.test(employee)
 
   beforeAll(async () => {
@@ -366,12 +373,31 @@ describeVendors('Vendors fuera del Payroll del closing — copia del 12/11 (solo
     service = moduleRef.get(MonthlyClosingService)
     usuarios = moduleRef.get(UsuarioSrsService, { strict: false })
     payroll = moduleRef.get(PayrollSnapshotKpiRepository, { strict: false })
+    expenses = moduleRef.get(ExpenseReportRepository, { strict: false })
     spend = moduleRef.get(PayrollKpiService, { strict: false })
     allDealers = await companyDealers(srs, PROVIDER)
-    base = await service.getSummary(admin, q())
-    asVendors([FRANCOL])
-    withVendor = await service.getSummary(admin, q())
-    jest.restoreAllMocks()
+    // Auto Wax no tiene % de payroll tax: lo de las expenses se resta sin tax.
+    const [cfg]: { pct: string }[] = await srs.query(`SELECT IFNULL(daily_report_payroll_tax, 0) AS pct FROM CONTRATISTA WHERE id = ?`, [PROVIDER])
+    expect(Number(cfg.pct)).toBe(0)
+    const active: { k: string; cents: string }[] = await srs.query(
+      `SELECT CONCAT(pw.id_dealer, '|', IF(pw.work_date <= '2026-10-15', '2026-10-01', '2026-10-16')) AS k, ROUND(SUM(pw.amount) * 100) AS cents
+         FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1 AND e.id_detailer = ?
+        WHERE pw.deleted_at IS NULL AND pw.work_date BETWEEN '2026-10-01' AND '2026-10-30'
+        GROUP BY k`,
+      [PROVIDER],
+    )
+    inExpenses = new Map(active.map((r) => [r.k, Number(r.cents)]))
+    const [francolIn]: { cents: string }[] = await srs.query(
+      `SELECT IFNULL(ROUND(SUM(pw.amount) * 100), 0) AS cents FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1 AND e.id_detailer = ?
+        WHERE pw.deleted_at IS NULL AND pw.id_employee = ? AND pw.id_dealer = ? AND pw.work_date BETWEEN '2026-10-01' AND '2026-10-30'`,
+      [PROVIDER, FRANCOL, LAND_ROVER_FTL],
+    )
+    const landRoverIn = [...inExpenses].filter(([k]) => k.startsWith(`${LAND_ROVER_FTL}|`)).reduce((a, [, c]) => a + c, 0)
+    landRoverCents = toCents(OCT_LAND_ROVER_PAYROLL) - landRoverIn
+    francolCents = toCents(OCT_FRANCOL) - Number(francolIn.cents)
+    mc = await service.getSummary(admin, q())
   }, 180000)
 
   afterEach(() => jest.restoreAllMocks())
@@ -380,123 +406,80 @@ describeVendors('Vendors fuera del Payroll del closing — copia del 12/11 (solo
     await moduleRef?.close()
   })
 
-  describe('P7: quiénes son vendors, por empresa', () => {
-    it('la consulta corre contra la copia: hoy nadie está marcado, ni en Auto Wax ni en GC', async () => {
-      await expect(usuarios.vendorIds(PROVIDER)).resolves.toEqual([])
-      await expect(usuarios.vendorIds(GC_PROVIDER)).resolves.toEqual([])
-    })
+  it('Francol está marcado vendor y el closing ya no mira la marca, en los dos scopes', async () => {
+    expect((await usuarios.activeVendors(PROVIDER)).map((v) => v.id)).toContain(FRANCOL)
+    const activeVendors = jest.spyOn(usuarios, 'activeVendors')
+    const all = await (service as any).prepare(admin, { ...q(), scope: 'all' }, allDealers)
+    const tint = await (service as any).prepare(admin, { ...q(), scope: 'tint' }, allDealers)
+    expect(activeVendors).not.toHaveBeenCalled()
+    expect(all).not.toHaveProperty('vendorIds')
+    expect(tint).not.toHaveProperty('vendorIds')
+  }, 60000)
 
-    it('el closing pide los vendors de la empresa de la sesión, en los dos scopes', async () => {
-      const spy = jest.spyOn(usuarios, 'vendorIds')
-      await (service as any).prepare(admin, { ...q(), scope: 'all' }, allDealers)
-      await (service as any).prepare(admin, { ...q(), scope: 'tint' }, allDealers)
-      const gcAdmin: SrsContext = { ...admin, idUsuario: 1, idDealerProvider: GC_PROVIDER }
-      const gcDealers = await companyDealers(srs, GC_PROVIDER)
-      await (service as any).prepare(gcAdmin, { month: '2026-10', idDealer: gcDealers }, gcDealers)
-      expect(spy.mock.calls).toEqual([[PROVIDER], [PROVIDER], [GC_PROVIDER]])
-    }, 60000)
+  it('Summary de octubre: Land Rover Ft Lauderdale con el Payroll de Francol (menos lo que esté en expenses Piecework) y Without dealer igual', async () => {
+    const landRover = mc.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
+    expect(toCents(landRover.payroll)).toBe(landRoverCents)
+    expect(mc.withoutDealer?.payroll).toBe(OCT_WITHOUT_DEALER)
 
-    it('un empleado de otra empresa en la lista no saca nada del closing de Auto Wax', async () => {
-      const [other]: { id: number }[] = await srs.query(
-        `SELECT u.id_usuario AS id FROM usuarios u WHERE u.id_contratista_owner = ? ORDER BY u.id_usuario LIMIT 1`,
-        [GC_PROVIDER],
-      )
-      asVendors([Number(other.id)])
-      expect(await service.getSummary(admin, q())).toEqual(base)
-    }, 120000)
-  })
+    const cc = await (service as any).prepare(admin, q(), allDealers)
+    const desdes: string[] = cc.periods.map((p: { desde: string }) => p.desde)
+    expect(desdes).toEqual(['2026-10-01', '2026-10-16'])
+    // El descuento es exactamente lo de las expenses Piecework activas (sin ninguna, nada).
+    expect((await (service as any).payrollDeduction(cc)).byKey).toEqual(inExpenses)
+    const read = await expenses.pieceworkInExpenses(PROVIDER, '2026-10-01', '2026-10-30')
+    expect(read.reduce((a, r) => a + toCents(r.amount), 0)).toBe([...inExpenses.values()].reduce((a, c) => a + c, 0))
 
-  describe('P4: octubre, Francol marcado vendor', () => {
-    it('Summary: Land Rover Ft Lauderdale baja $14,161.00 y Profit/Loss sube lo mismo; los demás dealers y Without dealer, igual', () => {
-      const before = base.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
-      const after = withVendor.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
-      expect(before.payroll).toBe(OCT_LAND_ROVER_PAYROLL)
-      expect(after.payroll).toBe(60151.21)
-      expect(toCents(before.payroll) - toCents(after.payroll)).toBe(toCents(OCT_FRANCOL))
-      expect(toCents(after.profit) - toCents(before.profit)).toBe(toCents(OCT_FRANCOL))
-      expect({ income: after.income, expenses: after.expenses }).toEqual({ income: before.income, expenses: before.expenses })
+    // El snapshot, por SQL independiente: lo de Francol en 627 son $14,161.00, sin ninguna exclusión.
+    const [francol]: { cents: string }[] = await srs.query(
+      `SELECT ROUND(SUM(p.monto + p.monto_tax) * 100) AS cents FROM PAYROLL_SNAPSHOT_DAY p
+        WHERE p.id_contratista = ? AND p.id_usuario = ? AND p.id_dealer = ? AND p.periodo_desde IN (?, ?)`,
+      [PROVIDER, FRANCOL, LAND_ROVER_FTL, ...desdes],
+    )
+    expect(Number(francol.cents)).toBe(toCents(OCT_FRANCOL))
+    const rows = await payroll.amountsByDealerPeriodType(cc.filter, desdes, true)
+    const cents = Math.round(rows.filter((r) => r.idDealer === LAND_ROVER_FTL).reduce((a, r) => a + r.monto + r.tax, 0) * 100)
+    expect(cents).toBe(toCents(OCT_LAND_ROVER_PAYROLL))
+  }, 120000)
 
-      const others = (mc: MonthlyClosingDto) => mc.rows.filter((r) => r.dealerId !== LAND_ROVER_FTL)
-      expect(others(withVendor)).toEqual(others(base))
-      expect(base.withoutDealer?.payroll).toBe(OCT_WITHOUT_DEALER)
-      expect(withVendor.withoutDealer).toEqual(base.withoutDealer)
-      expect(toCents(base.total.payroll) - toCents(withVendor.total.payroll)).toBe(toCents(OCT_FRANCOL))
-      expect(withVendor.total.income).toBe(base.total.income)
-      expect(withVendor.total.expenses).toBe(base.total.expenses)
-    })
+  it('detalle de Land Rover: las filas de Francol están (sus dos pay periods) y el detalle suma su fila', async () => {
+    const d = await service.getDealer(admin, LAND_ROVER_FTL, q())
+    const francol = d.payroll.filter((l) => isFrancol(l.employee))
+    expect(francol).toHaveLength(2)
+    expect(sumCents(francol.map((l) => l.amount))).toBe(francolCents)
+    expect(sumCents(d.payroll.map((l) => l.amount))).toBe(landRoverCents)
+  }, 120000)
 
-    it('detalle del dealer: sin las filas de Francol, suma su fila; Income y Expenses iguales', async () => {
-      const before = await service.getDealer(admin, LAND_ROVER_FTL, q())
-      asVendors([FRANCOL])
-      const after = await service.getDealer(admin, LAND_ROVER_FTL, q())
-      expect(before.payroll.filter((l) => isFrancol(l.employee))).toHaveLength(2)
-      expect(sumCents(before.payroll.map((l) => l.amount))).toBe(toCents(OCT_LAND_ROVER_PAYROLL))
-      expect(after.payroll.some((l) => isFrancol(l.employee))).toBe(false)
-      expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(60151.21))
-      expect(after.payroll).toEqual(before.payroll.filter((l) => !isFrancol(l.employee)))
-      expect(after.income).toEqual(before.income)
-      expect(after.expenses).toEqual(before.expenses)
-    }, 120000)
+  it('Excel: Summary y hoja Payroll con Francol, iguales a la pantalla', async () => {
+    const { res, buffer } = fakeResponse()
+    await service.export(admin, q(), res)
+    const wb = await loadBook(buffer())
+    const landRover = mc.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
 
-    it('Without dealer: el detalle no cambia', async () => {
-      const before = await service.getDealer(admin, 0, q())
-      asVendors([FRANCOL])
-      const after = await service.getDealer(admin, 0, q())
-      expect(after).toEqual(before)
-      expect(sumCents(after.payroll.map((l) => l.amount))).toBe(toCents(OCT_WITHOUT_DEALER))
-    }, 120000)
+    const summary = sheetRows(wb, 'Summary')
+    expect(toCents(Number(summary.find((r) => r.Dealer === landRover.dealer)?.Payroll))).toBe(landRoverCents)
 
-    it('Excel: Summary y hoja Payroll sin Francol, iguales a la pantalla', async () => {
-      asVendors([FRANCOL])
-      const { res, buffer } = fakeResponse()
-      await service.export(admin, q(), res)
-      const wb = await loadBook(buffer())
-      const landRover = withVendor.rows.find((r) => r.dealerId === LAND_ROVER_FTL)!
+    const payrollSheet = sheetRows(wb, 'Payroll')
+    const francolSheet = payrollSheet
+      .filter((r) => r.Dealer === landRover.dealer && isFrancol(String(r.Employee)))
+      .reduce((a, r) => a + toCents(Number(r.Amount)), 0)
+    expect(francolSheet).toBe(francolCents)
+    const lrCents = payrollSheet
+      .filter((r) => r.Dealer === landRover.dealer)
+      .reduce((a, r) => a + toCents(Number(r.Amount)), 0)
+    expect(lrCents).toBe(landRoverCents)
+    expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(toCents(mc.total.payroll))
+  }, 300000)
 
-      const summary = sheetRows(wb, 'Summary')
-      expect(toCents(Number(summary.find((r) => r.Dealer === landRover.dealer)?.Payroll))).toBe(toCents(60151.21))
-
-      const payrollSheet = sheetRows(wb, 'Payroll')
-      expect(payrollSheet.some((r) => isFrancol(String(r.Employee)))).toBe(false)
-      const lrCents = payrollSheet
-        .filter((r) => r.Dealer === landRover.dealer)
-        .reduce((a, r) => a + toCents(Number(r.Amount)), 0)
-      expect(lrCents).toBe(toCents(60151.21))
-      expect(sheetColumnCents(wb, 'Payroll', 'Amount')).toBe(toCents(withVendor.total.payroll))
-    }, 300000)
-
-    it('repositorio: excludeEmployeeIds baja la suma de 627 en lo de Francol y la de Without dealer en lo del excluido', async () => {
-      const cc = await (service as any).prepare(admin, q(), String(LAND_ROVER_FTL))
-      const desdes: string[] = cc.periods.map((p: { desde: string }) => p.desde)
-      expect(desdes).toEqual(['2026-10-01', '2026-10-16'])
-      type Row = { idDealer: number | null; monto: number; tax: number }
-      const cents = (rows: Row[], dealer: number | null) =>
-        Math.round(rows.filter((r) => r.idDealer === dealer).reduce((a, r) => a + r.monto + r.tax, 0) * 100)
-      const all = await payroll.amountsByDealerPeriodType(cc.filter, desdes, true)
-      const without = await payroll.amountsByDealerPeriodType(cc.filter, desdes, true, null, [FRANCOL, WITHOUT_DEALER_EMPLOYEE])
-      expect(cents(all, LAND_ROVER_FTL) - cents(without, LAND_ROVER_FTL)).toBe(toCents(OCT_FRANCOL))
-      expect(cents(all, null)).toBe(toCents(OCT_WITHOUT_DEALER))
-      expect(cents(all, null) - cents(without, null)).toBe(toCents(4000))
-
-      const employees = await payroll.amountsByDealerEmployeeForPeriods(cc.filter, desdes, LAND_ROVER_FTL)
-      const employeesWithout = await payroll.amountsByDealerEmployeeForPeriods(cc.filter, desdes, LAND_ROVER_FTL, null, [FRANCOL])
-      expect(employees.some((e) => e.idUsuario === FRANCOL)).toBe(true)
-      expect(employeesWithout.some((e) => e.idUsuario === FRANCOL)).toBe(false)
-      expect(employeesWithout).toEqual(employees.filter((e) => e.idUsuario !== FRANCOL))
-    }, 120000)
-  })
-
-  it('P5: Payroll Spend no mira los vendors ni los métodos del closing, y da lo mismo', async () => {
+  it('P5: Payroll Spend no usa los métodos del closing ni las expenses Piecework', async () => {
     const query = { fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', idDealer: allDealers }
-    const plain = await spend.getSpend(admin, query)
-    const vendorSpy = asVendors([FRANCOL])
     const typeSpy = jest.spyOn(payroll, 'amountsByDealerPeriodType')
     const employeeSpy = jest.spyOn(payroll, 'amountsByDealerEmployeeForPeriods')
-    const marked = await spend.getSpend(admin, query)
-    expect(vendorSpy).not.toHaveBeenCalled()
+    const pieceworkSpy = jest.spyOn(expenses, 'pieceworkInExpenses')
+    const result = await spend.getSpend(admin, query)
     expect(typeSpy).not.toHaveBeenCalled()
     expect(employeeSpy).not.toHaveBeenCalled()
-    expect(marked).toEqual(plain)
+    expect(pieceworkSpy).not.toHaveBeenCalled()
+    expect(result.totalPayroll).toBeGreaterThan(0)
   }, 180000)
 })
 

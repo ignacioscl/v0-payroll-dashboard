@@ -4,8 +4,9 @@ import { UsuarioSrs } from '../entity/usuario-srs.entity'
 import { UsuarioSrsRepository } from './usuario-srs.repository'
 
 /**
- * P7 de plans/plan-monthly-closing-vendors: `vendorIds` se acota a la empresa que se le pasa (`id_contratista_owner`),
- * que el closing toma de la sesión. La consulta real contra la copia está en monthly-closing-integration.spec.ts.
+ * Combo «Vendor» de la expense Piecework (plans/plan-reunion-juan-18-11, temas 3 y 4): `activeVendors` se acota a la
+ * empresa que se le pasa (`id_contratista_owner`, la de la sesión) y trae solo los vendors activos. La consulta real
+ * contra la copia está en expense-piecework-integration.spec.ts.
  */
 function repoWithSpy(rows: unknown[] = []) {
   const query = jest.fn().mockResolvedValue(rows)
@@ -13,20 +14,19 @@ function repoWithSpy(rows: unknown[] = []) {
   return { repo: new UsuarioSrsRepository(base), query }
 }
 
-describe('UsuarioSrsRepository.vendorIds', () => {
-  it('filtra por la empresa y por is_vendor = 1, con la empresa como parámetro', async () => {
+describe('UsuarioSrsRepository.activeVendors', () => {
+  it('filtra por la empresa, is_vendor = 1 y activos, con la empresa como parámetro', async () => {
     const { repo, query } = repoWithSpy()
-    await repo.vendorIds(79)
+    await repo.activeVendors(79)
     const [sql, params] = query.mock.calls[0]
     expect(sql).toContain('u.id_contratista_owner = ?')
     expect(sql).toContain('u.is_vendor = 1')
-    // Sin estado ni is_inactive: un vendor borrado con piecework en el período también se saca.
-    expect(sql).not.toMatch(/estado|is_inactive/)
+    expect(sql).toContain('u.estado = 1')
     expect(params).toEqual([79])
   })
 
-  it('devuelve números ordenados', async () => {
-    const { repo } = repoWithSpy([{ id: '8463' }, { id: 6985 }])
-    await expect(repo.vendorIds(79)).resolves.toEqual([6985, 8463])
+  it('devuelve id numérico y nombre', async () => {
+    const { repo } = repoWithSpy([{ id: '6985', name: 'Francol Services LLC' }])
+    await expect(repo.activeVendors(79)).resolves.toEqual([{ id: 6985, name: 'Francol Services LLC' }])
   })
 })

@@ -53,6 +53,8 @@ import {
   NOTES_MAX,
   RECEIPT_NUMBER_MAX,
 } from '../rules/expense-rules'
+import { MSG_PIECEWORK_LOCKED, PIECEWORK_EXPENSE_CATEGORY } from '../rules/expense-piecework'
+import { ExpensePieceworkService } from './expense-piecework.service'
 import { ExpenseService } from './expense.service'
 
 /** Lo común a todas las filas de un gasto (suelto o grupo). */
@@ -111,6 +113,7 @@ export class ExpenseFacadeService {
     @Inject(ExpenseRepetitiveService) private readonly rules: ExpenseRepetitiveService,
     @Inject(ExpenseReportRepository) private readonly report: ExpenseReportRepository,
     @Inject(SrsPermissionRepository) private readonly permissions: SrsPermissionRepository,
+    @Inject(ExpensePieceworkService) private readonly piecework: ExpensePieceworkService,
   ) {}
 
   private scope(ctx: SrsContext): ExpenseScope {
@@ -361,6 +364,7 @@ export class ExpenseFacadeService {
   @Transactional()
   async create(ctx: SrsContext, body: CreateExpenseDto): Promise<ExpenseDetail> {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_ADD)
+    if (body.pieceworkVendorId !== undefined || body.invoiceIds !== undefined) return this.createPiecework(ctx, body)
     const common = await this.resolveCommon(ctx, body)
     const split = await this.resolveSplit(ctx, body)
     const idAuthor = await this.resolveAuthor(ctx, body.idAuthor, split.rows.map((r) => r.idDealer))
@@ -387,6 +391,96 @@ export class ExpenseFacadeService {
     await this.logs.logGroup(group.id as number, ctx.idUsuario, `Group created (${ids.length} dealers, ${MODE_LABEL[split.mode]})`)
     await this.catalog.setLastCategory(ctx, common.idCompany, common.idCategory)
     return this.groupDetail(ctx, group.id as number, 1)
+  }
+
+  /**
+   * Expense Piecework (plans/plan-reunion-juan-18-11, temas 3 y 4): vendor + WO de los pay periods que terminan en el
+   * mes de la fecha. Compañía = el vendor y categoría «Piecework» (por nombre, al vuelo); el monto lo recalcula el
+   * servidor y va una fila por dealer (By amount si son varios). Queda a nombre de quien la carga, pendiente.
+   */
+  private async createPiecework(ctx: SrsContext, body: CreateExpenseDto): Promise<ExpenseDetail> {
+    let ticketDate: string
+    try {
+      ticketDate = validateReceiptDate(body.ticketDate, todayNy())
+    } catch (e) {
+      throw fieldError('ticketDate', (e as Error).message)
+    }
+    const resolved = await this.piecework.resolveForCreate(ctx, body.pieceworkVendorId, ticketDate, body.invoiceIds)
+    const dealerIds = resolved.byDealer.map((r) => r.idDealer)
+    await this.assertDealersInScope(ctx, dealerIds, () => 'invoiceIds')
+    const common = await this.resolveCommon(ctx, {
+      ticketDate,
+      newCompanyName: resolved.vendor.name,
+      newCategoryName: PIECEWORK_EXPENSE_CATEGORY,
+      description: body.description,
+      receiptNumber: body.receiptNumber,
+      notes: body.notes,
+    })
+    const workOrders = new Set(resolved.rows.map((r) => r.idInvoice)).size
+    const expenseIdByDealer = new Map<number, number>()
+
+    if (resolved.byDealer.length === 1) {
+      const created = await this.insertRow(ctx, common, resolved.byDealer[0], ctx.idUsuario, null, null, 'Piecework expense created')
+      expenseIdByDealer.set(resolved.byDealer[0].idDealer, created.id)
+      await this.piecework.saveRows(resolved, expenseIdByDealer)
+      await this.logs.logExpense(created.id, ctx.idUsuario, `Piecework: ${resolved.vendor.name}, ${workOrders} work orders`)
+      return this.detailByExpenseId(ctx, created.id)
+    }
+
+    const group = await this.groups.create({
+      idDetailer: ctx.idDealerProvider,
+      idCreatedBy: ctx.idUsuario,
+      splitType: GROUP_SPLIT_AMOUNT,
+      idAttachmentExpense: null,
+    })
+    for (const row of resolved.byDealer) {
+      const created = await this.insertRow(ctx, common, row, ctx.idUsuario, null, group.id as number, 'Piecework expense created')
+      expenseIdByDealer.set(row.idDealer, created.id)
+    }
+    await this.groups.setAttachmentExpense(group.id as number, Math.min(...expenseIdByDealer.values()))
+    await this.piecework.saveRows(resolved, expenseIdByDealer)
+    await this.logs.logGroup(
+      group.id as number,
+      ctx.idUsuario,
+      `Piecework expense created (${resolved.vendor.name}, ${workOrders} work orders, ${resolved.byDealer.length} dealers)`,
+    )
+    return this.groupDetail(ctx, group.id as number, 1)
+  }
+
+  /**
+   * Expense Piecework: solo description, receipt # y notes. Si el cuerpo cambia la fecha, la compañía, la categoría,
+   * «Assign to employee» o el reparto → 409 (se borra y se carga de nuevo).
+   */
+  private async updatePieceworkTexts(ctx: SrsContext, current: SingleWithMeta[], body: UpdateExpenseDto, splitChanged: boolean): Promise<void> {
+    const first = current[0].row
+    const description = this.length(body.description, DESCRIPTION_MAX, 'description')
+    const receiptNumber = this.length(body.receiptNumber, RECEIPT_NUMBER_MAX, 'receiptNumber')
+    const notes = this.length(body.notes, NOTES_MAX, 'notes')
+    const touchesLocked =
+      (body.ticketDate !== undefined && body.ticketDate !== first.ticketDate) ||
+      (body.idCompany !== undefined && Number(body.idCompany) !== first.company.id) ||
+      (body.idCategory !== undefined && Number(body.idCategory) !== first.category.id) ||
+      (body.idAuthor !== undefined && Number(body.idAuthor) !== first.author.id) ||
+      (body.idDealer !== undefined && Number(body.idDealer) !== first.dealer.id) ||
+      (body.newCompanyName ?? '').trim() !== '' ||
+      (body.newCategoryName ?? '').trim() !== '' ||
+      splitChanged
+    if (touchesLocked) throw new ConflictException(MSG_PIECEWORK_LOCKED)
+    for (const r of current) {
+      const changes = await this.describeChanges(ctx, r.row, {
+        ticketDate: r.row.ticketDate,
+        idCompany: r.row.company.id,
+        idCategory: r.row.category.id,
+        idDealer: r.row.dealer.id,
+        amount: r.row.amount,
+        idAuthor: r.row.author.id,
+        description,
+        receiptNumber,
+        notes,
+      })
+      await this.expenses.updateById(r.row.id, { description: description || null, receiptNumber: receiptNumber || null, notes })
+      if (changes.length) await this.logs.logExpense(r.row.id, ctx.idUsuario, changes.join('; '))
+    }
   }
 
   private async insertRow(
@@ -436,6 +530,11 @@ export class ExpenseFacadeService {
   private async updateSingle(ctx: SrsContext, expense: Expense, body: UpdateExpenseDto): Promise<ExpenseDetail> {
     const { meta } = await this.requireWritable(ctx, expense.id)
     if (Number(expense.isApproved) === 1) throw new ConflictException(MSG_RECEIPT_APPROVED)
+    if (meta.row.piecework) {
+      const amountChanged = body.totalAmount !== undefined && toCents(body.totalAmount) !== toCents(meta.row.amount)
+      await this.updatePieceworkTexts(ctx, [meta], body, amountChanged || (body.mode !== undefined && body.mode !== 'single'))
+      return this.detailByExpenseId(ctx, expense.id)
+    }
     if (body.mode === undefined) throw fieldError('mode', MSG_CHOOSE_MODE)
     if (body.mode !== 'single') throw fieldError('mode', 'A single expense keeps one dealer.')
     const common = await this.resolveCommon(ctx, body)
@@ -529,6 +628,11 @@ export class ExpenseFacadeService {
     if (!current.length) throw new NotFoundException('Expense not found')
     const first = current[0].row
     const anyApproved = current.some((r) => r.row.status === 'approved')
+
+    if (current.some((r) => r.row.piecework)) {
+      await this.updatePieceworkTexts(ctx, current, body, this.splitChanges(body, group.splitType, current))
+      return this.groupDetail(ctx, groupId, 1)
+    }
 
     if (anyApproved) {
       const description = this.length(body.description, DESCRIPTION_MAX, 'description')
@@ -743,6 +847,8 @@ export class ExpenseFacadeService {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_EDIT)
     const { expense } = await this.requireWritable(ctx, id)
     if (Number(expense.estado) === 1) return this.detailByExpenseId(ctx, id)
+    // Expense Piecework: sus WO no pueden estar ya en otra expense activa (D4).
+    await this.piecework.assertRestorable(ctx, [id])
     await this.reactivate(id)
     await this.logs.logExpense(id, ctx.idUsuario, 'Receipt activated')
     if (expense.idExpGroup) await this.groups.setDeleted(expense.idExpGroup, false)
@@ -762,6 +868,10 @@ export class ExpenseFacadeService {
     if (!agg) return this.groupDetail(ctx, groupId, 1)
     if (agg.inScope < agg.total) throw new ForbiddenException(MSG_SOME_BRANCHES_OUTSIDE)
     const deleted = await this.expenses.findByGroup(groupId, ctx.idDealerProvider, 0)
+    await this.piecework.assertRestorable(
+      ctx,
+      deleted.map((e) => e.id),
+    )
     const text = `Group restored (${deleted.length} dealers)`
     for (const e of deleted) {
       await this.reactivate(e.id)

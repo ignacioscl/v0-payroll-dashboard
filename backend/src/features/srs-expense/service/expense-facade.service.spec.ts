@@ -54,6 +54,7 @@ function raw(partial: Partial<RawExpenseRow>): RawExpenseRow {
     idExpRepetitive: null,
     hasLog: 1,
     hasAttachment: 0,
+    isPiecework: 0,
     groupSplitType: null,
     groupAttachmentExpense: null,
     inScope: 1,
@@ -121,6 +122,7 @@ function build() {
     logRows: jest.fn().mockResolvedValue([]),
   }
   const permissions = { assertRolAccion: jest.fn().mockResolvedValue(undefined), userHasRolAccion: jest.fn().mockResolvedValue(false) }
+  const piecework = { assertRestorable: jest.fn().mockResolvedValue(undefined), resolveForCreate: jest.fn(), saveRows: jest.fn() }
   const facade = new ExpenseFacadeService(
     expenses as any,
     groups as any,
@@ -130,6 +132,7 @@ function build() {
     rules as any,
     report as any,
     permissions as any,
+    piecework as any,
   )
   return { facade, expense, expenses, groups, catalog, logs, dealers, report, permissions }
 }

@@ -4,9 +4,10 @@ import type { SrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PayrollSnapshotKpiRepository } from './payroll-snapshot-kpi.repository'
 
 /**
- * `excludeEmployeeIds` de los dos métodos del Monthly Closing (plans/plan-monthly-closing-vendors T5): el NOT IN va en
- * cada rama (también la de `p.id_dealer IS NULL`), con sus params en el orden de los `?`; vacío = la consulta de antes.
- * La suma real contra la copia está en monthly-closing-integration.spec.ts (P4).
+ * Los dos métodos del Monthly Closing ya no sacan a nadie (reunión con Juan 18/11, tema 4): los vendors cuentan en
+ * Payroll como cualquier empleado y el cierre les resta lo que está en una expense Piecework
+ * (ExpenseReportRepository.pieceworkInExpenses). Antes, plans/plan-monthly-closing-vendors T5 los sacaba con NOT IN.
+ * La suma real contra la copia está en monthly-closing-integration.spec.ts.
  */
 function filter(partial: Partial<SrsKpiFilter> = {}): SrsKpiFilter {
   return {
@@ -32,51 +33,34 @@ function repoWithSpy() {
 
 const PERIODS = ['2026-10-01', '2026-10-16']
 
-describe('PayrollSnapshotKpiRepository — excludeEmployeeIds (vendors del closing)', () => {
-  it('amountsByDealerPeriodType: NOT IN en la rama con dealer y en la de Without dealer, params en orden', async () => {
+describe('PayrollSnapshotKpiRepository — el closing no saca empleados (tema 4)', () => {
+  it('amountsByDealerPeriodType: sin NOT IN en ninguna rama, params en orden', async () => {
     const { repo, query } = repoWithSpy()
-    await repo.amountsByDealerPeriodType(filter(), PERIODS, true, null, [6985, 7653])
+    await repo.amountsByDealerPeriodType(filter(), PERIODS, true)
     const [sql, params] = query.mock.calls[0]
-    expect((sql.match(/AND p\.id_usuario NOT IN \(\?,\?\)/g) ?? []).length).toBe(2)
-    expect(params).toEqual([79, ...PERIODS, 6985, 7653, 627, 301, 79, ...PERIODS, 6985, 7653])
+    expect(sql).not.toContain('NOT IN')
+    expect(params).toEqual([79, ...PERIODS, 627, 301, 79, ...PERIODS])
     expect(placeholders(sql)).toBe(params.length)
   })
 
-  it('amountsByDealerPeriodType: con employeeIds (tinteros) y vendors, los dos filtros y en orden', async () => {
+  it('amountsByDealerPeriodType: con employeeIds (tinteros), solo el IN', async () => {
     const { repo, query } = repoWithSpy()
-    await repo.amountsByDealerPeriodType(filter(), PERIODS, false, [5439, 3958], [5439])
+    await repo.amountsByDealerPeriodType(filter(), PERIODS, false, [5439, 3958])
     const [sql, params] = query.mock.calls[0]
-    expect(sql).toContain('AND p.id_usuario IN (?,?) AND p.id_usuario NOT IN (?)')
-    expect(params).toEqual([79, ...PERIODS, 5439, 3958, 5439, 627, 301])
+    expect(sql).toContain('AND p.id_usuario IN (?,?)')
+    expect(sql).not.toContain('NOT IN')
+    expect(params).toEqual([79, ...PERIODS, 5439, 3958, 627, 301])
     expect(placeholders(sql)).toBe(params.length)
   })
 
-  it('amountsByDealerPeriodType: sin vendors (o lista vacía) la consulta es la de antes', async () => {
-    const a = repoWithSpy()
-    const b = repoWithSpy()
-    await a.repo.amountsByDealerPeriodType(filter(), PERIODS, true)
-    await b.repo.amountsByDealerPeriodType(filter(), PERIODS, true, null, [])
-    expect(a.query.mock.calls[0][0]).not.toContain('NOT IN')
-    expect(b.query.mock.calls[0]).toEqual(a.query.mock.calls[0])
-  })
-
-  it('amountsByDealerEmployeeForPeriods: NOT IN antes del filtro de dealer, para un dealer, all y none', async () => {
+  it('amountsByDealerEmployeeForPeriods: sin NOT IN, para un dealer, all y none', async () => {
     for (const dealer of [627, 'all', 'none'] as const) {
       const { repo, query } = repoWithSpy()
-      await repo.amountsByDealerEmployeeForPeriods(filter(), PERIODS, dealer, null, [6985])
+      await repo.amountsByDealerEmployeeForPeriods(filter(), PERIODS, dealer)
       const [sql, params] = query.mock.calls[0]
-      expect(sql).toContain('AND p.id_usuario NOT IN (?)')
-      expect(params.slice(0, 4)).toEqual([79, ...PERIODS, 6985])
+      expect(sql).not.toContain('NOT IN')
+      expect(params.slice(0, 3)).toEqual([79, ...PERIODS])
       expect(placeholders(sql)).toBe(params.length)
     }
-  })
-
-  it('amountsByDealerEmployeeForPeriods: sin vendors la consulta es la de antes', async () => {
-    const a = repoWithSpy()
-    const b = repoWithSpy()
-    await a.repo.amountsByDealerEmployeeForPeriods(filter(), PERIODS, 'all')
-    await b.repo.amountsByDealerEmployeeForPeriods(filter(), PERIODS, 'all', null, [])
-    expect(a.query.mock.calls[0][0]).not.toContain('NOT IN')
-    expect(b.query.mock.calls[0]).toEqual(a.query.mock.calls[0])
   })
 })

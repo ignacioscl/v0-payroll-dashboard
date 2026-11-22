@@ -1731,7 +1731,7 @@ export const es: Messages = {
       item1:
         'Income: igual que el Closing Report (Work Orders por fecha de creación, invoices TTK y Generic, con descuento, sin tax).',
       item2:
-        'Payroll: los períodos de pago que terminan en el mes. Los empleados marcados como Vendor no cuentan. Los sueldos sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
+        'Payroll: los períodos de pago que terminan en el mes. El piecework de las WO que están en una expense Piecework no cuenta acá: cuenta en Expenses. Los sueldos sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
       item3: 'Expenses: todos los gastos con fecha en el mes, aprobados o no; los borrados no cuentan.',
     },
     tintClosing: {
@@ -1742,9 +1742,9 @@ export const es: Messages = {
       item3:
         'Income: solo los servicios con «tint» en el nombre, de las WO del mes asignadas a un tintero (un empleado con un rol que tiene «tint» en el nombre), por fecha de creación, facturadas o no. Con el descuento de la invoice, sin tax. Las líneas de invoices Generic con «tint» en la descripción también cuentan. Las invoices TTK no cuentan.',
       item4:
-        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre), con todos los tipos de pago, en los períodos de pago que terminan en el mes, sin el piecework de los servicios que no tienen «tint» en el nombre. Lo que se paga fuera de SRS no cuenta. Los empleados marcados como Vendor no cuentan. Los sueldos de tinteros sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
+        'Payroll: lo que SRS les paga en el dealer a los tinteros (empleados con un rol que tiene «tint» en el nombre), con todos los tipos de pago, en los períodos de pago que terminan en el mes, sin el piecework de los servicios que no tienen «tint» en el nombre. Lo que se paga fuera de SRS no cuenta. El piecework de las WO que están en una expense Piecework no cuenta acá: cuenta en Expenses. Los sueldos de tinteros sin dealer van en la fila «Without dealer» y están incluidos en el Total.',
       item5:
-        'Expenses: los gastos del dealer de la categoría «Window Tint Film», con fecha en el mes, aprobados o no. Los borrados no cuentan.',
+        'Expenses: los gastos del dealer de la categoría «Window Tint Film», con fecha en el mes, aprobados o no, y de las expenses Piecework de los tinteros, la parte de los servicios con «tint» en el nombre. Los borrados no cuentan.',
       item6: 'Profit/Loss: Income − Payroll − Expenses.',
       item7: '%: Profit/Loss dividido por Income. Muestra «—» cuando el Income es $0.',
     },
@@ -2094,6 +2094,28 @@ export const es: Messages = {
     pastPeriodsTitle: 'Períodos pasados',
     pastPeriodsHint:
       'Este gasto recurrente empezó antes de hoy. Estos son los gastos de los {periods} períodos pasados que todavía no generó: {n} gastos, uno por dealer y período, pendientes de aprobación. Los gastos cargados a mano no se tienen en cuenta.',
+    type: 'Tipo',
+    typeRegular: 'Común',
+    typePiecework: 'Piecework',
+    typeRegularHint: 'Un gasto con sus dealers, compañía y categoría.',
+    typePieceworkHint: 'Las WO de un vendor: su piecework cuenta como gasto y deja de contar como payroll en Monthly Closing y Window Tint Closing.',
+    vendor: 'Vendor',
+    selectVendor: 'Elegí un vendor…',
+    noVendors: 'No hay empleados marcados como Vendor.',
+    colWorkOrder: 'WO',
+    colVin: 'VIN',
+    colPiecework: 'Piecework',
+    pieceworkSelectAll: 'Marcar todas las WO',
+    pieceworkSelectRow: 'Marcar la WO {nro}',
+    pieceworkChooseVendorAndDate: 'Elegí el vendor y la fecha: acá aparecen las WO de los pay periods que terminan en ese mes.',
+    pieceworkPeriods: 'WO de los pay periods {periods}',
+    pieceworkNoPeriods: 'Este mes no tiene pay periods.',
+    pieceworkNoWorkOrders: 'Este vendor no tiene WO con piecework en estos pay periods que no estén en otra expense Piecework.',
+    pieceworkSelected: '{n} de {total} WO',
+    pieceworkHint: 'El monto es el piecework de las WO marcadas, repartido por el dealer de cada una. La compañía es el vendor y la categoría, «Piecework». Una WO va en una sola expense Piecework; para cambiarla, se borra y se carga de nuevo.',
+    pieceworkLocked: 'Expense Piecework: solo cambian la descripción, el recibo y las notas. Para cambiar las WO, el monto o la fecha, borrala y cargala de nuevo.',
+    errChooseVendor: 'Elegí un vendor.',
+    errChooseWorkOrders: 'Marcá al menos una WO.',
     pastPeriodsAbout:
       'Un gasto recurrente crea sus gastos cada día de corrida de hoy en adelante. Si su fecha de inicio es anterior, los días de corrida que ya pasaron quedan sin gasto: esta pantalla los crea, uno por dealer, hasta ayer (el de hoy se crea solo). Un día de corrida que ya tiene un gasto de este gasto recurrente no se vuelve a crear.',
     pastPeriodsNone: 'No hay períodos pasados sin un gasto de este gasto recurrente.',

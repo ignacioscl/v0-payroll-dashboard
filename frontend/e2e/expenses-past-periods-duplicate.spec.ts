@@ -15,6 +15,7 @@ import {
   E2E_MISSING_USER_REASON,
   login,
   noHorizontalScroll,
+  filterExpensesByCompany,
   pickAllDealersAndDatePreset,
 } from './helpers'
 
@@ -64,14 +65,8 @@ async function pickDealers(page: Page, count: number, trigger: Locator) {
   await page.keyboard.press('Escape')
 }
 
-/** La lista pagina de a 25: se filtra por la compañía de este archivo (panel Filters, arranca cerrado). */
-async function filterByCompany(page: Page) {
-  const field = page.locator('div.space-y-1').filter({ has: page.getByText('Company', { exact: true }) }).getByRole('combobox')
-  if (!(await field.isVisible())) await page.getByRole('button', { name: /^Filters/ }).click()
-  await field.click()
-  await page.locator('[cmdk-input]').last().fill(COMPANY)
-  await page.getByRole('option', { name: COMPANY }).first().click()
-}
+/** La lista pagina de a 25: se filtra por la compañía de este archivo. */
+const filterByCompany = (page: Page) => filterExpensesByCompany(page, COMPANY)
 
 async function rowActions(page: Page, text: string) {
   await page.getByRole('row').filter({ hasText: text }).first().getByRole('button', { name: 'Actions' }).click()

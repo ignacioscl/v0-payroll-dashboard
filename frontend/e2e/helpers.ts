@@ -95,3 +95,15 @@ export async function pickAllDealersAndDatePreset(page: Page, preset: string) {
     await expect(page.getByRole('dialog')).toBeHidden()
   }
 }
+
+/**
+ * Expenses List pagina de a 25 y ordena por fecha: lo que crea una prueba puede quedar en otra página. Se filtra por la
+ * compañía (panel Filters, que arranca cerrado).
+ */
+export async function filterExpensesByCompany(page: Page, company: string) {
+  const field = page.locator('div.space-y-1').filter({ has: page.getByText('Company', { exact: true }) }).getByRole('combobox')
+  if (!(await field.isVisible())) await page.getByRole('button', { name: /^Filters/ }).click()
+  await field.click()
+  await page.locator('[cmdk-input]').last().fill(company)
+  await page.getByRole('option', { name: company }).first().click()
+}

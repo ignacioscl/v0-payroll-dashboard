@@ -61,6 +61,13 @@ export interface ExpenseFormValues {
   /** Por id de dealer: su porcentaje o su monto, según el modo. */
   branches: Record<string, BranchInputValue>
   idExpRepetitive: number | null
+  /**
+   * «Type» (temas 3 y 4 de plan-reunion-juan-18-11): `piecework` = las WO de un vendor; sin dealers, compañía ni
+   * categoría (las pone el Nest) y el monto es la suma del piecework de las WO marcadas.
+   */
+  kind: 'regular' | 'piecework'
+  pieceworkVendorId: number | null
+  invoiceIds: number[]
 }
 
 export interface ExpenseFormMessages {
@@ -75,6 +82,8 @@ export interface ExpenseFormMessages {
   errChooseCategory: string
   /** `{n}` */
   errUpTo: string
+  errChooseVendor?: string
+  errChooseWorkOrders?: string
 }
 
 export interface ExpenseFormContext {
@@ -119,6 +128,9 @@ export function createExpenseFormSchema(ctx: ExpenseFormContext, m: ExpenseFormM
       // campo que no está en pantalla y Save no hace nada (Ignacio, 03/11/2026).
       branches: z.record(z.string(), z.object({ percentage: z.string().catch(''), amount: z.string().catch('') })),
       idExpRepetitive: z.number().nullable(),
+      kind: z.enum(['regular', 'piecework']).catch('regular'),
+      pieceworkVendorId: z.number().nullable().catch(null),
+      invoiceIds: z.array(z.number()).catch([]),
     })
     .superRefine((data, refine) => {
       const issue = (path: (string | number)[], message: string) =>
@@ -140,6 +152,13 @@ export function createExpenseFormSchema(ctx: ExpenseFormContext, m: ExpenseFormM
         validateReceiptDate(data.ticketDate, ctx.todayNy)
       } catch {
         issue(['ticketDate'], m.errDate)
+      }
+
+      // Piecework: el vendor y al menos una WO; dealers, compañía, categoría y monto los arma el Nest.
+      if (data.kind === 'piecework') {
+        if (!data.pieceworkVendorId) issue(['pieceworkVendorId'], m.errChooseVendor ?? m.errChooseBranch)
+        if (data.invoiceIds.length === 0) issue(['invoiceIds'], m.errChooseWorkOrders ?? m.errChooseBranch)
+        return
       }
 
       if (!data.company || !data.company.name.trim()) issue(['company'], m.errChooseCompany)
@@ -217,6 +236,9 @@ export const emptyExpenseFormValues = (todayNy: string): ExpenseFormValues => ({
   branchIds: [],
   branches: {},
   idExpRepetitive: null,
+  kind: 'regular',
+  pieceworkVendorId: null,
+  invoiceIds: [],
 })
 
 type SplitInput = Pick<ExpenseFormValues, 'mode' | 'totalAmount' | 'branchIds' | 'branches'>
@@ -405,6 +427,15 @@ export function expenseFormValuesToPayload(
   values: ExpenseFormValues,
   opts: ExpensePayloadOptions = { canAssign: true },
 ): CreateExpensePayload {
+  // Piecework: solo el vendor, las WO, la fecha y los textos (el Nest arma el resto).
+  if (values.kind === 'piecework') {
+    return {
+      ticketDate: values.ticketDate,
+      ...expenseFormValuesToTextOnlyPayload(values),
+      pieceworkVendorId: values.pieceworkVendorId ?? undefined,
+      invoiceIds: [...values.invoiceIds],
+    }
+  }
   const payload: CreateExpensePayload = {
     ticketDate: values.ticketDate,
     ...expenseFormValuesToTextOnlyPayload(values),

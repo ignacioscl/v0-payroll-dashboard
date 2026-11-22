@@ -26,6 +26,8 @@ export interface ExpenseSingleRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Expense Piecework (migration 032): no se duplica ni cambia monto, WO ni fecha. */
+  piecework?: boolean
   idExpRepetitive?: number | null
   /** Fila de un grupo: el id del grupo (lo manda el Nest en las hijas). */
   groupId?: number | null
@@ -56,6 +58,8 @@ export interface ExpenseGroupRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Alguna fila es de una expense Piecework. */
+  piecework?: boolean
   attachmentExpenseId?: number | null
   idExpRepetitive?: number | null
   rows: ExpenseSingleRow[]
@@ -117,11 +121,15 @@ export interface CreateExpensePayload {
   receiptNumber?: string
   notes?: string
   idAuthor?: number
-  mode: ExpenseMode
+  /** No va en una expense Piecework (el reparto sale de las WO). */
+  mode?: ExpenseMode
   idDealer?: number
   totalAmount?: string
   branches?: ExpenseBranchInput[]
   idExpRepetitive?: number
+  /** Expense Piecework (temas 3 y 4 de plan-reunion-juan-18-11): el vendor y las WO marcadas. */
+  pieceworkVendorId?: number
+  invoiceIds?: number[]
 }
 
 /**
@@ -467,6 +475,41 @@ export function fetchExpenseEmployees(term: string, idDealer: string | null): Pr
     `${EXPENSES_BASE_URL}/employees${qs({ term, idDealer })}`,
     { method: 'GET' },
     'Failed to search employees',
+  )
+}
+
+// Expense Piecework (temas 3 y 4 de plan-reunion-juan-18-11)
+export interface PieceworkVendor {
+  id: number
+  name: string
+}
+
+export interface PieceworkWorkOrder {
+  idInvoice: number
+  nro: string
+  vin: string
+  dealer: NamedRef
+  date: string
+  piecework: string
+  services: string[]
+}
+
+export interface PieceworkWorkOrders {
+  /** Los pay periods que terminan en el mes (los del Payroll de Monthly Closing de ese mes). */
+  periods: { desde: string; hasta: string }[]
+  workOrders: PieceworkWorkOrder[]
+}
+
+export function fetchPieceworkVendors(): Promise<{ data: PieceworkVendor[] }> {
+  return requestJson(`${EXPENSES_BASE_URL}/piecework-vendors`, { method: 'GET' }, 'Failed to load the vendors')
+}
+
+/** `month`: YYYY-MM. */
+export function fetchPieceworkWorkOrders(vendorId: number, month: string): Promise<PieceworkWorkOrders> {
+  return requestJson(
+    `${EXPENSES_BASE_URL}/piecework-work-orders${qs({ vendorId: String(vendorId), month })}`,
+    { method: 'GET' },
+    'Failed to load the work orders',
   )
 }
 

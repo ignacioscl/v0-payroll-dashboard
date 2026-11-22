@@ -2001,6 +2001,28 @@ export interface Messages {
     generatePastExpenses: string
     pastPeriodsTitle: string
     pastPeriodsHint: string
+    type: string
+    typeRegular: string
+    typePiecework: string
+    typeRegularHint: string
+    typePieceworkHint: string
+    vendor: string
+    selectVendor: string
+    noVendors: string
+    colWorkOrder: string
+    colVin: string
+    colPiecework: string
+    pieceworkSelectAll: string
+    pieceworkSelectRow: string
+    pieceworkChooseVendorAndDate: string
+    pieceworkPeriods: string
+    pieceworkNoPeriods: string
+    pieceworkNoWorkOrders: string
+    pieceworkSelected: string
+    pieceworkHint: string
+    pieceworkLocked: string
+    errChooseVendor: string
+    errChooseWorkOrders: string
     pastPeriodsAbout: string
     pastPeriodsNone: string
     pastPeriodsProblem: string

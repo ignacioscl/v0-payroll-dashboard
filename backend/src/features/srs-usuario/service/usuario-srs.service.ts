@@ -41,12 +41,9 @@ export class UsuarioSrsService extends GlobalBaseService<UsuarioSrs, UsuarioSrsQ
     return this.repository.idsWithRoleNameLike(idCompania, fragment)
   }
 
-  /**
-   * Regla única de «vendor» (plans/plan-monthly-closing-vendors T4): empleados de la empresa con «Vendor» marcado en la
-   * ficha, borrados incluidos. Monthly Closing y Window Tint Closing los sacan del Payroll.
-   */
-  vendorIds(idCompania: number): Promise<number[]> {
-    return this.repository.vendorIds(idCompania)
+  /** Los vendors activos con su nombre: el combo «Vendor» de la expense Piecework (tema 4 de plan-reunion-juan-18-11). */
+  activeVendors(idCompania: number): Promise<{ id: number; name: string }[]> {
+    return this.repository.activeVendors(idCompania)
   }
 
   /** Usuarios activos con el rol: si hay alguno, el rol no se puede eliminar. */

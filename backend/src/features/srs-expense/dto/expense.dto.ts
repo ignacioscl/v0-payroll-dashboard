@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator'
 
@@ -145,7 +146,9 @@ export class CreateExpenseDto {
   @Min(1)
   idAuthor?: number
 
+  /** En una expense Piecework no va: el reparto sale de las WO (una fila por dealer). */
   @ApiProperty({ enum: EXPENSE_MODES })
+  @ValidateIf((o: CreateExpenseDto) => o.pieceworkVendorId === undefined)
   @IsIn(EXPENSE_MODES, { message: 'Choose how to split the amount.' })
   mode!: ExpenseMode
 
@@ -180,6 +183,27 @@ export class CreateExpenseDto {
   @IsInt()
   @Min(1)
   idExpRepetitive?: number
+
+  /**
+   * Expense Piecework (plans/plan-reunion-juan-18-11, temas 3 y 4): el vendor. Con él, la compañía es el vendor, la
+   * categoría «Piecework» y el monto la suma del piecework de `invoiceIds`, repartido por el dealer de cada WO; se
+   * ignoran compañía, categoría, reparto y «Assign to employee» del cuerpo.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toOptionalInt)
+  @IsInt()
+  @Min(1, { message: 'Choose a vendor.' })
+  pieceworkVendorId?: number
+
+  /** Expense Piecework: las WO marcadas. */
+  @ApiPropertyOptional({ type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  invoiceIds?: number[]
 }
 
 /**
@@ -187,7 +211,7 @@ export class CreateExpenseDto {
  * opcionales: un grupo con alguna fila aprobada se edita mandando solo description, receiptNumber y notes (el
  * facade conserva lo demás); un gasto suelto o un grupo sin aprobadas los exige (400 en el campo si faltan).
  */
-export class UpdateExpenseDto extends OmitType(CreateExpenseDto, ['ticketDate', 'mode'] as const) {
+export class UpdateExpenseDto extends OmitType(CreateExpenseDto, ['ticketDate', 'mode', 'pieceworkVendorId', 'invoiceIds'] as const) {
   @ApiPropertyOptional({ example: '2026-11-02' })
   @IsOptional()
   @Transform(trim)

@@ -181,6 +181,7 @@ export class ExpenseReportRepository {
           e.id_exp_repetitive AS idExpRepetitive,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id) AS hasLog,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id AND lg.description LIKE 'Attachment %') AS hasAttachment,
+          EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id AND pw.deleted_at IS NULL) AS isPiecework,
           g.split_type AS groupSplitType, g.id_attachment_expense AS groupAttachmentExpense,
           ${inScope.sql} AS inScope` + from.sql,
       params: [scope.idDealerProvider, ...inScope.params, ...from.params],
@@ -452,6 +453,88 @@ export class ExpenseReportRepository {
       dealer: String(r.dealer ?? ''),
       total: money(r.total),
       accidentTotal: money(r.accidentTotal),
+    }))
+  }
+
+  /**
+   * Cierres (plans/plan-reunion-juan-18-11 tema 4, D6): el piecework que está en una expense Piecework activa de la
+   * empresa, por (dealer, empleado, día de la WO) de [desde, hasta]. Se resta del Payroll: ese piecework cuenta en
+   * Expenses. `employeeIds` acota a esos empleados (los tinteros de Window Tint Closing); `serviceLike` toma solo los
+   * servicios con ese texto en el nombre («tint», Window Tint Closing: los demás ya los saca el tema 6).
+   */
+  async pieceworkInExpenses(
+    idDealerProvider: number,
+    desde: string,
+    hasta: string,
+    opts: { employeeIds?: readonly number[] | null; serviceLike?: string } = {},
+  ): Promise<{ idDealer: number; idUsuario: number; workDate: string; amount: number; payrollTax: number | null }[]> {
+    if (opts.employeeIds && !opts.employeeIds.length) return []
+    const emp = opts.employeeIds ? ` AND pw.id_employee IN (${opts.employeeIds.map(() => '?').join(',')})` : ''
+    const svc = opts.serviceLike ? ` AND LOWER(IFNULL(s.nombre, '')) LIKE ?` : ''
+    const rows: { idDealer: unknown; idUsuario: unknown; workDate: unknown; amount: unknown; payrollTax: unknown }[] = await this.db.query(
+      `SELECT pw.id_dealer AS idDealer, pw.id_employee AS idUsuario, DATE_FORMAT(pw.work_date, '%Y-%m-%d') AS workDate,
+              SUM(pw.amount) AS amount, MAX(u.payroll_tax) AS payrollTax
+         FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1 AND e.id_detailer = ?
+         JOIN usuarios u ON u.id_usuario = pw.id_employee
+         LEFT JOIN INVOICE_SERVICE s ON s.id = pw.id_invoice_service
+        WHERE pw.deleted_at IS NULL AND pw.work_date BETWEEN ? AND ?${emp}${svc}
+        GROUP BY pw.id_dealer, pw.id_employee, pw.work_date`,
+      [
+        idDealerProvider,
+        desde,
+        hasta,
+        ...(opts.employeeIds ?? []),
+        ...(opts.serviceLike ? [`%${opts.serviceLike.toLowerCase()}%`] : []),
+      ],
+    )
+    return rows.map((r) => ({
+      idDealer: Number(r.idDealer),
+      idUsuario: Number(r.idUsuario),
+      workDate: String(r.workDate),
+      amount: Number(r.amount ?? 0),
+      payrollTax: r.payrollTax === null || r.payrollTax === undefined ? null : Number(r.payrollTax),
+    }))
+  }
+
+  /**
+   * Window Tint Closing (tema 4): de las expenses Piecework activas de los tinteros con fecha en el rango, solo la parte
+   * de los servicios con `serviceLike` en el nombre, por fila de gasto. Mismo filtro de empresa, fechas y dealers que
+   * Expenses (buildExpenseWhere), sin la categoría: la expense Piecework es de la categoría «Piecework».
+   */
+  async pieceworkServiceLines(
+    filter: ExpenseListFilter,
+    employeeIds: readonly number[],
+    serviceLike: string,
+  ): Promise<ExpenseLineRow[]> {
+    if (!employeeIds.length) return []
+    const { categoryNameIs: _c, idCategory: _i, ...rest } = filter
+    const from = this.fromSql(rest)
+    const where = this.buildExpenseWhere(rest)
+    const rows: { id: unknown; ticketDate: unknown; dealerId: unknown; dealer: unknown; vendor: unknown; category: unknown; amount: unknown; notes: unknown }[] =
+      await this.db.query(
+        `SELECT e.id, DATE_FORMAT(e.ticket_date, '%Y-%m-%d') AS ticketDate, c.id AS dealerId,
+                GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer, gco.name AS vendor, gca.name AS category,
+                SUM(pw.amount) AS amount, e.notes
+           ${from.sql}
+           JOIN EXP_EXPENSE_PIECEWORK_WO pw ON pw.id_expense = e.id AND pw.deleted_at IS NULL
+           LEFT JOIN INVOICE_SERVICE s ON s.id = pw.id_invoice_service
+          WHERE 1 ${where.sql}
+            AND pw.id_employee IN (${employeeIds.map(() => '?').join(',')})
+            AND LOWER(IFNULL(s.nombre, '')) LIKE ?
+          GROUP BY e.id
+          ORDER BY dealer, e.ticket_date, e.id`,
+        [filter.idDealerProvider, ...from.params, ...where.params, ...employeeIds, `%${serviceLike.toLowerCase()}%`],
+      )
+    return rows.map((r) => ({
+      id: Number(r.id),
+      ticketDate: String(r.ticketDate),
+      dealerId: Number(r.dealerId),
+      dealer: String(r.dealer ?? ''),
+      vendor: String(r.vendor ?? ''),
+      category: String(r.category ?? ''),
+      amount: money(r.amount),
+      notes: String(r.notes ?? ''),
     }))
   }
 

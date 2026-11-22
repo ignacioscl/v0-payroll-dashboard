@@ -1723,7 +1723,7 @@ export const en: Messages = {
       item1:
         'Income: same as the Closing Report (Work Orders by creation date, TTK and Generic invoices, discount included, no tax).',
       item2:
-        'Payroll: the pay periods that end in the month. Employees marked as Vendor do not count. Salaries without dealer go in the «Without dealer» row and are included in the Total.',
+        'Payroll: the pay periods that end in the month. The piecework of the work orders that are in a Piecework expense does not count here: it counts in Expenses. Salaries without dealer go in the «Without dealer» row and are included in the Total.',
       item3: 'Expenses: every expense dated in the month, approved or not; deleted expenses do not count.',
     },
     // PAIR of backend/src/srs/monthly-closing/tint-closing-column-notes.ts: the same text is the note on each
@@ -1736,9 +1736,9 @@ export const en: Messages = {
       item3:
         "Income: only the services with «tint» in their name, of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name), by creation date, invoiced or not. With the invoice discount, without tax. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
       item4:
-        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name), with every payment type, in the pay periods that end in the month, without the piecework of services that do not have «tint» in their name. What is paid outside SRS does not count. Employees marked as Vendor do not count. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
+        'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name), with every payment type, in the pay periods that end in the month, without the piecework of services that do not have «tint» in their name. What is paid outside SRS does not count. The piecework of the work orders that are in a Piecework expense does not count here: it counts in Expenses. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
       item5:
-        "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
+        "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not, and the part of the services with «tint» in their name of the tinters' Piecework expenses. Deleted expenses do not count.",
       item6: 'Profit/Loss: Income − Payroll − Expenses.',
       item7: '%: Profit/Loss divided by Income. Shows «—» when Income is $0.',
     },
@@ -2088,6 +2088,28 @@ export const en: Messages = {
     pastPeriodsTitle: 'Past periods',
     pastPeriodsHint:
       'This recurring expense started before today. These are the expenses of the {periods} past periods that it has not generated yet: {n} expenses, one per dealer and period, pending approval. Expenses loaded by hand are not taken into account.',
+    type: 'Type',
+    typeRegular: 'Regular',
+    typePiecework: 'Piecework',
+    typeRegularHint: 'An expense with its dealers, company and category.',
+    typePieceworkHint: 'The work orders of a vendor: their piecework counts as an expense and no longer as payroll in Monthly Closing and Window Tint Closing.',
+    vendor: 'Vendor',
+    selectVendor: 'Select a vendor…',
+    noVendors: 'No employee is marked as Vendor.',
+    colWorkOrder: 'WO',
+    colVin: 'VIN',
+    colPiecework: 'Piecework',
+    pieceworkSelectAll: 'Select all the work orders',
+    pieceworkSelectRow: 'Select work order {nro}',
+    pieceworkChooseVendorAndDate: 'Choose the vendor and the date: the work orders of the pay periods that end in that month appear here.',
+    pieceworkPeriods: 'Work orders from pay periods {periods}',
+    pieceworkNoPeriods: 'This month has no pay periods.',
+    pieceworkNoWorkOrders: 'This vendor has no work orders with piecework in these pay periods that are not in another Piecework expense.',
+    pieceworkSelected: '{n} of {total} work orders',
+    pieceworkHint: 'The amount is the piecework of the selected work orders, split by the dealer of each one. The company is the vendor and the category, «Piecework». A work order goes in a single Piecework expense; to change one, delete it and add it again.',
+    pieceworkLocked: 'Piecework expense: only the description, the receipt # and the notes can change. To change the work orders, the amount or the date, delete it and add it again.',
+    errChooseVendor: 'Choose a vendor.',
+    errChooseWorkOrders: 'Choose at least one work order.',
     pastPeriodsAbout:
       "A recurring expense creates its expenses on each run day from today on. If its start date is earlier, the run days that already passed are left without an expense: this screen creates them, one per dealer, up to yesterday (today's is created automatically). A run day that already has an expense of this recurring expense is not created again.",
     pastPeriodsNone: 'There are no past periods without an expense of this recurring expense.',

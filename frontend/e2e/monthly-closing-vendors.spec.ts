@@ -1,15 +1,25 @@
 /**
- * Marca «Vendor» — el camino entero (plans/plan-monthly-closing-vendors P8), en 375×812 y 1280×800 (los dos proyectos de
- * playwright.config.ts, Chromium de Playwright). Contra la copia local de PROD: legacy en http://srs.com y PRO en
- * http://pro.srs.com, con el usuario de `.env.e2e.local` (Admin Company de Auto Wax).
+ * Expense Piecework — el camino entero (plans/plan-reunion-juan-18-11, temas 3 y 4; antes P8 de
+ * plans/plan-monthly-closing-vendors), en 375×812 y 1280×800 (los dos proyectos de playwright.config.ts, Chromium de
+ * Playwright). Contra la copia local de PROD: legacy en http://srs.com y PRO en http://pro.srs.com, con el usuario de
+ * `.env.e2e.local` (Admin Company de Auto Wax). Francol Services LLC ya está marcado Vendor en la copia.
  *
- * Lo que recorre: PRO › Monthly Closing de octubre 2026, el Payroll de Land Rover Ft Lauderdale sin la marca → legacy,
- * ficha de Francol Services LLC, Applications & Notifications › «Vendor» › Save → la ficha muestra el cartel → Users ›
- * Filters › «Vendors only» lo trae con la etiqueta «Vendor» → PRO: el Payroll del dealer bajó lo de Francol y su fila
- * no está en la solapa Payroll → legacy: se desmarca (el dato queda como estaba).
+ * Lo que recorre: legacy, la ficha de Francol dice que sus WO van en expenses Piecework → PRO › Monthly Closing de
+ * octubre 2026: Payroll y Expenses de Land Rover Ft Lauderdale → Add Expense › Type Piecework › Francol, 10/31/2026 →
+ * el texto de los pay periods dice lo mismo que la línea «Pay periods» del cierre → se marcan 2 WO → Save → el cierre:
+ * Payroll bajó y Expenses subió el monto de la expense → se borra la expense.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, E2E_PASSWORD, E2E_USER, login, noHorizontalScroll, openMobileMenuIfNeeded } from './helpers'
+import {
+  E2E_MISSING_USER,
+  E2E_MISSING_USER_REASON,
+  E2E_PASSWORD,
+  E2E_USER,
+  filterExpensesByCompany,
+  login,
+  noHorizontalScroll,
+  openMobileMenuIfNeeded,
+} from './helpers'
 
 test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
 
@@ -51,23 +61,8 @@ async function openUserForm(page: Page, id: string) {
   await expect(page.locator('#is_vendor')).toBeAttached()
 }
 
-/** Tilda o destilda «Vendor» y guarda la ficha (vuelve a la lista). */
-async function setVendor(page: Page, value: boolean) {
-  await openUserForm(page, VENDOR_ID)
-  await page.getByRole('link', { name: 'Applications & Notifications' }).click()
-  const box = page.locator('#is_vendor')
-  if ((await box.isChecked()) !== value) {
-    await page.locator('label[for="is_vendor"]').click()
-    // Al tildar, la ficha le pregunta al servidor si tiene otros tipos de pago; Francol solo tiene Piecework.
-    await expect(page.locator('#is_vendor_error')).toBeHidden()
-    await expect(box).toBeChecked({ checked: value })
-  }
-  await page.locator('#btn_submit').click()
-  await page.waitForURL(/usuarios\.php/, { timeout: 30_000 })
-}
-
-/** PRO › Monthly Closing de octubre con All Dealers; devuelve el Payroll del dealer. */
-async function dealerPayroll(page: Page): Promise<number> {
+/** PRO › Monthly Closing de octubre con All Dealers: Payroll y Expenses del dealer y la línea «Pay periods». */
+async function closing(page: Page): Promise<{ payroll: number; expenses: number; periods: string }> {
   // La segunda vez ya hay sesión de PRO y /login no muestra el formulario.
   await page.goto('/')
   if (new URL(page.url()).pathname.startsWith('/login')) await login(page)
@@ -96,56 +91,73 @@ async function dealerPayroll(page: Page): Promise<number> {
   await page.locator('[cmdk-input]').last().fill(MONTH)
   await page.getByRole('option', { name: MONTH, exact: true }).click()
   if (mobile) await page.getByRole('button', { name: 'Apply' }).click()
-  await expect(page.locator('main').getByText(/^Pay periods: /)).toBeVisible({ timeout: 90_000 })
+  const periodsLine = page.locator('main').getByText(/^Pay periods: /)
+  await expect(periodsLine).toBeVisible({ timeout: 90_000 })
 
   const row = page.locator('main tbody tr').filter({ hasText: DEALER })
   const cells = (await row.locator('td').allInnerTexts()).map((c) => c.trim())
-  return money(cells[2])
+  return { payroll: money(cells[2]), expenses: money(cells[3]), periods: (await periodsLine.innerText()).replace(/^Pay periods: /, '') }
 }
 
-async function payrollTabEmployees(page: Page): Promise<string> {
-  await page.locator('main tbody tr').filter({ hasText: DEALER }).click()
-  const dialog = page.getByRole('dialog')
-  await dialog.getByRole('tab', { name: 'Payroll' }).click()
-  const panel = dialog.locator('[role="tabpanel"][data-state="active"]')
-  // Mientras carga, la tabla muestra «No records» con la ruedita: se espera el Total.
-  await expect(panel).toContainText(/Total\s*\$[\d,]+\.\d{2}/, { timeout: 90_000 })
-  return panel.innerText()
-}
+test.describe.serial('Piecework expense — full path', () => {
+  test('the vendor form says where its work orders go', async ({ page }) => {
+    await legacyLogin(page)
+    await openUserForm(page, VENDOR_ID)
+    await expect(page.locator('#is_vendor')).toBeChecked()
+    await expect(page.locator('#vendor_banner')).toContainText('Its work orders go in Piecework expenses')
+  })
 
-test.describe.serial('Vendor mark — full path', () => {
-  test('mark in the legacy form, find it in Users, and the Monthly Closing payroll leaves it out', async ({ page }) => {
+  test('Add Expense › Piecework: Payroll goes down and Expenses up by the same amount in Monthly Closing', async ({ page }) => {
     // Dos cierres de octubre con All Dealers: cada uno tarda 1–2 min contra la copia local (tarea monthly-closing-lento).
     test.setTimeout(900_000)
-    await legacyLogin(page)
-    await setVendor(page, false) // punto de partida: sin la marca
-    const before = await dealerPayroll(page)
-    expect(await payrollTabEmployees(page)).toContain(VENDOR_NAME)
+    const before = await closing(page)
 
-    await legacyLogin(page)
-    await setVendor(page, true)
-    await openUserForm(page, VENDOR_ID)
-    await expect(page.locator('#vendor_banner')).toBeVisible()
-    await expect(page.locator('#vendor_banner')).toContainText('it does not count in the Monthly Closing payroll')
+    await page.goto('/expenses')
+    await page.getByRole('button', { name: 'Add Expense' }).click()
+    const form = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Add Expense' }) })
+    await form.locator('#exp-kind').click()
+    await page.getByRole('option', { name: 'Piecework' }).click()
+    await form.locator('[data-field="pieceworkVendorId"]').getByRole('combobox').click()
+    await page.locator('[cmdk-input]').last().fill('Francol')
+    await page.getByRole('option', { name: VENDOR_NAME }).click()
+    await form.locator('#exp-date').fill('2026-10-31')
 
-    // Users › Filters › «Vendors only»: lo trae con la etiqueta. (Las pantallas del legacy no son responsive: el control
-    // de scroll lateral queda para las de PRO.)
-    await page.goto(`${LEGACY}/modulos/usuarios/php/usuarios.php`)
-    await page.locator('button:has(.fa-filter)').first().click()
-    await page.locator('label[for="only_vendors"]').click()
-    await expect(page.locator('#count_filters')).toHaveText('1')
-    await page.locator('#modal-filters').getByRole('button', { name: 'Close', exact: true }).click()
-    const vendorRow = page.locator('table tbody tr').filter({ hasText: VENDOR_NAME })
-    await expect(vendorRow).toBeVisible({ timeout: 30_000 })
-    await expect(vendorRow.locator('[data-vendor-badge]')).toHaveText('Vendor')
-
-    const after = await dealerPayroll(page)
-    // Francol cobró $14,161.00 de piecework en Land Rover Ft Lauderdale en octubre 2026 (copia de PROD del 12/11).
-    expect(Math.round((before - after) * 100) / 100).toBe(14161)
-    expect(await payrollTabEmployees(page)).not.toContain(VENDOR_NAME)
+    // El texto de arriba de la tabla dice los mismos pay periods que el cierre de octubre (D5).
+    await expect(form.getByTestId('piecework-periods')).toHaveText(`Work orders from pay periods ${before.periods}`, { timeout: 60_000 })
+    const rows = form.locator('tbody tr').filter({ hasText: DEALER })
+    await expect(rows.first()).toBeVisible({ timeout: 60_000 })
+    await rows.nth(0).getByRole('checkbox').click()
+    await rows.nth(1).getByRole('checkbox').click()
+    await expect(form.getByText(/^2 of \d+ work orders$/)).toBeVisible()
+    const total = money(await form.getByTestId('piecework-total').innerText())
+    expect(total).toBeGreaterThan(0)
     await noHorizontalScroll(page)
+    const created = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/srs-kpis/expenses',
+    )
+    await form.getByRole('button', { name: 'Save' }).click()
+    const detail = (await (await created).json()) as { kind: 'single' | 'group'; id?: number; groupId?: number }
+    const deleteUrl =
+      detail.kind === 'group' ? `/api/srs-kpis/expenses/groups/${detail.groupId}` : `/api/srs-kpis/expenses/${detail.id}`
+    await expect(page.getByText('Expense saved.')).toBeVisible()
 
-    await legacyLogin(page)
-    await setVendor(page, false)
+    // La expense en la lista: compañía = el vendor, categoría Piecework, sin «Duplicate».
+    await filterExpensesByCompany(page, VENDOR_NAME)
+    const row = page.getByRole('row').filter({ hasText: VENDOR_NAME }).filter({ hasText: 'Piecework' }).first()
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    await row.getByRole('button', { name: 'Actions' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+
+    try {
+      const after = await closing(page)
+      expect(Math.round((before.payroll - after.payroll) * 100) / 100).toBe(total)
+      expect(Math.round((after.expenses - before.expenses) * 100) / 100).toBe(total)
+      await noHorizontalScroll(page)
+    } finally {
+      // Se borra lo creado (libera las WO), como Delete de la lista.
+      const status = await page.evaluate((url) => fetch(url, { method: 'DELETE' }).then((r) => r.status), deleteUrl)
+      expect(status).toBe(204)
+    }
   })
 })
