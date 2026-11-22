@@ -2116,6 +2116,8 @@ export const es: Messages = {
     pieceworkLocked: 'Expense Piecework: solo cambian la descripción, el recibo y las notas. Para cambiar las WO, el monto o la fecha, borrala y cargala de nuevo.',
     errChooseVendor: 'Elegí un vendor.',
     errChooseWorkOrders: 'Marcá al menos una WO.',
+    typeLockedRegular: 'Para pasar a Piecework, primero sacá los dealers y el monto.',
+    typeLockedPiecework: 'Para pasar a Común, primero sacá el vendor.',
     pastPeriodsAbout:
       'Un gasto recurrente crea sus gastos cada día de corrida de hoy en adelante. Si su fecha de inicio es anterior, los días de corrida que ya pasaron quedan sin gasto: esta pantalla los crea, uno por dealer, hasta ayer (el de hoy se crea solo). Un día de corrida que ya tiene un gasto de este gasto recurrente no se vuelve a crear.',
     pastPeriodsNone: 'No hay períodos pasados sin un gasto de este gasto recurrente.',

@@ -66,13 +66,19 @@ export class UsuarioSrsRepository extends BaseRepository<UsuarioSrs, UsuarioSrsQ
    * Los vendors activos de la empresa con su nombre (combo «Vendor» de la expense Piecework, plans/plan-reunion-juan-
    * 18-11 tema 4). Un vendor borrado no se ofrece.
    */
-  async activeVendors(idCompania: number): Promise<{ id: number; name: string }[]> {
-    const rows: { id: unknown; name: unknown }[] = await this.query(
-      `SELECT u.id_usuario AS id, u.nombre AS name FROM usuarios u
+  async activeVendors(idCompania: number): Promise<{ id: number; name: string; thumbnailUuid: string | null; logoImg: string | null }[]> {
+    const rows: { id: unknown; name: unknown; thumbnailUuid: unknown; logoImg: unknown }[] = await this.query(
+      `SELECT u.id_usuario AS id, u.nombre AS name, u.thumbnail_uuid AS thumbnailUuid, u.logo_img AS logoImg FROM usuarios u
         WHERE u.id_contratista_owner = ? AND u.is_vendor = 1 AND u.estado = 1
         ORDER BY u.nombre`,
       [idCompania],
     )
-    return rows.map((r) => ({ id: Number(r.id), name: String(r.name ?? '') }))
+    // La foto (o las iniciales) del combo de empleados común: thumbnail de v0 y, si no, el logo del legacy.
+    return rows.map((r) => ({
+      id: Number(r.id),
+      name: String(r.name ?? ''),
+      thumbnailUuid: r.thumbnailUuid ? String(r.thumbnailUuid) : null,
+      logoImg: r.logoImg ? String(r.logoImg) : null,
+    }))
   }
 }

@@ -30,6 +30,23 @@ no radio dot (or checkbox) inside it.
   noise.
 - Build the pattern as a `RadioGroup` with cards used as labels.
 
+## Two options are never a combo
+
+**A choice between two options never goes in a `Select`/combo.** It is two tiles (`OptionTile`,
+`components/shared/option-tile.tsx`, like Single dealer / Multiple dealers in Add Expense) or, for a plain on/off,
+a switch. The default option starts selected.
+
+If the choice decides which fields are filled (Type Regular / Piecework in Add Expense), **once data of one option
+was entered, the other tile is disabled**, with one line under the tiles that says what to clear to change it
+(`expenseKindLocked`, `lib/expenses/expense-piecework.ts`).
+
+**Control:** `lib/ui-guards.test.ts` fails on a `<SelectContent>` with exactly two fixed `<SelectItem>`. The four that
+were already there are listed in the test as pending, with the task `ui-dos-opciones-a-tarjetas` in
+`plans/plan-general/PLAN-GENERAL.md`; when one of those screens is touched, it goes to tiles and leaves the list.
+
+*(Ignacio, 22/11/2026: T5 of plan-reunion-juan-18-11 shipped «Type» as a two-option Select; «nunca hagas un combo de
+dos opciones… esas card que quedan lindas».)*
+
 ## When NOT to use tiles
 
 - More than ~5 options, or options with no description → `Select` / `SearchableCombobox`.

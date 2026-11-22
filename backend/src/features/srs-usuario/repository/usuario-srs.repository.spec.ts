@@ -25,8 +25,10 @@ describe('UsuarioSrsRepository.activeVendors', () => {
     expect(params).toEqual([79])
   })
 
-  it('devuelve id numérico y nombre', async () => {
-    const { repo } = repoWithSpy([{ id: '6985', name: 'Francol Services LLC' }])
-    await expect(repo.activeVendors(79)).resolves.toEqual([{ id: 6985, name: 'Francol Services LLC' }])
+  it('devuelve id numérico, nombre y la foto (thumbnail o logo)', async () => {
+    const { repo } = repoWithSpy([{ id: '6985', name: 'Francol Services LLC', thumbnailUuid: 'abc', logoImg: null }])
+    await expect(repo.activeVendors(79)).resolves.toEqual([
+      { id: 6985, name: 'Francol Services LLC', thumbnailUuid: 'abc', logoImg: null },
+    ])
   })
 })

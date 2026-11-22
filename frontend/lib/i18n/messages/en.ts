@@ -2110,6 +2110,8 @@ export const en: Messages = {
     pieceworkLocked: 'Piecework expense: only the description, the receipt # and the notes can change. To change the work orders, the amount or the date, delete it and add it again.',
     errChooseVendor: 'Choose a vendor.',
     errChooseWorkOrders: 'Choose at least one work order.',
+    typeLockedRegular: 'To use Piecework, first clear the dealers and the amount.',
+    typeLockedPiecework: 'To use Regular, first clear the vendor.',
     pastPeriodsAbout:
       "A recurring expense creates its expenses on each run day from today on. If its start date is earlier, the run days that already passed are left without an expense: this screen creates them, one per dealer, up to yesterday (today's is created automatically). A run day that already has an expense of this recurring expense is not created again.",
     pastPeriodsNone: 'There are no past periods without an expense of this recurring expense.',

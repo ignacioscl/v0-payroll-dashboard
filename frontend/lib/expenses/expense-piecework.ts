@@ -23,3 +23,24 @@ export function selectedDealerIds(selected: readonly number[], available: readon
   return [...new Set(available.filter((w) => ids.has(w.idInvoice)).map((w) => String(w.dealer.id)))]
 }
 
+
+/**
+ * Las tarjetas Regular / Piecework de Add Expense (Ignacio, 22/11): una vez que se cargó algo de un tipo, no se pasa
+ * al otro. Regular: un dealer, dealers o montos/porcentajes. Piecework: el vendor o alguna WO. Si se borra todo, se
+ * vuelve a poder cambiar.
+ */
+export function expenseKindLocked(values: {
+  kind: 'regular' | 'piecework'
+  idDealer: string
+  branchIds: string[]
+  totalAmount: string
+  branches: Record<string, { percentage?: string; amount?: string }>
+  pieceworkVendorId: number | null
+  invoiceIds: number[]
+}): boolean {
+  if (values.kind === 'piecework') return values.pieceworkVendorId != null || values.invoiceIds.length > 0
+  const anyBranchValue = Object.values(values.branches ?? {}).some(
+    (b) => (b?.percentage ?? '').trim() !== '' || (b?.amount ?? '').trim() !== '',
+  )
+  return Boolean(values.idDealer) || values.branchIds.length > 0 || values.totalAmount.trim() !== '' || anyBranchValue
+}

@@ -11,7 +11,8 @@ import {
   DataTableColumnHeader,
   type DataTableColumnMeta,
 } from '@/components/shared/data-table'
-import { SearchableCombobox } from '@/components/shared/searchable-combobox'
+import { EmployeeCombobox } from '@/components/ttk/employee-combobox'
+import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -27,6 +28,11 @@ import {
   type PieceworkVendor,
   type PieceworkWorkOrder,
 } from '@/lib/srs-expenses-api'
+
+/** Un vendor como opción del combo de empleados común (foto: thumbnail de v0 o logo del legacy; si no, iniciales). */
+function toEmployeeOption(v: PieceworkVendor): TtkEmployeeOption {
+  return { id: v.id, nombre: v.name, thumbnailUuid: v.thumbnailUuid, logoImg: v.logoImg }
+}
 
 export const pieceworkVendorsKey = ['expense-piecework-vendors'] as const
 export const pieceworkWorkOrdersKey = (vendorId: number, month: string) => ['expense-piecework-work-orders', vendorId, month] as const
@@ -73,15 +79,16 @@ export function ExpensePieceworkFields({
   }, [workOrders.data, available, form, onWorkOrders])
 
   const [term, setTerm] = React.useState('')
-  const vendorItems = React.useMemo(() => {
-    const all = vendors.data?.data ?? []
-    const q = term.trim().toLowerCase()
-    return q ? all.filter((v) => v.name.toLowerCase().includes(q)) : all
-  }, [vendors.data, term])
-  const selectedVendor = React.useMemo(
-    () => (vendors.data?.data ?? []).find((v) => v.id === vendorId) ?? null,
-    [vendors.data, vendorId],
+  // El combo de empleados común (foto o iniciales), con la lista de vendors filtrada acá.
+  const vendorOptions = React.useMemo<TtkEmployeeOption[]>(
+    () => (vendors.data?.data ?? []).map(toEmployeeOption),
+    [vendors.data],
   )
+  const vendorItems = React.useMemo(() => {
+    const q = term.trim().toLowerCase()
+    return q ? vendorOptions.filter((v) => v.nombre.toLowerCase().includes(q)) : vendorOptions
+  }, [vendorOptions, term])
+  const selectedVendor = React.useMemo(() => vendorOptions.find((v) => v.id === vendorId) ?? null, [vendorOptions, vendorId])
 
   const rowSelection = React.useMemo(() => Object.fromEntries(selected.map((id) => [String(id), true])), [selected])
   const setSelection = (next: Record<string, boolean>) => {
@@ -191,22 +198,20 @@ export function ExpensePieceworkFields({
               <FormLabel>{t('expenses.vendor')}</FormLabel>
               <FormControl>
                 <div data-field="pieceworkVendorId" className="min-w-0">
-                  <SearchableCombobox<PieceworkVendor>
+                  <EmployeeCombobox
                     value={selectedVendor}
                     onChange={(v) => {
                       field.onChange(v?.id ?? null)
+                      // Otro vendor (o ninguno): las WO marcadas eran del anterior.
+                      form.setValue('invoiceIds', [])
                       form.clearErrors('pieceworkVendorId')
                     }}
                     searchTerm={term}
                     onSearchTermChange={setTerm}
-                    items={vendorItems}
+                    employees={vendorItems}
                     isLoading={vendors.isLoading}
                     disabled={disabled}
-                    getItemKey={(v) => v.id}
-                    getItemLabel={(v) => v.name}
                     placeholder={t('expenses.selectVendor')}
-                    emptyTitle={t('expenses.noVendors')}
-                    showFooterHint={false}
                   />
                 </div>
               </FormControl>

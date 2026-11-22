@@ -120,3 +120,30 @@ describe('tooltips (T8)', () => {
     expect(filesMatching(/<TooltipProvider\b/)).toEqual(['components/app-providers.tsx'])
   })
 })
+
+describe('combos de empleados y de dos opciones (Ignacio, 22/11)', () => {
+  it('todo combo de empleados es EmployeeCombobox (con la foto)', () => {
+    expect(filesMatching(/SearchableCombobox<\s*\w*(Employee|Vendor|Usuario)\w*/, uiSources)).toEqual([
+      'components/ttk/employee-combobox.tsx',
+    ])
+  })
+
+  it('ningún combo nuevo de dos opciones fijas: van en tarjetas o en un switch', () => {
+    // Ya estaban: tarea `ui-dos-opciones-a-tarjetas` (PLAN-GENERAL). Al tocar una, pasa a tarjetas y sale de acá.
+    const pending = [
+      'components/billing/invoice-po-ro-dialog.tsx',
+      'components/expenses/recurring-rule-form.tsx',
+      'components/roles/role-form-dialog.tsx',
+      'components/roles/templates/role-template-form-dialog.tsx',
+    ]
+    const twoOptions = uiSources
+      .filter(({ src }) =>
+        [...src.matchAll(/<SelectContent[\s\S]*?<\/SelectContent>/g)].some(
+          (m) => (m[0].match(/<SelectItem\b/g) ?? []).length === 2 && !m[0].includes('.map('),
+        ),
+      )
+      .map(({ file }) => file)
+      .sort()
+    expect(twoOptions).toEqual(pending)
+  })
+})

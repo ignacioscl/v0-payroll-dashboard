@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Building2, Copy, Equal, Hammer, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
+import { AlertTriangle, Building2, Copy, Equal, Hammer, Loader2, Percent, Receipt, Repeat, Save, Sigma, Split, Tags, Upload, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -12,7 +12,7 @@ import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
 import { ExpensePieceworkFields } from '@/components/expenses/expense-piecework-fields'
-import { selectedDealerIds } from '@/lib/expenses/expense-piecework'
+import { expenseKindLocked, selectedDealerIds } from '@/lib/expenses/expense-piecework'
 import { ExpenseSplitTable } from '@/components/expenses/expense-split-table'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { OptionTile } from '@/components/shared/option-tile'
@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses-list'
 import { useSrsDealers } from '@/hooks/use-srs-dealers'
@@ -144,6 +143,21 @@ export function ExpenseForm({
   const mode = useWatch({ control: form.control, name: 'mode' })
   const kind = useWatch({ control: form.control, name: 'kind' })
   const isPiecework = kind === 'piecework'
+  const watched = useWatch({ control: form.control })
+  const kindLocked = expenseKindLocked({
+    kind: kind ?? 'regular',
+    idDealer: watched.idDealer ?? '',
+    branchIds: (watched.branchIds ?? []).filter((x): x is string => typeof x === 'string'),
+    totalAmount: watched.totalAmount ?? '',
+    branches: (watched.branches ?? {}) as Record<string, { percentage?: string; amount?: string }>,
+    pieceworkVendorId: watched.pieceworkVendorId ?? null,
+    invoiceIds: (watched.invoiceIds ?? []).filter((x): x is number => typeof x === 'number'),
+  })
+  const setKind = (next: 'regular' | 'piecework') => {
+    if (next === kind || kindLocked) return
+    form.setValue('kind', next, { shouldDirty: true })
+    form.clearErrors()
+  }
   /** La lista de WO que se ve (Piecework), para saber los dealers del gasto al grabar. */
   const [pieceworkWorkOrders, setPieceworkWorkOrders] = React.useState<PieceworkWorkOrder[]>([])
   const idDealer = useWatch({ control: form.control, name: 'idDealer' })
@@ -383,38 +397,33 @@ export function ExpenseForm({
         ) : null}
 
         {canPiecework && !isEdit ? (
-          <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="kind"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel htmlFor="exp-kind">{t('expenses.type')}</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={(v) => {
-                      field.onChange(v)
-                      form.clearErrors()
-                    }}
-                    disabled={busy}
-                  >
-                    <FormControl>
-                      <SelectTrigger id="exp-kind" className="w-full cursor-pointer" data-field="kind">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="regular" className="cursor-pointer">{t('expenses.typeRegular')}</SelectItem>
-                      <SelectItem value="piecework" className="cursor-pointer">{t('expenses.typePiecework')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <p className="pt-0 text-xs text-muted-foreground md:pt-7">
-              {isPiecework ? t('expenses.typePieceworkHint') : t('expenses.typeRegularHint')}
-            </p>
+          <FormSection title={t('expenses.type')} icon={Tags} className="space-y-2">
+            {/* Dos opciones: tarjetas, como Single / Multiple dealers (no un combo). Con datos cargados de un tipo, el
+                otro queda deshabilitado (Ignacio, 22/11). */}
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              <OptionTile
+                dataField="kind"
+                selected={!isPiecework}
+                onSelect={() => setKind('regular')}
+                title={t('expenses.typeRegular')}
+                description={t('expenses.typeRegularHint')}
+                icon={Receipt}
+                disabled={busy || (isPiecework && kindLocked)}
+              />
+              <OptionTile
+                selected={isPiecework}
+                onSelect={() => setKind('piecework')}
+                title={t('expenses.typePiecework')}
+                description={t('expenses.typePieceworkHint')}
+                icon={Hammer}
+                disabled={busy || (!isPiecework && kindLocked)}
+              />
+            </div>
+            {kindLocked ? (
+              <p className="text-xs text-muted-foreground">
+                {isPiecework ? t('expenses.typeLockedPiecework') : t('expenses.typeLockedRegular')}
+              </p>
+            ) : null}
           </FormSection>
         ) : null}
 

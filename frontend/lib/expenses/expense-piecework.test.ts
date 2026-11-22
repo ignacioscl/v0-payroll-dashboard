@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { keepAvailable, selectedDealerIds, selectedTotal } from './expense-piecework'
+import { expenseKindLocked, keepAvailable, selectedDealerIds, selectedTotal } from './expense-piecework'
 import { createExpenseFormSchema, emptyExpenseFormValues, expenseFormValuesToPayload } from './expense-form-schema'
 import type { PieceworkWorkOrder } from '@/lib/srs-expenses-api'
 
@@ -85,5 +85,35 @@ describe('Add Expense tipo Piecework — esquema y cuerpo (pareja de CreateExpen
     expect(payload).toMatchObject({ mode: 'single', idDealer: 627, totalAmount: '10.00' })
     expect(payload).not.toHaveProperty('pieceworkVendorId')
     expect(payload).not.toHaveProperty('invoiceIds')
+  })
+})
+
+describe('Tarjetas Regular / Piecework: con datos cargados no se cambia (Ignacio, 22/11)', () => {
+  const base = {
+    kind: 'regular' as const,
+    idDealer: '',
+    branchIds: [] as string[],
+    totalAmount: '',
+    branches: {} as Record<string, { percentage?: string; amount?: string }>,
+    pieceworkVendorId: null as number | null,
+    invoiceIds: [] as number[],
+  }
+
+  it('Regular vacío se puede cambiar; con dealer, dealers, monto o un valor de la tabla, no', () => {
+    expect(expenseKindLocked(base)).toBe(false)
+    expect(expenseKindLocked({ ...base, idDealer: '627' })).toBe(true)
+    expect(expenseKindLocked({ ...base, branchIds: ['627'] })).toBe(true)
+    expect(expenseKindLocked({ ...base, totalAmount: '10' })).toBe(true)
+    expect(expenseKindLocked({ ...base, branches: { '627': { amount: '5' } } })).toBe(true)
+    expect(expenseKindLocked({ ...base, branches: { '627': { amount: ' ', percentage: '' } } })).toBe(false)
+  })
+
+  it('Piecework vacío se puede cambiar; con vendor o alguna WO, no', () => {
+    const pw = { ...base, kind: 'piecework' as const }
+    expect(expenseKindLocked(pw)).toBe(false)
+    expect(expenseKindLocked({ ...pw, pieceworkVendorId: 6985 })).toBe(true)
+    expect(expenseKindLocked({ ...pw, invoiceIds: [1] })).toBe(true)
+    // Lo de Regular no cuenta estando en Piecework.
+    expect(expenseKindLocked({ ...pw, totalAmount: '10' })).toBe(false)
   })
 })

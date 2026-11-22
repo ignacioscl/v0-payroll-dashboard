@@ -2023,6 +2023,8 @@ export interface Messages {
     pieceworkLocked: string
     errChooseVendor: string
     errChooseWorkOrders: string
+    typeLockedRegular: string
+    typeLockedPiecework: string
     pastPeriodsAbout: string
     pastPeriodsNone: string
     pastPeriodsProblem: string

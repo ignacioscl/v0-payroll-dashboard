@@ -42,7 +42,7 @@ export class UsuarioSrsService extends GlobalBaseService<UsuarioSrs, UsuarioSrsQ
   }
 
   /** Los vendors activos con su nombre: el combo «Vendor» de la expense Piecework (tema 4 de plan-reunion-juan-18-11). */
-  activeVendors(idCompania: number): Promise<{ id: number; name: string }[]> {
+  activeVendors(idCompania: number): Promise<{ id: number; name: string; thumbnailUuid: string | null; logoImg: string | null }[]> {
     return this.repository.activeVendors(idCompania)
   }
 

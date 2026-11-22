@@ -56,6 +56,23 @@ const projectsQuery = useProjectSearch(term, { enabled: term.length >= 2 })
 />
 ```
 
+## Empleados (y vendors): siempre `EmployeeCombobox`, con la foto
+
+**Todo combo que elige un empleado** —«Assign to employee», el filtro de empleado, el «Vendor» de la expense
+Piecework, el que venga— es `EmployeeCombobox` (`components/ttk/employee-combobox.tsx`) o un wrapper fino sobre él
+(como `ExpenseEmployeeCombobox`): muestra la foto del empleado (thumbnail de v0 y, si no, el logo del legacy) o sus
+iniciales, en la lista y en el campo elegido. **Nunca** un `SearchableCombobox` con el nombre a secas ni un `Select`.
+
+- El endpoint que alimenta el combo devuelve `thumbnailUuid` y `logoImg` (`usuarios.thumbnail_uuid` / `logo_img`)
+  además del id y el nombre, y el front lo pasa como `TtkEmployeeOption` (`nombre`, `thumbnailUuid`, `logoImg`).
+- Si la lista es chica y viene entera (los vendors de la empresa), se filtra en el cliente y se le pasa a
+  `EmployeeCombobox` igual.
+- **Control:** `lib/ui-guards.test.ts` falla si un `SearchableCombobox<…Employee|Vendor|Usuario…>` aparece fuera de
+  `components/ttk/employee-combobox.tsx`.
+
+*(Regla de Ignacio, 22/11/2026: en T5 de plan-reunion-juan-18-11 el combo «Vendor» salió como `SearchableCombobox`
+con el nombre solo; «¿no había un componente de empleados donde ponía la foto en el combo?… estandarizalo».)*
+
 ## Wrappers de dominio
 
 Si necesitás avatares, subtítulos o iconografía específica, **no copies el

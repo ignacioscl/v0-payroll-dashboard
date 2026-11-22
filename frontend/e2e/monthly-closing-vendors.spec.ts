@@ -115,12 +115,18 @@ test.describe.serial('Piecework expense — full path', () => {
     await page.goto('/expenses')
     await page.getByRole('button', { name: 'Add Expense' }).click()
     const form = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Add Expense' }) })
-    await form.locator('#exp-kind').click()
-    await page.getByRole('option', { name: 'Piecework' }).click()
+    // Tarjetas Regular / Piecework: Regular por defecto; con datos de un tipo, el otro queda deshabilitado.
+    // Las tarjetas tienen aria-pressed (el título de la columna Piecework de la tabla, no).
+    const regularTile = form.locator('button[aria-pressed]').filter({ hasText: /^Regular/ })
+    const pieceworkTile = form.locator('button[aria-pressed]').filter({ hasText: /^Piecework/ })
+    await expect(regularTile).toHaveAttribute('aria-pressed', 'true')
+    await pieceworkTile.click()
+    await expect(pieceworkTile).toHaveAttribute('aria-pressed', 'true')
     await form.locator('[data-field="pieceworkVendorId"]').getByRole('combobox').click()
     await page.locator('[cmdk-input]').last().fill('Francol')
     await page.getByRole('option', { name: VENDOR_NAME }).click()
     await form.locator('#exp-date').fill('2026-10-31')
+    await expect(regularTile).toBeDisabled()
 
     // El texto de arriba de la tabla dice los mismos pay periods que el cierre de octubre (D5).
     await expect(form.getByTestId('piecework-periods')).toHaveText(`Work orders from pay periods ${before.periods}`, { timeout: 60_000 })

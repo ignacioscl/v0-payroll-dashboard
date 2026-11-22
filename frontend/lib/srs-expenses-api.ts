@@ -482,6 +482,8 @@ export function fetchExpenseEmployees(term: string, idDealer: string | null): Pr
 export interface PieceworkVendor {
   id: number
   name: string
+  thumbnailUuid: string | null
+  logoImg: string | null
 }
 
 export interface PieceworkWorkOrder {

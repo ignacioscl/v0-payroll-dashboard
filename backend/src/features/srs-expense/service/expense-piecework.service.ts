@@ -26,9 +26,12 @@ import { fromCents, toCents } from '../rules/expense-rules'
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 
+/** Con la foto: el combo «Vendor» es el combo de empleados común (foto o iniciales). */
 export interface PieceworkVendorDto {
   id: number
   name: string
+  thumbnailUuid: string | null
+  logoImg: string | null
 }
 
 export interface PieceworkWorkOrderDto {
