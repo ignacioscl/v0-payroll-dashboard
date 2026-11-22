@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { expenseKindLocked, keepAvailable, selectedDealerIds, selectedTotal } from './expense-piecework'
+import { expenseKindLocked, keepAvailable, pieceworkRangeText, selectedDealerIds, selectedTotal } from './expense-piecework'
 import { createExpenseFormSchema, emptyExpenseFormValues, expenseFormValuesToPayload } from './expense-form-schema'
 import type { PieceworkWorkOrder } from '@/lib/srs-expenses-api'
 
@@ -115,5 +115,34 @@ describe('Tarjetas Regular / Piecework: con datos cargados no se cambia (Ignacio
     expect(expenseKindLocked({ ...pw, invoiceIds: [1] })).toBe(true)
     // Lo de Regular no cuenta estando en Piecework.
     expect(expenseKindLocked({ ...pw, totalAmount: '10' })).toBe(false)
+  })
+})
+
+describe('Texto de arriba de la tabla de WO: un solo rango (Ignacio, 22/11)', () => {
+  const nov = [
+    { desde: '2026-10-31', hasta: '2026-11-15' },
+    { desde: '2026-11-16', hasta: '2026-11-30' },
+  ]
+
+  it('del primer día del primer pay period al último del último, en inglés y castellano', () => {
+    expect(pieceworkRangeText(nov, 'en')).toEqual({
+      key: 'expenses.pieceworkPeriods',
+      params: { from: 'Oct 31', to: 'Nov 30', year: '2026' },
+    })
+    expect(pieceworkRangeText(nov, 'es')).toEqual({
+      key: 'expenses.pieceworkPeriods',
+      params: { from: '31 de oct.', to: '30 de nov.', year: '2026' },
+    })
+  })
+
+  it('si cruza de año, cada punta con su año', () => {
+    expect(pieceworkRangeText([{ desde: '2026-12-31', hasta: '2027-01-30' }], 'en')).toEqual({
+      key: 'expenses.pieceworkPeriodsCrossYear',
+      params: { from: 'Dec 31', fromYear: '2026', to: 'Jan 30', toYear: '2027' },
+    })
+  })
+
+  it('sin pay periods, nada', () => {
+    expect(pieceworkRangeText([], 'en')).toBeNull()
   })
 })

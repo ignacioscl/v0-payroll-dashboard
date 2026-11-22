@@ -18,9 +18,8 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input'
 import { fmtAmount, fmtYmd } from '@/lib/expenses/expense-format'
 import type { ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
-import { keepAvailable, selectedTotal } from '@/lib/expenses/expense-piecework'
+import { keepAvailable, pieceworkRangeText, selectedTotal } from '@/lib/expenses/expense-piecework'
 import { isRealYmd, toCents } from '@/lib/expenses/expense-rules'
-import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import {
   fetchPieceworkVendors,
@@ -52,7 +51,7 @@ export function ExpensePieceworkFields({
   /** La lista que se ve, para que el form sepa los dealers al grabar. */
   onWorkOrders?: (wos: PieceworkWorkOrder[]) => void
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const form = useFormContext<ExpenseFormValues>()
   const vendorId = useWatch({ control: form.control, name: 'pieceworkVendorId' })
   const ticketDate = useWatch({ control: form.control, name: 'ticketDate' })
@@ -176,14 +175,14 @@ export function ExpensePieceworkFields({
     [t, disabled],
   )
 
+  // Un solo rango, del primer día del primer pay period al último del último (Ignacio, 22/11).
+  const range = pieceworkRangeText(periods, locale)
   // Sin vendor o sin fecha no hay texto arriba: la tabla vacía ya dice qué falta.
   const periodsText = !vendorId || !month
     ? ''
     : workOrders.data
-      ? periods.length
-        ? t('expenses.pieceworkPeriods', {
-            periods: periods.map((p) => `${formatUsCalendarDate(p.desde)} – ${formatUsCalendarDate(p.hasta)}`).join(', '),
-          })
+      ? range
+        ? t(range.key, range.params)
         : t('expenses.pieceworkNoPeriods')
       : ''
 

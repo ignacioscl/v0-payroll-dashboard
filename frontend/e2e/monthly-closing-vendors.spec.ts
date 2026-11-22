@@ -99,6 +99,16 @@ async function closing(page: Page): Promise<{ payroll: number; expenses: number;
   return { payroll: money(cells[2]), expenses: money(cells[3]), periods: (await periodsLine.innerText()).replace(/^Pay periods: /, '') }
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** «10/01/2026 – 10/15/2026, 10/16/2026 – 10/30/2026» (línea del cierre) → «Work orders from Oct 1 to Oct 30, 2026». */
+function rangeText(periods: string): string {
+  const dates = periods.match(/\d{2}\/\d{2}\/\d{4}/g) ?? []
+  const [m1, d1] = dates[0].split('/').map(Number)
+  const [m2, d2, y2] = dates[dates.length - 1].split('/').map(Number)
+  return `Work orders from ${MONTHS[m1 - 1]} ${d1} to ${MONTHS[m2 - 1]} ${d2}, ${y2}`
+}
+
 test.describe.serial('Piecework expense — full path', () => {
   test('the vendor form says where its work orders go', async ({ page }) => {
     await legacyLogin(page)
@@ -128,8 +138,9 @@ test.describe.serial('Piecework expense — full path', () => {
     await form.locator('#exp-date').fill('2026-10-31')
     await expect(regularTile).toBeDisabled()
 
-    // El texto de arriba de la tabla dice los mismos pay periods que el cierre de octubre (D5).
-    await expect(form.getByTestId('piecework-periods')).toHaveText(`Work orders from pay periods ${before.periods}`, { timeout: 60_000 })
+    // El texto de arriba de la tabla es un solo rango: del primer día del primer pay period del cierre de octubre al
+    // último del último (D5; formato aprobado por Ignacio el 22/11, «Work orders from Oct 1 to Oct 30, 2026»).
+    await expect(form.getByTestId('piecework-periods')).toHaveText(rangeText(before.periods), { timeout: 60_000 })
     const rows = form.locator('tbody tr').filter({ hasText: DEALER })
     await expect(rows.first()).toBeVisible({ timeout: 60_000 })
     await rows.nth(0).getByRole('checkbox').click()
