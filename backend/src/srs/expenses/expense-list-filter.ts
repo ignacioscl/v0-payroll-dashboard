@@ -30,6 +30,8 @@ export interface ExpenseListFilter {
   idAuthor?: number
   idCreatedBy?: number
   status?: ExpenseStatusFilter
+  /** Expense Piecework (con filas en EXP_EXPENSE_PIECEWORK_WO) o común; sin él, las dos. */
+  type?: 'regular' | 'piecework'
   amountMin?: string
   amountMax?: string
   /** Show deleted: `estado = 0`. */
@@ -66,6 +68,7 @@ export function buildExpenseListFilter(ctx: SrsContext, query: ExpenseListQueryD
     idAuthor: query.idAuthor,
     idCreatedBy: query.idCreatedBy,
     status: query.status,
+    type: query.type,
     amountMin: query.amountMin,
     amountMax: query.amountMax,
     deleted: query.deleted === '1',

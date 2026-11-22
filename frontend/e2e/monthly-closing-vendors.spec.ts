@@ -144,7 +144,9 @@ test.describe.serial('Piecework expense — full path', () => {
     const rows = form.locator('tbody tr').filter({ hasText: DEALER })
     await expect(rows.first()).toBeVisible({ timeout: 60_000 })
     await rows.nth(0).getByRole('checkbox').click()
-    await rows.nth(1).getByRole('checkbox').click()
+    // Toda la fila marca la WO: la segunda se marca tocando el VIN, no el check.
+    await rows.nth(1).locator('td').nth(2).click()
+    await expect(rows.nth(1).getByRole('checkbox')).toBeChecked()
     await expect(form.getByText(/^2 of \d+ work orders$/)).toBeVisible()
     const total = money(await form.getByTestId('piecework-total').innerText())
     expect(total).toBeGreaterThan(0)
@@ -165,6 +167,13 @@ test.describe.serial('Piecework expense — full path', () => {
     await row.getByRole('button', { name: 'Actions' }).click()
     await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveCount(0)
     await page.keyboard.press('Escape')
+
+    // Filtro All / Regular / Piecework (Ignacio, 22/11): Regular la esconde, Piecework la muestra.
+    const typeFilter = page.getByTestId('expense-type-filter')
+    await typeFilter.locator('button[aria-pressed]').filter({ hasText: /^Regular$/ }).click()
+    await expect(page.getByRole('row').filter({ hasText: VENDOR_NAME })).toHaveCount(0)
+    await typeFilter.locator('button[aria-pressed]').filter({ hasText: /^Piecework$/ }).click()
+    await expect(row).toBeVisible()
 
     try {
       const after = await closing(page)

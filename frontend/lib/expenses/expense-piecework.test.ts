@@ -125,20 +125,14 @@ describe('Texto de arriba de la tabla de WO: un solo rango (Ignacio, 22/11)', ()
   ]
 
   it('del primer día del primer pay period al último del último, en inglés y castellano', () => {
-    expect(pieceworkRangeText(nov, 'en')).toEqual({
-      key: 'expenses.pieceworkPeriods',
-      params: { from: 'Oct 31', to: 'Nov 30', year: '2026' },
-    })
-    expect(pieceworkRangeText(nov, 'es')).toEqual({
-      key: 'expenses.pieceworkPeriods',
-      params: { from: '31 de oct.', to: '30 de nov.', year: '2026' },
-    })
+    expect(pieceworkRangeText(nov, 'en')).toEqual({ from: 'Oct 31', to: 'Nov 30, 2026' })
+    expect(pieceworkRangeText(nov, 'es')).toEqual({ from: '31 de oct.', to: '30 de nov. de 2026' })
   })
 
-  it('si cruza de año, cada punta con su año', () => {
+  it('si cruza de año, las dos fechas llevan su año', () => {
     expect(pieceworkRangeText([{ desde: '2026-12-31', hasta: '2027-01-30' }], 'en')).toEqual({
-      key: 'expenses.pieceworkPeriodsCrossYear',
-      params: { from: 'Dec 31', fromYear: '2026', to: 'Jan 30', toYear: '2027' },
+      from: 'Dec 31, 2026',
+      to: 'Jan 30, 2027',
     })
   })
 

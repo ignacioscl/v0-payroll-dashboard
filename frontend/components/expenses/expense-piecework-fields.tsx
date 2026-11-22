@@ -119,15 +119,18 @@ export function ExpensePieceworkFields({
             className="cursor-pointer"
           />
         ),
+        // El check de Radix, dentro de un <form>, tiene un input oculto que dispara su propio clic cada vez que cambia:
+        // si ese clic llega a la fila (que también marca la WO), vuelve a cambiarlo y queda en bucle. El span lo frena.
         cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            disabled={disabled}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label={t('expenses.pieceworkSelectRow', { nro: row.original.nro })}
-            className="cursor-pointer"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={row.getIsSelected()}
+              disabled={disabled}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label={t('expenses.pieceworkSelectRow', { nro: row.original.nro })}
+              className="cursor-pointer"
+            />
+          </span>
         ),
         meta: {
           label: t('expenses.pieceworkSelectRow', { nro: '' }),
@@ -177,14 +180,25 @@ export function ExpensePieceworkFields({
 
   // Un solo rango, del primer día del primer pay period al último del último (Ignacio, 22/11).
   const range = pieceworkRangeText(periods, locale)
-  // Sin vendor o sin fecha no hay texto arriba: la tabla vacía ya dice qué falta.
-  const periodsText = !vendorId || !month
-    ? ''
-    : workOrders.data
-      ? range
-        ? t(range.key, range.params)
+  // Sin vendor o sin fecha no hay texto arriba: la tabla vacía ya dice qué falta. Las fechas van en negrita y el resto
+  // del texto normal (Ignacio, 22/11): el texto traducido se arma con marcas en lugar de las fechas y se parte ahí.
+  const MARK = '\u0001'
+  const periodsText: React.ReactNode =
+    !vendorId || !month || !workOrders.data
+      ? null
+      : range
+        ? t('expenses.pieceworkPeriods', { from: `${MARK}from${MARK}`, to: `${MARK}to${MARK}` })
+            .split(MARK)
+            .map((part, i) =>
+              i % 2 === 1 ? (
+                <strong key={i} className="font-semibold">
+                  {range[part as 'from' | 'to']}
+                </strong>
+              ) : (
+                part
+              ),
+            )
         : t('expenses.pieceworkNoPeriods')
-      : ''
 
   return (
     <div className="min-w-0 space-y-4">
@@ -235,7 +249,7 @@ export function ExpensePieceworkFields({
         />
       </div>
 
-      {periodsText ? <p className="text-sm font-semibold text-foreground" data-testid="piecework-periods">{periodsText}</p> : null}
+      {periodsText ? <p className="text-sm text-foreground" data-testid="piecework-periods">{periodsText}</p> : null}
 
       <FormField
         control={form.control}
@@ -252,6 +266,8 @@ export function ExpensePieceworkFields({
                 enableRowSelection={!disabled}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setSelection}
+                // Toda la fila marca o desmarca la WO, con la manito (Ignacio, 22/11); el check no repite el clic.
+                onRowClick={disabled ? undefined : (w) => setSelection({ ...rowSelection, [String(w.idInvoice)]: !rowSelection[String(w.idInvoice)] })}
                 defaultPageSize={DATA_TABLE_PAGE_SIZE_ALL}
                 includeAllPageSize
                 tableScrollHeight="40vh"

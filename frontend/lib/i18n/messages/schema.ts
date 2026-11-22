@@ -2016,7 +2016,6 @@ export interface Messages {
     pieceworkSelectRow: string
     pieceworkChooseVendorAndDate: string
     pieceworkPeriods: string
-    pieceworkPeriodsCrossYear: string
     pieceworkNoPeriods: string
     pieceworkNoWorkOrders: string
     pieceworkSelected: string

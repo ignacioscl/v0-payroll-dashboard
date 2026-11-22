@@ -85,6 +85,8 @@ export interface ExpenseListFilters {
   idAuthor?: number
   idCreatedBy?: number
   status?: ExpenseStatus | ''
+  /** Tarjetas All / Regular / Piecework (Ignacio, 22/11); sin él, los dos tipos. */
+  type?: 'regular' | 'piecework'
   amountMin?: string
   amountMax?: string
   deleted?: 0 | 1
@@ -381,6 +383,7 @@ export function buildExpenseListQuery(params: Partial<ExpenseListParams>): strin
     idAuthor: params.idAuthor,
     idCreatedBy: params.idCreatedBy,
     status: params.status,
+    type: params.type,
     amountMin: params.amountMin,
     amountMax: params.amountMax,
     deleted: params.deleted,

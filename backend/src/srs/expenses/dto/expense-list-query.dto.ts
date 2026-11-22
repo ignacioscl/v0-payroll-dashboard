@@ -81,6 +81,12 @@ export class ExpenseListQueryDto {
   @IsIn(['pending', 'approved', 'rejected'])
   status?: 'pending' | 'approved' | 'rejected'
 
+  /** Tarjetas All / Regular / Piecework de Expenses List (Ignacio, 22/11). Sin él, los dos tipos. */
+  @ApiPropertyOptional({ enum: ['regular', 'piecework'] })
+  @IsOptional()
+  @IsIn(['regular', 'piecework'])
+  type?: 'regular' | 'piecework'
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

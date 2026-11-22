@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calculator, Hash, Plus, Receipt, Tag } from 'lucide-react'
+import { Calculator, Hammer, Hash, Layers, Plus, Receipt, Tag } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ContentSkeleton } from '@/components/layout/content-skeleton'
@@ -11,6 +11,7 @@ import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpensesDataTable } from '@/components/expenses/expenses-data-table'
 import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
+import { OptionTile } from '@/components/shared/option-tile'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,8 @@ function ExpensesListPage() {
   const [author, setAuthor] = React.useState<TtkEmployeeOption | null>(null)
   const [createdBy, setCreatedBy] = React.useState<TtkEmployeeOption | null>(null)
   const [status, setStatus] = React.useState<StatusFilter>('all')
+  /** All / Regular / Piecework (Ignacio, 22/11): tarjetas, no un combo. */
+  const [kind, setKind] = React.useState<'all' | 'regular' | 'piecework'>('all')
   const [amountMin, setAmountMin] = React.useState('')
   const [amountMax, setAmountMax] = React.useState('')
   const [showDeleted, setShowDeleted] = React.useState(false)
@@ -129,11 +132,12 @@ function ExpensesListPage() {
       idAuthor: author?.id,
       idCreatedBy: createdBy?.id,
       status: status === 'all' ? undefined : status,
+      type: kind === 'all' ? undefined : kind,
       amountMin: amountMin.trim() && isValidAmount(amountMin.trim()) ? amountMin.trim() : undefined,
       amountMax: amountMax.trim() && isValidAmount(amountMax.trim()) ? amountMax.trim() : undefined,
       deleted: showDeleted ? 1 : 0,
     }
-  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, amountMin, amountMax, showDeleted])
+  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, kind, amountMin, amountMax, showDeleted])
 
   const summary = useExpenseSummary(filters)
 
@@ -155,6 +159,9 @@ function ExpensesListPage() {
     ...(createdBy ? [{ key: 'createdBy', label: `${t('expenses.createdBy')}: ${createdBy.nombre}`, onRemove: () => setCreatedBy(null) }] : []),
     ...(status !== 'all'
       ? [{ key: 'status', label: statusOptions.find((o) => o.value === status)?.label ?? status, onRemove: () => setStatus('all') }]
+      : []),
+    ...(kind !== 'all'
+      ? [{ key: 'type', label: kind === 'piecework' ? t('expenses.typePiecework') : t('expenses.typeRegular'), onRemove: () => setKind('all') }]
       : []),
     ...(amountMin.trim() ? [{ key: 'amountMin', label: `${t('expenses.amountFrom')}: ${amountMin.trim()}`, onRemove: () => setAmountMin('') }] : []),
     ...(amountMax.trim() ? [{ key: 'amountMax', label: `${t('expenses.amountTo')}: ${amountMax.trim()}`, onRemove: () => setAmountMax('') }] : []),
@@ -245,6 +252,14 @@ function ExpensesListPage() {
             placeholder="0.00"
           />
         </div>
+          </div>
+          <div className="space-y-1.5 border-t border-border/60 pt-3">
+            <span className={FILTER_FIELD_LABEL}>{t('expenses.type')}</span>
+            <div className="grid gap-1.5 sm:grid-cols-3" data-testid="expense-type-filter">
+              <OptionTile selected={kind === 'all'} onSelect={() => setKind('all')} title={t('expenses.all')} icon={Layers} />
+              <OptionTile selected={kind === 'regular'} onSelect={() => setKind('regular')} title={t('expenses.typeRegular')} icon={Receipt} />
+              <OptionTile selected={kind === 'piecework'} onSelect={() => setKind('piecework')} title={t('expenses.typePiecework')} icon={Hammer} />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
           <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />

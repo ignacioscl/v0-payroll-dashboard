@@ -130,6 +130,10 @@ export class ExpenseReportRepository {
       sql += ' AND e.id_created_by = ?'
       params.push(filter.idCreatedBy)
     }
+    // All / Regular / Piecework (Ignacio, 22/11): una expense Piecework tiene filas en EXP_EXPENSE_PIECEWORK_WO.
+    const isPiecework = 'EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id AND pw.deleted_at IS NULL)'
+    if (filter.type === 'piecework') sql += ` AND ${isPiecework}`
+    else if (filter.type === 'regular') sql += ` AND NOT ${isPiecework}`
     if (filter.status === 'pending') sql += ' AND e.is_approved IS NULL'
     else if (filter.status === 'approved') sql += ' AND e.is_approved = 1'
     else if (filter.status === 'rejected') sql += ' AND e.is_approved = 0'
