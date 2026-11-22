@@ -170,9 +170,9 @@ test.describe.serial('Piecework expense — full path', () => {
 
     // Filtro All / Regular / Piecework (Ignacio, 22/11): Regular la esconde, Piecework la muestra.
     const typeFilter = page.getByTestId('expense-type-filter')
-    await typeFilter.locator('button[aria-pressed]').filter({ hasText: /^Regular$/ }).click()
+    await typeFilter.getByRole('radio', { name: 'Regular', exact: true }).click()
     await expect(page.getByRole('row').filter({ hasText: VENDOR_NAME })).toHaveCount(0)
-    await typeFilter.locator('button[aria-pressed]').filter({ hasText: /^Piecework$/ }).click()
+    await typeFilter.getByRole('radio', { name: 'Piecework', exact: true }).click()
     await expect(row).toBeVisible()
 
     try {

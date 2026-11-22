@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calculator, Hammer, Hash, Layers, Plus, Receipt, Tag } from 'lucide-react'
+import { Calculator, Hash, Plus, Receipt, Tag } from 'lucide-react'
 
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { ContentSkeleton } from '@/components/layout/content-skeleton'
@@ -11,7 +11,7 @@ import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpensesDataTable } from '@/components/expenses/expenses-data-table'
 import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
-import { OptionTile } from '@/components/shared/option-tile'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
@@ -253,19 +253,38 @@ function ExpensesListPage() {
           />
         </div>
           </div>
-          <div className="space-y-1.5 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border/60 pt-3">
+          <div className="flex items-center gap-2">
             <span className={FILTER_FIELD_LABEL}>{t('expenses.type')}</span>
-            <div className="grid gap-1.5 sm:grid-cols-3" data-testid="expense-type-filter">
-              <OptionTile selected={kind === 'all'} onSelect={() => setKind('all')} title={t('expenses.all')} icon={Layers} />
-              <OptionTile selected={kind === 'regular'} onSelect={() => setKind('regular')} title={t('expenses.typeRegular')} icon={Receipt} />
-              <OptionTile selected={kind === 'piecework'} onSelect={() => setKind('piecework')} title={t('expenses.typePiecework')} icon={Hammer} />
-            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={kind}
+              onValueChange={(value) => {
+                // Radix emite '' al tocar la opción ya elegida: se queda la que estaba.
+                if (value === 'all' || value === 'regular' || value === 'piecework') setKind(value)
+              }}
+              aria-label={t('expenses.type')}
+              data-testid="expense-type-filter"
+            >
+              <ToggleGroupItem value="all" className="cursor-pointer px-3">
+                {t('expenses.all')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="regular" className="cursor-pointer px-3">
+                {t('expenses.typeRegular')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="piecework" className="cursor-pointer px-3">
+                {t('expenses.typePiecework')}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
-          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+          <div className="flex items-center gap-3">
           <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />
           <Label htmlFor="exp-show-deleted" className="cursor-pointer text-sm">
             {t('expenses.showDeleted')}
           </Label>
+          </div>
           </div>
         </div>
       </FilterPanel>
