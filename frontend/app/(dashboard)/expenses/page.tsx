@@ -11,7 +11,7 @@ import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpensesDataTable } from '@/components/expenses/expenses-data-table'
 import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { SegmentedControl } from '@/components/shared/segmented-control'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
@@ -256,28 +256,17 @@ function ExpensesListPage() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border/60 pt-3">
           <div className="flex items-center gap-2">
             <span className={FILTER_FIELD_LABEL}>{t('expenses.type')}</span>
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
+            <SegmentedControl
               value={kind}
-              onValueChange={(value) => {
-                // Radix emite '' al tocar la opción ya elegida: se queda la que estaba.
-                if (value === 'all' || value === 'regular' || value === 'piecework') setKind(value)
-              }}
+              onValueChange={setKind}
+              options={[
+                { value: 'all', label: t('expenses.all') },
+                { value: 'regular', label: t('expenses.typeRegular') },
+                { value: 'piecework', label: t('expenses.typePiecework') },
+              ]}
               aria-label={t('expenses.type')}
               data-testid="expense-type-filter"
-            >
-              <ToggleGroupItem value="all" className="cursor-pointer px-3">
-                {t('expenses.all')}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="regular" className="cursor-pointer px-3">
-                {t('expenses.typeRegular')}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="piecework" className="cursor-pointer px-3">
-                {t('expenses.typePiecework')}
-              </ToggleGroupItem>
-            </ToggleGroup>
+            />
           </div>
           <div className="flex items-center gap-3">
           <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />

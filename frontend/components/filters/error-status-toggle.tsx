@@ -1,12 +1,11 @@
 'use client'
 
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { SegmentedControl } from '@/components/shared/segmented-control'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useFilters } from '@/lib/filter-context'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { errorStatusCrossesType, isErrorStatus } from '@/lib/ttk/error-status'
 import { TODAY_LIVE_STATUS_ALL } from '@/lib/ttk/today-live-status'
-import { cn } from '@/lib/utils'
 
 /**
  * Eje pendiente / corregido.
@@ -37,14 +36,10 @@ export function ErrorStatusToggle({
   const notApplied = respectSelectedType && !errorStatusCrossesType(selectedType)
 
   const control = (
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      size="sm"
+    <SegmentedControl
       value={notApplied ? '' : errorStatus}
       onValueChange={(value) => {
-        // Radix emite '' al des-seleccionar el ítem activo: sin este guard el eje
-        // se queda sin valor y la grilla pide un issueType vacío.
+        // SegmentedControl ya ignora el '' de Radix al des-seleccionar el ítem activo.
         if (!isErrorStatus(value)) return
         setErrorStatus(value)
         if (notApplied) {
@@ -53,16 +48,13 @@ export function ErrorStatusToggle({
           setSelectedTodayLiveStatus(TODAY_LIVE_STATUS_ALL)
         }
       }}
-      className={cn('shrink-0', className)}
+      options={[
+        { value: 'pending', label: t('punch.errorStatusPending') },
+        { value: 'corrected', label: t('punch.errorStatusCorrected') },
+      ]}
+      className={className}
       aria-label={t('punch.errorStatus')}
-    >
-      <ToggleGroupItem value="pending" className="cursor-pointer px-3">
-        {t('punch.errorStatusPending')}
-      </ToggleGroupItem>
-      <ToggleGroupItem value="corrected" className="cursor-pointer px-3">
-        {t('punch.errorStatusCorrected')}
-      </ToggleGroupItem>
-    </ToggleGroup>
+    />
   )
 
   if (!notApplied) return control

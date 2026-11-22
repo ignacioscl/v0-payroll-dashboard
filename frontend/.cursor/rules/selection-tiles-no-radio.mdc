@@ -50,11 +50,12 @@ dos opciones… esas card que quedan lindas».)*
 ## When NOT to use tiles
 
 - **Filters (the Filters panel of a list) never use tiles.** A short filter with 2–4 fixed options
-  (All / Regular / Piecework in Expenses List, Pending / Corrected in Punch Report) is a compact
-  `ToggleGroup` (`type="single" variant="outline" size="sm"`, like `components/filters/error-status-toggle.tsx`),
-  on one line with its label, sharing the row with other small controls (Show deleted). Tiles take the
-  whole width for a few words. *(Ignacio, 22/11/2026: «mirá todo el espacio que ocupa… jamás ocupar todo ese
-  espacio sin necesidad».)*
+  (All / Regular / Piecework in Expenses List, Pending / Corrected in Punch Report) is the compact
+  `SegmentedControl` (`components/shared/segmented-control.tsx`: grey track, the chosen option white with a shadow
+  and the company color; hover only darkens the text), on one line with its label, sharing the row with other small
+  controls (Show deleted). Tiles take the whole width for a few words. Never the raw `ToggleGroup variant="outline"`:
+  its padding is too tight and its hover paints the same color as the chosen option. *(Ignacio, 22/11/2026: «mirá todo
+  el espacio que ocupa… jamás ocupar todo ese espacio sin necesidad»; «quedó mal el padding».)*
 - More than ~5 options, or options with no description → `Select` / `SearchableCombobox`.
 - On/off or multi-select options → `BillingToggleRow` / checkboxes.
 
