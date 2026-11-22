@@ -212,6 +212,8 @@ export function ExpensePieceworkFields({
                     isLoading={vendors.isLoading}
                     disabled={disabled}
                     placeholder={t('expenses.selectVendor')}
+                    // La lista llega entera (los vendors de la empresa): se ven sin tipear.
+                    minSearchChars={0}
                   />
                 </div>
               </FormControl>
