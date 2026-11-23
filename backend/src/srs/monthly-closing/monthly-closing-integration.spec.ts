@@ -268,7 +268,8 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
     }, 300000)
   })
 
-  describe('Check «Window Tint Closing» de la empresa (plans/plan-checks-expenses-tint, migration 021)', () => {
+  // El check se llama «Closing reports» desde D17 de plans/plan-reunion-juan-18-11 (misma columna) y abre los dos.
+  describe('Check «Closing reports» de la empresa (plans/plan-checks-expenses-tint, migration 021)', () => {
     const gcAdmin: SrsContext = { ...admin, idUsuario: 1, idDealerProvider: GC_PROVIDER }
     let gcDealers: string
 
@@ -291,11 +292,11 @@ describeIf('Monthly Closing — integración contra la copia local (solo lectura
       await expect(service.export(gcAdmin, tint, fakeResponse().res)).rejects.toBeInstanceOf(ForbiddenException)
     })
 
-    it('sin el check: Monthly Closing (scope=all) sigue andando', async () => {
-      const mc = await service.getSummary(gcAdmin, { month: '2026-09', idDealer: gcDealers })
-      expect(mc.scope).toBe('all')
-      expect(mc.rows.length).toBeGreaterThan(0)
-    }, 120000)
+    it('sin el check: Monthly Closing (scope=all) también da 403 (D17), aunque sea admin', async () => {
+      const mc = { month: '2026-09', idDealer: gcDealers }
+      await expect(service.getSummary(gcAdmin, mc)).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(service.export(gcAdmin, mc, fakeResponse().res)).rejects.toBeInstanceOf(ForbiddenException)
+    })
   })
 
   describe('P6: aislamiento', () => {

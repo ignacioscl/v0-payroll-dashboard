@@ -20,30 +20,32 @@ export const ROL_ACCION_BILLING_DISTRICT = 69
 /** Invoices > Delete Generic Service — catalog soft-delete from the generic invoice modal. */
 export const ROL_ACCION_GENERIC_SERVICE_DELETE = 145
 
-/**
- * Time Tracking > Payroll (legacy `show-rol-action-93`, menú Payroll Excel Report). Montos de
- * payroll: tab Payroll Spend y endpoints `/srs/kpis/payroll` (plans/plan-payroll-spend, decisión C).
+/*
+ * Un permiso por reporte de Pro (migration 033, tema 10 de plans/plan-reunion-juan-18-11). Sin roles al salir (D13): los
+ * admins pasan siempre. Los del legacy que abrían estos reportes (47, 93, 123 y 140) gobiernan solo el legacy.
+ * Mismos números en F/lib/auth/ttk-permissions.ts.
  */
-export const ROL_ACCION_TTK_PAYROLL = 93
+
+/** Report Pro > Business KPIs: todas las tabs (Billing, Open AR, Punch Quality y Payroll Spend) y sus endpoints. */
+export const ROL_ACCION_REPORT_BUSINESS_KPIS = 148
+
+/** Report Pro > Production vs Goal by Dealer: la grilla y su Excel. */
+export const ROL_ACCION_REPORT_PRODUCTION_VS_GOAL = 149
+
+/** Report Pro > Income by Dealer: la pantalla, por servicio y los autos. */
+export const ROL_ACCION_REPORT_INCOME_BY_DEALER = 150
 
 /**
- * Reports > Production Report (legacy show-rol-action-47): Production vs Goal, the Billing tabs of
- * Business KPIs and Income by Dealer.
+ * Report Pro > Monthly Closing (scope all). Quien lo tiene ve el payroll de cada empleado en el detalle. La compañía
+ * necesita además el módulo «Closing reports» (`ContratistaService.assertCompanyModule`, D17).
  */
-export const ROL_ACCION_PRODUCTION_REPORT = 47
+export const ROL_ACCION_REPORT_MONTHLY_CLOSING = 151
 
-/**
- * Reports > Closing / Inc. Pay. Status (legacy show-rol-action-140, el Closing Report): Monthly Closing y
- * Window Tint Closing (plans/plan-monthly-closing T0, plans/plan-reporte-tint D6). Quien lo tiene ve el
- * payroll de cada empleado en el detalle.
- */
-export const ROL_ACCION_CLOSING = 140
+/** Report Pro > Window Tint Closing (scope tint), con el módulo «Closing reports» de la compañía. */
+export const ROL_ACCION_REPORT_WINDOW_TINT_CLOSING = 152
 
-/**
- * Reports > Due On Billing (legacy show-rol-action-123, the aging report of legacy): Reports › Open Invoices
- * in PRO, its snapshots and the comparison (P3 of plans/plan-reporte-javier).
- */
-export const ROL_ACCION_DUE_ON_BILLING = 123
+/** Report Pro > Open Invoices: la pantalla, el Excel, las fotos y la comparación, con el módulo «Closing reports». */
+export const ROL_ACCION_REPORT_OPEN_INVOICES = 153
 
 /** Time Tracking menu / Punch Report (legacy show-rol-action-65). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65

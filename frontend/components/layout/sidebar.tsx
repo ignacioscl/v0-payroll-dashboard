@@ -48,10 +48,12 @@ import { canAccessDailyPunch } from '@/lib/auth/ttk-permissions'
 import {
   canAccessBusinessKpis,
   canAccessBillingInvoices,
+  canAccessIncomeByDealer,
   canAccessMonthlyClosing,
   canAccessOpenInvoices,
-  canAccessProductionReport,
+  canAccessProductionVsGoal,
   canAccessWindowTintClosing,
+  companyHasClosingReports,
 } from '@/lib/auth/payroll-access'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
 import { canAccessExpenses } from '@/lib/auth/expenses-permissions'
@@ -116,7 +118,8 @@ function SidebarInner({
     isDev: isDevEnvironment(),
     canAccessTtk,
     canAccessProdKpis: canAccessBusinessKpis(user, hasPermission),
-    canAccessProductionGoal: canAccessProductionReport(user, hasPermission),
+    canAccessProductionGoal: canAccessProductionVsGoal(user, hasPermission),
+    canAccessIncomeByDealer: canAccessIncomeByDealer(user, hasPermission),
     canAccessBillingInvoices: canAccessBillingInvoices(user, hasPermission),
     canViewRoles: canViewRoles(hasPermission, user?.isSystemAdmin),
     canManageRoleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
@@ -127,7 +130,7 @@ function SidebarInner({
     canAccessOpenInvoices: canAccessOpenInvoices(user, hasPermission),
     companyModules: {
       companyHasExpenses: Boolean(user?.hasExpenses),
-      companyHasWindowTintClosing: Boolean(user?.hasWindowTintClosing),
+      companyHasClosingReports: companyHasClosingReports(user),
     },
     t,
   })

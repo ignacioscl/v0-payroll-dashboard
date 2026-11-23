@@ -7,7 +7,11 @@ import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.
 import { ContratistaService } from 'src/features/srs-contratista/service/contratista.service'
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_CLOSING, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import {
+  ROL_ACCION_REPORT_MONTHLY_CLOSING,
+  ROL_ACCION_REPORT_WINDOW_TINT_CLOSING,
+  SrsPermissionRepository,
+} from '../../auth/srs-permission.repository'
 import { BillingKpiRepository } from '../../billing/repository/billing-kpi.repository'
 import type { ClosingLineDto } from '../../billing/dto/billing-kpi.dto'
 import { PayrollSnapshotKpiRepository } from '../../payroll/repository/payroll-snapshot-kpi.repository'
@@ -283,14 +287,18 @@ export class MonthlyClosingService {
 
   /** Permiso, mes, alcance y filtros: todo lo que valida el pedido. */
   private async prepare(ctx: SrsContext, query: MonthlyClosingQueryDto, idDealer: string): Promise<ClosingContext> {
-    await this.permissions.assertRolAccion(ctx, ROL_ACCION_CLOSING)
+    const scope: ClosingScope = query.scope ?? 'all'
+    if (!CLOSING_SCOPES.includes(scope)) throw new BadRequestException({ message: 'Invalid scope', field: 'scope' })
+    // Cada reporte, su permiso (tema 10 de plans/plan-reunion-juan-18-11), y los dos el módulo «Closing reports» de la
+    // empresa (D17): sin el módulo, 403 aunque sea admin.
+    await this.permissions.assertRolAccion(
+      ctx,
+      scope === 'tint' ? ROL_ACCION_REPORT_WINDOW_TINT_CLOSING : ROL_ACCION_REPORT_MONTHLY_CLOSING,
+    )
+    await this.contratistas.assertCompanyModule(ctx, 'closingReports')
     if (!isValidClosingMonth(query.month)) {
       throw new BadRequestException({ message: MONTHLY_CLOSING_MONTH_ERROR, field: 'month' })
     }
-    const scope: ClosingScope = query.scope ?? 'all'
-    if (!CLOSING_SCOPES.includes(scope)) throw new BadRequestException({ message: 'Invalid scope', field: 'scope' })
-    // Window Tint Closing pide además el check de la empresa (plans/plan-checks-expenses-tint); scope=all no.
-    if (scope === 'tint') await this.contratistas.assertCompanyModule(ctx, 'windowTintClosing')
     const { firstDay, lastDay } = monthBounds(query.month)
     // includeZero fijo: el Closing trae las líneas de $0 (T1 de MC, v5); WO por fecha de alta.
     const filter = buildSrsKpiFilter(ctx, {

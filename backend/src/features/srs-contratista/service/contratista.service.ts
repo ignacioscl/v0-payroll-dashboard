@@ -10,12 +10,16 @@ import { ContratistaRepository } from '../repository/contratista.repository'
 const ID_ROL_ADMIN_GENERAL = 1
 const ID_ROL_ADMIN_COMPANY = 2
 
-/** Company checks of legacy dealer_edit > Modules & function access (plans/plan-checks-expenses-tint). */
-export type CompanyModule = 'expenses' | 'windowTintClosing'
+/**
+ * Company checks of legacy dealer_edit > Modules & function access (plans/plan-checks-expenses-tint).
+ * `closingReports`: Monthly Closing, Window Tint Closing and Open Invoices (D17 of plans/plan-reunion-juan-18-11). The
+ * column keeps its old name, `has_window_tint_closing`, so PHP and Nest keep working while they are deployed.
+ */
+export type CompanyModule = 'expenses' | 'closingReports'
 
 const COMPANY_MODULE_COLUMN: Record<CompanyModule, 'hasExpenses' | 'hasWindowTintClosing'> = {
   expenses: 'hasExpenses',
-  windowTintClosing: 'hasWindowTintClosing',
+  closingReports: 'hasWindowTintClosing',
 }
 
 @Injectable()

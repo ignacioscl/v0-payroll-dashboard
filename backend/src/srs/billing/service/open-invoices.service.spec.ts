@@ -8,6 +8,7 @@ import ExcelJS from 'exceljs'
 import { PassThrough } from 'stream'
 
 import type { SrsContext } from '../../auth/srs-auth-context.service'
+import { ROL_ACCION_REPORT_OPEN_INVOICES } from '../../auth/srs-permission.repository'
 import { buildDealerTotals } from '../../../features/open-invoice-snapshot/service/open-invoice-snapshot.service'
 import type { OpenInvoiceSnapshotFull } from '../../../features/open-invoice-snapshot/dto/open-invoice-snapshot.dto'
 import { isValidOpenInvoicesAsOf } from '../dto/open-invoices.dto'
@@ -72,8 +73,17 @@ function makeMocks(rows: OpenInvoiceSqlRow[]) {
       return []
     }),
   }
-  const service = new OpenInvoicesService(repository as never, permissions as never, payroll as never, snapshots as never, srs as never)
-  return { repository, permissions, payroll, snapshots, srs, service }
+  // «Closing reports» module of the company (D17 of plans/plan-reunion-juan-18-11): on by default.
+  const contratistas = { assertCompanyModule: jest.fn(async () => undefined) }
+  const service = new OpenInvoicesService(
+    repository as never,
+    permissions as never,
+    payroll as never,
+    snapshots as never,
+    srs as never,
+    contratistas as never,
+  )
+  return { repository, permissions, payroll, snapshots, srs, contratistas, service }
 }
 
 async function exportToWorkbook(m: Mocks, ctx: SrsContext, query: Record<string, unknown>): Promise<ExcelJS.Workbook> {
@@ -104,13 +114,32 @@ describe('As of', () => {
   })
 })
 
-describe('permission «Reports > Due On Billing» (123)', () => {
-  it('without it: 403 and no query', async () => {
+describe('permission «Report Pro > Open Invoices» (153) and the «Closing reports» module', () => {
+  it('without the permission: 403 and no query', async () => {
     const m = makeMocks([])
     m.permissions.assertRolAccion.mockRejectedValueOnce(new ForbiddenException('Forbidden'))
     await expect(m.service.getReport(RESTRICTED, { asOf: '2026-09-27', idDealer: '10' } as never)).rejects.toBeInstanceOf(ForbiddenException)
-    expect(m.permissions.assertRolAccion).toHaveBeenCalledWith(RESTRICTED, 123)
+    expect(m.permissions.assertRolAccion).toHaveBeenCalledWith(RESTRICTED, ROL_ACCION_REPORT_OPEN_INVOICES)
+    expect(ROL_ACCION_REPORT_OPEN_INVOICES).toBe(153)
     expect(m.repository.openRows).not.toHaveBeenCalled()
+  })
+
+  it('without the company module: 403 and no query, also for an admin', async () => {
+    const m = makeMocks([])
+    m.contratistas.assertCompanyModule.mockRejectedValue(new ForbiddenException('Forbidden'))
+    await expect(m.service.getReport(ADMIN, { asOf: '2026-09-27', idDealer: '10' } as never)).rejects.toBeInstanceOf(ForbiddenException)
+    expect(m.contratistas.assertCompanyModule).toHaveBeenCalledWith(ADMIN, 'closingReports')
+    expect(m.repository.openRows).not.toHaveBeenCalled()
+  })
+
+  it('the snapshots and their comparison ask the same', async () => {
+    const m = makeMocks([])
+    m.contratistas.assertCompanyModule.mockRejectedValue(new ForbiddenException('Forbidden'))
+    const compare = new OpenInvoicesCompareService(m.service, m.repository as never, {} as never, m.snapshots as never, m.srs as never)
+    await expect(compare.list(ADMIN, { page: 1, pageSize: 10 } as never)).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(compare.compare(ADMIN, 1)).rejects.toBeInstanceOf(ForbiddenException)
+    expect(m.snapshots.listHeadersByProvider).not.toHaveBeenCalled()
+    expect(m.snapshots.findOneByProvider).not.toHaveBeenCalled()
   })
 })
 

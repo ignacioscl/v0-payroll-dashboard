@@ -33,7 +33,11 @@ export class Contratista extends SrsEntityBase {
   @Column({ name: 'has_expenses', type: 'tinyint', default: 0 })
   hasExpenses!: number
 
-  /** 1=check «Window Tint Closing» (legacy dealer_edit > Modules & function access). Migration 021. */
+  /**
+   * 1=check «Closing reports» (legacy dealer_edit > Modules & function access). Migration 021. Abre los tres reportes
+   * de Auto Wax: Monthly Closing, Window Tint Closing y Open Invoices (D17 de plans/plan-reunion-juan-18-11). La columna
+   * conserva el nombre de cuando abría solo Window Tint Closing.
+   */
   @Column({ name: 'has_window_tint_closing', type: 'tinyint', default: 0 })
   hasWindowTintClosing!: number
 

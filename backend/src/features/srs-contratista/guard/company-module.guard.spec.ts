@@ -1,6 +1,7 @@
 /**
- * Check por empresa «Expenses» y «Window Tint Closing» (plans/plan-checks-expenses-tint, T8/T9): el guard, el control
- * del servicio y que todo controller de `/srs/expenses` lo tenga. Sin base: el repositorio es un doble.
+ * Check por empresa «Expenses» y «Closing reports» (plans/plan-checks-expenses-tint, T8/T9; «Closing reports» era
+ * «Window Tint Closing» hasta D17 de plans/plan-reunion-juan-18-11, misma columna): el guard, el control del servicio y
+ * que todo controller de `/srs/expenses` lo tenga. Sin base: el repositorio es un doble.
  */
 import { readdirSync } from 'fs'
 import { join } from 'path'
@@ -12,7 +13,7 @@ import { SrsContext } from 'src/srs/auth/srs-auth-context.service'
 import { ContratistaService } from '../service/contratista.service'
 import { COMPANY_MODULE_KEY, CompanyModuleGuard, RequireCompanyModule } from './company-module.guard'
 
-const AUTO_WAX = 79 // Expenses y Window Tint Closing
+const AUTO_WAX = 79 // Expenses y Closing reports
 const GC = 188 // solo Expenses
 const MOOI = 749 // ninguno
 
@@ -63,9 +64,9 @@ describe('ContratistaService — check de módulo de la empresa', () => {
   it('lee cada check de su columna', async () => {
     const s = service()
     expect(await s.hasCompanyModule(AUTO_WAX, 'expenses')).toBe(true)
-    expect(await s.hasCompanyModule(AUTO_WAX, 'windowTintClosing')).toBe(true)
+    expect(await s.hasCompanyModule(AUTO_WAX, 'closingReports')).toBe(true)
     expect(await s.hasCompanyModule(GC, 'expenses')).toBe(true)
-    expect(await s.hasCompanyModule(GC, 'windowTintClosing')).toBe(false)
+    expect(await s.hasCompanyModule(GC, 'closingReports')).toBe(false)
     expect(await s.hasCompanyModule(MOOI, 'expenses')).toBe(false)
     expect(await s.hasCompanyModule(999999, 'expenses')).toBe(false)
   })
@@ -73,7 +74,7 @@ describe('ContratistaService — check de módulo de la empresa', () => {
   it('assertCompanyModule: 403 sin el check', async () => {
     const s = service()
     await expect(s.assertCompanyModule(ctx(GC), 'expenses')).resolves.toBeUndefined()
-    await expect(s.assertCompanyModule(ctx(GC), 'windowTintClosing')).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(s.assertCompanyModule(ctx(GC), 'closingReports')).rejects.toBeInstanceOf(ForbiddenException)
     await expect(s.assertCompanyModule(ctx(MOOI), 'expenses')).rejects.toBeInstanceOf(ForbiddenException)
   })
 })

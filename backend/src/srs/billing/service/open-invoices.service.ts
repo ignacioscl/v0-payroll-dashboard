@@ -5,7 +5,8 @@ import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_DUE_ON_BILLING, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import { ROL_ACCION_REPORT_OPEN_INVOICES, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import { ContratistaService } from '../../../features/srs-contratista/service/contratista.service'
 import { buildSrsKpiFilterNoPeriod } from '../../shared/kpi/srs-kpi-filter'
 import { countRequestedDealersInScope } from '../../shared/kpi/srs-kpi-dealer-scope'
 import { removedDealersProvider } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -65,8 +66,9 @@ export function toSnapshotRow(r: OpenInvoiceRow): OpenInvoiceSnapshotRow {
 
 /**
  * Reports › Open Invoices (T4 of plans/plan-reporte-javier/PLAN.md): the screen and its Excel. Permission
- * «Reports > Due On Billing» (123); Admin General and Admin Company always pass. The provider always comes
- * from the session.
+ * «Report Pro > Open Invoices» (153, migration 033) and the company's «Closing reports» module (D17 of
+ * plans/plan-reunion-juan-18-11); Admin General and Admin Company pass the permission, not the module. The provider
+ * always comes from the session.
  */
 @Injectable()
 export class OpenInvoicesService {
@@ -76,11 +78,16 @@ export class OpenInvoicesService {
     @Inject(PayrollSnapshotKpiRepository) private readonly payroll: PayrollSnapshotKpiRepository,
     @Inject(OpenInvoiceSnapshotService) private readonly snapshots: OpenInvoiceSnapshotService,
     @InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource,
+    @Inject(ContratistaService) private readonly contratistas: ContratistaService,
   ) {}
 
-  /** Permission and «As of»: what every endpoint of the report checks first. */
+  /**
+   * Permission and company module: what every endpoint of the report checks first (the screen, the Excel, the
+   * snapshots and their comparison, through OpenInvoicesCompareService).
+   */
   async assertAccess(ctx: SrsContext): Promise<void> {
-    await this.permissions.assertRolAccion(ctx, ROL_ACCION_DUE_ON_BILLING)
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_OPEN_INVOICES)
+    await this.contratistas.assertCompanyModule(ctx, 'closingReports')
   }
 
   async labels(ctx: SrsContext): Promise<OpenInvoicesExportLabels> {

@@ -41,7 +41,10 @@ export interface SrsMeUser {
   isSystemAdmin: boolean
   /** Check «Expenses» of the company (legacy dealer_edit > Modules & function access). */
   hasExpenses?: boolean
-  /** Check «Window Tint Closing» of the company (legacy dealer_edit > Modules & function access). */
+  /**
+   * Check «Closing reports» of the company (legacy dealer_edit > Modules & function access; it was «Window Tint
+   * Closing»): Monthly Closing, Window Tint Closing and Open Invoices (D17). The name is the column's.
+   */
   hasWindowTintClosing?: boolean
   navTemplate?: 1 | 2
   locale?: AppLocale

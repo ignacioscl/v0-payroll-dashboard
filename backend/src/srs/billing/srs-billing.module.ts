@@ -6,6 +6,7 @@ import { SrsAuthModule } from '../auth/srs-auth.module'
 import { SrsExportModule } from '../shared/export/srs-export.module'
 import { SrsPayrollModule } from '../payroll/srs-payroll.module'
 import { OpenInvoiceSnapshotModule } from '../../features/open-invoice-snapshot/open-invoice-snapshot.module'
+import { SrsContratistaModule } from '../../features/srs-contratista/srs-contratista.module'
 import { InvoiceStatement } from './entity/invoice-statement.srsentity'
 import { InvoiceStatementInvRel } from './entity/invoice-statement-inv-rel.srsentity'
 
@@ -34,6 +35,8 @@ import { OpenInvoicesCompareService } from './service/open-invoices-compare.serv
     // Open Invoices: «All» in Report Info (activeDealerIds) and the snapshot (plans/plan-reporte-javier T6).
     SrsPayrollModule,
     OpenInvoiceSnapshotModule,
+    // Open Invoices: the company's «Closing reports» module (D17 of plans/plan-reunion-juan-18-11).
+    SrsContratistaModule,
     TypeOrmModule.forFeature([InvoiceStatement, InvoiceStatementInvRel], SRS_CONNECTION),
   ],
   providers: [

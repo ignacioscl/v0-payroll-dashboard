@@ -7,7 +7,11 @@ import { SRS_CONNECTION } from '../../srs.datasource'
 import { ProductionKpiRepository } from '../repository/production-kpi.repository'
 import { ProductionKpiDto, ProductionWeekRowDto, WoStatusSliceDto } from '../dto/production-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_PRODUCTION_REPORT, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import {
+  ROL_ACCION_REPORT_BUSINESS_KPIS,
+  ROL_ACCION_REPORT_PRODUCTION_VS_GOAL,
+  SrsPermissionRepository,
+} from '../../auth/srs-permission.repository'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { removedDealersProvider } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -34,15 +38,23 @@ export class ProductionKpiService {
     @InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource,
   ) {}
 
+  /**
+   * The production cards of Business KPIs (the Payroll Spend tab uses them for Revenue per Employee) and the pipeline:
+   * «Report Pro > Business KPIs» (148, tema 10 of plans/plan-reunion-juan-18-11). Before, they asked nothing.
+   */
   async getProductionKpis(ctx: SrsContext, query: SrsKpiQueryDto): Promise<ProductionKpiDto> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_BUSINESS_KPIS)
     return this.repository.getProductionKpis(buildSrsKpiFilter(ctx, query))
   }
 
   async getOpenPipeline(ctx: SrsContext, query: SrsKpiQueryDto): Promise<WoStatusSliceDto[]> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_BUSINESS_KPIS)
     return this.repository.getOpenPipeline(buildSrsKpiFilter(ctx, query))
   }
 
+  /** The grid of Reports › Production vs Goal: «Report Pro > Production vs Goal by Dealer» (149). */
   async getDealerProduction(ctx: SrsContext, query: SrsKpiQueryDto) {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_PRODUCTION_VS_GOAL)
     return this.repository.getDealerProduction(buildSrsKpiFilter(ctx, query))
   }
 
@@ -50,16 +62,17 @@ export class ProductionKpiService {
     ctx: SrsContext,
     query: SrsKpiQueryDto,
   ): Promise<ProductionWeekRowDto[]> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_BUSINESS_KPIS)
     return this.repository.getProductionByWeek(buildSrsKpiFilter(ctx, query))
   }
 
   /**
    * Reports › Production vs Goal, Export: the grid's rows (the same query as the screen) with
    * Report Info, built here and not in the browser (D5). plans/plan-report-info-exports-tablas §5.1.
-   * Same gate as the screen and Income by Dealer: «Reports > Production Report» (admins pass).
+   * Same gate as the screen: «Report Pro > Production vs Goal by Dealer» (149; admins pass).
    */
   async exportDealerProduction(ctx: SrsContext, query: SrsKpiQueryDto, res: Response): Promise<void> {
-    await this.permissions.assertRolAccion(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_PRODUCTION_VS_GOAL)
     const filter = buildSrsKpiFilter(ctx, query)
     const requested = [...new Set(filter.dealerIds)]
     // GET_DEALER_NAME_BY_PROVIDER does not look at the scope: name only dealers of this company

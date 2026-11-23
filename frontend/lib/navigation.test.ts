@@ -1,12 +1,21 @@
 /**
- * Checks por empresa «Expenses» y «Window Tint Closing» (plans/plan-checks-expenses-tint, T7/T9): menú, rutas y
- * permisos con cada combinación de permiso × check, también en dev (el bypass de dev es solo para permisos).
+ * Checks por empresa «Expenses» y «Closing reports» (plans/plan-checks-expenses-tint, T7/T9; «Closing reports» era
+ * «Window Tint Closing» y desde D17 de plans/plan-reunion-juan-18-11 abre también Monthly Closing y Open Invoices): menú,
+ * rutas y permisos con cada combinación de permiso × check, también en dev (el bypass de dev es solo para permisos).
+ * Un permiso por reporte (tema 10, migration 033): cada id abre su pantalla y ninguna otra.
  */
 import { describe, expect, it } from 'vitest'
 
 import { canAccessExpenses, ROL_ACCION_EXPENSES_APPROVE } from './auth/expenses-permissions'
 import { canAccessMonthlyClosing, canAccessOpenInvoices, canAccessWindowTintClosing } from './auth/payroll-access'
-import { ROL_ACCION_CLOSING, ROL_ACCION_DUE_ON_BILLING } from './auth/ttk-permissions'
+import {
+  ROL_ACCION_REPORT_BUSINESS_KPIS,
+  ROL_ACCION_REPORT_INCOME_BY_DEALER,
+  ROL_ACCION_REPORT_MONTHLY_CLOSING,
+  ROL_ACCION_REPORT_OPEN_INVOICES,
+  ROL_ACCION_REPORT_PRODUCTION_VS_GOAL,
+  ROL_ACCION_REPORT_WINDOW_TINT_CLOSING,
+} from './auth/ttk-permissions'
 import type { SrsMeUser } from './auth/types'
 import type { NavItem } from './navigation'
 import fs from 'node:fs'
@@ -62,17 +71,26 @@ describe('canAccessExpenses', () => {
   })
 })
 
-describe('canAccessWindowTintClosing', () => {
-  it('pide el permiso de Monthly Closing y el check de la empresa', () => {
-    const closing = granted(ROL_ACCION_CLOSING)
-    expect(canAccessWindowTintClosing(user({ hasWindowTintClosing: true }), closing)).toBe(true)
-    expect(canAccessWindowTintClosing(user({ hasWindowTintClosing: false }), closing)).toBe(false)
-    expect(canAccessWindowTintClosing(user({ isSystemAdmin: true }), none)).toBe(false)
-    expect(canAccessWindowTintClosing(user({ hasWindowTintClosing: true }), none)).toBe(false)
+describe('los tres de «Closing reports»: su permiso y el módulo de la empresa (D17)', () => {
+  const reports = [
+    ['Monthly Closing', canAccessMonthlyClosing, ROL_ACCION_REPORT_MONTHLY_CLOSING],
+    ['Window Tint Closing', canAccessWindowTintClosing, ROL_ACCION_REPORT_WINDOW_TINT_CLOSING],
+    ['Open Invoices', canAccessOpenInvoices, ROL_ACCION_REPORT_OPEN_INVOICES],
+  ] as const
+
+  it.each(reports)('%s: su permiso con el módulo; sin el módulo, nunca (ni el admin)', (_name, can, id) => {
+    expect(can(user({ hasWindowTintClosing: true }), granted(id))).toBe(true)
+    expect(can(user({ hasWindowTintClosing: false }), granted(id))).toBe(false)
+    expect(can(user({ hasWindowTintClosing: true }), none)).toBe(false)
+    expect(can(user({ isSystemAdmin: true, hasWindowTintClosing: true }), none)).toBe(true)
+    expect(can(user({ isSystemAdmin: true }), none)).toBe(false)
   })
 
-  it('Monthly Closing no mira el check', () => {
-    expect(canAccessMonthlyClosing(user({ hasWindowTintClosing: false }), granted(ROL_ACCION_CLOSING))).toBe(true)
+  it('el permiso de uno no abre los otros dos', () => {
+    const withModule = user({ hasWindowTintClosing: true })
+    expect(canAccessWindowTintClosing(withModule, granted(ROL_ACCION_REPORT_MONTHLY_CLOSING))).toBe(false)
+    expect(canAccessOpenInvoices(withModule, granted(ROL_ACCION_REPORT_MONTHLY_CLOSING))).toBe(false)
+    expect(canAccessMonthlyClosing(withModule, granted(ROL_ACCION_REPORT_WINDOW_TINT_CLOSING))).toBe(false)
   })
 })
 
@@ -96,15 +114,21 @@ describe('isProdAllowedPath', () => {
 
 describe('isCompanyModuleBlockedPath', () => {
   it('bloquea las rutas del módulo que la empresa no tiene', () => {
-    const none = { companyHasExpenses: false, companyHasWindowTintClosing: false }
+    const none = { companyHasExpenses: false, companyHasClosingReports: false }
     expect(isCompanyModuleBlockedPath('/expenses', none)).toBe(true)
     expect(isCompanyModuleBlockedPath('/expenses/recurring/3', none)).toBe(true)
     expect(isCompanyModuleBlockedPath('/reports/window-tint-closing', none)).toBe(true)
-    expect(isCompanyModuleBlockedPath('/reports/monthly-closing', none)).toBe(false)
+    expect(isCompanyModuleBlockedPath('/reports/monthly-closing', none)).toBe(true)
+    expect(isCompanyModuleBlockedPath('/reports/open-invoices', none)).toBe(true)
+    expect(isCompanyModuleBlockedPath('/reports/open-invoices/snapshots/7', none)).toBe(true)
+    expect(isCompanyModuleBlockedPath('/reports/business-kpis', none)).toBe(false)
+    expect(isCompanyModuleBlockedPath('/reports/income-by-dealer', none)).toBe(false)
     expect(isCompanyModuleBlockedPath('/expenses-other', none)).toBe(false)
-    const both = { companyHasExpenses: true, companyHasWindowTintClosing: true }
+    const both = { companyHasExpenses: true, companyHasClosingReports: true }
     expect(isCompanyModuleBlockedPath('/expenses', both)).toBe(false)
     expect(isCompanyModuleBlockedPath('/reports/window-tint-closing', both)).toBe(false)
+    expect(isCompanyModuleBlockedPath('/reports/monthly-closing', both)).toBe(false)
+    expect(isCompanyModuleBlockedPath('/reports/open-invoices', both)).toBe(false)
   })
 })
 
@@ -112,7 +136,7 @@ describe('getVisibleNavigation', () => {
   const nav = (
     isDev: boolean,
     access: { expenses: boolean; monthly: boolean; tint: boolean },
-    company: { companyHasExpenses: boolean; companyHasWindowTintClosing: boolean },
+    company: { companyHasExpenses: boolean; companyHasClosingReports: boolean },
   ) =>
     hrefs(
       getVisibleNavigation({
@@ -126,13 +150,14 @@ describe('getVisibleNavigation', () => {
       }),
     )
 
-  it('prod: sin el check de la empresa no aparecen Expenses ni Window Tint Closing', () => {
+  it('prod: sin el check de la empresa no aparecen Expenses ni los reportes de cierre', () => {
+    // canAccess* ya vienen en false sin el módulo (payroll-access); el menú solo lista lo que recibe.
     const items = nav(
       false,
-      { expenses: false, monthly: true, tint: false },
-      { companyHasExpenses: false, companyHasWindowTintClosing: false },
+      { expenses: false, monthly: false, tint: false },
+      { companyHasExpenses: false, companyHasClosingReports: false },
     )
-    expect(items).toContain('/reports/monthly-closing')
+    expect(items).not.toContain('/reports/monthly-closing')
     expect(items).not.toContain('/reports/window-tint-closing')
     expect(items.some((h) => h.startsWith('/expenses'))).toBe(false)
   })
@@ -141,7 +166,7 @@ describe('getVisibleNavigation', () => {
     const items = nav(
       false,
       { expenses: true, monthly: true, tint: true },
-      { companyHasExpenses: true, companyHasWindowTintClosing: true },
+      { companyHasExpenses: true, companyHasClosingReports: true },
     )
     expect(items).toEqual(expect.arrayContaining(['/expenses', '/expenses/recurring', '/reports/window-tint-closing']))
   })
@@ -150,16 +175,18 @@ describe('getVisibleNavigation', () => {
     const gc = nav(
       true,
       { expenses: false, monthly: false, tint: false },
-      { companyHasExpenses: true, companyHasWindowTintClosing: false },
+      { companyHasExpenses: true, companyHasClosingReports: false },
     )
     expect(gc).toContain('/expenses')
-    expect(gc).toContain('/reports/monthly-closing')
+    expect(gc).toContain('/reports/business-kpis')
+    expect(gc).not.toContain('/reports/monthly-closing')
     expect(gc).not.toContain('/reports/window-tint-closing')
+    expect(gc).not.toContain('/reports/open-invoices')
 
     const mooi = nav(
       true,
       { expenses: false, monthly: false, tint: false },
-      { companyHasExpenses: false, companyHasWindowTintClosing: false },
+      { companyHasExpenses: false, companyHasClosingReports: false },
     )
     expect(mooi.some((h) => h.startsWith('/expenses'))).toBe(false)
     expect(mooi).not.toContain('/reports/window-tint-closing')
@@ -240,41 +267,43 @@ describe('getScreenAccess', () => {
 })
 
 /**
- * Reports › Open Invoices (plans/plan-reporte-javier §4.3, §7.3): «Reports > Due On Billing» (123) abre el reporte y sus
- * fotos. Un rol con SOLO 123 ve el menú y la pantalla en producción (no «sin módulos»: hallazgo de la review 1).
+ * Reports › Open Invoices (plans/plan-reporte-javier §4.3, §7.3): «Report Pro > Open Invoices» (153, antes 123) y el
+ * módulo «Closing reports» abren el reporte y sus fotos. Un rol con SOLO 153 ve el menú y la pantalla en producción (no
+ * «sin módulos»: hallazgo de la review 1).
  */
-describe('Open Invoices (123)', () => {
-  const only123 = { user: user(), permissionIds: [ROL_ACCION_DUE_ON_BILLING] }
-  const without = { user: user(), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
+describe('Open Invoices (153)', () => {
+  const autoWax = (over: Partial<SrsMeUser> = {}) => user({ hasWindowTintClosing: true, ...over })
+  const only153 = { user: autoWax(), permissionIds: [ROL_ACCION_REPORT_OPEN_INVOICES] }
+  const without = { user: autoWax(), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
 
-  it('un rol con solo 123 entra en producción, al reporte y a la comparación', () => {
-    expect(getScreenAccess('/reports/open-invoices', only123, { isDev: false })).toBe('allowed')
-    expect(getScreenAccess('/reports/open-invoices/snapshots/7', only123, { isDev: false })).toBe('allowed')
-    expect(getScreenAccess('/reports/monthly-closing', only123, { isDev: false })).toBe('denied')
+  it('un rol con solo 153 entra en producción, al reporte y a la comparación', () => {
+    expect(getScreenAccess('/reports/open-invoices', only153, { isDev: false })).toBe('allowed')
+    expect(getScreenAccess('/reports/open-invoices/snapshots/7', only153, { isDev: false })).toBe('allowed')
+    expect(getScreenAccess('/reports/monthly-closing', only153, { isDev: false })).toBe('denied')
   })
 
-  it('sin 123 no entra; Admin General y Admin Company sí', () => {
+  it('sin 153 no entra; Admin General y Admin Company sí (con el módulo)', () => {
     expect(getScreenAccess('/reports/open-invoices', without, { isDev: false })).toBe('denied')
-    expect(canAccessOpenInvoices(user(), none)).toBe(false)
-    expect(canAccessOpenInvoices(user({ isSystemAdmin: true }), none)).toBe(true)
+    expect(canAccessOpenInvoices(autoWax(), none)).toBe(false)
+    expect(canAccessOpenInvoices(autoWax({ isSystemAdmin: true }), none)).toBe(true)
   })
 
-  it('el menú de un rol con solo 123 trae Reports › Open Invoices y nada más', () => {
+  it('el menú de un rol con solo 153 trae Reports › Open Invoices y nada más', () => {
     const items = getVisibleNavigation({
       isDev: false,
       canAccessTtk: false,
       canAccessOpenInvoices: true,
-      companyModules: { companyHasExpenses: true, companyHasWindowTintClosing: true },
+      companyModules: { companyHasExpenses: true, companyHasClosingReports: true },
       t,
     })
     expect(hrefs(items)).toEqual(['/reports/business-kpis', '/reports/open-invoices'])
   })
 
-  it('sin 123 el menú no lo trae', () => {
+  it('sin 153 el menú no lo trae', () => {
     const items = getVisibleNavigation({
       isDev: false,
       canAccessTtk: true,
-      companyModules: { companyHasExpenses: true, companyHasWindowTintClosing: true },
+      companyModules: { companyHasExpenses: true, companyHasClosingReports: true },
       t,
     })
     expect(hrefs(items)).not.toContain('/reports/open-invoices')
@@ -283,5 +312,67 @@ describe('Open Invoices (123)', () => {
   it('isProdAllowedPath abre la ruta solo con la bandera de Open Invoices', () => {
     expect(isProdAllowedPath('/reports/open-invoices', false, false, false, false, false, false, false, false, false, false, true)).toBe(true)
     expect(isProdAllowedPath('/reports/open-invoices', false, false, false, false, false, false, false, false, false, false, false)).toBe(false)
+  })
+})
+
+/**
+ * Un permiso por reporte (tema 10 de plans/plan-reunion-juan-18-11, migration 033): un usuario que no es admin, de una
+ * empresa con el módulo «Closing reports» (Auto Wax), con Punch Report para tener algún módulo.
+ */
+describe('un permiso por reporte (148–153)', () => {
+  const REPORTS = {
+    '/reports/business-kpis': ROL_ACCION_REPORT_BUSINESS_KPIS,
+    '/reports/production-vs-goal': ROL_ACCION_REPORT_PRODUCTION_VS_GOAL,
+    '/reports/income-by-dealer': ROL_ACCION_REPORT_INCOME_BY_DEALER,
+    '/reports/monthly-closing': ROL_ACCION_REPORT_MONTHLY_CLOSING,
+    '/reports/window-tint-closing': ROL_ACCION_REPORT_WINDOW_TINT_CLOSING,
+    '/reports/open-invoices': ROL_ACCION_REPORT_OPEN_INVOICES,
+  } as const
+  const paths = Object.keys(REPORTS) as (keyof typeof REPORTS)[]
+  const autoWax = (...ids: number[]) => ({
+    user: user({ hasWindowTintClosing: true }),
+    permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS, ...ids],
+  })
+
+  it('sin ninguno de los seis: Access denied en los seis', () => {
+    for (const path of paths) expect(getScreenAccess(path, autoWax(), { isDev: false }), path).toBe('denied')
+  })
+
+  it('los permisos del legacy (47, 93, 123 y 140) ya no abren ningún reporte de Pro', () => {
+    for (const path of paths) expect(getScreenAccess(path, autoWax(47, 93, 123, 140), { isDev: false }), path).toBe('denied')
+  })
+
+  it.each(paths)('%s: su permiso lo abre a él solo', (path) => {
+    const me = autoWax(REPORTS[path])
+    for (const other of paths) {
+      expect(getScreenAccess(other, me, { isDev: false }), ).toBe(other === path ? 'allowed' : 'denied')
+    }
+  })
+
+  it('con solo Monthly Closing, el menú de Reports trae Monthly Closing y nada más de los seis', () => {
+    const u = user({ hasWindowTintClosing: true })
+    const has = granted(ROL_ACCION_REPORT_MONTHLY_CLOSING)
+    const items = hrefs(
+      getVisibleNavigation({
+        isDev: false,
+        canAccessTtk: true,
+        canAccessMonthlyClosing: canAccessMonthlyClosing(u, has),
+        canAccessWindowTintClosing: canAccessWindowTintClosing(u, has),
+        canAccessOpenInvoices: canAccessOpenInvoices(u, has),
+        companyModules: { companyHasExpenses: true, companyHasClosingReports: true },
+        t,
+      }),
+    )
+    expect(items.filter((h) => h.startsWith('/reports/') && h !== '/reports/business-kpis')).toEqual(['/reports/monthly-closing'])
+  })
+
+  it('la empresa sin el módulo: los tres de cierre dan «no-module», aun al admin; los otros tres abren', () => {
+    const admin = { user: user({ isSystemAdmin: true, hasWindowTintClosing: false }), permissionIds: [] }
+    for (const path of ['/reports/monthly-closing', '/reports/window-tint-closing', '/reports/open-invoices']) {
+      expect(getScreenAccess(path, admin, { isDev: false }), path).toBe('no-module')
+    }
+    for (const path of ['/reports/business-kpis', '/reports/production-vs-goal', '/reports/income-by-dealer']) {
+      expect(getScreenAccess(path, admin, { isDev: false }), path).toBe('allowed')
+    }
   })
 })

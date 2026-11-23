@@ -50,7 +50,8 @@ type VisibleSnapshot = {
 
 /**
  * Snapshots of Reports › Open Invoices and their comparison with today (T7 of
- * plans/plan-reporte-javier/PLAN.md, §1.5 and §3.6). Same permission as the report (123). A user with
+ * plans/plan-reporte-javier/PLAN.md, §1.5 and §3.6). Same permission and company module as the report
+ * (`OpenInvoicesService.assertAccess`: 153 and «Closing reports»). A user with
  * assigned dealers only sees, in the list, the comparison and its Excel, the dealers they see: totals, row
  * counts and dealers of the filter are recalculated on them, and a snapshot with none of them is a 404.
  */

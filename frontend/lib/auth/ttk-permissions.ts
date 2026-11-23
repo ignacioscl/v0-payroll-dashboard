@@ -1,20 +1,23 @@
 /** Legacy ROL_ACCION ids (ttk_main / rolMaganer.userHavePermission). */
 /** Invoices module access (legacy billing "Invoice" tab). */
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
-/** Same gate as legacy production.php / ProductionReportService. */
-export const ROL_ACCION_PRODUCTION_REPORT = 47
-/**
- * «Reports > Closing / Inc. Pay. Status» (legacy closing_main.php): Monthly Closing y Window Tint Closing
- * (plans/plan-monthly-closing T0). Mismo número en BE/srs/auth/srs-permission.repository.ts.
+/*
+ * Un permiso por reporte de Pro (migration 033, tema 10 de plans/plan-reunion-juan-18-11). Sin roles al salir: los admins
+ * pasan siempre. Los del legacy que abrían estos reportes (47, 93, 123 y 140) gobiernan solo el legacy. Mismos números
+ * en BE/srs/auth/srs-permission.repository.ts.
  */
-export const ROL_ACCION_CLOSING = 140
-/**
- * «Reports > Due On Billing» (legacy show-rol-action-123, the aging report of legacy): Reports › Open Invoices
- * (plans/plan-reporte-javier P3). Mismo número en BE/srs/auth/srs-permission.repository.ts.
- */
-export const ROL_ACCION_DUE_ON_BILLING = 123
-/** Time Tracking > Payroll (legacy show-rol-action-93, Payroll Excel Report): montos de payroll. */
-export const ROL_ACCION_TTK_PAYROLL = 93
+/** Report Pro > Business KPIs: la pantalla y todas sus tabs (también Payroll Spend). */
+export const ROL_ACCION_REPORT_BUSINESS_KPIS = 148
+/** Report Pro > Production vs Goal by Dealer. */
+export const ROL_ACCION_REPORT_PRODUCTION_VS_GOAL = 149
+/** Report Pro > Income by Dealer. */
+export const ROL_ACCION_REPORT_INCOME_BY_DEALER = 150
+/** Report Pro > Monthly Closing (con el módulo «Closing reports» de la empresa). */
+export const ROL_ACCION_REPORT_MONTHLY_CLOSING = 151
+/** Report Pro > Window Tint Closing (con el módulo «Closing reports» de la empresa). */
+export const ROL_ACCION_REPORT_WINDOW_TINT_CLOSING = 152
+/** Report Pro > Open Invoices y sus fotos (con el módulo «Closing reports» de la empresa). */
+export const ROL_ACCION_REPORT_OPEN_INVOICES = 153
 /** Same gate as legacy Time Tracking menu (show-rol-action-65 / Daily Punch). */
 export const ROL_ACCION_TTK_ADMIN_HOURS = 65
 export const ROL_ACCION_ADD_EDIT_PUNCH = 67
