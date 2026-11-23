@@ -67,6 +67,8 @@ function ExpensesListPage() {
   const [amountMin, setAmountMin] = React.useState('')
   const [amountMax, setAmountMax] = React.useState('')
   const [showDeleted, setShowDeleted] = React.useState(false)
+  // «Piecework con cambios» (T5b de plan-reunion-juan-18-11): las expenses Piecework que cambiaron solas o en Edit.
+  const [changedOnly, setChangedOnly] = React.useState(false)
   const [formTarget, setFormTarget] = React.useState<ExpenseFormTarget | null>(null)
 
   // Llegada desde Analytics (click en una fila):
@@ -136,8 +138,9 @@ function ExpensesListPage() {
       amountMin: amountMin.trim() && isValidAmount(amountMin.trim()) ? amountMin.trim() : undefined,
       amountMax: amountMax.trim() && isValidAmount(amountMax.trim()) ? amountMax.trim() : undefined,
       deleted: showDeleted ? 1 : 0,
+      changed: changedOnly ? 1 : undefined,
     }
-  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, kind, amountMin, amountMax, showDeleted])
+  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, kind, amountMin, amountMax, showDeleted, changedOnly])
 
   const summary = useExpenseSummary(filters)
 
@@ -166,6 +169,7 @@ function ExpensesListPage() {
     ...(amountMin.trim() ? [{ key: 'amountMin', label: `${t('expenses.amountFrom')}: ${amountMin.trim()}`, onRemove: () => setAmountMin('') }] : []),
     ...(amountMax.trim() ? [{ key: 'amountMax', label: `${t('expenses.amountTo')}: ${amountMax.trim()}`, onRemove: () => setAmountMax('') }] : []),
     ...(showDeleted ? [{ key: 'deleted', label: t('expenses.showDeleted'), onRemove: () => setShowDeleted(false) }] : []),
+    ...(changedOnly ? [{ key: 'changed', label: t('expenses.pieceworkChangedOnly'), onRemove: () => setChangedOnly(false) }] : []),
   ]
 
   return (
@@ -272,6 +276,18 @@ function ExpensesListPage() {
           <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />
           <Label htmlFor="exp-show-deleted" className="cursor-pointer text-sm">
             {t('expenses.showDeleted')}
+          </Label>
+          </div>
+          <div className="flex items-center gap-3">
+          <Switch
+            id="exp-piecework-changed"
+            checked={changedOnly}
+            onCheckedChange={setChangedOnly}
+            className="cursor-pointer"
+            data-testid="expense-piecework-changed"
+          />
+          <Label htmlFor="exp-piecework-changed" className="cursor-pointer text-sm">
+            {t('expenses.pieceworkChangedOnly')}
           </Label>
           </div>
           </div>

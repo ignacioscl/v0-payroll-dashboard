@@ -286,6 +286,8 @@ describeIf('Expense Piecework — camino entero contra la copia local (escribe y
         const groupIds = [...createdGroupIds]
         const inGrp = groupIds.length ? groupIds.map(() => '?').join(',') : 'NULL'
         await step(() => db.query(`DELETE FROM LOG_GENERIC WHERE id_expense IN (${inExp}) OR id_exp_group IN (${inGrp})`, [...expenseIds, ...groupIds]))
+        // T5b (migration 034): el histórico apunta a las filas; va primero.
+        await step(() => db.query(`DELETE FROM EXP_EXPENSE_PIECEWORK_WO_HISTORY WHERE id_expense IN (${inExp})`, expenseIds))
         await step(() => db.query(`DELETE FROM EXP_EXPENSE_PIECEWORK_WO WHERE id_expense IN (${inExp})`, expenseIds))
         if (groupIds.length) await step(() => db.query(`UPDATE EXP_EXPENSE_GROUP SET id_attachment_expense = NULL WHERE id IN (${inGrp})`, groupIds))
         await step(() => db.query(`DELETE FROM EXP_EXPENSE WHERE id IN (${inExp}) AND id_detailer = ?`, [...expenseIds, PROVIDER]))

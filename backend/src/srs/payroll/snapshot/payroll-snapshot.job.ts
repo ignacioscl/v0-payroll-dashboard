@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 
 import { PayrollPeriodStateService } from '../../../features/payroll-period-state/service/payroll-period-state.service'
+import { ExpensePieceworkRecalcService } from '../../../features/srs-expense/service/expense-piecework-recalc.service'
 import { emptyJobResult, JobContext, JobForm, JobHandler, JobResult } from '../../../jobs/job.interface'
 import { proratedDayId } from './payment-type-ids'
 import { calculatePeriod } from './payroll-period.calculator'
@@ -83,6 +84,7 @@ export class PayrollSnapshotJob implements JobHandler<PayrollSnapshotPayload> {
     private readonly fingerprints: PayrollFingerprintRepository,
     private readonly writer: PayrollSnapshotWriter,
     private readonly states: PayrollPeriodStateService,
+    private readonly pieceworkRecalc: ExpensePieceworkRecalcService,
   ) {}
 
   async run(payload: PayrollSnapshotPayload, ctx: JobContext): Promise<JobResult> {
@@ -104,6 +106,7 @@ export class PayrollSnapshotJob implements JobHandler<PayrollSnapshotPayload> {
     const explicitRange = !!(payload?.desde || payload?.hasta)
     const rangeFrom = explicitRange ? maxDate(payload.desde ?? from, from) : maxDate(ventana, from)
     const rangeTo = minDate(payload?.hasta ?? corte, corte)
+    const liveWindow = { from: maxDate(ventana, from), to: corte }
 
     const result = emptyJobResult()
     const skippedProviders: number[] = []
@@ -181,7 +184,11 @@ export class PayrollSnapshotJob implements JobHandler<PayrollSnapshotPayload> {
             corte,
             CALC_VERSION,
           )
-          const written = await this.writer.rewritePeriod(provider.idContratista, periodo.desde, rows)
+          // T5b: las expenses Piecework de este período se recalculan en la misma transacción. La ventana para decidir
+          // si un período está vivo es la de la noche, también en una corrida a mano con rango (plan v9, R2).
+          const written = await this.writer.rewritePeriod(provider.idContratista, periodo.desde, rows, () =>
+            this.pieceworkRecalc.recalcPeriod(provider, periodo, liveWindow),
+          )
           await this.states.save({
             idContratista: provider.idContratista,
             periodoDesde: periodo.desde,

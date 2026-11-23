@@ -2,24 +2,16 @@
 
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { ColumnDef } from '@tanstack/react-table'
 import { useFormContext, useWatch } from 'react-hook-form'
 
-import {
-  DATA_TABLE_PAGE_SIZE_ALL,
-  DataTable,
-  DataTableColumnHeader,
-  type DataTableColumnMeta,
-} from '@/components/shared/data-table'
+import { PieceworkPeriodsText, PieceworkWorkOrdersTable } from '@/components/expenses/piecework-work-orders-table'
 import { EmployeeCombobox } from '@/components/ttk/employee-combobox'
 import type { TtkEmployeeOption } from '@/hooks/use-ttk-employee-search'
-import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { fmtAmount, fmtYmd } from '@/lib/expenses/expense-format'
 import type { ExpenseFormValues } from '@/lib/expenses/expense-form-schema'
-import { keepAvailable, pieceworkRangeText, selectedTotal } from '@/lib/expenses/expense-piecework'
-import { isRealYmd, toCents } from '@/lib/expenses/expense-rules'
+import { keepAvailable } from '@/lib/expenses/expense-piecework'
+import { isRealYmd } from '@/lib/expenses/expense-rules'
 import { useTranslation } from '@/lib/i18n/locale-context'
 import {
   fetchPieceworkVendors,
@@ -51,7 +43,7 @@ export function ExpensePieceworkFields({
   /** La lista que se ve, para que el form sepa los dealers al grabar. */
   onWorkOrders?: (wos: PieceworkWorkOrder[]) => void
 }) {
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
   const form = useFormContext<ExpenseFormValues>()
   const vendorId = useWatch({ control: form.control, name: 'pieceworkVendorId' })
   const ticketDate = useWatch({ control: form.control, name: 'ticketDate' })
@@ -89,116 +81,10 @@ export function ExpensePieceworkFields({
   }, [vendorOptions, term])
   const selectedVendor = React.useMemo(() => vendorOptions.find((v) => v.id === vendorId) ?? null, [vendorOptions, vendorId])
 
-  const rowSelection = React.useMemo(() => Object.fromEntries(selected.map((id) => [String(id), true])), [selected])
-  const setSelection = (next: Record<string, boolean>) => {
-    form.setValue(
-      'invoiceIds',
-      Object.entries(next)
-        .filter(([, v]) => v)
-        .map(([k]) => Number(k)),
-      { shouldDirty: true },
-    )
+  const setSelected = (ids: number[]) => {
+    form.setValue('invoiceIds', ids, { shouldDirty: true })
     form.clearErrors('invoiceIds')
   }
-
-  const columns = React.useMemo<ColumnDef<PieceworkWorkOrder>[]>(
-    () => [
-      {
-        id: 'select',
-        size: 40,
-        minSize: 40,
-        maxSize: 44,
-        enableSorting: false,
-        enableHiding: false,
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? 'indeterminate' : false}
-            disabled={disabled || table.getRowModel().rows.length === 0}
-            onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
-            aria-label={t('expenses.pieceworkSelectAll')}
-            className="cursor-pointer"
-          />
-        ),
-        // El check de Radix, dentro de un <form>, tiene un input oculto que dispara su propio clic cada vez que cambia:
-        // si ese clic llega a la fila (que también marca la WO), vuelve a cambiarlo y queda en bucle. El span lo frena.
-        cell: ({ row }) => (
-          <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
-            <Checkbox
-              checked={row.getIsSelected()}
-              disabled={disabled}
-              onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label={t('expenses.pieceworkSelectRow', { nro: row.original.nro })}
-              className="cursor-pointer"
-            />
-          </span>
-        ),
-        meta: {
-          label: t('expenses.pieceworkSelectRow', { nro: '' }),
-          headerClassName: 'w-[40px] px-2',
-          cellClassName: 'px-2',
-        } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-      {
-        accessorKey: 'nro',
-        size: 110,
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colWorkOrder')} />,
-        meta: { label: t('expenses.colWorkOrder') } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-      {
-        accessorKey: 'vin',
-        size: 170,
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colVin')} />,
-        cell: ({ row }) => <span className="break-all">{row.original.vin || '—'}</span>,
-        meta: { label: t('expenses.colVin') } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-      {
-        id: 'dealer',
-        accessorFn: (w) => w.dealer.name,
-        size: 200,
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colBranch')} />,
-        cell: ({ row }) => <span className="whitespace-normal break-words">{row.original.dealer.name}</span>,
-        meta: { label: t('expenses.colBranch') } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-      {
-        accessorKey: 'date',
-        size: 110,
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colDate')} />,
-        cell: ({ row }) => <span className="tabular-nums">{fmtYmd(row.original.date)}</span>,
-        meta: { label: t('expenses.colDate') } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-      {
-        id: 'piecework',
-        accessorFn: (w) => toCents(w.piecework),
-        size: 120,
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colPiecework')} />,
-        cell: ({ row }) => <span className="tabular-nums">{fmtAmount(row.original.piecework)}</span>,
-        meta: { label: t('expenses.colPiecework'), numeric: true } satisfies DataTableColumnMeta<PieceworkWorkOrder>,
-      },
-    ],
-    [t, disabled],
-  )
-
-  // Un solo rango, del primer día del primer pay period al último del último (Ignacio, 22/11).
-  const range = pieceworkRangeText(periods, locale)
-  // Sin vendor o sin fecha no hay texto arriba: la tabla vacía ya dice qué falta. Las fechas van en negrita y el resto
-  // del texto normal (Ignacio, 22/11): el texto traducido se arma con marcas en lugar de las fechas y se parte ahí.
-  const MARK = '\u0001'
-  const periodsText: React.ReactNode =
-    !vendorId || !month || !workOrders.data
-      ? null
-      : range
-        ? t('expenses.pieceworkPeriods', { from: `${MARK}from${MARK}`, to: `${MARK}to${MARK}` })
-            .split(MARK)
-            .map((part, i) =>
-              i % 2 === 1 ? (
-                <strong key={i} className="font-semibold">
-                  {range[part as 'from' | 'to']}
-                </strong>
-              ) : (
-                part
-              ),
-            )
-        : t('expenses.pieceworkNoPeriods')
 
   return (
     <div className="min-w-0 space-y-4">
@@ -249,7 +135,8 @@ export function ExpensePieceworkFields({
         />
       </div>
 
-      {periodsText ? <p className="text-sm text-foreground" data-testid="piecework-periods">{periodsText}</p> : null}
+      {/* Sin vendor o sin fecha no hay texto arriba: la tabla vacía ya dice qué falta. */}
+      {vendorId && month && workOrders.data ? <PieceworkPeriodsText periods={periods} /> : null}
 
       <FormField
         control={form.control}
@@ -257,37 +144,14 @@ export function ExpensePieceworkFields({
         render={() => (
           <FormItem>
             <div data-field="invoiceIds" className="min-w-0">
-              <DataTable<PieceworkWorkOrder>
+              <PieceworkWorkOrdersTable
                 tableId="expense-piecework-work-orders"
-                columns={columns}
-                data={available}
-                getRowId={(w) => String(w.idInvoice)}
+                workOrders={available}
+                selected={selected}
+                onSelectedChange={setSelected}
+                disabled={disabled}
                 isLoading={workOrders.isFetching}
-                enableRowSelection={!disabled}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setSelection}
-                // Toda la fila marca o desmarca la WO, con la manito (Ignacio, 22/11); el check no repite el clic.
-                onRowClick={disabled ? undefined : (w) => setSelection({ ...rowSelection, [String(w.idInvoice)]: !rowSelection[String(w.idInvoice)] })}
-                defaultPageSize={DATA_TABLE_PAGE_SIZE_ALL}
-                includeAllPageSize
-                tableScrollHeight="40vh"
-                enableGlobalFilter={false}
-                enableViewOptions={false}
-                emptyState={
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    {vendorId && month ? t('expenses.pieceworkNoWorkOrders') : t('expenses.pieceworkChooseVendorAndDate')}
-                  </p>
-                }
-                footer={
-                  available.length > 0 ? (
-                    <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-sm font-semibold">
-                      <span>{t('expenses.pieceworkSelected', { n: selected.length, total: available.length })}</span>
-                      <span className="tabular-nums" data-testid="piecework-total">
-                        {fmtAmount(selectedTotal(selected, available))}
-                      </span>
-                    </div>
-                  ) : undefined
-                }
+                emptyText={vendorId && month ? t('expenses.pieceworkNoWorkOrders') : t('expenses.pieceworkChooseVendorAndDate')}
               />
             </div>
             <FormMessage />

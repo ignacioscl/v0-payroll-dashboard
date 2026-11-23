@@ -30,6 +30,20 @@ import {
  */
 export const EXPENSE_IDENTITY_SQL = "IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group))"
 
+/**
+ * Expense Piecework: tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO (también liberadas: T5b, review R3). Una expense
+ * sin WO sigue siendo Piecework: no se duplica, no cambia monto ni compañía y abre el editor de WO.
+ */
+export const IS_PIECEWORK_SQL = 'EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id)'
+
+/**
+ * «Piecework con cambios» (T5b): la expense (su fila o cualquiera de su grupo) tiene algún cambio en el histórico,
+ * después del alta (la noche o Edit). Por grupo: si cambia la WO de un dealer, se ven todas las filas del grupo.
+ */
+export const PIECEWORK_CHANGED_SQL = `EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO_HISTORY h
+    JOIN EXP_EXPENSE he ON he.id = h.id_expense
+   WHERE he.id = e.id OR (e.id_exp_group IS NOT NULL AND he.id_exp_group = e.id_exp_group))`
+
 export function expenseIdentity(alias = 'e'): string {
   return EXPENSE_IDENTITY_SQL.replace(/e\./g, `${alias}.`)
 }
@@ -130,10 +144,11 @@ export class ExpenseReportRepository {
       sql += ' AND e.id_created_by = ?'
       params.push(filter.idCreatedBy)
     }
-    // All / Regular / Piecework (Ignacio, 22/11): una expense Piecework tiene filas en EXP_EXPENSE_PIECEWORK_WO.
-    const isPiecework = 'EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id AND pw.deleted_at IS NULL)'
-    if (filter.type === 'piecework') sql += ` AND ${isPiecework}`
-    else if (filter.type === 'regular') sql += ` AND NOT ${isPiecework}`
+    // All / Regular / Piecework (Ignacio, 22/11): una expense Piecework tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO
+    // (T5b, review R3: sigue siendo Piecework aunque se le hayan sacado todas las WO).
+    if (filter.type === 'piecework') sql += ` AND ${IS_PIECEWORK_SQL}`
+    else if (filter.type === 'regular') sql += ` AND NOT ${IS_PIECEWORK_SQL}`
+    if (filter.changed) sql += ` AND ${PIECEWORK_CHANGED_SQL}`
     if (filter.status === 'pending') sql += ' AND e.is_approved IS NULL'
     else if (filter.status === 'approved') sql += ' AND e.is_approved = 1'
     else if (filter.status === 'rejected') sql += ' AND e.is_approved = 0'
@@ -185,7 +200,8 @@ export class ExpenseReportRepository {
           e.id_exp_repetitive AS idExpRepetitive,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id) AS hasLog,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id AND lg.description LIKE 'Attachment %') AS hasAttachment,
-          EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id AND pw.deleted_at IS NULL) AS isPiecework,
+          ${IS_PIECEWORK_SQL} AS isPiecework,
+          ${PIECEWORK_CHANGED_SQL} AS isPieceworkChanged,
           g.split_type AS groupSplitType, g.id_attachment_expense AS groupAttachmentExpense,
           ${inScope.sql} AS inScope` + from.sql,
       params: [scope.idDealerProvider, ...inScope.params, ...from.params],

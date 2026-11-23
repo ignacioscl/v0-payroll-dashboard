@@ -250,3 +250,16 @@ export class ApprovalDto {
   @IsBoolean()
   approved!: boolean
 }
+
+/**
+ * PUT /srs/expenses/:id/piecework-work-orders (T5b, D18): las WO que quedan en la expense Piecework. Las que no vienen
+ * salen y quedan libres; las nuevas se validan como en el alta. Vacío = la expense queda sin WO (sigue siendo Piecework).
+ */
+export class PieceworkWorkOrdersBodyDto {
+  @ApiProperty({ type: [Number] })
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  invoiceIds!: number[]
+}

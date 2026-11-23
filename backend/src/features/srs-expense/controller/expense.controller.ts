@@ -16,7 +16,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
 import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
-import { ApprovalDto, AttachmentLogDto, CreateExpenseDto, UpdateExpenseDto } from '../dto/expense.dto'
+import { ApprovalDto, AttachmentLogDto, CreateExpenseDto, PieceworkWorkOrdersBodyDto, UpdateExpenseDto } from '../dto/expense.dto'
 import { ExpenseFacadeService } from '../service/expense-facade.service'
 import { ExpensePieceworkService } from '../service/expense-piecework.service'
 
@@ -49,6 +49,18 @@ export class ExpenseController {
     @Query('month') month: string,
   ) {
     return this.piecework.workOrders(request.srsContext, vendorId, month)
+  }
+
+  /** Edit de una expense Piecework (T5b, D18): sus WO, las libres del mismo vendor y mes, y el histórico de cambios. */
+  @Get(':id(\\d+)/piecework-work-orders')
+  pieceworkWorkOrdersOfExpense(@Req() request: any, @Param('id', ParseIntPipe) id: number) {
+    return this.service.pieceworkWorkOrders(request.srsContext, id)
+  }
+
+  /** Edit de una expense Piecework (D18): las WO que quedan en la expense (agrega las nuevas, libera las que salen). */
+  @Put(':id(\\d+)/piecework-work-orders')
+  updatePieceworkWorkOrders(@Req() request: any, @Param('id', ParseIntPipe) id: number, @Body() body: PieceworkWorkOrdersBodyDto) {
+    return this.service.updatePieceworkWorkOrders(request.srsContext, id, body.invoiceIds)
   }
 
   @Get(':id(\\d+)')

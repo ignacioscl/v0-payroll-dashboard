@@ -25,6 +25,8 @@ export type ExpenseExportLabels = {
   /** Tarjetas All / Regular / Piecework de Expenses List (Ignacio, 22/11). */
   type: string
   typeLabels: Record<'regular' | 'piecework', string>
+  /** Switch «Piecework con cambios» (T5b). */
+  changedOnly: string
   amountFrom: string
   amountTo: string
   showDeleted: string
@@ -97,6 +99,7 @@ const EN: ExpenseExportLabels = {
   status: 'Status',
   type: 'Type',
   typeLabels: { regular: 'Regular', piecework: 'Piecework' },
+  changedOnly: 'Piecework with changes',
   amountFrom: 'Amount from',
   amountTo: 'Amount to',
   showDeleted: 'Show deleted',
@@ -170,6 +173,7 @@ const ES: ExpenseExportLabels = {
   status: 'Estado',
   type: 'Tipo',
   typeLabels: { regular: 'Común', piecework: 'Piecework' },
+  changedOnly: 'Piecework con cambios',
   amountFrom: 'Monto desde',
   amountTo: 'Monto hasta',
   showDeleted: 'Mostrar eliminados',

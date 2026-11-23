@@ -10,10 +10,13 @@ import { periodsEndingInMonth } from 'src/srs/payroll/snapshot/payroll-month-per
 import { PayrollSourceRepository, WorkOrderServicePiecework } from 'src/srs/payroll/snapshot/payroll-source.repository'
 import type { PayrollPeriod } from 'src/srs/payroll/snapshot/payroll-snapshot.types'
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
-import { ExpensePieceworkWoRepository } from '../repository/expense-piecework-wo.repository'
+import { ExpensePieceworkWo } from '../entity/expense-piecework-wo.entity'
+import { ExpensePieceworkWoRepository, PieceworkUnitKey } from '../repository/expense-piecework-wo.repository'
+import { NewPieceworkRow, inputsOf } from './expense-piecework-recalc.service'
 import {
   MSG_CHOOSE_VENDOR,
   MSG_CHOOSE_WORK_ORDERS,
+  MSG_NOT_PIECEWORK,
   MSG_NO_PAY_PERIODS,
   MSG_PIECEWORK_RESTORE_TAKEN,
   MSG_WORK_ORDER_NOT_AVAILABLE,
@@ -133,6 +136,108 @@ export class ExpensePieceworkService {
         workDate: r.workDate,
       })),
     )
+  }
+
+  /**
+   * Edit de una expense Piecework (D18): qué filas salen (las WO que ya no vienen) y qué filas entran (las WO nuevas,
+   * validadas igual que el alta: del vendor, de los pay periods que terminan en el mes de la expense, del alcance del
+   * usuario y libres). Las WO que quedan no cambian.
+   */
+  async resolveForEdit(
+    ctx: SrsContext,
+    unit: PieceworkUnitKey,
+    ticketDate: string,
+    invoiceIds: readonly number[],
+  ): Promise<{ removed: ExpensePieceworkWo[]; added: NewPieceworkRow[] }> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_PIECEWORK)
+    const vendor = await this.pieceworkRows.vendorOfUnit(ctx.idDealerProvider, unit)
+    if (vendor === null) throw new ConflictException(MSG_NOT_PIECEWORK)
+    const active = await this.pieceworkRows.activeRowsOfUnit(ctx.idDealerProvider, unit)
+    const desired = new Set(invoiceIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))
+    const current = new Set(active.map((r) => r.idInvoice))
+    const removed = active.filter((r) => !desired.has(r.idInvoice))
+    const addIds = [...desired].filter((id) => !current.has(id))
+    if (!addIds.length) return { removed, added: [] }
+    const { periods, rows } = await this.candidates(ctx, vendor, monthOf(ticketDate), addIds)
+    if (!periods.length) throw fieldError('invoiceIds', MSG_NO_PAY_PERIODS)
+    const found = new Set(rows.map((r) => r.idInvoice))
+    if (addIds.some((id) => !found.has(id))) throw fieldError('invoiceIds', MSG_WORK_ORDER_NOT_AVAILABLE)
+    const state = await this.source.workOrderPieceworkState(ctx.idDealerProvider, vendor, addIds)
+    const added = rows.map((r): NewPieceworkRow => {
+      const services = state.filter((s) => s.idInvoice === r.idInvoice)
+      return {
+        idInvoice: r.idInvoice,
+        idService: r.idService,
+        idDealer: r.idDealer,
+        workDate: r.workDate,
+        amount: fromCents(toCents(r.piecework)),
+        inputs: inputsOf(services[0], services.find((s) => s.idService === r.idService)),
+      }
+    })
+    return { removed, added }
+  }
+
+  /**
+   * Edit de una expense Piecework: sus WO (marcadas) y, si se puede editar, las libres del mismo vendor y mes, con el
+   * piecework de cada una; arriba de la tabla, los pay periods. Las suyas muestran lo que la expense tiene hoy.
+   */
+  async workOrdersOfExpense(
+    ctx: SrsContext,
+    unit: PieceworkUnitKey,
+    ticketDate: string,
+    withAvailable: boolean,
+  ): Promise<{ vendor: PieceworkVendorDto | null; periods: { desde: string; hasta: string }[]; workOrders: (PieceworkWorkOrderDto & { selected: boolean })[] }> {
+    const idVendor = await this.pieceworkRows.vendorOfUnit(ctx.idDealerProvider, unit)
+    if (idVendor === null) throw new ConflictException(MSG_NOT_PIECEWORK)
+    const active = await this.pieceworkRows.activeRowsOfUnit(ctx.idDealerProvider, unit)
+    const ids = [...new Set(active.map((r) => r.idInvoice))]
+    const [state, names, vendorNames] = await Promise.all([
+      this.source.workOrderPieceworkState(ctx.idDealerProvider, idVendor, ids),
+      this.report.dealerNames(ctx.idDealerProvider, [...new Set(active.map((r) => r.idDealer))]),
+      this.report.userNames(ctx.idDealerProvider, [idVendor]),
+    ])
+    const serviceName = new Map(state.filter((s) => s.idService !== null).map((s) => [`${s.idInvoice}:${s.idService}`, s.service]))
+    const own = new Map<number, PieceworkWorkOrderDto & { selected: boolean; cents: number }>()
+    for (const r of active) {
+      const head = state.find((s) => s.idInvoice === r.idInvoice)
+      let wo = own.get(r.idInvoice)
+      if (!wo) {
+        wo = {
+          idInvoice: r.idInvoice,
+          nro: head?.nro ?? String(r.idInvoice),
+          vin: head?.vin ?? '',
+          dealer: { id: r.idDealer, name: names.get(r.idDealer) ?? '' },
+          date: r.workDate,
+          piecework: '0.00',
+          services: [],
+          selected: true,
+          cents: 0,
+        }
+        own.set(r.idInvoice, wo)
+      }
+      wo.cents += toCents(r.amount)
+      const svc = serviceName.get(`${r.idInvoice}:${r.idInvoiceService}`)
+      if (svc && !wo.services.includes(svc)) wo.services.push(svc)
+    }
+    const mine = [...own.values()].map(({ cents, ...wo }) => ({ ...wo, piecework: fromCents(cents) }))
+    let periods: { desde: string; hasta: string }[] = []
+    let free: (PieceworkWorkOrderDto & { selected: boolean })[] = []
+    if (withAvailable) {
+      const avail = await this.workOrders(ctx, idVendor, monthOf(ticketDate))
+      periods = avail.periods
+      free = avail.workOrders.filter((w) => !own.has(w.idInvoice)).map((w) => ({ ...w, selected: false }))
+    } else {
+      const { firstDay, lastDay } = monthBounds(monthOf(ticketDate))
+      periods = (await periodsEndingInMonth(this.source, ctx.idDealerProvider, firstDay, lastDay)).map((p) => ({ desde: p.desde, hasta: p.hasta }))
+    }
+    const workOrders = [...mine, ...free].sort((a, b) => (a.date === b.date ? a.idInvoice - b.idInvoice : a.date < b.date ? -1 : 1))
+    const vendor = (await this.usuarios.activeVendors(ctx.idDealerProvider)).find((v) => v.id === idVendor) ?? {
+      id: idVendor,
+      name: vendorNames.get(idVendor) ?? String(idVendor),
+      thumbnailUuid: null,
+      logoImg: null,
+    }
+    return { vendor, periods, workOrders }
   }
 
   /** Restore: ninguna WO de esas filas puede estar ya en otra expense Piecework activa (D4). */

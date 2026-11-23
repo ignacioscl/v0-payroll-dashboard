@@ -2021,6 +2021,34 @@ export interface Messages {
     pieceworkSelected: string
     pieceworkHint: string
     pieceworkLocked: string
+    pieceworkReadOnly: string
+    pieceworkChangedOnly: string
+    pieceworkChangedMark: string
+    pieceworkHistory: string
+    pieceworkHistoryEmpty: string
+    pieceworkHistoryNightly: string
+    pieceworkHistoryWoChangedBy: string
+    pieceworkHistoryBy: string
+    pieceworkHistoryNew: string
+    pieceworkReasons: {
+      wo_deleted: string
+      wo_active_again: string
+      service_removed: string
+      service_added: string
+      vendor_removed: string
+      vendor_added: string
+      service_piecework: string
+      vendor_piecework: string
+      service_price: string
+      employee_count: string
+      dealer: string
+      date: string
+      moved_out: string
+      moved_frozen: string
+      calc: string
+      edit_added: string
+      edit_removed: string
+    }
     errChooseVendor: string
     errChooseWorkOrders: string
     typeLockedRegular: string

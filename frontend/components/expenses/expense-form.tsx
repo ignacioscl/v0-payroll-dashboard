@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, Building2, Copy, Equal, Hammer, Loader2, Percent, Receipt, Repeat, Save, Sigma, Split, Tags, Upload, X } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -11,6 +12,7 @@ import { useExpenseAttachments } from '@/components/expenses/expense-attachment-
 import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
+import { ExpensePieceworkEdit, expensePieceworkWorkOrdersKey, type PieceworkEditState } from '@/components/expenses/expense-piecework-edit'
 import { ExpensePieceworkFields } from '@/components/expenses/expense-piecework-fields'
 import { expenseKindLocked, selectedDealerIds } from '@/lib/expenses/expense-piecework'
 import { ExpenseSplitTable } from '@/components/expenses/expense-split-table'
@@ -43,7 +45,14 @@ import { dealersToShowSaved, savedDealerIds } from '@/lib/expenses/expense-saved
 import { useFilters } from '@/lib/filter-context'
 import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { isExpensesApiError, type ExpenseDetail, type ExpenseMode, type PieceworkWorkOrder, type RuleDetail } from '@/lib/srs-expenses-api'
+import {
+  isExpensesApiError,
+  updateExpensePieceworkWorkOrders,
+  type ExpenseDetail,
+  type ExpenseMode,
+  type PieceworkWorkOrder,
+  type RuleDetail,
+} from '@/lib/srs-expenses-api'
 
 const FORM_ID = 'expense-form'
 
@@ -101,8 +110,10 @@ export function ExpenseForm({
   // Bloqueos de edición (F3).
   const readOnlyGroup = detail?.kind === 'group' && detail.readOnly
   const approvedSingle = detail?.kind === 'single' && detail.status === 'approved'
-  // Expense Piecework: solo los textos (monto, WO y fecha no cambian: se borra y se carga de nuevo).
-  const pieceworkDetail = Boolean(detail?.piecework) && !readOnlyGroup && !approvedSingle
+  // Expense Piecework: los textos y, con D18 (T5b), sus WO; vendor, fecha y reparto no cambian. Aprobada o de un grupo
+  // que no se ve entero, solo se miran sus WO y su historial.
+  const pieceworkView = Boolean(detail?.piecework)
+  const pieceworkDetail = pieceworkView && !readOnlyGroup && !approvedSingle
   const textOnly = (detail?.kind === 'group' && detail.approvedCount > 0 && !readOnlyGroup) || pieceworkDetail
   const locked = readOnlyGroup || approvedSingle
   const branchLocked = detail?.kind === 'single' && detail.hasAttachment
@@ -158,6 +169,11 @@ export function ExpenseForm({
     form.setValue('kind', next, { shouldDirty: true })
     form.clearErrors()
   }
+  /** Edit Piecework (D18): con qué WO abrió y si se pueden cambiar. */
+  const [pieceworkEdit, setPieceworkEdit] = React.useState<PieceworkEditState | null>(null)
+  const queryClient = useQueryClient()
+  /** Una fila de la expense: el PUT de WO va por fila (si es un grupo, cualquiera de las suyas). */
+  const pieceworkRowId = detail ? (detail.kind === 'group' ? detail.rows[0]?.id : detail.id) : undefined
   /** La lista de WO que se ve (Piecework), para saber los dealers del gasto al grabar. */
   const [pieceworkWorkOrders, setPieceworkWorkOrders] = React.useState<PieceworkWorkOrder[]>([])
   const idDealer = useWatch({ control: form.control, name: 'idDealer' })
@@ -235,6 +251,15 @@ export function ExpenseForm({
     const files = [...copies, ...newFiles]
     try {
       let saved: ExpenseDetail
+      if (detail && pieceworkView && pieceworkEdit?.canEdit && pieceworkRowId !== undefined) {
+        // D18: primero las WO (agrega las nuevas, libera las que salen); después los textos, como cualquier Edit.
+        const before = [...pieceworkEdit.initialIds].sort((a, b) => a - b).join(',')
+        const after = [...values.invoiceIds].sort((a, b) => a - b).join(',')
+        if (before !== after) {
+          await updateExpensePieceworkWorkOrders(pieceworkRowId, values.invoiceIds)
+          void queryClient.invalidateQueries({ queryKey: expensePieceworkWorkOrdersKey(pieceworkRowId) })
+        }
+      }
       if (detail) {
         // Grupo con una fila aprobada: solo los textos. Si no, el cuerpo entero; `idAuthor` va solo
         // con el permiso 117 y solo si cambió respecto del autor cargado.
@@ -441,7 +466,11 @@ export function ExpenseForm({
           </Alert>
         ) : null}
 
-        {isPiecework ? (
+        {pieceworkView && pieceworkRowId !== undefined ? (
+          <FormSection title={t('expenses.typePiecework')} icon={Hammer} className="space-y-3">
+            <ExpensePieceworkEdit expenseId={pieceworkRowId} disabled={busy || locked} onState={setPieceworkEdit} />
+          </FormSection>
+        ) : isPiecework ? (
           <FormSection title={t('expenses.typePiecework')} icon={Hammer} className="space-y-3">
             <ExpensePieceworkFields disabled={busy} todayNy={todayNy} onWorkOrders={setPieceworkWorkOrders} />
           </FormSection>
@@ -613,7 +642,7 @@ export function ExpenseForm({
         )}
 
         <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-          {!isPiecework ? (
+          {!isPiecework && !pieceworkView ? (
           <>
           <FormField
             control={form.control}

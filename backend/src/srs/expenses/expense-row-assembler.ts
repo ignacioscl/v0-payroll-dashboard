@@ -30,6 +30,7 @@ export interface RawExpenseRow {
   hasLog: unknown
   hasAttachment: unknown
   isPiecework: unknown
+  isPieceworkChanged?: unknown
   groupSplitType: unknown
   groupAttachmentExpense: unknown
   inScope: unknown
@@ -93,6 +94,7 @@ export function toSingle(r: RawExpenseRow): SingleWithMeta {
     hasLog: Number(r.hasLog) === 1,
     hasAttachment: Number(r.hasAttachment) === 1,
     piecework: Number(r.isPiecework) === 1,
+    pieceworkChanged: Number(r.isPieceworkChanged) === 1,
     groupId: r.idExpGroup === null || r.idExpGroup === undefined ? null : Number(r.idExpGroup),
   }
   if (idAuthorApproved > 0) {
@@ -189,6 +191,7 @@ export function buildGroupRow(groupId: number, visible: SingleWithMeta[], agg: G
     hasLog: agg.hasLog || visible.some((v) => v.row.hasLog),
     hasAttachment: groupHasAttachment,
     piecework: visible.some((v) => v.row.piecework),
+    pieceworkChanged: visible.some((v) => v.row.pieceworkChanged),
     rows,
   }
   if (attachmentId) group.attachmentExpenseId = attachmentId

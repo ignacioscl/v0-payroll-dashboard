@@ -4,6 +4,9 @@ import { Repository } from 'typeorm'
 
 import { ExpensePieceworkWo } from '../entity/expense-piecework-wo.entity'
 
+/** Una expense Piecework: el grupo (repartida entre dealers) o la expense suelta. */
+export type PieceworkUnitKey = { idExpGroup: number } | { idExpense: number }
+
 /** Una WO de un vendor que ya está en una expense Piecework activa. */
 export interface TakenWorkOrder {
   idInvoice: number
@@ -46,6 +49,58 @@ export class ExpensePieceworkWoRepository {
       [idDetailer, idEmployee, ...(invoiceIds ?? []), ...exceptExpenseIds],
     )
     return rows.map((r) => ({ idInvoice: Number(r.idInvoice), idEmployee: Number(r.idEmployee), idExpense: Number(r.idExpense) }))
+  }
+
+  /**
+   * T5b, la noche: las expenses (la unidad = el grupo, o la expense suelta) que tienen alguna fila sin liberar con la
+   * fecha guardada en [desde, hasta] **o** cuya WO tiene hoy la fecha de alta en ese rango (las que llegaron de otro pay
+   * period). Solo expenses activas de la empresa; aprobadas también (D19).
+   */
+  async unitsTouchingPeriod(idDetailer: number, desde: string, hasta: string): Promise<PieceworkUnitKey[]> {
+    const rows: { idExpGroup: unknown; idExpense: unknown }[] = await this.repo.query(
+      `SELECT DISTINCT e.id_exp_group AS idExpGroup, IF(e.id_exp_group IS NULL, e.id, NULL) AS idExpense
+         FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1 AND e.id_detailer = ?
+         JOIN INVOICE i ON i.id = pw.id_invoice
+        WHERE pw.deleted_at IS NULL
+          AND ((pw.work_date BETWEEN ? AND ?)
+               OR (i.fecha_alta >= ? AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)))`,
+      [idDetailer, desde, hasta, desde, hasta],
+    )
+    return rows.map((r) => (r.idExpGroup !== null && r.idExpGroup !== undefined ? { idExpGroup: Number(r.idExpGroup) } : { idExpense: Number(r.idExpense) }))
+  }
+
+  /** Las filas sin liberar de una unidad (todas sus filas de EXP_EXPENSE activas), de la empresa. */
+  async activeRowsOfUnit(idDetailer: number, unit: PieceworkUnitKey): Promise<ExpensePieceworkWo[]> {
+    const qb = this.repo
+      .createQueryBuilder('pw')
+      .innerJoin('EXP_EXPENSE', 'e', 'e.id = pw.id_expense AND e.id_detailer = :det AND e.estado = 1', { det: idDetailer })
+    if ('idExpGroup' in unit) qb.where('e.id_exp_group = :g', { g: unit.idExpGroup })
+    else qb.where('e.id = :id', { id: unit.idExpense })
+    return qb.orderBy('pw.id', 'ASC').getMany()
+  }
+
+  /** El vendor de una unidad: el de cualquiera de sus filas, también las liberadas (una expense sin WO sigue siendo suya). */
+  async vendorOfUnit(idDetailer: number, unit: PieceworkUnitKey): Promise<number | null> {
+    const rows: { idEmployee: unknown }[] = await this.repo.query(
+      `SELECT pw.id_employee AS idEmployee
+         FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.id_detailer = ?
+        WHERE ${'idExpGroup' in unit ? 'e.id_exp_group = ?' : 'e.id = ?'}
+        ORDER BY pw.id LIMIT 1`,
+      [idDetailer, 'idExpGroup' in unit ? unit.idExpGroup : unit.idExpense],
+    )
+    return rows.length ? Number(rows[0].idEmployee) : null
+  }
+
+  /** Cambia una fila (monto, dealer, fecha, fila de EXP_EXPENSE, insumos, revisión). */
+  async updateRow(id: number, patch: Partial<Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>>): Promise<void> {
+    await this.repo.update({ id }, patch)
+  }
+
+  /** La WO sale de la expense y queda libre (D18 y D20): la fila queda como histórico. */
+  async release(id: number): Promise<void> {
+    await this.repo.softDelete({ id })
   }
 
   /** Las filas de esas expenses de la empresa (cualquier estado de la expense). */

@@ -133,6 +133,8 @@ function build() {
     report as any,
     permissions as any,
     piecework as any,
+    { applyEdit: jest.fn() } as any,
+    { listForUnit: jest.fn().mockResolvedValue([]) } as any,
   )
   return { facade, expense, expenses, groups, catalog, logs, dealers, report, permissions }
 }

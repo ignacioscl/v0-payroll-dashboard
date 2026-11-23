@@ -99,6 +99,12 @@ export class ExpenseListQueryDto {
   @Matches(/^\d{1,8}(\.\d{1,2})?$/, { message: 'Enter an amount greater than 0 (up to 2 decimals).' })
   amountMax?: string
 
+  /** Switch «Piecework con cambios» de Expenses List (T5b): las expenses Piecework con algún cambio después del alta. */
+  @ApiPropertyOptional({ enum: ['0', '1'], description: 'Only Piecework expenses that changed' })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  changed?: string
+
   @ApiPropertyOptional({ enum: ['0', '1'], description: 'Show deleted' })
   @IsOptional()
   @IsIn(['0', '1'])

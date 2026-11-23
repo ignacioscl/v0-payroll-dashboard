@@ -8,6 +8,7 @@ import {
   ROL_ACCION_EXPENSES_APPROVE,
   ROL_ACCION_EXPENSES_EDIT,
   ROL_ACCION_EXPENSES_ON_BEHALF,
+  ROL_ACCION_EXPENSES_PIECEWORK,
   SrsPermissionRepository,
 } from 'src/srs/auth/srs-permission.repository'
 import { ymdToUs } from 'src/srs/punch/punch-export-format'
@@ -53,8 +54,11 @@ import {
   NOTES_MAX,
   RECEIPT_NUMBER_MAX,
 } from '../rules/expense-rules'
-import { MSG_PIECEWORK_LOCKED, PIECEWORK_EXPENSE_CATEGORY } from '../rules/expense-piecework'
-import { ExpensePieceworkService } from './expense-piecework.service'
+import { MSG_NOT_PIECEWORK, MSG_PIECEWORK_LOCKED, PIECEWORK_EXPENSE_CATEGORY } from '../rules/expense-piecework'
+import { ExpensePieceworkWoHistoryRepository, PieceworkHistoryEntry } from '../repository/expense-piecework-wo-history.repository'
+import type { PieceworkUnitKey } from '../repository/expense-piecework-wo.repository'
+import { ExpensePieceworkRecalcService } from './expense-piecework-recalc.service'
+import { ExpensePieceworkService, PieceworkVendorDto, PieceworkWorkOrderDto } from './expense-piecework.service'
 import { ExpenseService } from './expense.service'
 
 /** Lo común a todas las filas de un gasto (suelto o grupo). */
@@ -82,6 +86,19 @@ type CommonBody = Pick<
 
 /** Lo que el reparto lee del cuerpo. */
 type SplitBody = Pick<CreateExpenseDto, 'idDealer' | 'totalAmount' | 'branches'> & { mode?: ExpenseMode }
+
+/** GET /srs/expenses/:id/piecework-work-orders (T5b, D18): lo que muestra Edit de una expense Piecework. */
+export interface PieceworkExpenseWorkOrdersDto {
+  vendor: PieceworkVendorDto | null
+  /** YYYY-MM: el mes de la expense. */
+  month: string
+  periods: { desde: string; hasta: string }[]
+  /** Las de la expense (selected) y, si canEdit, las libres del mismo vendor y mes. */
+  workOrders: (PieceworkWorkOrderDto & { selected: boolean })[]
+  /** Pendiente, activa, el grupo entero en el alcance y con los permisos de Edit y de Piecework. */
+  canEdit: boolean
+  history: PieceworkHistoryEntry[]
+}
 
 const MSG_CHOOSE_MODE = 'Choose how to split the amount.'
 
@@ -114,6 +131,8 @@ export class ExpenseFacadeService {
     @Inject(ExpenseReportRepository) private readonly report: ExpenseReportRepository,
     @Inject(SrsPermissionRepository) private readonly permissions: SrsPermissionRepository,
     @Inject(ExpensePieceworkService) private readonly piecework: ExpensePieceworkService,
+    @Inject(ExpensePieceworkRecalcService) private readonly pieceworkRecalc: ExpensePieceworkRecalcService,
+    @Inject(ExpensePieceworkWoHistoryRepository) private readonly pieceworkHistory: ExpensePieceworkWoHistoryRepository,
   ) {}
 
   private scope(ctx: SrsContext): ExpenseScope {
@@ -445,6 +464,57 @@ export class ExpenseFacadeService {
       `Piecework expense created (${resolved.vendor.name}, ${workOrders} work orders, ${resolved.byDealer.length} dealers)`,
     )
     return this.groupDetail(ctx, group.id as number, 1)
+  }
+
+  // ---------------------------------------------------------------- expense Piecework: sus WO (T5b, D18)
+
+  /** La unidad Piecework de una fila: su grupo o ella misma. */
+  private pieceworkUnit(expense: Expense): PieceworkUnitKey {
+    return expense.idExpGroup ? { idExpGroup: expense.idExpGroup } : { idExpense: expense.id }
+  }
+
+  /**
+   * GET /srs/expenses/:id/piecework-work-orders: las WO de la expense, las libres del mismo vendor y mes (si se puede
+   * editar) y el histórico de cambios, el más nuevo arriba. Con el alcance de dealers de la expense (`requireVisible`).
+   */
+  async pieceworkWorkOrders(ctx: SrsContext, id: number): Promise<PieceworkExpenseWorkOrdersDto> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_APPROVE)
+    const meta = await this.requireVisible(ctx, id)
+    if (!meta.row.piecework) throw new ConflictException(MSG_NOT_PIECEWORK)
+    const expense = await this.expenses.findOwned(id, ctx.idDealerProvider)
+    if (!expense) throw new NotFoundException('Expense not found')
+    const unit = this.pieceworkUnit(expense)
+    const rows = expense.idExpGroup ? await this.report.rowsByGroup(expense.idExpGroup, expense.estado, this.scope(ctx)) : [meta]
+    const canEdit =
+      Number(expense.estado) === 1 &&
+      !rows.some((r) => r.row.status === 'approved') &&
+      rows.every((r) => r.inScope) &&
+      (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_EDIT)) &&
+      (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_PIECEWORK))
+    const [wos, history] = await Promise.all([
+      this.piecework.workOrdersOfExpense(ctx, unit, expense.ticketDate, canEdit),
+      this.pieceworkHistory.listForUnit(ctx.idDealerProvider, unit),
+    ])
+    return { ...wos, month: expense.ticketDate.slice(0, 7), canEdit, history }
+  }
+
+  /**
+   * PUT /srs/expenses/:id/piecework-work-orders (D18): agrega y saca WO. Igual que Edit: pendiente (aprobada → 409) y
+   * el grupo entero en el alcance; las WO nuevas se validan como en el alta. Vendor, fecha y reparto no cambian.
+   */
+  @Transactional()
+  async updatePieceworkWorkOrders(ctx: SrsContext, id: number, invoiceIds: readonly number[]): Promise<ExpenseDetail> {
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_EDIT)
+    const { expense, meta } = await this.requireWritable(ctx, id)
+    if (!meta.row.piecework) throw new ConflictException(MSG_NOT_PIECEWORK)
+    if (Number(expense.estado) !== 1) throw new NotFoundException('Expense not found')
+    const rows = expense.idExpGroup ? await this.report.rowsByGroup(expense.idExpGroup, 1, this.scope(ctx)) : [meta]
+    if (rows.some((r) => r.row.status === 'approved')) throw new ConflictException(MSG_RECEIPT_APPROVED)
+    const unit = this.pieceworkUnit(expense)
+    const { removed, added } = await this.piecework.resolveForEdit(ctx, unit, expense.ticketDate, invoiceIds)
+    await this.assertDealersInScope(ctx, [...new Set(added.map((a) => a.idDealer))], () => 'invoiceIds')
+    await this.pieceworkRecalc.applyEdit(ctx.idDealerProvider, unit, removed, added, ctx.idUsuario)
+    return this.detailByExpenseId(ctx, expense.id)
   }
 
   /**

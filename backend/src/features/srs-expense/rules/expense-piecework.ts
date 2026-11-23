@@ -14,7 +14,9 @@ export const MSG_CHOOSE_WORK_ORDERS = 'Choose at least one work order.'
 export const MSG_WORK_ORDER_NOT_AVAILABLE =
   'One or more work orders are not available for this vendor and month: they are not in its pay periods or they are already in another Piecework expense.'
 export const MSG_NO_PAY_PERIODS = 'This month has no pay periods.'
-export const MSG_PIECEWORK_LOCKED = 'A Piecework expense keeps its amount, work orders and date: delete it and add it again.'
+export const MSG_PIECEWORK_LOCKED =
+  'A Piecework expense keeps its vendor, date and split: its amount follows its work orders. Change the work orders in Edit.'
+export const MSG_NOT_PIECEWORK = 'This is not a Piecework expense.'
 export const MSG_PIECEWORK_RESTORE_TAKEN =
   'One of the work orders of this Piecework expense is already in another active Piecework expense.'
 
