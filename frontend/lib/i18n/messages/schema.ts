@@ -2024,11 +2024,7 @@ export interface Messages {
     pieceworkReadOnly: string
     pieceworkChangedOnly: string
     pieceworkChangedMark: string
-    pieceworkHistory: string
-    pieceworkHistoryEmpty: string
-    pieceworkHistoryNightly: string
     pieceworkHistoryWoChangedBy: string
-    pieceworkHistoryBy: string
     pieceworkHistoryNew: string
     pieceworkReasons: {
       wo_deleted: string

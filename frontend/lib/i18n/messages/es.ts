@@ -2116,12 +2116,8 @@ export const es: Messages = {
     pieceworkLocked: 'Expense Piecework: el vendor, la fecha y el reparto no cambian. El monto sigue a sus WO: si una cambia, la expense cambia a la noche. Abajo se pueden agregar o sacar WO.',
     pieceworkReadOnly: 'Solo una expense pendiente puede agregar o sacar WO.',
     pieceworkChangedOnly: 'Piecework con cambios',
-    pieceworkChangedMark: 'Sus WO cambiaron después del alta. El historial está en Edit.',
-    pieceworkHistory: 'Cambios',
-    pieceworkHistoryEmpty: 'Sin cambios desde el alta.',
-    pieceworkHistoryNightly: 'Detectado el {date}',
+    pieceworkChangedMark: 'Sus WO cambiaron después del alta. Los cambios están en su log.',
     pieceworkHistoryWoChangedBy: 'Último cambio de la WO: {name}, {date}',
-    pieceworkHistoryBy: 'Por {name}',
     pieceworkHistoryNew: 'nueva',
     pieceworkReasons: {
       wo_deleted: 'WO eliminada',

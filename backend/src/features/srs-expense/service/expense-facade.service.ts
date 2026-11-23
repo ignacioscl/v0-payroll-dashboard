@@ -97,7 +97,6 @@ export interface PieceworkExpenseWorkOrdersDto {
   workOrders: (PieceworkWorkOrderDto & { selected: boolean })[]
   /** Pendiente, activa, el grupo entero en el alcance y con los permisos de Edit y de Piecework. */
   canEdit: boolean
-  history: PieceworkHistoryEntry[]
 }
 
 const MSG_CHOOSE_MODE = 'Choose how to split the amount.'
@@ -146,10 +145,21 @@ export class ExpenseFacadeService {
     return this.detailByExpenseId(ctx, id)
   }
 
-  async log(ctx: SrsContext, id: number): Promise<{ data: ExpenseLogEntry[] }> {
+  /**
+   * El log del gasto (LOG_GENERIC) y, si es una expense Piecework, su historial de WO (T5b): qué WO cambió, por qué, de
+   * cuánto a cuánto y quién. Va en el log, no en Edit (Ignacio, 22/11).
+   */
+  async log(ctx: SrsContext, id: number): Promise<{ data: ExpenseLogEntry[]; pieceworkHistory: PieceworkHistoryEntry[] }> {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_APPROVE)
     const meta = await this.requireVisible(ctx, id)
-    return { data: await this.report.logRows(id, meta.row.groupId ?? null, this.scope(ctx)) }
+    const groupId = meta.row.groupId ?? null
+    const [data, pieceworkHistory] = await Promise.all([
+      this.report.logRows(id, groupId, this.scope(ctx)),
+      meta.row.piecework
+        ? this.pieceworkHistory.listForUnit(ctx.idDealerProvider, groupId ? { idExpGroup: groupId } : { idExpense: id })
+        : Promise.resolve([]),
+    ])
+    return { data, pieceworkHistory }
   }
 
   /** Un gasto o, si pertenece a un grupo, el grupo con sus filas visibles. 404 si no es de la empresa o no se ve. */
@@ -474,8 +484,8 @@ export class ExpenseFacadeService {
   }
 
   /**
-   * GET /srs/expenses/:id/piecework-work-orders: las WO de la expense, las libres del mismo vendor y mes (si se puede
-   * editar) y el histórico de cambios, el más nuevo arriba. Con el alcance de dealers de la expense (`requireVisible`).
+   * GET /srs/expenses/:id/piecework-work-orders: las WO de la expense y las libres del mismo vendor y mes (si se puede
+   * editar). Con el alcance de dealers de la expense (`requireVisible`). El historial va en el log (`log`).
    */
   async pieceworkWorkOrders(ctx: SrsContext, id: number): Promise<PieceworkExpenseWorkOrdersDto> {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_APPROVE)
@@ -491,11 +501,8 @@ export class ExpenseFacadeService {
       rows.every((r) => r.inScope) &&
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_EDIT)) &&
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_PIECEWORK))
-    const [wos, history] = await Promise.all([
-      this.piecework.workOrdersOfExpense(ctx, unit, expense.ticketDate, canEdit),
-      this.pieceworkHistory.listForUnit(ctx.idDealerProvider, unit),
-    ])
-    return { ...wos, month: expense.ticketDate.slice(0, 7), canEdit, history }
+    const wos = await this.piecework.workOrdersOfExpense(ctx, unit, expense.ticketDate, canEdit)
+    return { ...wos, month: expense.ticketDate.slice(0, 7), canEdit }
   }
 
   /**

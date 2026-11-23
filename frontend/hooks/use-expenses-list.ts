@@ -18,6 +18,7 @@ import {
   type ExpenseDetail,
   type ExpenseListFilters,
   type ExpenseLogRow,
+  type PieceworkHistoryEntry,
   type ExpenseSummary,
   type UpdateExpensePayload,
 } from '@/lib/srs-expenses-api'
@@ -46,10 +47,14 @@ export function useExpenseDetail(id: number | null) {
   })
 }
 
+/** El log del gasto y, si es Piecework, el historial de sus WO (T5b). */
 export function useExpenseLog(id: number | null, enabled = true) {
-  return useQuery<ExpenseLogRow[]>({
+  return useQuery<{ rows: ExpenseLogRow[]; pieceworkHistory: PieceworkHistoryEntry[] }>({
     queryKey: expenseLogKey(id ?? 0),
-    queryFn: async () => (await fetchExpenseLog(id as number)).data,
+    queryFn: async () => {
+      const res = await fetchExpenseLog(id as number)
+      return { rows: res.data, pieceworkHistory: res.pieceworkHistory ?? [] }
+    },
     enabled: enabled && id !== null && id > 0,
   })
 }

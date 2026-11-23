@@ -2110,12 +2110,8 @@ export const en: Messages = {
     pieceworkLocked: 'Piecework expense: the vendor, the date and the split do not change. The amount follows its work orders: if one changes, the expense changes overnight. You can add or remove work orders below.',
     pieceworkReadOnly: 'Only a pending expense can add or remove work orders.',
     pieceworkChangedOnly: 'Piecework with changes',
-    pieceworkChangedMark: 'Its work orders changed after it was added. The history is in Edit.',
-    pieceworkHistory: 'Changes',
-    pieceworkHistoryEmpty: 'No changes since it was added.',
-    pieceworkHistoryNightly: 'Detected on {date}',
+    pieceworkChangedMark: 'Its work orders changed after it was added. The changes are in its log.',
     pieceworkHistoryWoChangedBy: 'Last change to the WO: {name}, {date}',
-    pieceworkHistoryBy: 'By {name}',
     pieceworkHistoryNew: 'new',
     pieceworkReasons: {
       wo_deleted: 'WO deleted',

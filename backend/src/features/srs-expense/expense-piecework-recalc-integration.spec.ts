@@ -33,7 +33,7 @@ import type { MonthlyClosingDto } from 'src/srs/monthly-closing/dto/monthly-clos
 import { PayrollSnapshotJob } from 'src/srs/payroll/snapshot/payroll-snapshot.job'
 import { PayrollSnapshotModule } from 'src/srs/payroll/snapshot/payroll-snapshot.module'
 import { PIECEWORK_REASON } from './rules/expense-piecework-recalc'
-import { toCents } from './rules/expense-rules'
+import { fromCents, toCents } from './rules/expense-rules'
 import { ExpenseFacadeService } from './service/expense-facade.service'
 import { ExpensePieceworkService } from './service/expense-piecework.service'
 import { SrsExpenseModule } from './srs-expense.module'
@@ -72,11 +72,21 @@ const MONTH = '2026-10'
 const TICKET_DATE = '2026-10-20'
 const SPEC_NOTES = 'expense-piecework-recalc-integration.spec'
 
-/** WO de Francol de octubre (dealer 627), sin ponchada y libres en la copia del 12/11 (consulta del 22/11). */
-const WO_A = 4354653 // 10/01, servicio 141023, $105 — pay period 10/01–10/15
-const WO_A_SERVICE = 141023
-const WO_B = 4379021 // 10/16, servicio 143063, $210 — pay period 10/16–10/30
-const WO_C = 4382571 // 10/19, servicio 143063, $70 — la que se agrega en Edit
+/**
+ * WO de Francol de octubre (dealer 627, sin ponchada), elegidas en el beforeAll entre las libres: así la prueba no
+ * choca con una expense Piecework cargada a mano en dev. A del pay period 10/01–10/15; B y C del 10/16–10/30 (C es la
+ * que se agrega en Edit). Cada una con un solo servicio, sin monto propio del vendor y con el vendor solo en la WO, así
+ * su piecework es el del servicio.
+ */
+let WO_A = 0
+let WO_A_SERVICE = 0
+let A_CENTS = 0
+let WO_B = 0
+let B_CENTS = 0
+let B_DATE = ''
+let WO_C = 0
+let C_CENTS = 0
+let C_DATE = ''
 const DEALER = 627
 const OTHER_DEPARTMENT = 1060 // departamento del dealer 613
 const OTHER_DEALER = 613
@@ -160,6 +170,39 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     const jobsDb = moduleRef.get(`${JOBS_CONNECTION}DataSource`) as DataSource
     const [lastRun]: { id: unknown }[] = await jobsDb.query(`SELECT MAX(id) AS id FROM JOB_RUN`)
     jobCtx.runId = Number(lastRun?.id ?? 0)
+
+    // Las WO libres que sirven, del dealer 627, sin ponchada del vendor.
+    const candidates: { id: unknown; d: unknown; svc: unknown; pw: unknown }[] = await db.query(
+      `SELECT i.id, DATE_FORMAT(i.fecha_alta, '%Y-%m-%d') AS d, MIN(isr.id_service_invoice) AS svc, MIN(isr.piecework) AS pw
+         FROM INVOICE i
+         JOIN DEPARTMENT dp ON dp.id = i.id_department AND dp.id_dealer = ?
+         JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+        WHERE i.id_dealer_provider = ? AND i.estado = 1
+          AND i.fecha_alta >= '2026-10-01' AND i.fecha_alta < '2026-10-31'
+          AND EXISTS (SELECT 1 FROM INVOICE_EMPLOYEE_REL v WHERE v.id_invoice = i.id AND v.id_usuario = ?)
+          AND (SELECT COUNT(DISTINCT c.id_usuario) FROM INVOICE_EMPLOYEE_REL c WHERE c.id_invoice = i.id) = 1
+          AND NOT EXISTS (SELECT 1 FROM INVOICE_SERVICE_EMPLOYEE_REL x WHERE x.id_invoice = i.id AND x.piecework IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM TTK_EMPLOYEE_WORK t WHERE t.id_author = ? AND DATE(t.punch_in) = DATE(i.fecha_alta))
+          AND NOT EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1
+                           WHERE pw.id_invoice = i.id AND pw.deleted_at IS NULL)
+        GROUP BY i.id
+       HAVING COUNT(*) = 1 AND MIN(isr.piecework) > 0
+        ORDER BY i.fecha_alta`,
+      [DEALER, PROVIDER, FRANCOL, FRANCOL],
+    )
+    const inA = candidates.filter((r) => String(r.d) <= PERIOD_A.hasta)
+    const inB = candidates.filter((r) => String(r.d) >= PERIOD_B.desde && String(r.d) <= PERIOD_B.hasta)
+    expect(inA.length).toBeGreaterThanOrEqual(1)
+    expect(inB.length).toBeGreaterThanOrEqual(2)
+    WO_A = Number(inA[0].id)
+    WO_A_SERVICE = Number(inA[0].svc)
+    A_CENTS = toCents(String(inA[0].pw))
+    WO_B = Number(inB[0].id)
+    B_CENTS = toCents(String(inB[0].pw))
+    B_DATE = String(inB[0].d)
+    WO_C = Number(inB[1].id)
+    C_CENTS = toCents(String(inB[1].pw))
+    C_DATE = String(inB[1].d)
 
     original = (
       await db.query(
@@ -270,12 +313,18 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
 
   it('cambia el piecework del servicio: la expense cambia sola, queda el motivo y Monthly Closing sigue cerrando (Payroll igual, Expenses +$50)', async () => {
     const closingBefore = await closingNow()
-    await db.query(`UPDATE INVOICE_SERVICE_REL SET piecework = 155 WHERE id_invoice = ? AND id_service_invoice = ?`, [WO_A, WO_A_SERVICE])
+    await db.query(`UPDATE INVOICE_SERVICE_REL SET piecework = ? WHERE id_invoice = ? AND id_service_invoice = ?`, [(A_CENTS + 5000) / 100, WO_A, WO_A_SERVICE])
     await runJob(PERIOD_A.desde, PERIOD_A.hasta)
     const rows = await pwRows()
-    expect(toCents(rows.find((r) => r.idInvoice === WO_A)!.amount)).toBe(15500)
+    expect(toCents(rows.find((r) => r.idInvoice === WO_A)!.amount)).toBe(A_CENTS + 5000)
     expect(await historyOf(WO_A)).toEqual([
-      { reason: PIECEWORK_REASON.servicePiecework, detail: 'service_piecework:105.00>155.00', oldAmount: '105.00', newAmount: '155.00', source: 'nightly' },
+      {
+        reason: PIECEWORK_REASON.servicePiecework,
+        detail: `service_piecework:${fromCents(A_CENTS)}>${fromCents(A_CENTS + 5000)}`,
+        oldAmount: fromCents(A_CENTS),
+        newAmount: fromCents(A_CENTS + 5000),
+        source: 'nightly',
+      },
     ])
     const closingAfter = await closingNow()
     expect(dealerRow(closingAfter, DEALER).payroll).toBe(dealerRow(closingBefore, DEALER).payroll)
@@ -292,7 +341,7 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     await db.query(`UPDATE INVOICE SET estado = 1 WHERE id = ?`, [WO_A])
     await runJob(PERIOD_A.desde, PERIOD_A.hasta)
     a = (await pwRows()).find((r) => r.idInvoice === WO_A)!
-    expect(toCents(a.amount)).toBe(15500)
+    expect(toCents(a.amount)).toBe(A_CENTS + 5000)
     expect((await historyOf(WO_A)).slice(-2).map((h) => h.reason)).toEqual([PIECEWORK_REASON.woDeleted, PIECEWORK_REASON.woActiveAgain])
   }, 600000)
 
@@ -300,12 +349,12 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     const res: { insertId: number } = await db.query(`INSERT INTO INVOICE_EMPLOYEE_REL (id_invoice, id_usuario) VALUES (?, ?)`, [WO_A, OTHER_EMPLOYEE])
     insertedEmployeeRel = Number(res.insertId)
     await runJob(PERIOD_A.desde, PERIOD_A.hasta)
-    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_A)!.amount)).toBe(7750)
+    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_A)!.amount)).toBe(Math.round((A_CENTS + 5000) / 2))
     expect((await historyOf(WO_A)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.employeeCount, detail: 'employee_count:1>2' })
     await db.query(`DELETE FROM INVOICE_EMPLOYEE_REL WHERE id = ?`, [insertedEmployeeRel])
     insertedEmployeeRel = null
     await runJob(PERIOD_A.desde, PERIOD_A.hasta)
-    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_A)!.amount)).toBe(15500)
+    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_A)!.amount)).toBe(A_CENTS + 5000)
   }, 600000)
 
   it('la WO cambia de dealer: el monto pasa al dealer nuevo (la expense pasa a grupo) y el Payroll de cada dealer no cambia', async () => {
@@ -315,8 +364,8 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     const d = track(await detail())
     expect(d.kind).toBe('group')
     const byDealer = new Map(rowsOf(d).map((r) => [r.dealer.id, toCents(r.amount)]))
-    expect(byDealer.get(DEALER)).toBe(15500)
-    expect(byDealer.get(OTHER_DEALER)).toBe(21000)
+    expect(byDealer.get(DEALER)).toBe(A_CENTS + 5000)
+    expect(byDealer.get(OTHER_DEALER)).toBe(B_CENTS)
     expect((await historyOf(WO_B)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.dealer })
     const closingAfter = await closingNow()
     for (const id of [DEALER, OTHER_DEALER]) expect(dealerRow(closingAfter, id).payroll).toBe(dealerRow(closingBefore, id).payroll)
@@ -324,7 +373,7 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     await db.query(`UPDATE INVOICE SET id_department = ? WHERE id = ?`, [original.find((o) => o.id === WO_B)!.idDepartment, WO_B])
     await runJob(PERIOD_B.desde, PERIOD_B.hasta)
     const back = new Map(rowsOf(await detail()).map((r) => [r.dealer.id, toCents(r.amount)]))
-    expect(back.get(DEALER)).toBe(15500 + 21000)
+    expect(back.get(DEALER)).toBe(A_CENTS + 5000 + B_CENTS)
     expect(back.get(OTHER_DEALER)).toBe(0)
   }, 600000)
 
@@ -335,13 +384,15 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     expect(view.workOrders.some((w) => w.idInvoice === WO_C && !w.selected)).toBe(true)
     await facade.updatePieceworkWorkOrders(admin, expenseId, [WO_B, WO_C])
     expect((await historyOf(WO_A)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.editRemoved, source: 'edit' })
-    expect((await historyOf(WO_C)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.editAdded, source: 'edit', oldAmount: null, newAmount: '70.00' })
-    expect(await totalCents()).toBe(21000 + 7000)
+    expect((await historyOf(WO_C)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.editAdded, source: 'edit', oldAmount: null, newAmount: fromCents(C_CENTS) })
+    expect(await totalCents()).toBe(B_CENTS + C_CENTS)
     const free = await piecework.workOrders(admin, FRANCOL, MONTH)
     expect(free.workOrders.some((w) => w.idInvoice === WO_A)).toBe(true)
-    const after = await facade.pieceworkWorkOrders(admin, expenseId)
-    expect(after.history[0].source).toBe('edit')
-    expect(after.history[0].changedBy?.id).toBe(ADMIN_USER)
+    // El historial va en el log de la expense (Ignacio, 22/11), el más nuevo arriba, con quién.
+    const log = await facade.log(admin, expenseId)
+    expect(log.pieceworkHistory[0].source).toBe('edit')
+    expect(log.pieceworkHistory[0].changedBy?.id).toBe(ADMIN_USER)
+    expect(log.pieceworkHistory.map((h) => h.reason)).toEqual(expect.arrayContaining([PIECEWORK_REASON.editAdded, PIECEWORK_REASON.editRemoved]))
     const list = await reportService.list(admin, {
       idDealer: allDealers,
       from: '2026-10-01',
@@ -361,14 +412,14 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     await db.query(`UPDATE INVOICE SET fecha_alta = '2026-10-05 10:00:00' WHERE id = ?`, [WO_B])
     await runJob(PERIOD_B.desde, PERIOD_B.hasta)
     const b = (await pwRows()).find((r) => r.idInvoice === WO_B && !r.deleted)!
-    expect([toCents(b.amount), b.workDate, b.deleted]).toEqual([0, '2026-10-16', false])
-    expect((await historyOf(WO_B)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.movedFrozen, detail: 'moved_frozen:2026-10-16>2026-10-05' })
+    expect([toCents(b.amount), b.workDate, b.deleted]).toEqual([0, B_DATE, false])
+    expect((await historyOf(WO_B)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.movedFrozen, detail: `moved_frozen:${B_DATE}>2026-10-05` })
     const closingAfter = await closingNow()
     expect(dealerRow(closingAfter, DEALER).payroll).toBe(dealerRow(closingBefore, DEALER).payroll)
     delete process.env.PAYROLL_SNAPSHOT_CHECK_MONTHS
     await db.query(`UPDATE INVOICE SET fecha_alta = ? WHERE id = ?`, [original.find((o) => o.id === WO_B)!.fechaAlta, WO_B])
     await runJob(PERIOD_A.desde, PERIOD_B.hasta)
-    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_B && !r.deleted)!.amount)).toBe(21000)
+    expect(toCents((await pwRows()).find((r) => r.idInvoice === WO_B && !r.deleted)!.amount)).toBe(B_CENTS)
   }, 600000)
 
   it('D20: la WO C pasa a noviembre → sale de la expense y queda libre para la de noviembre', async () => {
@@ -376,8 +427,8 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     await runJob(PERIOD_B.desde, PERIOD_B.hasta)
     const c = (await pwRows()).find((r) => r.idInvoice === WO_C)!
     expect(c.deleted).toBe(true)
-    expect((await historyOf(WO_C)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.movedOut, detail: 'moved_out:2026-10-19>2026-11-05' })
-    expect(await totalCents()).toBe(21000)
+    expect((await historyOf(WO_C)).at(-1)).toMatchObject({ reason: PIECEWORK_REASON.movedOut, detail: `moved_out:${C_DATE}>2026-11-05` })
+    expect(await totalCents()).toBe(B_CENTS)
     const november = await piecework.workOrders(admin, FRANCOL, '2026-11')
     expect(november.workOrders.some((w) => w.idInvoice === WO_C)).toBe(true)
   }, 600000)

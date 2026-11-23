@@ -457,7 +457,8 @@ export function restoreGroup(groupId: number): Promise<ExpenseDetail> {
   return requestJson(`${EXPENSES_BASE_URL}/groups/${groupId}/restore`, { method: 'POST' }, 'Failed to restore expense')
 }
 
-export function fetchExpenseLog(id: number): Promise<{ data: ExpenseLogRow[] }> {
+/** El log del gasto y, si es una expense Piecework, su historial de WO (T5b; va en el log, no en Edit). */
+export function fetchExpenseLog(id: number): Promise<{ data: ExpenseLogRow[]; pieceworkHistory?: PieceworkHistoryEntry[] }> {
   return requestJson(`${EXPENSES_BASE_URL}/${id}/log`, { method: 'GET' }, 'Failed to load log')
 }
 
@@ -550,7 +551,7 @@ export interface PieceworkHistoryEntry {
   woChangedAt: string | null
 }
 
-/** Edit de una expense Piecework: sus WO (selected), las libres del mismo vendor y mes, y el histórico. */
+/** Edit de una expense Piecework: sus WO (selected) y las libres del mismo vendor y mes. El historial va en el log. */
 export interface ExpensePieceworkWorkOrders extends PieceworkWorkOrders {
   vendor: PieceworkVendor | null
   /** YYYY-MM. */
@@ -558,7 +559,6 @@ export interface ExpensePieceworkWorkOrders extends PieceworkWorkOrders {
   workOrders: (PieceworkWorkOrder & { selected: boolean })[]
   /** Pendiente, activa, el grupo entero a la vista y con los permisos de Edit y de Piecework. */
   canEdit: boolean
-  history: PieceworkHistoryEntry[]
 }
 
 export function fetchExpensePieceworkWorkOrders(id: number): Promise<ExpensePieceworkWorkOrders> {

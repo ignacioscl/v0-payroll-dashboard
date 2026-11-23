@@ -5,8 +5,8 @@
  *
  * Lo que recorre: se carga una expense Piecework de Francol (octubre, 2 WO de Land Rover Ft Lauderdale) → Monthly
  * Closing de octubre → Expenses List: sin la marca de cambios → Edit: se saca una WO y se agrega otra → Save → el switch
- * «Piecework with changes» la trae, con la marca → Edit: el historial dice «Removed in Edit» y «Added in Edit», con
- * quién → Monthly Closing: Expenses subió y Payroll bajó la diferencia → se borra la expense.
+ * «Piecework with changes» la trae, con la marca → … › Log: el historial dice «Removed in Edit» y «Added in Edit»,
+ * con quién → Monthly Closing: Expenses subió y Payroll bajó la diferencia → se borra la expense.
  *
  * El recálculo de la noche (la WO cambia en el legacy y el job del snapshot la sigue) lo prueba
  * `backend/src/features/srs-expense/expense-piecework-recalc-integration.spec.ts`, con el job corrido a mano: el job
@@ -87,7 +87,6 @@ test.describe.serial('Piecework expense — follows its work orders', () => {
       await expect(woRow(a).getByRole('checkbox')).toBeChecked({ timeout: 60_000 })
       await expect(woRow(b).getByRole('checkbox')).toBeChecked()
       await expect(woRow(c).getByRole('checkbox')).not.toBeChecked()
-      await expect(form.getByTestId('piecework-history')).toContainText('No changes since it was added.')
       await woRow(a).getByRole('checkbox').click()
       await woRow(c).locator('td').nth(2).click() // toda la fila marca la WO
       await expect(woRow(c).getByRole('checkbox')).toBeChecked()
@@ -103,17 +102,19 @@ test.describe.serial('Piecework expense — follows its work orders', () => {
       await expect(row).toBeVisible({ timeout: 30_000 })
       await expect(row.getByTestId('expense-piecework-changed-mark')).toBeVisible()
 
-      // El historial en Edit, el más nuevo arriba, con quién.
-      await row.getByRole('button', { name: 'Edit' }).click()
-      const history = form.getByTestId('piecework-history')
-      await expect(history.getByTestId('piecework-history-entry')).toHaveCount(2, { timeout: 30_000 })
-      await expect(history).toContainText('Removed in Edit')
-      await expect(history).toContainText('Added in Edit')
-      await expect(history).toContainText(`WO ${a.nro}`)
-      await expect(history).toContainText(`WO ${c.nro}`)
-      await expect(history).toContainText('By ')
+      // El historial va en el log de la expense (… › Log), no en Edit (Ignacio, 22/11): junto a las líneas de siempre,
+      // el más nuevo arriba, con quién.
+      await row.getByRole('button', { name: 'Actions' }).click()
+      await page.getByRole('menuitem', { name: 'Log' }).click()
+      const log = page.getByRole('dialog').filter({ has: page.getByText('Expense log') })
+      await expect(log.getByTestId('piecework-history-entry')).toHaveCount(2, { timeout: 30_000 })
+      await expect(log).toContainText('Removed in Edit')
+      await expect(log).toContainText('Added in Edit')
+      await expect(log).toContainText(`WO ${a.nro}`)
+      await expect(log).toContainText(`WO ${c.nro}`)
+      await expect(log).toContainText('by ')
       await noHorizontalScroll(page)
-      await form.getByRole('button', { name: 'Cancel' }).click()
+      await page.keyboard.press('Escape')
 
       // Monthly Closing: Expenses sube y Payroll baja la diferencia (C − A) en el dealer.
       const after = await monthlyClosingDealer(page, MONTH, DEALER)
