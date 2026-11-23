@@ -79,6 +79,12 @@ export const ROL_ACCION_EXPENSES_ON_BEHALF = 117
 export const ROL_ACCION_EXPENSES_EDIT = 118
 
 /**
+ * Expenses > Add Piecework expense (migration 032, plans/plan-reunion-juan-18-11 temas 3 y 4): el tipo Piecework de
+ * Add Expense (las WO de un vendor como gasto). Sin roles asignados al salir; los admins pasan siempre.
+ */
+export const ROL_ACCION_EXPENSES_PIECEWORK = 147
+
+/**
  * Port parcial de `PayrollPermissionService::userHasRolAccion` /
  * `getPermissionIds` → `loadAssignedRolAccionesForRole` → `RolDao::loadRolAccion`
  * con `idRolLeftJoin` + `existe === 1`.

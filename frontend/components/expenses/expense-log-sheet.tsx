@@ -2,6 +2,7 @@
 
 import { History, Loader2 } from 'lucide-react'
 
+import { PieceworkHistoryCard } from '@/components/expenses/piecework-history-card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -15,7 +16,11 @@ import { useExpenseLog } from '@/hooks/use-expenses-list'
 import { formatUsDateTimeForExport } from '@/lib/format-us-datetime'
 import { useTranslation } from '@/lib/i18n/locale-context'
 
-/** «Expense log»: LOG_GENERIC del gasto y, si tiene, de su grupo (F2, T2.2). */
+/**
+ * «Expense log»: LOG_GENERIC del gasto y, si tiene, de su grupo (F2, T2.2). En una expense Piecework, también el
+ * historial de sus WO (T5b de plan-reunion-juan-18-11: va acá y no en Edit, Ignacio 22/11), todo junto, el más nuevo
+ * arriba.
+ */
 export function ExpenseLogSheet({
   expenseId,
   title,
@@ -29,7 +34,13 @@ export function ExpenseLogSheet({
 }) {
   const { t } = useTranslation()
   const query = useExpenseLog(expenseId, open)
-  const rows = query.data ?? []
+  const rows = query.data?.rows ?? []
+  const history = query.data?.pieceworkHistory ?? []
+  // Las dos fechas vienen como `YYYY-MM-DD HH:mm:ss`: se ordenan como texto, la más nueva arriba.
+  const items = [
+    ...rows.map((row) => ({ kind: 'log' as const, date: row.date, row })),
+    ...history.map((entry) => ({ kind: 'piecework' as const, date: entry.createdAt, entry })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -51,11 +62,14 @@ export function ExpenseLogSheet({
             <p className="text-sm text-destructive" role="alert">
               {query.error.message}
             </p>
-          ) : rows.length === 0 ? (
+          ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('expenses.noChanges')}</p>
           ) : (
             <ul className="space-y-3">
-              {rows.map((row) => (
+              {items.map((item) => {
+                if (item.kind === 'piecework') return <PieceworkHistoryCard key={`pw-${item.entry.id}`} entry={item.entry} />
+                const row = item.row
+                return (
                 <li key={`${row.scope}-${row.id}`} className="rounded-md border border-border/80 bg-muted/20 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     {row.dealer ? (
@@ -74,7 +88,8 @@ export function ExpenseLogSheet({
                     {t('expenses.logBy', { name: row.author?.name ?? '—' })}
                   </p>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </ScrollArea>

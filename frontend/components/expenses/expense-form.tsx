@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Building2, Copy, Equal, Loader2, Percent, Repeat, Save, Sigma, Split, Upload, X } from 'lucide-react'
+import { AlertTriangle, Building2, Copy, Equal, Hammer, Loader2, Percent, Receipt, Repeat, Save, Sigma, Split, Tags, Upload, X } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -11,6 +12,9 @@ import { useExpenseAttachments } from '@/components/expenses/expense-attachment-
 import { CatalogCombobox } from '@/components/expenses/catalog-combobox'
 import { DealerCombobox } from '@/components/expenses/dealer-combobox'
 import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-combobox'
+import { ExpensePieceworkEdit, expensePieceworkWorkOrdersKey, type PieceworkEditState } from '@/components/expenses/expense-piecework-edit'
+import { ExpensePieceworkFields } from '@/components/expenses/expense-piecework-fields'
+import { expenseKindLocked, selectedDealerIds } from '@/lib/expenses/expense-piecework'
 import { ExpenseSplitTable } from '@/components/expenses/expense-split-table'
 import { DealerMultiSelect } from '@/components/filters/dealer-multi-select'
 import { OptionTile } from '@/components/shared/option-tile'
@@ -41,7 +45,14 @@ import { dealersToShowSaved, savedDealerIds } from '@/lib/expenses/expense-saved
 import { useFilters } from '@/lib/filter-context'
 import { useFormWithFocus } from '@/lib/forms/use-form-with-focus'
 import { useTranslation } from '@/lib/i18n/locale-context'
-import { isExpensesApiError, type ExpenseDetail, type ExpenseMode, type RuleDetail } from '@/lib/srs-expenses-api'
+import {
+  isExpensesApiError,
+  updateExpensePieceworkWorkOrders,
+  type ExpenseDetail,
+  type ExpenseMode,
+  type PieceworkWorkOrder,
+  type RuleDetail,
+} from '@/lib/srs-expenses-api'
 
 const FORM_ID = 'expense-form'
 
@@ -57,6 +68,8 @@ export type ExpenseFormProps = {
   duplicateOf?: ExpenseDetail
   /** Permiso 117: combo «Assign to employee». */
   canAssign: boolean
+  /** Permiso 147 (temas 3 y 4 de plan-reunion-juan-18-11): el campo «Type» con Piecework, solo en el alta. */
+  canPiecework?: boolean
   /** Nombre del usuario que carga (sin 117 el gasto queda a su nombre). */
   userName?: string | null
 }
@@ -69,12 +82,23 @@ function mapServerField(field: string): string {
   if (field === 'newCategoryName' || field === 'idCategory') return 'category'
   if (field === 'idAuthor') return 'author'
   if (field === 'branches') return 'branchIds'
+  if (field === 'invoiceIds' || field === 'pieceworkVendorId') return field
   const m = /^branches\[(\d+)\]\.(percentage|amount)$/.exec(field) ?? /^branches\.(\d+)\.(percentage|amount)$/.exec(field)
   if (m) return `branches.${m[1]}.${m[2]}`
   return field
 }
 
-export function ExpenseForm({ title, description, onClose, detail, fromRule, duplicateOf, canAssign, userName }: ExpenseFormProps) {
+export function ExpenseForm({
+  title,
+  description,
+  onClose,
+  detail,
+  fromRule,
+  duplicateOf,
+  canAssign,
+  canPiecework = false,
+  userName,
+}: ExpenseFormProps) {
   const { t } = useTranslation()
   const { dateRange, setDateRange, setSelectedDealers } = useFilters()
   const { dealers, loading: dealersLoading } = useSrsDealers()
@@ -86,7 +110,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
   // Bloqueos de edición (F3).
   const readOnlyGroup = detail?.kind === 'group' && detail.readOnly
   const approvedSingle = detail?.kind === 'single' && detail.status === 'approved'
-  const textOnly = detail?.kind === 'group' && detail.approvedCount > 0 && !readOnlyGroup
+  // Expense Piecework: los textos y, con D18 (T5b), sus WO; vendor, fecha y reparto no cambian. Aprobada o de un grupo
+  // que no se ve entero, solo se miran sus WO y su historial.
+  const pieceworkView = Boolean(detail?.piecework)
+  const pieceworkDetail = pieceworkView && !readOnlyGroup && !approvedSingle
+  const textOnly = (detail?.kind === 'group' && detail.approvedCount > 0 && !readOnlyGroup) || pieceworkDetail
   const locked = readOnlyGroup || approvedSingle
   const branchLocked = detail?.kind === 'single' && detail.hasAttachment
 
@@ -104,6 +132,8 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
           errChooseCompany: t('expenses.errChooseCompany'),
           errChooseCategory: t('expenses.errChooseCategory'),
           errUpTo: t('expenses.errUpTo'),
+          errChooseVendor: t('expenses.errChooseVendor'),
+          errChooseWorkOrders: t('expenses.errChooseWorkOrders'),
         },
       ),
     [t, todayNy, textOnly],
@@ -122,6 +152,30 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
   })
 
   const mode = useWatch({ control: form.control, name: 'mode' })
+  const kind = useWatch({ control: form.control, name: 'kind' })
+  const isPiecework = kind === 'piecework'
+  const watched = useWatch({ control: form.control })
+  const kindLocked = expenseKindLocked({
+    kind: kind ?? 'regular',
+    idDealer: watched.idDealer ?? '',
+    branchIds: (watched.branchIds ?? []).filter((x): x is string => typeof x === 'string'),
+    totalAmount: watched.totalAmount ?? '',
+    branches: (watched.branches ?? {}) as Record<string, { percentage?: string; amount?: string }>,
+    pieceworkVendorId: watched.pieceworkVendorId ?? null,
+    invoiceIds: (watched.invoiceIds ?? []).filter((x): x is number => typeof x === 'number'),
+  })
+  const setKind = (next: 'regular' | 'piecework') => {
+    if (next === kind || kindLocked) return
+    form.setValue('kind', next, { shouldDirty: true })
+    form.clearErrors()
+  }
+  /** Edit Piecework (D18): con qué WO abrió y si se pueden cambiar. */
+  const [pieceworkEdit, setPieceworkEdit] = React.useState<PieceworkEditState | null>(null)
+  const queryClient = useQueryClient()
+  /** Una fila de la expense: el PUT de WO va por fila (si es un grupo, cualquiera de las suyas). */
+  const pieceworkRowId = detail ? (detail.kind === 'group' ? detail.rows[0]?.id : detail.id) : undefined
+  /** La lista de WO que se ve (Piecework), para saber los dealers del gasto al grabar. */
+  const [pieceworkWorkOrders, setPieceworkWorkOrders] = React.useState<PieceworkWorkOrder[]>([])
   const idDealer = useWatch({ control: form.control, name: 'idDealer' })
   const branchIds = useWatch({ control: form.control, name: 'branchIds' })
   const dealersCsv = mode === 'single' ? idDealer : (branchIds ?? []).join(',')
@@ -197,6 +251,15 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
     const files = [...copies, ...newFiles]
     try {
       let saved: ExpenseDetail
+      if (detail && pieceworkView && pieceworkEdit?.canEdit && pieceworkRowId !== undefined) {
+        // D18: primero las WO (agrega las nuevas, libera las que salen); después los textos, como cualquier Edit.
+        const before = [...pieceworkEdit.initialIds].sort((a, b) => a - b).join(',')
+        const after = [...values.invoiceIds].sort((a, b) => a - b).join(',')
+        if (before !== after) {
+          await updateExpensePieceworkWorkOrders(pieceworkRowId, values.invoiceIds)
+          void queryClient.invalidateQueries({ queryKey: expensePieceworkWorkOrdersKey(pieceworkRowId) })
+        }
+      }
       if (detail) {
         // Grupo con una fila aprobada: solo los textos. Si no, el cuerpo entero; `idAuthor` va solo
         // con el permiso 117 y solo si cambió respecto del autor cargado.
@@ -222,7 +285,12 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
         }
       }
       toast.success(t('expenses.toastSaved'))
-      finish(values)
+      // Piecework: los dealers son los de las WO marcadas (el header los muestra, como en un gasto repartido).
+      finish(
+        values.kind === 'piecework'
+          ? { ...values, mode: 'amount', branchIds: selectedDealerIds(values.invoiceIds, pieceworkWorkOrders) }
+          : values,
+      )
     } catch (err) {
       setUploading(false)
       if (isExpensesApiError(err) && applyServerErrors(err.validationErrors, mapServerField)) return
@@ -341,11 +409,47 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
             <AlertTriangle className="size-4" />
             <AlertTitle>{t('expenses.errApproved')}</AlertTitle>
           </Alert>
+        ) : pieceworkDetail ? (
+          <Alert>
+            <Hammer className="size-4" />
+            <AlertTitle className="line-clamp-none">{t('expenses.pieceworkLocked')}</AlertTitle>
+          </Alert>
         ) : textOnly ? (
           <Alert>
             <AlertTriangle className="size-4" />
             <AlertTitle>{t('expenses.approvedRowsLockSplit')}</AlertTitle>
           </Alert>
+        ) : null}
+
+        {canPiecework && !isEdit ? (
+          <FormSection title={t('expenses.type')} icon={Tags} className="space-y-2">
+            {/* Dos opciones: tarjetas, como Single / Multiple dealers (no un combo). Con datos cargados de un tipo, el
+                otro queda deshabilitado (Ignacio, 22/11). */}
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              <OptionTile
+                dataField="kind"
+                selected={!isPiecework}
+                onSelect={() => setKind('regular')}
+                title={t('expenses.typeRegular')}
+                description={t('expenses.typeRegularHint')}
+                icon={Receipt}
+                disabled={busy || (isPiecework && kindLocked)}
+              />
+              <OptionTile
+                selected={isPiecework}
+                onSelect={() => setKind('piecework')}
+                title={t('expenses.typePiecework')}
+                description={t('expenses.typePieceworkHint')}
+                icon={Hammer}
+                disabled={busy || (!isPiecework && kindLocked)}
+              />
+            </div>
+            {kindLocked ? (
+              <p className="text-xs text-muted-foreground">
+                {isPiecework ? t('expenses.typeLockedPiecework') : t('expenses.typeLockedRegular')}
+              </p>
+            ) : null}
+          </FormSection>
         ) : null}
 
         {pendingUpload ? (
@@ -362,6 +466,15 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
           </Alert>
         ) : null}
 
+        {pieceworkView && pieceworkRowId !== undefined ? (
+          <FormSection title={t('expenses.typePiecework')} icon={Hammer} className="space-y-3">
+            <ExpensePieceworkEdit expenseId={pieceworkRowId} disabled={busy || locked} onState={setPieceworkEdit} />
+          </FormSection>
+        ) : isPiecework ? (
+          <FormSection title={t('expenses.typePiecework')} icon={Hammer} className="space-y-3">
+            <ExpensePieceworkFields disabled={busy} todayNy={todayNy} onWorkOrders={setPieceworkWorkOrders} />
+          </FormSection>
+        ) : (
         <FormSection title={t('expenses.branches')} icon={Building2} className="space-y-3">
           <div className="grid gap-1.5 sm:grid-cols-2">
             <OptionTile
@@ -526,8 +639,11 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
             </div>
           )}
         </FormSection>
+        )}
 
         <FormSection className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+          {!isPiecework && !pieceworkView ? (
+          <>
           <FormField
             control={form.control}
             name="ticketDate"
@@ -586,6 +702,8 @@ export function ExpenseForm({ title, description, onClose, detail, fromRule, dup
               </FormItem>
             )}
           />
+          </>
+          ) : null}
           <FormField
             control={form.control}
             name="description"

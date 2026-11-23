@@ -186,7 +186,31 @@ export function ExpensesDataTable({ filters, canApprove, canEdit, canAdd }: Expe
         accessorFn: (r) => rowAmount(r),
         size: 120,
         header: ({ column }) => <DataTableColumnHeader column={column} title={t('expenses.colAmount')} />,
-        cell: ({ row }) => <span className="font-medium tabular-nums">{fmtAmount(rowAmount(row.original))}</span>,
+        cell: ({ row }) => {
+          const amount = <span className="font-medium tabular-nums">{fmtAmount(rowAmount(row.original))}</span>
+          if (!row.original.pieceworkChanged) return amount
+          // T5b: la expense Piecework cambió sola (sus WO cambiaron) o en Edit; el historial está en Edit.
+          return (
+            <span className="inline-flex items-center justify-end gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className="inline-flex text-amber-600 dark:text-amber-400"
+                    role="img"
+                    aria-label={t('expenses.pieceworkChangedMark')}
+                    data-testid="expense-piecework-changed-mark"
+                  >
+                    <History className="size-3.5" aria-hidden />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  {t('expenses.pieceworkChangedMark')}
+                </TooltipContent>
+              </Tooltip>
+              {amount}
+            </span>
+          )
+        },
         meta: { label: t('expenses.colAmount'), numeric: true,  sortKey: 'amount' } satisfies DataTableColumnMeta<ExpenseRow>,
       },
       {
@@ -318,8 +342,9 @@ export function ExpensesDataTable({ filters, canApprove, canEdit, canAdd }: Expe
                     <Paperclip className="size-4" />
                     {t('expenses.attachment')}
                   </DropdownMenuItem>
-                  {canAdd ? (
-                    // Un grupo que se ve solo en parte no se copia: faltarían los dealers que no se ven.
+                  {canAdd && !r.piecework ? (
+                    // Un grupo que se ve solo en parte no se copia: faltarían los dealers que no se ven. Una expense
+                    // Piecework tampoco: sus WO no se pueden repetir (tema 9 de plan-reunion-juan-18-11).
                     <DropdownMenuItem
                       className="cursor-pointer"
                       disabled={readOnly}

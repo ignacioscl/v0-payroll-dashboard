@@ -31,6 +31,10 @@ export interface ExpenseSingleRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Expense Piecework (migration 032): tiene o tuvo WO en EXP_EXPENSE_PIECEWORK_WO. No se duplica ni cambia monto/fecha. */
+  piecework: boolean
+  /** T5b: algún cambio en su histórico (la noche o Edit) después del alta. */
+  pieceworkChanged: boolean
   idExpRepetitive?: number
   /**
    * Solo en las filas de un grupo By percentage: el porcentaje de la fila sobre el total del grupo (todas sus filas
@@ -65,6 +69,10 @@ export interface ExpenseGroupRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Alguna fila es de una expense Piecework (ver ExpenseSingleRow.piecework). */
+  piecework: boolean
+  /** Alguna fila tiene cambios en el histórico Piecework. */
+  pieceworkChanged: boolean
   attachmentExpenseId?: number
   idExpRepetitive?: number
   rows: ExpenseSingleRow[]

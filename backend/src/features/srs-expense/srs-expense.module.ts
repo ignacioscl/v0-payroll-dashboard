@@ -13,8 +13,16 @@ import { SrsLogGenericModule } from '../srs-log-generic/srs-log-generic.module'
 import { ExpenseCatalogAdminController } from './controller/expense-catalog-admin.controller'
 import { ExpenseController } from './controller/expense.controller'
 import { RecurringPastPeriodsController } from './controller/recurring-past-periods.controller'
+import { SrsPayrollModule } from 'src/srs/payroll/srs-payroll.module'
+import { SrsUsuarioModule } from '../srs-usuario/srs-usuario.module'
 import { Expense } from './entity/expense.entity'
+import { ExpensePieceworkWo } from './entity/expense-piecework-wo.entity'
+import { ExpensePieceworkWoHistory } from './entity/expense-piecework-wo-history.entity'
+import { ExpensePieceworkWoHistoryRepository } from './repository/expense-piecework-wo-history.repository'
+import { ExpensePieceworkWoRepository } from './repository/expense-piecework-wo.repository'
 import { ExpenseRepository } from './repository/expense.repository'
+import { ExpensePieceworkService } from './service/expense-piecework.service'
+import { ExpensePieceworkRecalcService } from './service/expense-piecework-recalc.service'
 import { ExpenseCatalogAdminService } from './service/expense-catalog-admin.service'
 import { ExpenseFacadeService } from './service/expense-facade.service'
 import { ExpenseService } from './service/expense.service'
@@ -35,7 +43,11 @@ import { RecurringPastPeriodsService } from './service/recurring-past-periods.se
     SrsExpenseRepetitiveModule,
     SrsExpenseDealerAssignModule,
     SrsContratistaModule,
-    TypeOrmModule.forFeature([Expense]),
+    // Expense Piecework (plans/plan-reunion-juan-18-11 tema 4): el piecework por WO y los pay periods (snapshot) y
+    // los vendors (srs-usuario).
+    SrsPayrollModule,
+    SrsUsuarioModule,
+    TypeOrmModule.forFeature([Expense, ExpensePieceworkWo, ExpensePieceworkWoHistory]),
   ],
   controllers: [ExpenseController, ExpenseCatalogAdminController, RecurringPastPeriodsController],
   providers: [
@@ -44,7 +56,12 @@ import { RecurringPastPeriodsService } from './service/recurring-past-periods.se
     ExpenseFacadeService,
     ExpenseCatalogAdminService,
     RecurringPastPeriodsService,
+    ExpensePieceworkWoRepository,
+    ExpensePieceworkService,
+    ExpensePieceworkWoHistoryRepository,
+    ExpensePieceworkRecalcService,
   ],
-  exports: [ExpenseService, ExpenseFacadeService],
+  // ExpensePieceworkRecalcService: lo usa el job del snapshot de Payroll (T5b).
+  exports: [ExpenseService, ExpenseFacadeService, ExpensePieceworkRecalcService],
 })
 export class SrsExpenseModule {}

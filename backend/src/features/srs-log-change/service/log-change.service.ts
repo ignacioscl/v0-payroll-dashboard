@@ -29,4 +29,9 @@ export class LogChangeService extends GlobalBaseService<LogChange, LogChangeQuer
   listForRule(idExpRepetitive: number, take = 200) {
     return this.repository.listForRule(idExpRepetitive, take)
   }
+
+  /** El último que tocó cada WO y cuándo (LOG_CHANGE + LOG_WO_WORKFLOW_CHANGE). */
+  lastWorkOrderChanges(idContratista: number, invoiceIds: readonly number[]) {
+    return this.repository.lastWorkOrderChanges(idContratista, invoiceIds)
+  }
 }

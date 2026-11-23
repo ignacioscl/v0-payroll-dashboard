@@ -26,6 +26,10 @@ export interface ExpenseSingleRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Expense Piecework (migration 032): no se duplica ni cambia monto ni fecha; sus WO se cambian en Edit (T5b). */
+  piecework?: boolean
+  /** T5b: algún cambio en su histórico (la noche o Edit) después del alta. */
+  pieceworkChanged?: boolean
   idExpRepetitive?: number | null
   /** Fila de un grupo: el id del grupo (lo manda el Nest en las hijas). */
   groupId?: number | null
@@ -56,6 +60,10 @@ export interface ExpenseGroupRow {
   deleted: boolean
   hasLog: boolean
   hasAttachment: boolean
+  /** Alguna fila es de una expense Piecework. */
+  piecework?: boolean
+  /** Alguna fila tiene cambios en el histórico Piecework. */
+  pieceworkChanged?: boolean
   attachmentExpenseId?: number | null
   idExpRepetitive?: number | null
   rows: ExpenseSingleRow[]
@@ -81,9 +89,13 @@ export interface ExpenseListFilters {
   idAuthor?: number
   idCreatedBy?: number
   status?: ExpenseStatus | ''
+  /** Tarjetas All / Regular / Piecework (Ignacio, 22/11); sin él, los dos tipos. */
+  type?: 'regular' | 'piecework'
   amountMin?: string
   amountMax?: string
   deleted?: 0 | 1
+  /** «Piecework con cambios» (T5b): solo las expenses Piecework con algún cambio en su histórico. */
+  changed?: 1
 }
 
 export interface ExpenseListParams extends ExpenseListFilters {
@@ -117,11 +129,15 @@ export interface CreateExpensePayload {
   receiptNumber?: string
   notes?: string
   idAuthor?: number
-  mode: ExpenseMode
+  /** No va en una expense Piecework (el reparto sale de las WO). */
+  mode?: ExpenseMode
   idDealer?: number
   totalAmount?: string
   branches?: ExpenseBranchInput[]
   idExpRepetitive?: number
+  /** Expense Piecework (temas 3 y 4 de plan-reunion-juan-18-11): el vendor y las WO marcadas. */
+  pieceworkVendorId?: number
+  invoiceIds?: number[]
 }
 
 /**
@@ -373,9 +389,11 @@ export function buildExpenseListQuery(params: Partial<ExpenseListParams>): strin
     idAuthor: params.idAuthor,
     idCreatedBy: params.idCreatedBy,
     status: params.status,
+    type: params.type,
     amountMin: params.amountMin,
     amountMax: params.amountMax,
     deleted: params.deleted,
+    changed: params.changed,
   })
 }
 
@@ -439,7 +457,8 @@ export function restoreGroup(groupId: number): Promise<ExpenseDetail> {
   return requestJson(`${EXPENSES_BASE_URL}/groups/${groupId}/restore`, { method: 'POST' }, 'Failed to restore expense')
 }
 
-export function fetchExpenseLog(id: number): Promise<{ data: ExpenseLogRow[] }> {
+/** El log del gasto y, si es una expense Piecework, su historial de WO (T5b; va en el log, no en Edit). */
+export function fetchExpenseLog(id: number): Promise<{ data: ExpenseLogRow[]; pieceworkHistory?: PieceworkHistoryEntry[] }> {
   return requestJson(`${EXPENSES_BASE_URL}/${id}/log`, { method: 'GET' }, 'Failed to load log')
 }
 
@@ -467,6 +486,91 @@ export function fetchExpenseEmployees(term: string, idDealer: string | null): Pr
     `${EXPENSES_BASE_URL}/employees${qs({ term, idDealer })}`,
     { method: 'GET' },
     'Failed to search employees',
+  )
+}
+
+// Expense Piecework (temas 3 y 4 de plan-reunion-juan-18-11)
+export interface PieceworkVendor {
+  id: number
+  name: string
+  thumbnailUuid: string | null
+  logoImg: string | null
+}
+
+export interface PieceworkWorkOrder {
+  idInvoice: number
+  nro: string
+  vin: string
+  dealer: NamedRef
+  date: string
+  piecework: string
+  services: string[]
+}
+
+export interface PieceworkWorkOrders {
+  /** Los pay periods que terminan en el mes (los del Payroll de Monthly Closing de ese mes). */
+  periods: { desde: string; hasta: string }[]
+  workOrders: PieceworkWorkOrder[]
+}
+
+export function fetchPieceworkVendors(): Promise<{ data: PieceworkVendor[] }> {
+  return requestJson(`${EXPENSES_BASE_URL}/piecework-vendors`, { method: 'GET' }, 'Failed to load the vendors')
+}
+
+/** `month`: YYYY-MM. */
+export function fetchPieceworkWorkOrders(vendorId: number, month: string): Promise<PieceworkWorkOrders> {
+  return requestJson(
+    `${EXPENSES_BASE_URL}/piecework-work-orders${qs({ vendorId: String(vendorId), month })}`,
+    { method: 'GET' },
+    'Failed to load the work orders',
+  )
+}
+
+/** Un cambio del histórico de una expense Piecework (T5b, migration 034), el más nuevo primero. */
+export interface PieceworkHistoryEntry {
+  id: number
+  /** Cuándo se detectó (UTC, `YYYY-MM-DD HH:mm:ss`). */
+  createdAt: string
+  idInvoice: number
+  nro: string
+  service: string
+  /** null: la fila es nueva (se agregó la WO o un servicio). */
+  oldAmount: string | null
+  newAmount: string
+  oldDealer: NamedRef | null
+  newDealer: NamedRef
+  oldWorkDate: string | null
+  newWorkDate: string
+  /** Código del motivo principal (ver `lib/expenses/expense-piecework-history.ts`). */
+  reason: string
+  /** Todos los motivos con sus valores: `code` o `code:antes>después`, separados por `|`. */
+  detail: string | null
+  source: 'nightly' | 'edit' | string
+  /** En Edit, el usuario; de noche, el último que editó la WO. */
+  changedBy: NamedRef | null
+  woChangedAt: string | null
+}
+
+/** Edit de una expense Piecework: sus WO (selected) y las libres del mismo vendor y mes. El historial va en el log. */
+export interface ExpensePieceworkWorkOrders extends PieceworkWorkOrders {
+  vendor: PieceworkVendor | null
+  /** YYYY-MM. */
+  month: string
+  workOrders: (PieceworkWorkOrder & { selected: boolean })[]
+  /** Pendiente, activa, el grupo entero a la vista y con los permisos de Edit y de Piecework. */
+  canEdit: boolean
+}
+
+export function fetchExpensePieceworkWorkOrders(id: number): Promise<ExpensePieceworkWorkOrders> {
+  return requestJson(`${EXPENSES_BASE_URL}/${id}/piecework-work-orders`, { method: 'GET' }, 'Failed to load the work orders')
+}
+
+/** D18: las WO que quedan en la expense. Las que no vienen salen y quedan libres. */
+export function updateExpensePieceworkWorkOrders(id: number, invoiceIds: number[]): Promise<ExpenseDetail> {
+  return requestJson(
+    `${EXPENSES_BASE_URL}/${id}/piecework-work-orders`,
+    { method: 'PUT', body: JSON.stringify({ invoiceIds }) },
+    'Failed to save the work orders',
   )
 }
 

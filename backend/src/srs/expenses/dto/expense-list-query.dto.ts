@@ -81,6 +81,12 @@ export class ExpenseListQueryDto {
   @IsIn(['pending', 'approved', 'rejected'])
   status?: 'pending' | 'approved' | 'rejected'
 
+  /** Tarjetas All / Regular / Piecework de Expenses List (Ignacio, 22/11). Sin él, los dos tipos. */
+  @ApiPropertyOptional({ enum: ['regular', 'piecework'] })
+  @IsOptional()
+  @IsIn(['regular', 'piecework'])
+  type?: 'regular' | 'piecework'
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -92,6 +98,12 @@ export class ExpenseListQueryDto {
   @IsString()
   @Matches(/^\d{1,8}(\.\d{1,2})?$/, { message: 'Enter an amount greater than 0 (up to 2 decimals).' })
   amountMax?: string
+
+  /** Switch «Piecework con cambios» de Expenses List (T5b): las expenses Piecework con algún cambio después del alta. */
+  @ApiPropertyOptional({ enum: ['0', '1'], description: 'Only Piecework expenses that changed' })
+  @IsOptional()
+  @IsIn(['0', '1'])
+  changed?: string
 
   @ApiPropertyOptional({ enum: ['0', '1'], description: 'Show deleted' })
   @IsOptional()

@@ -9,14 +9,16 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 
 import { CompanyModuleGuard, RequireCompanyModule } from 'src/features/srs-contratista/guard/company-module.guard'
-import { ApprovalDto, AttachmentLogDto, CreateExpenseDto, UpdateExpenseDto } from '../dto/expense.dto'
+import { ApprovalDto, AttachmentLogDto, CreateExpenseDto, PieceworkWorkOrdersBodyDto, UpdateExpenseDto } from '../dto/expense.dto'
 import { ExpenseFacadeService } from '../service/expense-facade.service'
+import { ExpensePieceworkService } from '../service/expense-piecework.service'
 
 /**
  * Un gasto (o su grupo): detalle, alta, edición, aprobación, baja, restauración y log. Rutas con id numérico
@@ -28,7 +30,38 @@ import { ExpenseFacadeService } from '../service/expense-facade.service'
 @ApiTags('SRS Expenses')
 @ApiBearerAuth()
 export class ExpenseController {
-  constructor(@Inject(ExpenseFacadeService) private readonly service: ExpenseFacadeService) {}
+  constructor(
+    @Inject(ExpenseFacadeService) private readonly service: ExpenseFacadeService,
+    @Inject(ExpensePieceworkService) private readonly piecework: ExpensePieceworkService,
+  ) {}
+
+  /** Expense Piecework (plans/plan-reunion-juan-18-11 tema 4): los vendors activos de la empresa, para el combo. */
+  @Get('piecework-vendors')
+  pieceworkVendors(@Req() request: any) {
+    return this.piecework.vendors(request.srsContext)
+  }
+
+  /** Expense Piecework: las WO del vendor de los pay periods que terminan en `month` (YYYY-MM) que están libres. */
+  @Get('piecework-work-orders')
+  pieceworkWorkOrders(
+    @Req() request: any,
+    @Query('vendorId', ParseIntPipe) vendorId: number,
+    @Query('month') month: string,
+  ) {
+    return this.piecework.workOrders(request.srsContext, vendorId, month)
+  }
+
+  /** Edit de una expense Piecework (T5b, D18): sus WO, las libres del mismo vendor y mes, y el histórico de cambios. */
+  @Get(':id(\\d+)/piecework-work-orders')
+  pieceworkWorkOrdersOfExpense(@Req() request: any, @Param('id', ParseIntPipe) id: number) {
+    return this.service.pieceworkWorkOrders(request.srsContext, id)
+  }
+
+  /** Edit de una expense Piecework (D18): las WO que quedan en la expense (agrega las nuevas, libera las que salen). */
+  @Put(':id(\\d+)/piecework-work-orders')
+  updatePieceworkWorkOrders(@Req() request: any, @Param('id', ParseIntPipe) id: number, @Body() body: PieceworkWorkOrdersBodyDto) {
+    return this.service.updatePieceworkWorkOrders(request.srsContext, id, body.invoiceIds)
+  }
 
   @Get(':id(\\d+)')
   get(@Req() request: any, @Param('id', ParseIntPipe) id: number) {

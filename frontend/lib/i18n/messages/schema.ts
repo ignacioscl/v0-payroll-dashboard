@@ -2001,6 +2001,54 @@ export interface Messages {
     generatePastExpenses: string
     pastPeriodsTitle: string
     pastPeriodsHint: string
+    type: string
+    typeRegular: string
+    typePiecework: string
+    typeRegularHint: string
+    typePieceworkHint: string
+    vendor: string
+    selectVendor: string
+    noVendors: string
+    colWorkOrder: string
+    colVin: string
+    colPiecework: string
+    pieceworkSelectAll: string
+    pieceworkSelectRow: string
+    pieceworkChooseVendorAndDate: string
+    pieceworkPeriods: string
+    pieceworkNoPeriods: string
+    pieceworkNoWorkOrders: string
+    pieceworkSelected: string
+    pieceworkHint: string
+    pieceworkLocked: string
+    pieceworkReadOnly: string
+    pieceworkChangedOnly: string
+    pieceworkChangedMark: string
+    pieceworkHistoryWoChangedBy: string
+    pieceworkHistoryNew: string
+    pieceworkReasons: {
+      wo_deleted: string
+      wo_active_again: string
+      service_removed: string
+      service_added: string
+      vendor_removed: string
+      vendor_added: string
+      service_piecework: string
+      vendor_piecework: string
+      service_price: string
+      employee_count: string
+      dealer: string
+      date: string
+      moved_out: string
+      moved_frozen: string
+      calc: string
+      edit_added: string
+      edit_removed: string
+    }
+    errChooseVendor: string
+    errChooseWorkOrders: string
+    typeLockedRegular: string
+    typeLockedPiecework: string
     pastPeriodsAbout: string
     pastPeriodsNone: string
     pastPeriodsProblem: string

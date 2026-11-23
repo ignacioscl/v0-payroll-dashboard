@@ -11,6 +11,7 @@ import { ExpenseEmployeeCombobox } from '@/components/expenses/expense-employee-
 import { ExpenseFormDialog, type ExpenseFormTarget } from '@/components/expenses/expense-form-dialog'
 import { ExpensesDataTable } from '@/components/expenses/expenses-data-table'
 import { FilterPanel, FILTER_FIELD_LABEL, type FilterPanelChip } from '@/components/shared/filter-panel'
+import { SegmentedControl } from '@/components/shared/segmented-control'
 import { AccessDenied } from '@/components/layout/access-denied'
 import { PageHeading } from '@/components/layout/page-heading'
 import { Button } from '@/components/ui/button'
@@ -61,9 +62,13 @@ function ExpensesListPage() {
   const [author, setAuthor] = React.useState<TtkEmployeeOption | null>(null)
   const [createdBy, setCreatedBy] = React.useState<TtkEmployeeOption | null>(null)
   const [status, setStatus] = React.useState<StatusFilter>('all')
+  /** All / Regular / Piecework (Ignacio, 22/11): tarjetas, no un combo. */
+  const [kind, setKind] = React.useState<'all' | 'regular' | 'piecework'>('all')
   const [amountMin, setAmountMin] = React.useState('')
   const [amountMax, setAmountMax] = React.useState('')
   const [showDeleted, setShowDeleted] = React.useState(false)
+  // «Piecework con cambios» (T5b de plan-reunion-juan-18-11): las expenses Piecework que cambiaron solas o en Edit.
+  const [changedOnly, setChangedOnly] = React.useState(false)
   const [formTarget, setFormTarget] = React.useState<ExpenseFormTarget | null>(null)
 
   // Llegada desde Analytics (click en una fila):
@@ -129,11 +134,13 @@ function ExpensesListPage() {
       idAuthor: author?.id,
       idCreatedBy: createdBy?.id,
       status: status === 'all' ? undefined : status,
+      type: kind === 'all' ? undefined : kind,
       amountMin: amountMin.trim() && isValidAmount(amountMin.trim()) ? amountMin.trim() : undefined,
       amountMax: amountMax.trim() && isValidAmount(amountMax.trim()) ? amountMax.trim() : undefined,
       deleted: showDeleted ? 1 : 0,
+      changed: changedOnly ? 1 : undefined,
     }
-  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, amountMin, amountMax, showDeleted])
+  }, [ready, from, to, selectedDealers, company, category, author, createdBy, status, kind, amountMin, amountMax, showDeleted, changedOnly])
 
   const summary = useExpenseSummary(filters)
 
@@ -156,9 +163,13 @@ function ExpensesListPage() {
     ...(status !== 'all'
       ? [{ key: 'status', label: statusOptions.find((o) => o.value === status)?.label ?? status, onRemove: () => setStatus('all') }]
       : []),
+    ...(kind !== 'all'
+      ? [{ key: 'type', label: kind === 'piecework' ? t('expenses.typePiecework') : t('expenses.typeRegular'), onRemove: () => setKind('all') }]
+      : []),
     ...(amountMin.trim() ? [{ key: 'amountMin', label: `${t('expenses.amountFrom')}: ${amountMin.trim()}`, onRemove: () => setAmountMin('') }] : []),
     ...(amountMax.trim() ? [{ key: 'amountMax', label: `${t('expenses.amountTo')}: ${amountMax.trim()}`, onRemove: () => setAmountMax('') }] : []),
     ...(showDeleted ? [{ key: 'deleted', label: t('expenses.showDeleted'), onRemove: () => setShowDeleted(false) }] : []),
+    ...(changedOnly ? [{ key: 'changed', label: t('expenses.pieceworkChangedOnly'), onRemove: () => setChangedOnly(false) }] : []),
   ]
 
   return (
@@ -246,11 +257,39 @@ function ExpensesListPage() {
           />
         </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border/60 pt-3">
+          <div className="flex items-center gap-2">
+            <span className={FILTER_FIELD_LABEL}>{t('expenses.type')}</span>
+            <SegmentedControl
+              value={kind}
+              onValueChange={setKind}
+              options={[
+                { value: 'all', label: t('expenses.all') },
+                { value: 'regular', label: t('expenses.typeRegular') },
+                { value: 'piecework', label: t('expenses.typePiecework') },
+              ]}
+              aria-label={t('expenses.type')}
+              data-testid="expense-type-filter"
+            />
+          </div>
+          <div className="flex items-center gap-3">
           <Switch id="exp-show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} className="cursor-pointer" />
           <Label htmlFor="exp-show-deleted" className="cursor-pointer text-sm">
             {t('expenses.showDeleted')}
           </Label>
+          </div>
+          <div className="flex items-center gap-3">
+          <Switch
+            id="exp-piecework-changed"
+            checked={changedOnly}
+            onCheckedChange={setChangedOnly}
+            className="cursor-pointer"
+            data-testid="expense-piecework-changed"
+          />
+          <Label htmlFor="exp-piecework-changed" className="cursor-pointer text-sm">
+            {t('expenses.pieceworkChangedOnly')}
+          </Label>
+          </div>
           </div>
         </div>
       </FilterPanel>

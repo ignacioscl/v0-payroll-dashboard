@@ -126,6 +126,8 @@ export class ExpenseReportService {
     rows.push({ field: labels.status, value: filter.status ? labels.statusLabels[filter.status] : labels.all })
     if (withListFilters) {
       rows.push(
+        { field: labels.type, value: filter.type ? labels.typeLabels[filter.type] : labels.all },
+        { field: labels.changedOnly, value: filter.changed ? labels.yes : labels.no },
         { field: labels.amountFrom, value: filter.amountMin ? fromCents(toCents(filter.amountMin)) : labels.all },
         { field: labels.amountTo, value: filter.amountMax ? fromCents(toCents(filter.amountMax)) : labels.all },
         { field: labels.showDeleted, value: filter.deleted ? labels.yes : labels.no },

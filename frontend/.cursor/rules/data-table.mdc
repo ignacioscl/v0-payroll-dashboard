@@ -569,3 +569,14 @@ sin DB. Borrar cuando ya no se necesite.
 - Los mensajes y acciones de estado de la lista (acción sobre la selección, aviso de
   subconjunto) van en el header, al lado del contador (`recordsCountNote`); nunca en una fila
   aparte arriba de la tabla.
+
+
+## Fila que marca un check, dentro de un formulario
+
+Si toda la fila marca o desmarca su check (`onRowClick` + `enableRowSelection`, como la tabla de WO de la expense
+Piecework) y la tabla está dentro de un `<form>`, **el check va envuelto en un elemento que frena el clic**
+(`<span onClick={(e) => e.stopPropagation()}>`). El `Checkbox` de Radix, dentro de un formulario, tiene un input oculto
+que dispara su propio clic cada vez que cambia; si ese clic llega a la fila, la fila lo vuelve a cambiar y React corta
+con «Maximum update depth exceeded». Poner `stopPropagation` en el `Checkbox` no alcanza: el input oculto es hermano
+del botón. *(22/11/2026, T5 de plan-reunion-juan-18-11: la pantalla se rompía al tocar una fila; el e2e
+`monthly-closing-vendors.spec.ts` marca una WO tocando la fila.)*

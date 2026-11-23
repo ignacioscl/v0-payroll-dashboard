@@ -18,6 +18,40 @@ const num = (v: unknown): number => {
 }
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : num(v))
 
+/** Una fila por servicio de una WO con el piecework de un empleado (workOrderServicePiecework). */
+export interface WorkOrderServicePiecework {
+  idInvoice: number
+  nro: string
+  vin: string
+  idDealer: number
+  workDate: string
+  idService: number
+  service: string
+  piecework: number
+}
+
+/** T5b: una WO (y un servicio) hoy, con los insumos del cálculo del piecework del vendor. */
+export interface WorkOrderPieceworkState {
+  idInvoice: number
+  nro: string
+  vin: string
+  /** INVOICE.estado: 1 activa, 0 eliminada. */
+  woEstado: number
+  idDealer: number
+  workDate: string
+  /** 1 si el vendor está en la WO (INVOICE_EMPLOYEE_REL). */
+  hasVendor: number
+  /** Empleados distintos de la WO: el divisor de la función. */
+  employeeCount: number
+  /** null: la WO no tiene ningún servicio. */
+  idService: number | null
+  service: string
+  servicePrice: string | null
+  servicePiecework: string | null
+  employeePiecework: string | null
+  piecework: number
+}
+
 /**
  * Lecturas fuente del snapshot de payroll. SQL crudo: es el nivel «por ponchada» del TTK
  * Payroll Report de legacy (`TTKEmployeeReportDao::getFrom` + `load()` líneas 546-590),
@@ -335,6 +369,113 @@ export class PayrollSourceRepository {
         }),
       )
       .filter((r) => r.piecework !== 0)
+  }
+
+  /**
+   * Expense Piecework (reunión con Juan 18/11, tema 4): el piecework de un empleado por WO y servicio, de las WO
+   * creadas en [desde, hasta] (`fecha_alta`, como el snapshot con `filter_wo_done = 0`). Una fila por servicio de la WO
+   * con la misma función y los mismos joins con que el snapshot suma ese piecework
+   * (`GET_PIECEWORK_BY_EMPL_DATERANGE_PROV` → `GET_PIECEWORK_EMPLOYEES_BY_WO(..., 0, ..., force_flat_rate = 1)`): el
+   * dealer es el del departamento de la WO y el día, `DATE(fecha_alta)`. Las filas en $0 no vienen.
+   */
+  async workOrderServicePiecework(
+    idContratista: number,
+    idEmployee: number,
+    desde: string,
+    hasta: string,
+    invoiceIds: readonly number[] | null = null,
+  ): Promise<WorkOrderServicePiecework[]> {
+    if (invoiceIds && !invoiceIds.length) return []
+    const byIds = invoiceIds ? ` AND i.id IN (${invoiceIds.map(() => '?').join(',')})` : ''
+    const rows = await this.srs.query(
+      `SELECT i.id AS idInvoice, i.full_nro AS nro, UPPER(TRIM(IFNULL(car.vin, ''))) AS vin,
+              dp.id_dealer AS idDealer, DATE_FORMAT(i.fecha_alta, '%Y-%m-%d') AS workDate,
+              _is.id AS idService, IFNULL(_is.nombre, '') AS service,
+              IFNULL(GET_PIECEWORK_EMPLOYEES_BY_WO(i.id, _is.id, iser.piecework, 0, i.date_last_chg_workflow, i.fecha_alta, ier.id_usuario, 1), 0) AS piecework
+       FROM INVOICE i
+       INNER JOIN DEPARTMENT dp ON dp.id = i.id_department
+       INNER JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+       INNER JOIN INVOICE_SERVICE _is ON _is.id = isr.id_service_invoice
+       INNER JOIN INVOICE_EMPLOYEE_REL ier ON ier.id_invoice = i.id AND ier.id_usuario = ?
+       LEFT JOIN INVOICE_SERVICE_EMPLOYEE_REL iser
+              ON iser.id_invoice = i.id AND iser.id_invoice_service = _is.id AND iser.id_employee = ier.id_usuario
+       LEFT JOIN CAR car ON car.id = i.id_car
+       WHERE i.estado = 1
+         AND i.id_dealer_provider = ?
+         AND i.fecha_alta >= ?
+         AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)${byIds}
+       ORDER BY i.fecha_alta, i.id, _is.id`,
+      [idEmployee, idContratista, desde, hasta, ...(invoiceIds ?? [])],
+    )
+    return rows
+      .map(
+        (r: any): WorkOrderServicePiecework => ({
+          idInvoice: num(r.idInvoice),
+          nro: String(r.nro ?? ''),
+          vin: String(r.vin ?? ''),
+          idDealer: num(r.idDealer),
+          workDate: String(r.workDate),
+          idService: num(r.idService),
+          service: String(r.service ?? ''),
+          piecework: num(r.piecework),
+        }),
+      )
+      .filter((r: WorkOrderServicePiecework) => r.piecework !== 0)
+  }
+
+  /**
+   * T5b (plans/plan-reunion-juan-18-11 v9): cómo está hoy cada WO de una expense Piecework, **sin filtrar por fecha de
+   * alta ni por estado** (la fecha y el estado pueden haber cambiado). Una fila por servicio de la WO (o una sola, con
+   * `idService` null, si la WO no tiene servicios), con lo que entra en el cálculo (los insumos de
+   * `GET_PIECEWORK_EMPLOYEES_BY_WO`, migration 007) y el piecework de la misma función y con los mismos argumentos que
+   * `workOrderServicePiecework`. Que la WO esté eliminada o ya no tenga al vendor lo decide el que llama
+   * (`currentAmount`); acá el piecework sale tal cual.
+   */
+  async workOrderPieceworkState(
+    idContratista: number,
+    idEmployee: number,
+    invoiceIds: readonly number[],
+  ): Promise<WorkOrderPieceworkState[]> {
+    if (!invoiceIds.length) return []
+    const rows = await this.srs.query(
+      `SELECT i.id AS idInvoice, i.full_nro AS nro, UPPER(TRIM(IFNULL(car.vin, ''))) AS vin, i.estado AS woEstado,
+              dp.id_dealer AS idDealer, DATE_FORMAT(i.fecha_alta, '%Y-%m-%d') AS workDate,
+              EXISTS (SELECT 1 FROM INVOICE_EMPLOYEE_REL v WHERE v.id_invoice = i.id AND v.id_usuario = ?) AS hasVendor,
+              (SELECT COUNT(DISTINCT c.id_usuario) FROM INVOICE_EMPLOYEE_REL c WHERE c.id_invoice = i.id) AS employeeCount,
+              _is.id AS idService, IFNULL(_is.nombre, '') AS service, isr.price AS servicePrice,
+              isr.piecework AS servicePiecework, iser.piecework AS employeePiecework,
+              IF(_is.id IS NULL, 0,
+                 IFNULL(GET_PIECEWORK_EMPLOYEES_BY_WO(i.id, _is.id, iser.piecework, 0, i.date_last_chg_workflow, i.fecha_alta, ?, 1), 0)
+              ) AS piecework
+       FROM INVOICE i
+       INNER JOIN DEPARTMENT dp ON dp.id = i.id_department
+       LEFT JOIN INVOICE_SERVICE_REL isr ON isr.id_invoice = i.id
+       LEFT JOIN INVOICE_SERVICE _is ON _is.id = isr.id_service_invoice
+       LEFT JOIN INVOICE_SERVICE_EMPLOYEE_REL iser
+              ON iser.id_invoice = i.id AND iser.id_invoice_service = _is.id AND iser.id_employee = ?
+       LEFT JOIN CAR car ON car.id = i.id_car
+       WHERE i.id_dealer_provider = ? AND i.id IN (${invoiceIds.map(() => '?').join(',')})
+       ORDER BY i.id, _is.id`,
+      [idEmployee, idEmployee, idEmployee, idContratista, ...invoiceIds],
+    )
+    return rows.map(
+      (r: any): WorkOrderPieceworkState => ({
+        idInvoice: num(r.idInvoice),
+        nro: String(r.nro ?? ''),
+        vin: String(r.vin ?? ''),
+        woEstado: num(r.woEstado),
+        idDealer: num(r.idDealer),
+        workDate: String(r.workDate),
+        hasVendor: num(r.hasVendor) ? 1 : 0,
+        employeeCount: num(r.employeeCount),
+        idService: r.idService === null || r.idService === undefined ? null : num(r.idService),
+        service: String(r.service ?? ''),
+        servicePrice: r.servicePrice === null || r.servicePrice === undefined ? null : String(r.servicePrice),
+        servicePiecework: r.servicePiecework === null || r.servicePiecework === undefined ? null : String(r.servicePiecework),
+        employeePiecework: r.employeePiecework === null || r.employeePiecework === undefined ? null : String(r.employeePiecework),
+        piecework: num(r.piecework),
+      }),
+    )
   }
 
   /**

@@ -95,3 +95,66 @@ export async function pickAllDealersAndDatePreset(page: Page, preset: string) {
     await expect(page.getByRole('dialog')).toBeHidden()
   }
 }
+
+/**
+ * Expenses List pagina de a 25 y ordena por fecha: lo que crea una prueba puede quedar en otra página. Se filtra por la
+ * compañía (panel Filters, que arranca cerrado).
+ */
+export async function filterExpensesByCompany(page: Page, company: string) {
+  const field = page.locator('div.space-y-1').filter({ has: page.getByText('Company', { exact: true }) }).getByRole('combobox')
+  if (!(await field.isVisible())) await page.getByRole('button', { name: /^Filters/ }).click()
+  await field.click()
+  await page.locator('[cmdk-input]').last().fill(company)
+  await page.getByRole('option', { name: company }).first().click()
+}
+
+/** `$1,234.50` → 1234.5. */
+export function money(text: string): number {
+  return Number(text.replace(/[$,]/g, ''))
+}
+
+/**
+ * PRO › Monthly Closing de un mes («October 2026») con All Dealers: Payroll y Expenses de la fila del dealer y la línea
+ * «Pay periods». Lo usan los e2e de la expense Piecework (monthly-closing-vendors y expense-piecework-changes). Cada
+ * cierre tarda 1–2 min contra la copia local (tarea monthly-closing-lento).
+ */
+export async function monthlyClosingDealer(
+  page: Page,
+  month: string,
+  dealer: string,
+): Promise<{ payroll: number; expenses: number; periods: string }> {
+  // La segunda vez ya hay sesión de PRO y /login no muestra el formulario.
+  await page.goto('/')
+  if (new URL(page.url()).pathname.startsWith('/login')) await login(page)
+  const reports = page.getByRole('button', { name: /^Reports$/ })
+  const link = page.getByRole('link', { name: 'Monthly Closing', exact: true })
+  // En celular, un clic en la hamburguesa antes de que la página termine de cargar se pierde: se reintenta.
+  await expect(async () => {
+    await openMobileMenuIfNeeded(page)
+    await expect(reports.or(link).first()).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 60_000 })
+  if (!(await link.isVisible().catch(() => false))) await reports.click()
+  await link.click()
+  await expect(page.getByRole('heading', { name: 'Monthly Closing' })).toBeVisible()
+
+  const openFilters = page.getByRole('button', { name: 'Open filters' })
+  const mobile = await openFilters.isVisible()
+  if (mobile) await openFilters.click()
+  const scope = mobile ? page.getByRole('dialog') : page.locator('header')
+  const dealers = scope.getByRole('combobox').filter({ hasText: /Dealers/ })
+  if (!(await dealers.innerText()).includes('All Dealers')) {
+    await dealers.click()
+    await page.getByRole('button', { name: /^All Dealers$/ }).click()
+    await page.keyboard.press('Escape')
+  }
+  await scope.getByRole('combobox').filter({ hasText: /\b20\d\d\b|month/i }).click()
+  await page.locator('[cmdk-input]').last().fill(month)
+  await page.getByRole('option', { name: month, exact: true }).click()
+  if (mobile) await page.getByRole('button', { name: 'Apply' }).click()
+  const periodsLine = page.locator('main').getByText(/^Pay periods: /)
+  await expect(periodsLine).toBeVisible({ timeout: 90_000 })
+
+  const row = page.locator('main tbody tr').filter({ hasText: dealer })
+  const cells = (await row.locator('td').allInnerTexts()).map((c) => c.trim())
+  return { payroll: money(cells[2]), expenses: money(cells[3]), periods: (await periodsLine.innerText()).replace(/^Pay periods: /, '') }
+}

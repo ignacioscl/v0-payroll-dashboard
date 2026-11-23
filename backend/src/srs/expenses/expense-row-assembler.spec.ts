@@ -54,6 +54,7 @@ function raw(partial: Partial<RawExpenseRow>): RawExpenseRow {
     idExpRepetitive: null,
     hasLog: 1,
     hasAttachment: 0,
+    isPiecework: 0,
     groupSplitType: 1,
     groupAttachmentExpense: 1,
     inScope: 1,

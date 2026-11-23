@@ -11,9 +11,9 @@ export const TINT_CLOSING_COLUMN_NOTES = {
   income:
     "Income: only the services with «tint» in their name, of the month's work orders assigned to a tinter (an employee with a role that has «tint» in its name), by creation date, invoiced or not. With the invoice discount, without tax. Lines of Generic invoices with «tint» in their description also count. TTK invoices do not count.",
   payroll:
-    'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name), with every payment type, in the pay periods that end in the month, without the piecework of services that do not have «tint» in their name. What is paid outside SRS does not count. Employees marked as Vendor do not count. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
+    'Payroll: what SRS pays at the dealer to tinters (employees with a role that has «tint» in its name), with every payment type, in the pay periods that end in the month, without the piecework of services that do not have «tint» in their name. What is paid outside SRS does not count. The piecework of the work orders that are in a Piecework expense does not count here: it counts in Expenses. Salaries of tinters without dealer go in the «Without dealer» row and are included in the Total.',
   expenses:
-    "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not. Deleted expenses do not count.",
+    "Expenses: the dealer's expenses in the «Window Tint Film» category, dated in the month, approved or not, and the part of the services with «tint» in their name of the tinters' Piecework expenses. Deleted expenses do not count.",
   profit: 'Profit/Loss: Income − Payroll − Expenses.',
   pct: '%: Profit/Loss divided by Income. Shows «—» when Income is $0.',
 } as const

@@ -30,6 +30,25 @@ import {
  */
 export const EXPENSE_IDENTITY_SQL = "IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group))"
 
+/**
+ * Expense Piecework: la fila **o cualquier fila de su grupo** tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO (también
+ * liberadas: T5b, review R3). Una expense sin WO sigue siendo Piecework: no se duplica, no cambia monto ni compañía y
+ * abre el editor de WO. Por grupo (CODE-review-T5 R2): si la noche pasa todas las WO de una fila a otro dealer, la fila
+ * queda en $0 sin filas propias y sigue siendo la misma expense. Igual que el legacy
+ * (`ExpenseDao::countPieceworkRowsOfExpenseOrGroup`).
+ */
+export const IS_PIECEWORK_SQL = `EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw
+    JOIN EXP_EXPENSE pe ON pe.id = pw.id_expense
+   WHERE pe.id = e.id OR (e.id_exp_group IS NOT NULL AND pe.id_exp_group = e.id_exp_group))`
+
+/**
+ * «Piecework con cambios» (T5b): la expense (su fila o cualquiera de su grupo) tiene algún cambio en el histórico,
+ * después del alta (la noche o Edit). Por grupo: si cambia la WO de un dealer, se ven todas las filas del grupo.
+ */
+export const PIECEWORK_CHANGED_SQL = `EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO_HISTORY h
+    JOIN EXP_EXPENSE he ON he.id = h.id_expense
+   WHERE he.id = e.id OR (e.id_exp_group IS NOT NULL AND he.id_exp_group = e.id_exp_group))`
+
 export function expenseIdentity(alias = 'e'): string {
   return EXPENSE_IDENTITY_SQL.replace(/e\./g, `${alias}.`)
 }
@@ -130,6 +149,11 @@ export class ExpenseReportRepository {
       sql += ' AND e.id_created_by = ?'
       params.push(filter.idCreatedBy)
     }
+    // All / Regular / Piecework (Ignacio, 22/11): una expense Piecework tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO
+    // (T5b, review R3: sigue siendo Piecework aunque se le hayan sacado todas las WO).
+    if (filter.type === 'piecework') sql += ` AND ${IS_PIECEWORK_SQL}`
+    else if (filter.type === 'regular') sql += ` AND NOT ${IS_PIECEWORK_SQL}`
+    if (filter.changed) sql += ` AND ${PIECEWORK_CHANGED_SQL}`
     if (filter.status === 'pending') sql += ' AND e.is_approved IS NULL'
     else if (filter.status === 'approved') sql += ' AND e.is_approved = 1'
     else if (filter.status === 'rejected') sql += ' AND e.is_approved = 0'
@@ -181,6 +205,8 @@ export class ExpenseReportRepository {
           e.id_exp_repetitive AS idExpRepetitive,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id) AS hasLog,
           EXISTS (SELECT 1 FROM LOG_GENERIC lg WHERE lg.id_expense = e.id AND lg.description LIKE 'Attachment %') AS hasAttachment,
+          ${IS_PIECEWORK_SQL} AS isPiecework,
+          ${PIECEWORK_CHANGED_SQL} AS isPieceworkChanged,
           g.split_type AS groupSplitType, g.id_attachment_expense AS groupAttachmentExpense,
           ${inScope.sql} AS inScope` + from.sql,
       params: [scope.idDealerProvider, ...inScope.params, ...from.params],
@@ -452,6 +478,88 @@ export class ExpenseReportRepository {
       dealer: String(r.dealer ?? ''),
       total: money(r.total),
       accidentTotal: money(r.accidentTotal),
+    }))
+  }
+
+  /**
+   * Cierres (plans/plan-reunion-juan-18-11 tema 4, D6): el piecework que está en una expense Piecework activa de la
+   * empresa, por (dealer, empleado, día de la WO) de [desde, hasta]. Se resta del Payroll: ese piecework cuenta en
+   * Expenses. `employeeIds` acota a esos empleados (los tinteros de Window Tint Closing); `serviceLike` toma solo los
+   * servicios con ese texto en el nombre («tint», Window Tint Closing: los demás ya los saca el tema 6).
+   */
+  async pieceworkInExpenses(
+    idDealerProvider: number,
+    desde: string,
+    hasta: string,
+    opts: { employeeIds?: readonly number[] | null; serviceLike?: string } = {},
+  ): Promise<{ idDealer: number; idUsuario: number; workDate: string; amount: number; payrollTax: number | null }[]> {
+    if (opts.employeeIds && !opts.employeeIds.length) return []
+    const emp = opts.employeeIds ? ` AND pw.id_employee IN (${opts.employeeIds.map(() => '?').join(',')})` : ''
+    const svc = opts.serviceLike ? ` AND LOWER(IFNULL(s.nombre, '')) LIKE ?` : ''
+    const rows: { idDealer: unknown; idUsuario: unknown; workDate: unknown; amount: unknown; payrollTax: unknown }[] = await this.db.query(
+      `SELECT pw.id_dealer AS idDealer, pw.id_employee AS idUsuario, DATE_FORMAT(pw.work_date, '%Y-%m-%d') AS workDate,
+              SUM(pw.amount) AS amount, MAX(u.payroll_tax) AS payrollTax
+         FROM EXP_EXPENSE_PIECEWORK_WO pw
+         JOIN EXP_EXPENSE e ON e.id = pw.id_expense AND e.estado = 1 AND e.id_detailer = ?
+         JOIN usuarios u ON u.id_usuario = pw.id_employee
+         LEFT JOIN INVOICE_SERVICE s ON s.id = pw.id_invoice_service
+        WHERE pw.deleted_at IS NULL AND pw.work_date BETWEEN ? AND ?${emp}${svc}
+        GROUP BY pw.id_dealer, pw.id_employee, pw.work_date`,
+      [
+        idDealerProvider,
+        desde,
+        hasta,
+        ...(opts.employeeIds ?? []),
+        ...(opts.serviceLike ? [`%${opts.serviceLike.toLowerCase()}%`] : []),
+      ],
+    )
+    return rows.map((r) => ({
+      idDealer: Number(r.idDealer),
+      idUsuario: Number(r.idUsuario),
+      workDate: String(r.workDate),
+      amount: Number(r.amount ?? 0),
+      payrollTax: r.payrollTax === null || r.payrollTax === undefined ? null : Number(r.payrollTax),
+    }))
+  }
+
+  /**
+   * Window Tint Closing (tema 4): de las expenses Piecework activas de los tinteros con fecha en el rango, solo la parte
+   * de los servicios con `serviceLike` en el nombre, por fila de gasto. Mismo filtro de empresa, fechas y dealers que
+   * Expenses (buildExpenseWhere), sin la categoría: la expense Piecework es de la categoría «Piecework».
+   */
+  async pieceworkServiceLines(
+    filter: ExpenseListFilter,
+    employeeIds: readonly number[],
+    serviceLike: string,
+  ): Promise<ExpenseLineRow[]> {
+    if (!employeeIds.length) return []
+    const { categoryNameIs: _c, idCategory: _i, ...rest } = filter
+    const from = this.fromSql(rest)
+    const where = this.buildExpenseWhere(rest)
+    const rows: { id: unknown; ticketDate: unknown; dealerId: unknown; dealer: unknown; vendor: unknown; category: unknown; amount: unknown; notes: unknown }[] =
+      await this.db.query(
+        `SELECT e.id, DATE_FORMAT(e.ticket_date, '%Y-%m-%d') AS ticketDate, c.id AS dealerId,
+                GET_DEALER_NAME_BY_PROVIDER(?, c.id) AS dealer, gco.name AS vendor, gca.name AS category,
+                SUM(pw.amount) AS amount, e.notes
+           ${from.sql}
+           JOIN EXP_EXPENSE_PIECEWORK_WO pw ON pw.id_expense = e.id AND pw.deleted_at IS NULL
+           LEFT JOIN INVOICE_SERVICE s ON s.id = pw.id_invoice_service
+          WHERE 1 ${where.sql}
+            AND pw.id_employee IN (${employeeIds.map(() => '?').join(',')})
+            AND LOWER(IFNULL(s.nombre, '')) LIKE ?
+          GROUP BY e.id
+          ORDER BY dealer, e.ticket_date, e.id`,
+        [filter.idDealerProvider, ...from.params, ...where.params, ...employeeIds, `%${serviceLike.toLowerCase()}%`],
+      )
+    return rows.map((r) => ({
+      id: Number(r.id),
+      ticketDate: String(r.ticketDate),
+      dealerId: Number(r.dealerId),
+      dealer: String(r.dealer ?? ''),
+      vendor: String(r.vendor ?? ''),
+      category: String(r.category ?? ''),
+      amount: money(r.amount),
+      notes: String(r.notes ?? ''),
     }))
   }
 

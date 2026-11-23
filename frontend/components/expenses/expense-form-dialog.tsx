@@ -6,7 +6,7 @@ import { ExpenseForm } from '@/components/expenses/expense-form'
 import { FormDialog } from '@/components/layout/form-dialog'
 import { useExpenseDetail } from '@/hooks/use-expenses-list'
 import { useRecurringRule } from '@/hooks/use-recurring-rules'
-import { canAssignExpenseToEmployee } from '@/lib/auth/expenses-permissions'
+import { canAddPieceworkExpenses, canAssignExpenseToEmployee } from '@/lib/auth/expenses-permissions'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { fmtAmount, fmtYmd, rowAmount } from '@/lib/expenses/expense-format'
 import { useTranslation } from '@/lib/i18n/locale-context'
@@ -24,6 +24,7 @@ export function ExpenseFormDialog({ target, onClose }: { target: ExpenseFormTarg
   const { t } = useTranslation()
   const { user, hasPermission } = useSrsMe()
   const canAssign = canAssignExpenseToEmployee(hasPermission, user?.isSystemAdmin)
+  const canPiecework = canAddPieceworkExpenses(hasPermission, user?.isSystemAdmin)
   const editId = target?.kind === 'edit' ? target.id : target?.kind === 'new' ? target.fromExpenseId ?? null : null
   const ruleId = target?.kind === 'new' ? target.fromRuleId ?? null : null
   const detail = useExpenseDetail(editId)
@@ -57,6 +58,8 @@ export function ExpenseFormDialog({ target, onClose }: { target: ExpenseFormTarg
         fromRule={rule.data}
         duplicateOf={target.fromExpenseId ? detail.data : undefined}
         canAssign={canAssign}
+        // Duplicate y «Generate expense from this recurring expense» son gastos comunes: sin el tipo Piecework.
+        canPiecework={canPiecework && !target.fromExpenseId && !target.fromRuleId}
         userName={user?.nombre}
         onClose={onClose}
       />
@@ -72,6 +75,7 @@ export function ExpenseFormDialog({ target, onClose }: { target: ExpenseFormTarg
       description={`${detail.data.company.name} · ${fmtAmount(rowAmount(detail.data))} · ${fmtYmd(detail.data.ticketDate)}`}
       detail={detail.data}
       canAssign={canAssign}
+      canPiecework={false}
       userName={user?.nombre}
       onClose={onClose}
     />
