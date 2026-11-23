@@ -61,7 +61,11 @@ export function inputsOf(header: WorkOrderPieceworkState, svc: WorkOrderPiecewor
   }
 }
 
-function srcPatch(inputs: PieceworkInputs): QueryDeepPartialEntity<ExpensePieceworkWo> {
+/** Las columnas `src_*` de una fila (alta, Edit y la noche). */
+export function srcColumns(inputs: PieceworkInputs): Pick<
+  ExpensePieceworkWo,
+  'srcWoEstado' | 'srcHasService' | 'srcHasVendor' | 'srcServicePiecework' | 'srcServicePrice' | 'srcEmployeePiecework' | 'srcEmployeeCount'
+> {
   return {
     srcWoEstado: inputs.woEstado,
     srcHasService: inputs.hasService,
@@ -71,6 +75,10 @@ function srcPatch(inputs: PieceworkInputs): QueryDeepPartialEntity<ExpensePiecew
     srcEmployeePiecework: inputs.employeePiecework,
     srcEmployeeCount: inputs.employeeCount,
   }
+}
+
+function srcPatch(inputs: PieceworkInputs): QueryDeepPartialEntity<ExpensePieceworkWo> {
+  return srcColumns(inputs)
 }
 
 function storedInputs(r: ExpensePieceworkWo): PieceworkInputs {
@@ -338,7 +346,7 @@ export class ExpensePieceworkRecalcService {
   ): Promise<void> {
     for (const a of added) {
       const idExpense = await this.dealerRow(idDetailer, groupState, a.idDealer)
-      const [saved] = await this.rows.insertMany([
+      const [saved] = await this.rows.insertManyChecked([
         {
           idExpense,
           idInvoice: a.idInvoice,
@@ -347,10 +355,9 @@ export class ExpensePieceworkRecalcService {
           idDealer: a.idDealer,
           amount: a.amount,
           workDate: a.workDate,
-          ...(srcPatch(a.inputs) as object),
-        } as Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>,
+          ...srcColumns(a.inputs),
+        },
       ])
-      await this.rows.updateRow(saved.id as number, {})
       changes.history.push({
         ...meta,
         idPieceworkWo: saved.id as number,

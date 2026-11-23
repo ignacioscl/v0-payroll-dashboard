@@ -54,7 +54,13 @@ import {
   NOTES_MAX,
   RECEIPT_NUMBER_MAX,
 } from '../rules/expense-rules'
-import { MSG_NOT_PIECEWORK, MSG_PIECEWORK_LOCKED, PIECEWORK_EXPENSE_CATEGORY } from '../rules/expense-piecework'
+import {
+  MSG_NOT_PIECEWORK,
+  MSG_PIECEWORK_LOCKED,
+  PIECEWORK_EXPENSE_CATEGORY,
+  historyInScope,
+  workOrdersInScope,
+} from '../rules/expense-piecework'
 import { ExpensePieceworkWoHistoryRepository, PieceworkHistoryEntry } from '../repository/expense-piecework-wo-history.repository'
 import type { PieceworkUnitKey } from '../repository/expense-piecework-wo.repository'
 import { ExpensePieceworkRecalcService } from './expense-piecework-recalc.service'
@@ -153,13 +159,22 @@ export class ExpenseFacadeService {
     await this.permissions.assertRolAccion(ctx, ROL_ACCION_EXPENSES_APPROVE)
     const meta = await this.requireVisible(ctx, id)
     const groupId = meta.row.groupId ?? null
-    const [data, pieceworkHistory] = await Promise.all([
+    const [data, history] = await Promise.all([
       this.report.logRows(id, groupId, this.scope(ctx)),
       meta.row.piecework
         ? this.pieceworkHistory.listForUnit(ctx.idDealerProvider, groupId ? { idExpGroup: groupId } : { idExpense: id })
         : Promise.resolve([]),
     ])
-    return { data, pieceworkHistory }
+    const allowed = await this.dealersInScope(ctx, history.flatMap((h) => [h.newDealer.id, ...(h.oldDealer ? [h.oldDealer.id] : [])]))
+    return { data, pieceworkHistory: historyInScope(history, allowed) }
+  }
+
+  /**
+   * De esos dealers, los del alcance del usuario (CODE-review-T5 R1): un grupo visto en parte se puede leer, pero las WO
+   * y el histórico de los dealers que no ve no se muestran.
+   */
+  private async dealersInScope(ctx: SrsContext, ids: number[]): Promise<Set<number>> {
+    return new Set(await this.report.dealerIdsInRestriction(this.scope(ctx), [...new Set(ids)]))
   }
 
   /** Un gasto o, si pertenece a un grupo, el grupo con sus filas visibles. 404 si no es de la empresa o no se ve. */
@@ -451,7 +466,7 @@ export class ExpenseFacadeService {
     if (resolved.byDealer.length === 1) {
       const created = await this.insertRow(ctx, common, resolved.byDealer[0], ctx.idUsuario, null, null, 'Piecework expense created')
       expenseIdByDealer.set(resolved.byDealer[0].idDealer, created.id)
-      await this.piecework.saveRows(resolved, expenseIdByDealer)
+      await this.piecework.saveRows(ctx, resolved, expenseIdByDealer)
       await this.logs.logExpense(created.id, ctx.idUsuario, `Piecework: ${resolved.vendor.name}, ${workOrders} work orders`)
       return this.detailByExpenseId(ctx, created.id)
     }
@@ -467,7 +482,7 @@ export class ExpenseFacadeService {
       expenseIdByDealer.set(row.idDealer, created.id)
     }
     await this.groups.setAttachmentExpense(group.id as number, Math.min(...expenseIdByDealer.values()))
-    await this.piecework.saveRows(resolved, expenseIdByDealer)
+    await this.piecework.saveRows(ctx, resolved, expenseIdByDealer)
     await this.logs.logGroup(
       group.id as number,
       ctx.idUsuario,
@@ -502,7 +517,8 @@ export class ExpenseFacadeService {
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_EDIT)) &&
       (await this.permissions.userHasRolAccion(ctx, ROL_ACCION_EXPENSES_PIECEWORK))
     const wos = await this.piecework.workOrdersOfExpense(ctx, unit, expense.ticketDate, canEdit)
-    return { ...wos, month: expense.ticketDate.slice(0, 7), canEdit }
+    const allowed = await this.dealersInScope(ctx, wos.workOrders.map((w) => w.dealer.id))
+    return { ...wos, workOrders: workOrdersInScope(wos.workOrders, allowed), month: expense.ticketDate.slice(0, 7), canEdit }
   }
 
   /**

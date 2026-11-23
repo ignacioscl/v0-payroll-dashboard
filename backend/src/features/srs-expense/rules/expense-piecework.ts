@@ -77,3 +77,22 @@ export function amountsByDealer(rows: readonly WorkOrderServicePiecework[]): { i
     .sort((a, b) => a[0] - b[0])
     .map(([idDealer, c]) => ({ idDealer, amount: fromCents(c) }))
 }
+
+/**
+ * CODE-review-T5 R1: de una expense Piecework vista en parte (grupo con dealers fuera del alcance), las WO de los dealers
+ * que el usuario ve. Deshabilitar Edit no alcanza: la lista trae VIN, número y monto.
+ */
+export function workOrdersInScope<T extends { dealer: { id: number } }>(wos: readonly T[], allowed: ReadonlySet<number>): T[] {
+  return wos.filter((w) => allowed.has(w.dealer.id))
+}
+
+/**
+ * CODE-review-T5 R1: del historial, solo los cambios donde todos los dealers (el de antes y el de ahora) están en el
+ * alcance. Una WO que pasó a un dealer que no ve no se muestra; su fila igual dice el monto en LOG_GENERIC.
+ */
+export function historyInScope<T extends { oldDealer: { id: number } | null; newDealer: { id: number } }>(
+  entries: readonly T[],
+  allowed: ReadonlySet<number>,
+): T[] {
+  return entries.filter((h) => allowed.has(h.newDealer.id) && (h.oldDealer === null || allowed.has(h.oldDealer.id)))
+}

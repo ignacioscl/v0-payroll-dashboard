@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm'
 
-import { ExpenseReportRepository } from './expense-report.repository'
+import { ExpenseReportRepository, IS_PIECEWORK_SQL } from './expense-report.repository'
 import type { ExpenseListFilter } from '../expense-list-filter'
 
 /** Tarjetas All / Regular / Piecework de Expenses List (Ignacio, 22/11): el WHERE común de lista, summary y export. */
@@ -18,19 +18,28 @@ const filter = (type?: 'regular' | 'piecework'): ExpenseListFilter => ({
 
 describe('ExpenseReportRepository.buildExpenseWhere — tipo de gasto', () => {
   const repo = new ExpenseReportRepository({} as DataSource)
-  const PIECEWORK = 'EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id AND pw.deleted_at IS NULL)'
 
   it('All: no filtra por tipo', () => {
     expect(repo.buildExpenseWhere(filter()).sql).not.toContain('EXP_EXPENSE_PIECEWORK_WO')
   })
 
-  it('Piecework: solo las que tienen WO', () => {
-    expect(repo.buildExpenseWhere(filter('piecework')).sql).toContain(` AND ${PIECEWORK}`)
+  it('Piecework: solo las que tienen o tuvieron WO', () => {
+    expect(repo.buildExpenseWhere(filter('piecework')).sql).toContain(` AND ${IS_PIECEWORK_SQL}`)
   })
 
   it('Regular: las que no tienen WO, sin parámetros de más', () => {
     const where = repo.buildExpenseWhere(filter('regular'))
-    expect(where.sql).toContain(` AND NOT ${PIECEWORK}`)
+    expect(where.sql).toContain(` AND NOT ${IS_PIECEWORK_SQL}`)
     expect((where.sql.match(/\?/g) ?? []).length).toBe(where.params.length)
+  })
+})
+
+describe('IS_PIECEWORK_SQL — qué es una expense Piecework', () => {
+  it('cuentan también las WO liberadas (T5b: una expense sin WO sigue siendo Piecework)', () => {
+    expect(IS_PIECEWORK_SQL).not.toContain('deleted_at')
+  })
+
+  it('por grupo (CODE-review-T5 R2): una fila que quedó sin WO por un cambio de dealer sigue siendo Piecework', () => {
+    expect(IS_PIECEWORK_SQL).toContain('pe.id = e.id OR (e.id_exp_group IS NOT NULL AND pe.id_exp_group = e.id_exp_group)')
   })
 })

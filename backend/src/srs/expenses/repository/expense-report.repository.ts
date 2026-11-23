@@ -31,10 +31,15 @@ import {
 export const EXPENSE_IDENTITY_SQL = "IF(e.id_exp_group IS NULL, CONCAT('e', e.id), CONCAT('g', e.id_exp_group))"
 
 /**
- * Expense Piecework: tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO (también liberadas: T5b, review R3). Una expense
- * sin WO sigue siendo Piecework: no se duplica, no cambia monto ni compañía y abre el editor de WO.
+ * Expense Piecework: la fila **o cualquier fila de su grupo** tiene o tuvo filas en EXP_EXPENSE_PIECEWORK_WO (también
+ * liberadas: T5b, review R3). Una expense sin WO sigue siendo Piecework: no se duplica, no cambia monto ni compañía y
+ * abre el editor de WO. Por grupo (CODE-review-T5 R2): si la noche pasa todas las WO de una fila a otro dealer, la fila
+ * queda en $0 sin filas propias y sigue siendo la misma expense. Igual que el legacy
+ * (`ExpenseDao::countPieceworkRowsOfExpenseOrGroup`).
  */
-export const IS_PIECEWORK_SQL = 'EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw WHERE pw.id_expense = e.id)'
+export const IS_PIECEWORK_SQL = `EXISTS (SELECT 1 FROM EXP_EXPENSE_PIECEWORK_WO pw
+    JOIN EXP_EXPENSE pe ON pe.id = pw.id_expense
+   WHERE pe.id = e.id OR (e.id_exp_group IS NOT NULL AND pe.id_exp_group = e.id_exp_group))`
 
 /**
  * «Piecework con cambios» (T5b): la expense (su fila o cualquiera de su grupo) tiene algún cambio en el histórico,

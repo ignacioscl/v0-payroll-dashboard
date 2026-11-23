@@ -122,7 +122,13 @@ function build() {
     logRows: jest.fn().mockResolvedValue([]),
   }
   const permissions = { assertRolAccion: jest.fn().mockResolvedValue(undefined), userHasRolAccion: jest.fn().mockResolvedValue(false) }
-  const piecework = { assertRestorable: jest.fn().mockResolvedValue(undefined), resolveForCreate: jest.fn(), saveRows: jest.fn() }
+  const piecework = {
+    assertRestorable: jest.fn().mockResolvedValue(undefined),
+    resolveForCreate: jest.fn(),
+    saveRows: jest.fn(),
+    workOrdersOfExpense: jest.fn(),
+  }
+  const history = { listForUnit: jest.fn().mockResolvedValue([]) }
   const facade = new ExpenseFacadeService(
     expenses as any,
     groups as any,
@@ -134,9 +140,9 @@ function build() {
     permissions as any,
     piecework as any,
     { applyEdit: jest.fn() } as any,
-    { listForUnit: jest.fn().mockResolvedValue([]) } as any,
+    history as any,
   )
-  return { facade, expense, expenses, groups, catalog, logs, dealers, report, permissions }
+  return { facade, expense, expenses, groups, catalog, logs, dealers, report, permissions, piecework, history }
 }
 
 const singleBody = (patch: Record<string, unknown> = {}) => ({
@@ -362,5 +368,66 @@ describe('ExpenseFacadeService — rejectedCount en el grupo', () => {
     const out = (await facade.get(admin, 1)) as ExpenseGroupRow
     expect(out.approvedCount).toBe(1)
     expect(out.rejectedCount).toBe(1)
+  })
+})
+
+describe('ExpenseFacadeService — expense Piecework vista en parte (CODE-review-T5 R1)', () => {
+  /** Grupo Piecework: la fila de 408 en el alcance, la de 86 no. */
+  function partialGroup() {
+    const ctx = build()
+    const rows = [
+      toSingle(raw({ id: 1, idExpGroup: GROUP, idDealer: DEALER_A, isPiecework: 1, groupSplitType: 3, groupAttachmentExpense: 1 })),
+      toSingle(raw({ id: 2, idExpGroup: GROUP, idDealer: DEALER_B, dealerName: 'Honda', isPiecework: 1, inScope: 0, groupSplitType: 3, groupAttachmentExpense: 1 })),
+    ]
+    ctx.report.rowsByIds.mockResolvedValue([rows[0]])
+    ctx.report.rowsByGroup.mockResolvedValue(rows)
+    ctx.expenses.findOwned.mockResolvedValue({ ...ctx.expense, idExpGroup: GROUP })
+    ctx.report.dealerIdsInRestriction.mockImplementation(async (_scope: unknown, ids: number[]) => ids.filter((id) => id !== DEALER_B))
+    return ctx
+  }
+
+  const wo = (idInvoice: number, idDealer: number) => ({
+    idInvoice,
+    nro: `WO${idInvoice}`,
+    vin: `VIN${idInvoice}`,
+    dealer: { id: idDealer, name: String(idDealer) },
+    date: '2026-10-10',
+    piecework: '40.00',
+    services: ['Tint'],
+    selected: true,
+  })
+
+  const change = (id: number, newDealer: number, oldDealer: number | null) => ({
+    id,
+    createdAt: '2026-11-20 10:00:00',
+    idInvoice: id,
+    nro: `WO${id}`,
+    service: 'Tint',
+    oldAmount: oldDealer === null ? null : '60.00',
+    newAmount: '90.00',
+    oldDealer: oldDealer === null ? null : { id: oldDealer, name: String(oldDealer) },
+    newDealer: { id: newDealer, name: String(newDealer) },
+    oldWorkDate: null,
+    newWorkDate: '2026-10-10',
+    reason: 'calc',
+    detail: 'calc',
+    source: 'nightly',
+    changedBy: null,
+    woChangedAt: null,
+  })
+
+  it('las WO: solo las de los dealers que el usuario ve, y no se puede editar', async () => {
+    const { facade, piecework } = partialGroup()
+    piecework.workOrdersOfExpense.mockResolvedValue({ vendor: null, periods: [], workOrders: [wo(10, DEALER_A), wo(20, DEALER_B)] })
+    const out = await facade.pieceworkWorkOrders(admin, 1)
+    expect(out.workOrders.map((w) => w.idInvoice)).toEqual([10])
+    expect(out.canEdit).toBe(false)
+  })
+
+  it('el historial del log: solo los cambios con todos sus dealers en el alcance', async () => {
+    const { facade, history } = partialGroup()
+    history.listForUnit.mockResolvedValue([change(1, DEALER_A, DEALER_A), change(2, DEALER_B, DEALER_B), change(3, DEALER_B, DEALER_A), change(4, DEALER_A, null)])
+    const out = await facade.log(admin, 1)
+    expect(out.pieceworkHistory.map((h) => h.id)).toEqual([1, 4])
   })
 })

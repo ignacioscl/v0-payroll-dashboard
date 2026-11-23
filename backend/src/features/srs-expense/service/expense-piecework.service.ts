@@ -12,7 +12,7 @@ import type { PayrollPeriod } from 'src/srs/payroll/snapshot/payroll-snapshot.ty
 import { UsuarioSrsService } from 'src/features/srs-usuario/service/usuario-srs.service'
 import { ExpensePieceworkWo } from '../entity/expense-piecework-wo.entity'
 import { ExpensePieceworkWoRepository, PieceworkUnitKey } from '../repository/expense-piecework-wo.repository'
-import { NewPieceworkRow, inputsOf } from './expense-piecework-recalc.service'
+import { NewPieceworkRow, inputsOf, srcColumns } from './expense-piecework-recalc.service'
 import {
   MSG_CHOOSE_VENDOR,
   MSG_CHOOSE_WORK_ORDERS,
@@ -123,19 +123,40 @@ export class ExpensePieceworkService {
     return { vendor, rows, byDealer: amountsByDealer(rows) }
   }
 
-  /** Las filas de la tabla nueva, una por servicio, cada una con la fila de EXP_EXPENSE de su dealer. */
-  async saveRows(resolved: ResolvedPiecework, expenseIdByDealer: ReadonlyMap<number, number>): Promise<void> {
-    await this.pieceworkRows.insertMany(
-      resolved.rows.map((r) => ({
+  /**
+   * Las filas de la tabla nueva, una por servicio, cada una con la fila de EXP_EXPENSE de su dealer, con lo que entró en
+   * el cálculo (`src_*`) y `checked_at`: así el primer cambio de la noche sale con su motivo (CODE-review-T5 R3).
+   */
+  async saveRows(ctx: SrsContext, resolved: ResolvedPiecework, expenseIdByDealer: ReadonlyMap<number, number>): Promise<void> {
+    const rows = await this.newRows(ctx, resolved.vendor.id, resolved.rows)
+    await this.pieceworkRows.insertManyChecked(
+      rows.map((r) => ({
         idExpense: expenseIdByDealer.get(r.idDealer) as number,
         idInvoice: r.idInvoice,
         idInvoiceService: r.idService,
         idEmployee: resolved.vendor.id,
         idDealer: r.idDealer,
-        amount: fromCents(toCents(r.piecework)),
+        amount: r.amount,
         workDate: r.workDate,
+        ...srcColumns(r.inputs),
       })),
     )
+  }
+
+  /** Las filas por servicio como filas nuevas de la expense: el monto y los insumos de hoy (alta y Edit). */
+  private async newRows(ctx: SrsContext, vendor: number, rows: readonly WorkOrderServicePiecework[]): Promise<NewPieceworkRow[]> {
+    const state = await this.source.workOrderPieceworkState(ctx.idDealerProvider, vendor, [...new Set(rows.map((r) => r.idInvoice))])
+    return rows.map((r): NewPieceworkRow => {
+      const services = state.filter((s) => s.idInvoice === r.idInvoice)
+      return {
+        idInvoice: r.idInvoice,
+        idService: r.idService,
+        idDealer: r.idDealer,
+        workDate: r.workDate,
+        amount: fromCents(toCents(r.piecework)),
+        inputs: inputsOf(services[0], services.find((s) => s.idService === r.idService)),
+      }
+    })
   }
 
   /**
@@ -162,19 +183,7 @@ export class ExpensePieceworkService {
     if (!periods.length) throw fieldError('invoiceIds', MSG_NO_PAY_PERIODS)
     const found = new Set(rows.map((r) => r.idInvoice))
     if (addIds.some((id) => !found.has(id))) throw fieldError('invoiceIds', MSG_WORK_ORDER_NOT_AVAILABLE)
-    const state = await this.source.workOrderPieceworkState(ctx.idDealerProvider, vendor, addIds)
-    const added = rows.map((r): NewPieceworkRow => {
-      const services = state.filter((s) => s.idInvoice === r.idInvoice)
-      return {
-        idInvoice: r.idInvoice,
-        idService: r.idService,
-        idDealer: r.idDealer,
-        workDate: r.workDate,
-        amount: fromCents(toCents(r.piecework)),
-        inputs: inputsOf(services[0], services.find((s) => s.idService === r.idService)),
-      }
-    })
-    return { removed, added }
+    return { removed, added: await this.newRows(ctx, vendor, rows) }
   }
 
   /**

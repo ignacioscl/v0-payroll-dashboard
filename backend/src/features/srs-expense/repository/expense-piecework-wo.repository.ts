@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 
 import { ExpensePieceworkWo } from '../entity/expense-piecework-wo.entity'
@@ -27,6 +27,16 @@ export class ExpensePieceworkWoRepository {
   insertMany(rows: Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>[]): Promise<ExpensePieceworkWo[]> {
     if (!rows.length) return Promise.resolve([])
     return this.repo.save(rows.map((r) => this.repo.create(r)))
+  }
+
+  /**
+   * Alta con `checked_at` = la hora de la base (`NOW()`): la fila nace revisada, con sus `src_*` (alta, Edit y la noche;
+   * CODE-review-T5 R3).
+   */
+  async insertManyChecked(rows: Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>[]): Promise<ExpensePieceworkWo[]> {
+    const saved = await this.insertMany(rows)
+    if (saved.length) await this.repo.update({ id: In(saved.map((s) => s.id as number)) }, { checkedAt: () => 'NOW()' })
+    return saved
   }
 
   /**

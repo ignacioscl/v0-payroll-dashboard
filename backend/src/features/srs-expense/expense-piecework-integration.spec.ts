@@ -460,6 +460,25 @@ describeIf('Expense Piecework — camino entero contra la copia local (escribe y
       })),
     ).toEqual(expected)
 
+    // CODE-review-T5 R3: el alta graba lo que entró en el cálculo y la hora (si no, el primer cambio de la noche sale
+    // como «calc» en vez de su motivo).
+    const inputs: { checked: unknown; estado: unknown; svc: unknown; vendor: unknown; count: unknown }[] = await db.query(
+      `SELECT checked_at IS NOT NULL AS checked, src_wo_estado AS estado, src_has_service AS svc, src_has_vendor AS vendor,
+              src_employee_count AS count
+         FROM EXP_EXPENSE_PIECEWORK_WO WHERE id_expense IN (${expenseIds.map(() => '?').join(',')})`,
+      expenseIds,
+    )
+    expect(inputs.length).toBeGreaterThan(0)
+    for (const r of inputs) {
+      expect({ checked: Number(r.checked), estado: Number(r.estado), svc: Number(r.svc), vendor: Number(r.vendor) }).toEqual({
+        checked: 1,
+        estado: 1,
+        svc: 1,
+        vendor: 1,
+      })
+      expect(Number(r.count)).toBeGreaterThan(0)
+    }
+
     const logs: { description: string }[] = await db.query(
       `SELECT description FROM LOG_GENERIC WHERE id_expense IN (${expenseIds.map(() => '?').join(',')}) ORDER BY id`,
       expenseIds,
