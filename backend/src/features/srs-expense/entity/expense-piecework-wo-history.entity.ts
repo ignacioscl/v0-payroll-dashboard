@@ -61,7 +61,12 @@ export class ExpensePieceworkWoHistory {
   @Column({ name: 'wo_changed_by', type: 'int', nullable: true })
   woChangedBy!: number | null
 
-  @Column({ name: 'wo_changed_at', type: 'datetime', nullable: true })
+  /**
+   * DATETIME en la base. Va como texto (`YYYY-MM-DD HH:mm:ss`, el de LOG_CHANGE tal cual): con `type: 'datetime'`
+   * TypeORM lo pasa a Date y la conexión (`timezone: 'Z'`) lo graba corrido a UTC (+3 h en la copia local; prueba manual
+   * del 22/11).
+   */
+  @Column({ name: 'wo_changed_at', type: 'varchar', nullable: true })
   woChangedAt!: string | null
 
   @CreateDateColumn({ name: 'created_at' })

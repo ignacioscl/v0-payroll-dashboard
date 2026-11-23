@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 import { Transactional } from 'typeorm-transactional'
 
 import { monthBounds } from 'src/srs/monthly-closing/dto/monthly-closing-month'
@@ -47,8 +48,6 @@ interface UnitChanges {
   authorByExpense: Map<number, number>
 }
 
-const nowUtc = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ')
-
 /** Lo que entró en el cálculo de un servicio de la WO hoy (las columnas `src_*`). */
 export function inputsOf(header: WorkOrderPieceworkState, svc: WorkOrderPieceworkState | undefined): PieceworkInputs {
   return {
@@ -62,7 +61,7 @@ export function inputsOf(header: WorkOrderPieceworkState, svc: WorkOrderPiecewor
   }
 }
 
-function srcPatch(inputs: PieceworkInputs): Partial<ExpensePieceworkWo> {
+function srcPatch(inputs: PieceworkInputs): QueryDeepPartialEntity<ExpensePieceworkWo> {
   return {
     srcWoEstado: inputs.woEstado,
     srcHasService: inputs.hasService,
@@ -158,7 +157,6 @@ export class ExpensePieceworkRecalcService {
     const who = (idInvoice: number) => lastChanges.get(idInvoice) ?? null
 
     const changes: UnitChanges = { history: [], authorByExpense: new Map() }
-    const checkedAt = nowUtc()
     const updatedInvoices = new Set<number>()
     const groupState = { unit, expenseRows }
 
@@ -197,7 +195,7 @@ export class ExpensePieceworkRecalcService {
           detail: encodeReasons([{ code: PIECEWORK_REASON.movedOut, from: r.workDate, to: header.workDate }]),
         })
         changes.authorByExpense.set(r.idExpense, author)
-        await this.rows.updateRow(r.id as number, { ...srcPatch(inputs), checkedAt })
+        await this.rows.updateRow(r.id as number, { ...srcPatch(inputs) })
         await this.rows.release(r.id as number)
         continue
       }
@@ -217,7 +215,7 @@ export class ExpensePieceworkRecalcService {
           })
           changes.authorByExpense.set(r.idExpense, author)
         }
-        await this.rows.updateRow(r.id as number, { amount: '0.00', ...srcPatch(inputs), checkedAt })
+        await this.rows.updateRow(r.id as number, { amount: '0.00', ...srcPatch(inputs) })
         continue
       }
 
@@ -251,7 +249,6 @@ export class ExpensePieceworkRecalcService {
         workDate: header.workDate,
         idExpense,
         ...srcPatch(inputs),
-        checkedAt,
       })
     }
 
@@ -274,7 +271,6 @@ export class ExpensePieceworkRecalcService {
           { reason: PIECEWORK_REASON.serviceAdded, source: 'nightly', idUsuario: null, woChangedBy: by?.idAutor ?? null, woChangedAt: by?.fecha ?? null },
           changes,
           by?.idAutor ?? expenseRows[0].idCreatedBy,
-          checkedAt,
         )
       }
     }
@@ -294,7 +290,6 @@ export class ExpensePieceworkRecalcService {
     if (!expenseRows.length) return
     const groupState = { unit, expenseRows }
     const changes: UnitChanges = { history: [], authorByExpense: new Map() }
-    const checkedAt = nowUtc()
     for (const r of removed) {
       changes.history.push({
         idPieceworkWo: r.id as number,
@@ -326,7 +321,6 @@ export class ExpensePieceworkRecalcService {
         { reason: PIECEWORK_REASON.editAdded, source: 'edit', idUsuario, woChangedBy: null, woChangedAt: null },
         changes,
         idUsuario,
-        checkedAt,
       )
     }
     await this.history.insertMany(changes.history)
@@ -341,7 +335,6 @@ export class ExpensePieceworkRecalcService {
     meta: Pick<HistoryRow, 'reason' | 'source' | 'idUsuario' | 'woChangedBy' | 'woChangedAt'>,
     changes: UnitChanges,
     author: number,
-    checkedAt: string,
   ): Promise<void> {
     for (const a of added) {
       const idExpense = await this.dealerRow(idDetailer, groupState, a.idDealer)
@@ -354,10 +347,10 @@ export class ExpensePieceworkRecalcService {
           idDealer: a.idDealer,
           amount: a.amount,
           workDate: a.workDate,
-          checkedAt,
           ...(srcPatch(a.inputs) as object),
         } as Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>,
       ])
+      await this.rows.updateRow(saved.id as number, {})
       changes.history.push({
         ...meta,
         idPieceworkWo: saved.id as number,

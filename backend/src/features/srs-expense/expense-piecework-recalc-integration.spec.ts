@@ -343,6 +343,19 @@ describeIf('T5b — la expense Piecework sigue a sus WO (job corrido a mano, esc
     a = (await pwRows()).find((r) => r.idInvoice === WO_A)!
     expect(toCents(a.amount)).toBe(A_CENTS + 5000)
     expect((await historyOf(WO_A)).slice(-2).map((h) => h.reason)).toEqual([PIECEWORK_REASON.woDeleted, PIECEWORK_REASON.woActiveAgain])
+    // Quién y cuándo tocó la WO: la hora del último log de la WO tal cual, sin correrla de zona (prueba manual del 22/11).
+    const [last]: { at: unknown }[] = await db.query(
+      `SELECT DATE_FORMAT(MAX(x.f), '%Y-%m-%d %H:%i:%s') AS at FROM (
+         SELECT fecha AS f FROM LOG_CHANGE WHERE id_invoice = ? UNION ALL SELECT fecha FROM LOG_WO_WORKFLOW_CHANGE WHERE id_work_order = ?
+       ) x`,
+      [WO_A, WO_A],
+    )
+    const [saved]: { at: unknown }[] = await db.query(
+      `SELECT DATE_FORMAT(h.wo_changed_at, '%Y-%m-%d %H:%i:%s') AS at FROM EXP_EXPENSE_PIECEWORK_WO_HISTORY h
+        JOIN EXP_EXPENSE e ON e.id = h.id_expense WHERE h.id_invoice = ? AND e.notes = ? ORDER BY h.id DESC LIMIT 1`,
+      [WO_A, SPEC_NOTES],
+    )
+    expect(saved.at).toBe(last.at)
   }, 600000)
 
   it('otro empleado en la WO: el piecework se reparte y el motivo lo dice', async () => {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 
 import { ExpensePieceworkWo } from '../entity/expense-piecework-wo.entity'
 
@@ -93,9 +94,12 @@ export class ExpensePieceworkWoRepository {
     return rows.length ? Number(rows[0].idEmployee) : null
   }
 
-  /** Cambia una fila (monto, dealer, fecha, fila de EXP_EXPENSE, insumos, revisión). */
-  async updateRow(id: number, patch: Partial<Omit<ExpensePieceworkWo, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>>): Promise<void> {
-    await this.repo.update({ id }, patch)
+  /**
+   * Cambia una fila (monto, dealer, fecha, fila de EXP_EXPENSE, insumos) y deja `checked_at` con la hora de la base
+   * (`NOW()`, la misma que LOG_GENERIC y el histórico).
+   */
+  async updateRow(id: number, patch: QueryDeepPartialEntity<ExpensePieceworkWo>): Promise<void> {
+    await this.repo.update({ id }, { ...patch, checkedAt: () => 'NOW()' })
   }
 
   /** La WO sale de la expense y queda libre (D18 y D20): la fila queda como histórico. */
