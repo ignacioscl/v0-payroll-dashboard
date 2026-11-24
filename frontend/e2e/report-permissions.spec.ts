@@ -69,8 +69,11 @@ async function apiStatus(page: Page, url: string): Promise<number> {
 async function reportsMenuLinks(page: Page): Promise<string[]> {
   await page.goto('/issues')
   await openMobileMenuIfNeeded(page)
+  // El menú se arma cuando el marco ya tiene la sesión: «Punch Report» (el 65 del usuario) visible es la señal.
+  await expect(page.getByRole('link', { name: 'Punch Report', exact: true })).toBeVisible()
   const reports = page.getByRole('button', { name: /^Reports$/ })
-  await expect(reports).toBeVisible()
+  // Sin ninguno de los seis (y sin otro reporte), el grupo Reports no se dibuja.
+  if (!(await reports.isVisible().catch(() => false))) return []
   if (!(await page.getByRole('link', { name: 'Monthly Closing', exact: true }).isVisible().catch(() => false))) {
     await reports.click()
   }

@@ -65,8 +65,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** «10/01/2026 – 10/15/2026, 10/16/2026 – 10/30/2026» (línea del cierre) → «Work orders from Oct 1 to Oct 30, 2026». */
 function rangeText(periods: string): string {
   const dates = periods.match(/\d{2}\/\d{2}\/\d{4}/g) ?? []
-  const [m1, d1] = dates[0].split('/').map(Number)
-  const [m2, d2, y2] = dates[dates.length - 1].split('/').map(Number)
+  const first = dates[0]
+  const last = dates[dates.length - 1]
+  if (!first || !last) throw new Error(`«Pay periods» sin fechas: ${periods}`)
+  const [m1, d1] = first.split('/').map(Number)
+  const [m2, d2, y2] = last.split('/').map(Number)
   return `Work orders from ${MONTHS[m1 - 1]} ${d1} to ${MONTHS[m2 - 1]} ${d2}, ${y2}`
 }
 
