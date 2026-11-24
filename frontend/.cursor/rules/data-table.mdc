@@ -558,7 +558,23 @@ sin DB. Borrar cuando ya no se necesite.
 - Importar siempre desde `@/components/shared/data-table` (no del barrel
   interno ni de subpaths).
 - Usar `DataTableColumnHeader` para los headers — renderiza sort, hide column
-  y el icono de filter cuando hay `meta.filter`.
+  y el icono de filter cuando hay `meta.filter`. Un `header` de texto suelto pasa solo por él
+  (`DataTable` lo envuelve) y el título sale igual en todos los casos (`text-xs font-semibold
+  uppercase tracking-wide`). Control: `lib/data-table-header.test.ts`.
+- **Una lista nueva se arma como Invoices / Expenses, pieza por pieza** (24/11/2026: WO to be Billed
+  salió con los títulos en otra letra, el total metido en el contador, las acciones como íconos
+  sueltos y sin «Rows» ni «Columns», y cada pantalla pasaba sus pruebas por separado):
+  - totales en las tarjetas `StatCell` (`components/billing/invoice-summary-strip.tsx`) arriba de la
+    tabla, no en el texto del contador; el contador dice solo «N <cosas>»;
+  - el rango de la barra debajo del título (`PageHeading` `subtitle`), como Invoices;
+  - las acciones de la fila en el menú «⋯» (`aria-label` «Actions»), la que borra al final, separada y
+    en rojo; las marcas a la vista, en el grupo de `invoice-row-actions.tsx`;
+  - un campo editable de la fila (PO / RO) es la celda entera: valor (o «—») y el lápiz chico;
+  - «Rows» (`pageSize` + `onPageSizeChange` + `showPageSizeInInfiniteScroll`) y «Columns» (cada
+    columna con `accessorFn`; sin él no aparece en el menú);
+  - sin letras propias en las celdas (nada de `font-mono` para un VIN).
+  Control: `e2e/screens-consistency.spec.ts` mide la pantalla al lado de Invoices en compu y celular;
+  una lista nueva de Billing se suma a su `SCREENS`.
 - Para tablas server-side, usar `buildBackendQuery` para armar el query string;
   no concatenar params a mano.
 - Normalizar el JSON a `PaginatedDataTableResponse` en el hook o en un BFF

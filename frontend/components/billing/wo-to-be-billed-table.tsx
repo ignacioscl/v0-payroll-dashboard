@@ -106,6 +106,8 @@ export function WoToBeBilledTable({
   summary,
   renderActions,
   renderRoPo,
+  pageSize,
+  onPageSizeChange,
   recordsNote,
 }: {
   query: ReturnType<typeof useWoToBeBilledList>
@@ -118,6 +120,9 @@ export function WoToBeBilledTable({
   renderActions?: (row: WoToBeBilledRow) => React.ReactNode
   /** El lápiz de RO# / PO# (T10). */
   renderRoPo?: (row: WoToBeBilledRow, field: 'ro' | 'po') => React.ReactNode
+  /** «Rows» del toolbar (como Invoices). */
+  pageSize: number
+  onPageSizeChange: (size: number) => void
   /** «Delete selected (n)», al lado del contador (T10). */
   recordsNote?: React.ReactNode
 }) {
@@ -173,6 +178,8 @@ export function WoToBeBilledTable({
       },
       {
         id: 'vin',
+        // Con `accessorFn` la columna aparece en «Columns» (`DataTableViewOptions`), como en Invoices.
+        accessorFn: (r) => r.vin,
         header: t('woToBeBilled.columns.vin'),
         enableSorting: false,
         size: 190,
@@ -181,7 +188,7 @@ export function WoToBeBilledTable({
           const car = [r.year, r.make, r.model, r.color].filter(Boolean).join(' / ')
           return (
             <div className="min-w-0">
-              <span className="block truncate font-mono text-xs">{r.vin}</span>
+              <span className="block truncate">{r.vin}</span>
               {car ? <span className="block truncate text-[11px] text-muted-foreground">{car}</span> : null}
             </div>
           )
@@ -190,6 +197,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'stock',
+        accessorFn: (r) => r.stockNumber ?? '',
         header: t('woToBeBilled.columns.stock'),
         enableSorting: false,
         size: 90,
@@ -198,6 +206,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'wo',
+        accessorFn: (r) => r.fullNro,
         header: t('woToBeBilled.columns.wo'),
         enableSorting: false,
         size: 90,
@@ -206,6 +215,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'invoice',
+        accessorFn: (r) => r.invoiceNumbers,
         header: t('woToBeBilled.columns.invoice'),
         enableSorting: false,
         size: 100,
@@ -214,6 +224,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'date',
+        accessorFn: (r) => r.fechaAlta,
         header: t('woToBeBilled.columns.date'),
         enableSorting: false,
         size: 95,
@@ -222,6 +233,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'department',
+        accessorFn: (r) => r.department,
         header: t('woToBeBilled.columns.department'),
         enableSorting: false,
         size: 130,
@@ -230,6 +242,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'services',
+        accessorFn: (r) => r.services.length,
         header: t('woToBeBilled.columns.services'),
         enableSorting: false,
         size: 220,
@@ -262,6 +275,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'price',
+        accessorFn: (r) => r.total,
         header: t('woToBeBilled.columns.price'),
         enableSorting: false,
         size: 95,
@@ -270,32 +284,27 @@ export function WoToBeBilledTable({
       },
       {
         id: 'ro',
+        accessorFn: (r) => r.ro ?? '',
         header: t('woToBeBilled.columns.ro'),
         enableSorting: false,
         size: 110,
-        cell: ({ row }) => (
-          <span className="inline-flex items-center gap-1">
-            <span className="truncate">{row.original.ro ?? ''}</span>
-            {renderRoPo?.(row.original, 'ro')}
-          </span>
-        ),
+        // La celda entera es el botón, con el valor y el lápiz chico: la de PO / RO de Invoices.
+        cell: ({ row }) => renderRoPo?.(row.original, 'ro') ?? <span>{row.original.ro ?? '—'}</span>,
         meta: { label: t('woToBeBilled.columns.ro') } satisfies DataTableColumnMeta<WoToBeBilledRow>,
       },
       {
         id: 'po',
+        accessorFn: (r) => r.po ?? '',
         header: t('woToBeBilled.columns.po'),
         enableSorting: false,
         size: 110,
-        cell: ({ row }) => (
-          <span className="inline-flex items-center gap-1">
-            <span className="truncate">{row.original.po ?? ''}</span>
-            {renderRoPo?.(row.original, 'po')}
-          </span>
-        ),
+        // La celda entera es el botón, con el valor y el lápiz chico: la de PO / RO de Invoices.
+        cell: ({ row }) => renderRoPo?.(row.original, 'po') ?? <span>{row.original.po ?? '—'}</span>,
         meta: { label: t('woToBeBilled.columns.po') } satisfies DataTableColumnMeta<WoToBeBilledRow>,
       },
       {
         id: 'age',
+        accessorFn: (r) => r.fechaAlta,
         header: t('woToBeBilled.columns.age'),
         enableSorting: false,
         size: 100,
@@ -304,6 +313,7 @@ export function WoToBeBilledTable({
       },
       {
         id: 'approved',
+        accessorFn: (r) => r.approved,
         header: t('woToBeBilled.columns.approved'),
         enableSorting: false,
         size: 80,
@@ -349,14 +359,6 @@ export function WoToBeBilledTable({
     <StateBlock icon={<ClipboardList className="h-6 w-6" />} title={t('woToBeBilled.empty')} />
   )
 
-  const counterLabel = summary
-    ? (summary.count === 1
-        ? t('woToBeBilled.counterOne', { amount: fmtMoney(summary.total) })
-        : t('woToBeBilled.counter', { n: '', amount: fmtMoney(summary.total) })
-      )
-        .replace(/^1\s*/, '')
-        .trim()
-    : undefined
 
   return (
     <DataTable<WoToBeBilledRow>
@@ -368,7 +370,12 @@ export function WoToBeBilledTable({
       emptyState={emptyState}
       enableGlobalFilter={false}
       recordsCount={gateReady && summary ? summary.count : undefined}
-      recordsCountLabel={gateReady ? counterLabel : undefined}
+      recordsCountLabel={gateReady ? t('woToBeBilled.recordsLabel') : undefined}
+      // «Rows» como Invoices: cuántas trae cada tanda del scroll.
+      pageSize={pageSize}
+      onPageSizeChange={onPageSizeChange}
+      showPageSizeInInfiniteScroll
+      pageSizeOptions={[25, 50, 100]}
       recordsCountNote={recordsNote}
       enableRowSelection
       rowSelection={rowSelection}

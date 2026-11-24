@@ -281,6 +281,11 @@ export interface Messages {
     counterOne: string
     selectRow: string
     selectAll: string
+    recordsLabel: string
+    summaryCount: string
+    summaryCountHelp: string
+    summaryTotal: string
+    summaryTotalHelp: string
     filters: {
       department: string
       services: string

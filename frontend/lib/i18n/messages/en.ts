@@ -294,6 +294,11 @@ export const en: Messages = {
     counterOne: '1 work order · Total {amount}',
     selectRow: 'Select work order',
     selectAll: 'Select all loaded work orders',
+    recordsLabel: 'work orders',
+    summaryCount: 'Work orders',
+    summaryCountHelp: 'Work orders with at least one service that can still be invoiced with the selected Invoice Type and filters.',
+    summaryTotal: 'Total',
+    summaryTotalHelp: 'Sum of the Price column of every work order in the list with these filters, not only the loaded page. With a Services filter, only those services.',
     filters: {
       department: 'Department',
       services: 'Services',

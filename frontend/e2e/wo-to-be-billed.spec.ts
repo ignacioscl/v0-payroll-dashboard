@@ -182,6 +182,12 @@ async function onlyCompleted(page: Page) {
   await page.keyboard.press('Escape')
 }
 
+/** Una acción de la fila: el menú «⋯» (Actions) y el ítem, como en Invoices. */
+async function rowAction(page: Page, nro: string, item: string) {
+  await rowOf(page, nro).getByRole('button', { name: 'Actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: item }).click()
+}
+
 async function tick(page: Page, nro: string) {
   await rowOf(page, nro).getByRole('checkbox', { name: 'Select work order' }).check()
 }
@@ -285,9 +291,9 @@ test('individual: el PDF se abre en una pestaña nueva, la WO sale de la lista y
   await pickDealerAndRange(page, TESLA, DAY)
   await expect(rowOf(page, WO.t355.nro)).toBeVisible({ timeout: 60_000 })
   // Print WO también abre pestaña.
-  await expectPdfTab(page, () => rowOf(page, WO.t355.nro).getByRole('button', { name: 'Print WO' }).click())
+  await expectPdfTab(page, () => rowAction(page, WO.t355.nro, 'Print WO'))
 
-  await rowOf(page, WO.t354.nro).getByRole('button', { name: 'Generate Individual Invoice' }).click()
+  await rowAction(page, WO.t354.nro, 'Generate Individual Invoice')
   await expect(page.getByRole('alertdialog').getByText(`An invoice will be generated from work order #${WO.t354.nro}.`)).toBeVisible()
   await expectPdfTab(page, () => page.getByRole('button', { name: 'Yes, invoice it' }).click())
   await expect(rowOf(page, WO.t354.nro)).toHaveCount(0)
@@ -306,7 +312,7 @@ test('individual con Completed como único Status y alta anterior al rango: «Vi
   await pickDealerAndRange(page, KIA, '11/12/2026')
   await onlyCompleted(page)
   await expect(rowOf(page, WO.kia.nro)).toBeVisible({ timeout: 60_000 })
-  await rowOf(page, WO.kia.nro).getByRole('button', { name: 'Generate Individual Invoice' }).click()
+  await rowAction(page, WO.kia.nro, 'Generate Individual Invoice')
   await expectPdfTab(page, () => page.getByRole('button', { name: 'Yes, invoice it' }).click())
   const invoice = activeInvoiceOf(WO.kia.id)
   await page.getByRole('link', { name: 'View in Invoices' }).click()
@@ -320,7 +326,7 @@ test('individual de subtotal cero con «Include Zero Value»: «View in Invoices
   await pickDealerAndRange(page, SUBARU, '11/08/2026')
   await includeZero(page)
   await expect(rowOf(page, WO.zero.nro)).toBeVisible({ timeout: 60_000 })
-  await rowOf(page, WO.zero.nro).getByRole('button', { name: 'Generate Individual Invoice' }).click()
+  await rowAction(page, WO.zero.nro, 'Generate Individual Invoice')
   await expectPdfTab(page, () => page.getByRole('button', { name: 'Yes, invoice it' }).click())
   const invoice = activeInvoiceOf(WO.zero.id)
   expect(invoice).not.toBeNull()
@@ -371,7 +377,7 @@ test('eliminar una y varias; una WO pagada responde «is billed!» y no se elimi
   await page.goto(ROUTE)
   await pickDealerAndRange(page, TESLA, DAY)
   await expect(rowOf(page, WO.t355.nro)).toBeVisible({ timeout: 60_000 })
-  await rowOf(page, WO.t355.nro).getByRole('button', { name: 'Delete WO' }).click()
+  await rowAction(page, WO.t355.nro, 'Delete WO')
   await expect(page.getByRole('alertdialog').getByText(`WO# ${WO.t355.nro} will be deleted.`)).toBeVisible()
   await page.getByRole('button', { name: 'Yes, delete it' }).click()
   await expect(page.getByText(`WO# ${WO.t355.nro} deleted`)).toBeVisible()
@@ -525,7 +531,7 @@ test('filtros: «Clear all» limpia todo de una vez, otro dealer arranca sin dep
   await expect.poll(() => requests.length, { timeout: 30_000 }).toBeGreaterThan(0)
   expect(requests.every((u) => !new URL(u).searchParams.has('departments')), requests.join('\n')).toBe(true)
   await expect(page.locator('main').getByRole('button', { name: /^Clear Department/ })).toHaveCount(0)
-  await expect(page.locator('main').getByText(/work orders? · Total|No work orders to be billed/).first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.locator('main').getByText(/^work orders$|No work orders to be billed/).first()).toBeVisible({ timeout: 60_000 })
   await expect(page.locator('main').getByText('Select one dealer to see its work orders')).toHaveCount(0)
 
   // R11: «Clear» del calendario vuelve al rango por defecto: la lista sigue consultando.
@@ -537,7 +543,7 @@ test('filtros: «Clear all» limpia todo de una vez, otro dealer arranca sin dep
   const after = await filtersScope(page)
   await expect(after.scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}/ }).first()).toBeVisible()
   await after.apply()
-  await expect(page.locator('main').getByText(/work orders? · Total|No work orders to be billed|records/).first()).toBeVisible()
+  await expect(page.locator('main').getByText(/^work orders$|No work orders to be billed|records/).first()).toBeVisible()
 })
 
 test('doble clic en «Generate Invoices» con la respuesta demorada manda un solo pedido', async ({ page }) => {

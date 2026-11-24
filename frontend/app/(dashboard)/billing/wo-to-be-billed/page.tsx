@@ -16,6 +16,7 @@ import {
   WoToBeBilledFilters,
   type WoFilterState,
 } from '@/components/billing/wo-to-be-billed-filters'
+import { SUMMARY_GRID_CLASS, StatCell } from '@/components/billing/invoice-summary-strip'
 import { WoToBeBilledTable } from '@/components/billing/wo-to-be-billed-table'
 import { PageHeading } from '@/components/layout/page-heading'
 import { AppLink } from '@/components/shared/app-link'
@@ -37,6 +38,7 @@ import {
   type CreatedWoInvoice,
   type GenerateWoInvoicesResponse,
 } from '@/lib/srs-wo-to-be-billed-api'
+import { fmtMoney } from '@/lib/kpi-money'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 
 /** `YYYY-MM-DD` → fecha local (para el período de Invoices). */
@@ -58,7 +60,6 @@ function focusWhenDrawn(selector: string) {
 
 /** Debounce de los buscadores, como Invoices. */
 const SEARCH_DEBOUNCE_MS = 350
-const PAGE_SIZE = 25
 const NO_SELECTION: RowSelectionState = {}
 /** Sin departments ni servicios (siempre el mismo arreglo, para que nada se redibuje). */
 const NO_IDS: number[] = []
@@ -164,7 +165,8 @@ export default function WoToBeBilledPage() {
   )
 
   // Los tres pedidos salen juntos, sin esperarse uno al otro.
-  const list = useWoToBeBilledList(request, PAGE_SIZE)
+  const [pageSize, setPageSize] = React.useState(25)
+  const list = useWoToBeBilledList(request, pageSize)
   const summary = useWoToBeBilledSummary(request)
   const config = useWoToBeBilledConfig(gateReady ? oneDealer : null)
 
@@ -283,6 +285,8 @@ export default function WoToBeBilledPage() {
     <div className="flex min-w-0 flex-col gap-4">
       <PageHeading
         title={t('woToBeBilled.title')}
+        // El rango de la barra debajo del título, como Invoices.
+        subtitle={dateFrom && dateTo ? <span className="tabular-nums">{`${woUsDate(dateFrom)} – ${woUsDate(dateTo)}`}</span> : undefined}
         icon={<FilePlus2 />}
         variant="info"
         titleAside={<ReportRulesNotice screen="woToBeBilled" />}
@@ -306,6 +310,31 @@ export default function WoToBeBilledPage() {
         fieldErrors={fieldErrors}
       />
 
+      {/* Las tarjetas de total de Invoices (`StatCell`), arriba de la tabla. */}
+      {gateReady ? (
+        summary.data ? (
+          <div className={SUMMARY_GRID_CLASS}>
+            <StatCell
+              label={t('woToBeBilled.summaryCount')}
+              value={String(summary.data.count)}
+              help={t('woToBeBilled.summaryCountHelp')}
+            />
+            <StatCell
+              label={t('woToBeBilled.summaryTotal')}
+              value={fmtMoney(summary.data.total)}
+              help={t('woToBeBilled.summaryTotalHelp')}
+              highlight="total"
+            />
+          </div>
+        ) : (
+          <div className={SUMMARY_GRID_CLASS}>
+            {[0, 1].map((i) => (
+              <div key={i} className="h-[72px] animate-pulse rounded-lg border border-border/40 bg-muted/30" />
+            ))}
+          </div>
+        )
+      ) : null}
+
       <WoToBeBilledTable
         query={list}
         gateReady={gateReady}
@@ -316,6 +345,8 @@ export default function WoToBeBilledPage() {
         renderActions={rowActions.renderActions}
         renderRoPo={rowActions.renderRoPo}
         recordsNote={recordsNote}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
 
       {rowActions.dialogs}

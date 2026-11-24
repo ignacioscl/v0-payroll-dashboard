@@ -21,6 +21,7 @@ import {
   type Updater,
   type VisibilityState,
 } from '@tanstack/react-table'
+import { DataTableColumnHeader } from './data-table-column-header'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Loader2, Database } from 'lucide-react'
 
@@ -1305,9 +1306,13 @@ export function DataTable<TData, TValue = unknown>({
                         meta?.headerClassName,
                       )}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : typeof header.column.columnDef.header === 'string' ? (
+                        // Un título como texto suelto pasa por el encabezado común: todas las tablas con la misma letra
+                        // (WO to be Billed salió distinto a Invoices por esto, 24/11/2026).
+                        <DataTableColumnHeader column={header.column} title={header.column.columnDef.header} />
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
 
                       {canResize && (
                         <span

@@ -294,6 +294,11 @@ export const es: Messages = {
     counterOne: '1 WO · Total {amount}',
     selectRow: 'Tildar la WO',
     selectAll: 'Tildar todas las WO cargadas',
+    recordsLabel: 'WO',
+    summaryCount: 'WO',
+    summaryCountHelp: 'WO con al menos un servicio que todavía se puede facturar con el Invoice Type y los filtros elegidos.',
+    summaryTotal: 'Total',
+    summaryTotalHelp: 'Suma de la columna Price de todas las WO de la lista con estos filtros, no solo la página cargada. Con un filtro de Services, solo esos servicios.',
     filters: {
       department: 'Department',
       services: 'Services',

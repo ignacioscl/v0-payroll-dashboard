@@ -1,11 +1,18 @@
 'use client'
 
 import * as React from 'react'
-import { Copy, Info, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Copy, Info, MoreHorizontal, Pencil, Printer, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   useDeleteWorkOrders,
@@ -14,6 +21,7 @@ import {
   useWoPdf,
 } from '@/hooks/use-wo-to-be-billed-mutations'
 import { useTranslation } from '@/lib/i18n/locale-context'
+import { cn } from '@/lib/utils'
 import { openPdfTabNow } from '@/lib/srs/parse-srs-response'
 import {
   WO_STATUS_IN_TRANSIT,
@@ -30,39 +38,6 @@ type Dialog =
   | { kind: 'delete'; row: WoToBeBilledRow }
   | { kind: 'roPo'; row: WoToBeBilledRow; field: 'ro' | 'po' }
   | null
-
-function IconButton({
-  label,
-  onClick,
-  children,
-  tone,
-}: {
-  label: string
-  onClick: () => void
-  children: React.ReactNode
-  tone?: 'danger'
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={tone === 'danger' ? 'size-7 text-destructive hover:text-destructive' : 'size-7'}
-          aria-label={label}
-          onClick={(e) => {
-            e.stopPropagation()
-            onClick()
-          }}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 /**
  * Las acciones de la fila de WO to be Billed (plans/plan-wo-to-be-billed-v0, T10): Print WO (siempre), Obs (si la WO
@@ -109,50 +84,94 @@ export function useWoRowActions({
     [config],
   )
 
+  /**
+   * Las acciones de la fila con el mismo armado que Invoices (`invoice-row-actions.tsx`): las marcas a la vista en un
+   * grupo (acá, Obs) y todas las acciones en el menú «⋯», con la que borra al final, separada y en rojo.
+   */
   const renderActions = React.useCallback(
     (row: WoToBeBilledRow) => (
       <>
-        <IconButton label={t('woToBeBilled.tooltips.printWo')} onClick={() => printWo(row)}>
-          <Printer className="size-4" />
-        </IconButton>
         {row.observation ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex size-7 items-center justify-center text-muted-foreground" tabIndex={0}>
-                <Info className="size-4" aria-label={t('woToBeBilled.tooltips.obs', { text: row.observation })} />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs whitespace-normal">
-              {t('woToBeBilled.tooltips.obs', { text: row.observation })}
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-        {config?.canGenerate && !row.woHaveInvoice ? (
-          <IconButton
-            label={t('woToBeBilled.tooltips.generateIndividual')}
-            onClick={() => setDialog({ kind: 'individual', row })}
+          <div
+            className={cn(
+              'inline-flex items-center gap-px rounded-md border border-border/80',
+              'bg-muted/50 px-0.5 py-0.5 shadow-[inset_0_1px_0_0_hsl(var(--background)/0.6)]',
+            )}
           >
-            <Copy className="size-4" />
-          </IconButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm px-1 text-foreground/70"
+                  tabIndex={0}
+                  aria-label={t('woToBeBilled.tooltips.obs', { text: row.observation })}
+                >
+                  <Info className="size-3.5 shrink-0" strokeWidth={1.75} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs whitespace-normal">
+                {t('woToBeBilled.tooltips.obs', { text: row.observation })}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         ) : null}
-        {canDelete(row) ? (
-          <IconButton label={t('woToBeBilled.tooltips.deleteWo')} tone="danger" onClick={() => setDialog({ kind: 'delete', row })}>
-            <Trash2 className="size-4" />
-          </IconButton>
-        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label={t('woToBeBilled.columns.actions')}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[12rem]" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => printWo(row)}>
+              <Printer className="size-4" />
+              {t('woToBeBilled.tooltips.printWo')}
+            </DropdownMenuItem>
+            {config?.canGenerate && !row.woHaveInvoice ? (
+              <DropdownMenuItem onClick={() => setDialog({ kind: 'individual', row })}>
+                <Copy className="size-4" />
+                {t('woToBeBilled.tooltips.generateIndividual')}
+              </DropdownMenuItem>
+            ) : null}
+            {canDelete(row) ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDialog({ kind: 'delete', row })}
+                >
+                  <Trash2 className="size-4" />
+                  {t('woToBeBilled.tooltips.deleteWo')}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </>
     ),
     [t, printWo, config, canDelete],
   )
 
+  /** RO# / PO#: la celda de PO / RO de Invoices — el valor (o «—») y el lápiz chico, todo un botón. */
   const renderRoPo = React.useCallback(
     (row: WoToBeBilledRow, field: 'ro' | 'po') => (
-      <IconButton
-        label={field === 'ro' ? t('woToBeBilled.tooltips.editRo') : t('woToBeBilled.tooltips.editPo')}
-        onClick={() => setDialog({ kind: 'roPo', row, field })}
+      <button
+        type="button"
+        aria-label={field === 'ro' ? t('woToBeBilled.tooltips.editRo') : t('woToBeBilled.tooltips.editPo')}
+        className="inline-flex items-center gap-1 text-left text-foreground hover:text-accent"
+        onClick={(e) => {
+          e.stopPropagation()
+          setDialog({ kind: 'roPo', row, field })
+        }}
       >
-        <Pencil className="size-3.5" />
-      </IconButton>
+        <span>{row[field]?.trim() || '—'}</span>
+        <Pencil className="h-3 w-3 opacity-50" />
+      </button>
     ),
     [t],
   )
