@@ -52,6 +52,20 @@ export async function login(page: Page, user = E2E_USER, password = E2E_PASSWORD
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
 }
 
+/** El legacy (PHP) de la copia local, para los e2e que recorren una pantalla de `public/modulos`. */
+export const LEGACY = env.E2E_LEGACY_URL ?? 'http://srs.com'
+
+/** Login del legacy con el mismo usuario de `.env.e2e.local`. Si ya hay sesión, `login.php` no muestra el formulario. */
+export async function legacyLogin(page: Page, user = E2E_USER, password = E2E_PASSWORD) {
+  await page.goto(`${LEGACY}/login.php`)
+  if (await page.locator('#username').isVisible().catch(() => false)) {
+    await page.locator('#username').fill(user)
+    await page.locator('#password').fill(password)
+    await page.getByRole('button', { name: 'Secure Sign In' }).click()
+    await expect(page).not.toHaveURL(/login\.php/, { timeout: 30_000 })
+  }
+}
+
 export async function noHorizontalScroll(page: Page) {
   const ok = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   expect(ok, 'page must not scroll horizontally').toBe(true)

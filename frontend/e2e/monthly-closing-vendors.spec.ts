@@ -16,6 +16,8 @@ import {
   E2E_PASSWORD,
   E2E_USER,
   filterExpensesByCompany,
+  LEGACY,
+  legacyLogin,
   money,
   monthlyClosingDealer,
   noHorizontalScroll,
@@ -23,21 +25,10 @@ import {
 
 test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
 
-const LEGACY = process.env.E2E_LEGACY_URL ?? 'http://srs.com'
 const VENDOR_ID = '6985' // Francol Services LLC (empresa 79), solo Piecework
 const VENDOR_NAME = 'Francol Services LLC'
 const DEALER = 'AutoNation Land Rover Ft Lauderdale'
 const MONTH = 'October 2026'
-
-async function legacyLogin(page: Page) {
-  await page.goto(`${LEGACY}/login.php`)
-  if (await page.locator('#username').isVisible().catch(() => false)) {
-    await page.locator('#username').fill(E2E_USER)
-    await page.locator('#password').fill(E2E_PASSWORD)
-    await page.getByRole('button', { name: 'Secure Sign In' }).click()
-    await expect(page).not.toHaveURL(/login\.php/, { timeout: 30_000 })
-  }
-}
 
 /** La ficha se abre con un POST de `id_usuario`, como lo hace la lista de Users. */
 async function openUserForm(page: Page, id: string) {
