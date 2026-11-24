@@ -1,6 +1,6 @@
 /**
  * Dealer List del legacy (plans/plan-dealers-lista-goal-due-geofence, T5): las columnas «Goal Production report» y
- * «Payment Due On» y el filtro «Geofense TTK», el camino entero, en 1280×800 y 375×812 (los dos proyectos de
+ * «Payment Due On» y el filtro «Geofense TTK» (switch de tres opciones), el camino entero, en 1280×800 y 375×812 (los dos proyectos de
  * playwright.config.ts, Chromium de Playwright). Contra la copia local de PROD: legacy en http://srs.com, con el
  * usuario de `.env.e2e.local` (Admin Company de Auto Wax, que es un detailer).
  *
@@ -38,10 +38,15 @@ async function openList(page: Page) {
   await expect(info(page)).toContainText('entries')
 }
 
-/** El combo recarga la página, como los otros filtros de la pantalla. */
+const GEOFENCE_OPTION = { '': 'All', '1': 'With geofense', '0': 'Without geofense' } as const
+
+/** El switch de tres opciones recarga la página, como los otros filtros de la pantalla. La elegida queda marcada. */
 async function setGeofenceFilter(page: Page, value: '' | '1' | '0') {
-  await Promise.all([page.waitForEvent('load'), page.locator('#geofence').selectOption(value)])
+  const option = page.locator('#geofence_switch').getByRole('button', { name: GEOFENCE_OPTION[value], exact: true })
+  await Promise.all([page.waitForEvent('load'), option.click()])
   await expect(page.locator('#geofence')).toHaveValue(value)
+  await expect(option).toHaveClass(/btn-primary/)
+  await expect(page.locator('#geofence_switch .btn-primary')).toHaveCount(1)
   await expect(info(page)).toContainText('entries')
 }
 
@@ -98,9 +103,9 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
     const child = rowOf(page, firstId).locator('xpath=following-sibling::tr[1]')
     await expect(child).toContainText('GOAL PRODUCTION REPORT')
     await expect(child).toContainText('PAYMENT DUE ON')
-    // Esta pantalla del legacy ya es más ancha que un celular (el panel entero se corre de costado): el combo no la
+    // Esta pantalla del legacy ya es más ancha que un celular (el panel entero se corre de costado): el switch no la
     // ensancha, entra en el mismo panel que el buscador y la tabla.
-    const combo = (await page.locator('#geofence').boundingBox())!
+    const combo = (await page.locator('#geofence_switch').boundingBox())!
     const panel = (await page.locator('#panel-1 .panel-content').first().boundingBox())!
     expect(combo.x + combo.width).toBeLessThanOrEqual(panel.x + panel.width)
   } else {
