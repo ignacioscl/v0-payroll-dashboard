@@ -17,10 +17,43 @@ export type FilterPanelChip = { key: string; label: string; onRemove: () => void
  * Panel de filtros plegable de una lista: tarjeta con título, cantidad de activos, chips y «Clear all».
  * Mismo diseño que `InvoiceFilterDeck` y `PunchReportFilterPanel`. Cerrado por defecto, se abre solo
  * cuando entra un filtro activo y recuerda lo que eligió el usuario en la sesión.
+ *
+ * Con `open` / `onOpenChange` la pantalla lo puede abrir desde afuera (WO to be Billed: «Generate Invoice» lo abre y
+ * lleva el foco al campo que falta; cerrado, su contenido no está en la página). Sin ellos, se maneja solo.
  */
-export function FilterPanel({ storageKey, chips, children }: { storageKey: string; chips: FilterPanelChip[]; children: React.ReactNode }) {
+export function FilterPanel({
+  storageKey,
+  chips,
+  children,
+  open: openProp,
+  onOpenChange,
+  onClearAll,
+}: {
+  storageKey: string
+  chips: FilterPanelChip[]
+  children: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /**
+   * «Clear all» en una sola actualización. Hace falta cuando los filtros son un solo objeto: cada `onRemove` lo arma
+   * desde el mismo valor y el último pisaría a los otros (R8 de plans/plan-wo-to-be-billed-v0/CODE-review.md). Sin
+   * esto, llama a cada `onRemove` (sirve con un `setState` por filtro, como Expenses).
+   */
+  onClearAll?: () => void
+}) {
   const { t } = useTranslation()
-  const [open, setOpen] = React.useState(false)
+  const [openState, setOpenState] = React.useState(false)
+  const open = openProp ?? openState
+  // `onOpenChange` por ref: `setOpen` queda estable aunque quien llama pase una función nueva en cada render, así los
+  // efectos de abajo no se vuelven a correr.
+  const onOpenChangeRef = React.useRef(onOpenChange)
+  React.useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  })
+  const setOpen = React.useCallback((next: boolean) => {
+    setOpenState(next)
+    onOpenChangeRef.current?.(next)
+  }, [])
   const [hydrated, setHydrated] = React.useState(false)
   const prevActiveKey = React.useRef('')
   const activeKey = chips.map((c) => c.key).join('|')
@@ -33,13 +66,13 @@ export function FilterPanel({ storageKey, chips, children }: { storageKey: strin
       /* ignore */
     }
     setHydrated(true)
-  }, [storageKey])
+  }, [storageKey, setOpen])
 
   React.useEffect(() => {
     if (!hydrated) return
     if (activeKey && activeKey !== prevActiveKey.current) setOpen(true)
     prevActiveKey.current = activeKey
-  }, [activeKey, hydrated])
+  }, [activeKey, hydrated, setOpen])
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
@@ -94,7 +127,7 @@ export function FilterPanel({ storageKey, chips, children }: { storageKey: strin
             variant="ghost"
             size="sm"
             className="h-7 cursor-pointer gap-1 px-1.5 text-[11px] text-muted-foreground"
-            onClick={() => chips.forEach((chip) => chip.onRemove())}
+            onClick={() => (onClearAll ? onClearAll() : chips.forEach((chip) => chip.onRemove()))}
           >
             <X className="size-3" />
             {t('common.clearAll')}

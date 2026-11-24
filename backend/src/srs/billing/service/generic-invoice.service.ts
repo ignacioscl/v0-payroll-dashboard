@@ -13,7 +13,7 @@ import {
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   SrsPermissionRepository,
 } from '../../auth/srs-permission.repository'
-import { skipDealerRestrictionForRol } from '../../shared/kpi/srs-kpi-dealer-filter'
+import { assertDealerInScope } from '../billing-dealer-scope'
 import {
   CreateGenericInvoiceDto,
   CreateGenericInvoiceResponseDto,
@@ -318,16 +318,8 @@ export class GenericInvoiceService {
     }
   }
 
-  private async assertDealerInScope(ctx: SrsContext, idDealer: number): Promise<void> {
-    const exists = await this.repository.dealerRelExists(idDealer, ctx.idDealerProvider)
-    if (!exists) {
-      throw new ForbiddenException('Forbidden')
-    }
-    if (skipDealerRestrictionForRol(ctx.idRol)) return
-    const allowed = await this.repository.restrictionDealerAllows(ctx.idUsuario, idDealer)
-    if (!allowed) {
-      throw new ForbiddenException('Forbidden')
-    }
+  private assertDealerInScope(ctx: SrsContext, idDealer: number): Promise<void> {
+    return assertDealerInScope(ctx, idDealer, this.repository)
   }
 
   private assertNoDuplicateDescriptions(

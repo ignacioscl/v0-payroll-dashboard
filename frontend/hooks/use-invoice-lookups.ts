@@ -32,15 +32,18 @@ export function useInvoiceServiceLookup(
   departmentIds: number[],
   search: string,
   enabled: boolean,
+  /** WO to be Billed, «Show deleted services». Invoices never sends it. */
+  includeInactive = false,
 ) {
   const idDepartment = departmentIds.length ? departmentIds.join(',') : undefined
   return useQuery({
-    queryKey: ['invoice-svc-lookup', idDealer, idDepartment, search],
+    queryKey: ['invoice-svc-lookup', idDealer, idDepartment, search, includeInactive],
     queryFn: () =>
       fetchInvoiceServices({
         idDealer,
         idDepartment,
         search: search || undefined,
+        includeInactive: includeInactive || undefined,
       }),
     enabled: enabled && idDealer.length > 0,
     staleTime: 60_000,

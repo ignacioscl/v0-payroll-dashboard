@@ -26,6 +26,8 @@ export type LookupOption = {
   sublabel?: string
   thumbnailUuid?: string | null
   logoImg?: string | null
+  /** A deleted option still listed (WO to be Billed, «Show deleted services»): shown in red, like legacy. */
+  inactive?: boolean
 }
 import { useTranslation } from '@/lib/i18n/locale-context'
 import { userAvatarUrl } from '@/lib/face/face-proxy-url'
@@ -346,7 +348,9 @@ export function LookupMultiSelect({
                     <RowCheckbox checked={checked} />
                     {withPhotos ? <LookupPhoto option={opt} name={opt.label} /> : null}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{opt.label}</span>
+                      <span className={cn('block truncate font-medium', opt.inactive && 'text-destructive')}>
+                        {opt.label}
+                      </span>
                       {opt.sublabel ? (
                         <span className="block truncate text-[10px] text-muted-foreground">
                           {opt.sublabel}

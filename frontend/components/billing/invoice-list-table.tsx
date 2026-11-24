@@ -60,6 +60,7 @@ import {
 import { discountExportValue } from '@/lib/billing/invoice-discount'
 import { invoiceRowKey, uniqueStatementIds } from '@/lib/billing/invoice-nro-billed'
 import { isSrsBusyError } from '@/lib/srs-busy-error'
+import { StateBlock } from '@/components/shared/state-block'
 import type { InvoiceListInput, useInvoiceList } from '@/hooks/use-invoice-list'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -213,37 +214,6 @@ function rowServicesText(row: InvoiceRow, t: TranslateFn): string {
   }
 
   return `${serviceName}${noteSuffix}`
-}
-
-/* -------------------------- in-table empty states ------------------------ */
-
-function StateBlock({
-  icon,
-  title,
-  hint,
-  tone = 'muted',
-}: {
-  icon: React.ReactNode
-  title: string
-  hint?: string
-  tone?: 'muted' | 'danger'
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-      <div
-        className={cn(
-          'flex h-12 w-12 items-center justify-center rounded-xl',
-          tone === 'danger' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
-        )}
-      >
-        {icon}
-      </div>
-      <div className="space-y-1">
-        <p className="text-base font-medium text-foreground">{title}</p>
-        {hint ? <p className="max-w-md text-sm text-muted-foreground">{hint}</p> : null}
-      </div>
-    </div>
-  )
 }
 
 /* ------------------------------ detail dialog ---------------------------- */

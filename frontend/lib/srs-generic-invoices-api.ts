@@ -1,3 +1,12 @@
+import {
+  nestFieldErrors,
+  readNestErrorBody,
+  requestNestJson,
+  SrsNestApiError,
+  type NestErrorBody,
+  type NestFieldError,
+} from '@/lib/srs-nest-client'
+
 export type GenericCatalogCategory = 36 | 44
 
 export interface GenericCatalogItem {
@@ -102,22 +111,16 @@ export interface GenericInvoiceDetail {
   items: Array<GenericInvoiceFreeLine | GenericInvoiceTtkLine>
 }
 
-export class GenericInvoiceApiError extends Error {
-  status: number
-  code?: string
-  meta?: Record<string, unknown>
-
+export class GenericInvoiceApiError extends SrsNestApiError {
   constructor(
     message: string,
     status: number,
     code?: string,
     meta?: Record<string, unknown>,
+    validationErrors?: NestFieldError[],
   ) {
-    super(message)
+    super(message, status, { code, meta, validationErrors })
     this.name = 'GenericInvoiceApiError'
-    this.status = status
-    this.code = code
-    this.meta = meta
   }
 }
 
@@ -126,14 +129,6 @@ export function isGenericInvoiceApiError(err: unknown): err is GenericInvoiceApi
 }
 
 const BASE = '/api/srs-kpis/billing'
-
-type NestErrorBody = {
-  message?: string | string[]
-  validationErrors?: Array<{ field?: string; message?: string } | string> | string
-  statusCode?: number
-  code?: string
-  meta?: Record<string, unknown>
-}
 
 function formatValidationErrors(
   validationErrors: NestErrorBody['validationErrors'],
@@ -157,38 +152,20 @@ function formatValidationErrors(
 }
 
 async function parseNestError(res: Response, fallback: string): Promise<GenericInvoiceApiError> {
+  const body = await readNestErrorBody(res)
   let message = fallback
-  let code: string | undefined
-  let meta: Record<string, unknown> | undefined
-  try {
-    const body = (await res.json()) as NestErrorBody
-    code = body.code
-    meta = body.meta
+  if (body) {
     const fromValidation = formatValidationErrors(body.validationErrors)
     if (fromValidation) message = fromValidation
     else if (Array.isArray(body.message)) message = body.message.filter(Boolean).join(', ') || fallback
     else if (typeof body.message === 'string' && body.message.trim()) message = body.message
-  } catch {
-    /* non-JSON body */
   }
-  return new GenericInvoiceApiError(message, res.status, code, meta)
+  return new GenericInvoiceApiError(message, res.status, body?.code, body?.meta, nestFieldErrors(body))
 }
 
-async function requestJson<T>(
-  url: string,
-  init: RequestInit,
-  fallbackErrorMessage: string,
-): Promise<T> {
-  const res = await fetch(url, {
-    cache: 'no-store',
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-  })
-  if (!res.ok) {
-    throw await parseNestError(res, fallbackErrorMessage)
-  }
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+/** El cliente común del Nest (`lib/srs-nest-client.ts`) con el error de Generic. */
+function requestJson<T>(url: string, init: RequestInit, fallbackErrorMessage: string): Promise<T> {
+  return requestNestJson<T>(url, init, fallbackErrorMessage, parseNestError)
 }
 
 export async function fetchGenericInvoiceConfig(): Promise<GenericInvoiceConfig> {

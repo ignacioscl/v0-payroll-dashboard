@@ -105,6 +105,13 @@ interface FilterContextType {
    */
   invoiceIgnorePeriod: boolean
   setInvoiceIgnorePeriod: (value: boolean) => void
+  /**
+   * Aviso de un solo uso para Invoices: «View in Invoices» de WO to be Billed lo prende antes de navegar, y la pantalla
+   * de Invoices, al abrirse con él, arranca mostrando también las invoices de $0 y lo apaga
+   * (plans/plan-wo-to-be-billed-v0, §5).
+   */
+  invoiceShowZeroOnce: boolean
+  setInvoiceShowZeroOnce: (value: boolean) => void
   /** La pantalla lo publica cuando la búsqueda lo fuerza (invoice # o empleado). */
   invoiceIgnorePeriodLocked: boolean
   setInvoiceIgnorePeriodLocked: (value: boolean) => void
@@ -171,6 +178,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [invoiceDateFrom, setInvoiceDateFrom] = useState<Date | undefined>(undefined)
   const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
   const [invoiceDateMode, setInvoiceDateMode] = useState<InvoiceDateMode>('range')
+  const [invoiceShowZeroOnce, setInvoiceShowZeroOnce] = useState(false)
   const [invoiceIgnorePeriod, setInvoiceIgnorePeriod] = useState(false)
   const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
   const [incomeYearMode, setIncomeYearMode] = useState(false)
@@ -328,6 +336,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setInvoiceDateMode,
       invoiceIgnorePeriod,
       setInvoiceIgnorePeriod,
+      invoiceShowZeroOnce,
+      setInvoiceShowZeroOnce,
       invoiceIgnorePeriodLocked,
       setInvoiceIgnorePeriodLocked,
       incomeYearMode,

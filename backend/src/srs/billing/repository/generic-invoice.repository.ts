@@ -18,6 +18,13 @@ import {
   valorLineaTtk,
 } from '../generic-invoice-money'
 import { assertRelWriteAffected } from '../generic-invoice-write-errors'
+import { nextInvoiceNumber } from '../invoice-number'
+import {
+  checkDateFreezeSql,
+  dealerRelExistsSql,
+  restrictionDealerAllowsSql,
+} from '../billing-dealer-scope'
+import { mysqlAffectedRows, mysqlInsertId } from '../../shared/mysql-result'
 
 const CAT_GENERIC_ITEM = 36
 const CAT_HEADER_NOTE = 44
@@ -98,21 +105,6 @@ export type UpdateGenericParams = {
   punchesByEmployee: Map<number, TtkPunchRow[]>
 }
 
-function mysqlInsertId(result: unknown): number {
-  if (result && typeof result === 'object' && 'insertId' in result) {
-    const id = Number((result as { insertId: number }).insertId)
-    if (Number.isFinite(id) && id > 0) return id
-  }
-  throw new Error('INSERT did not return insertId')
-}
-
-function mysqlAffectedRows(result: unknown): number {
-  if (result && typeof result === 'object' && 'affectedRows' in result) {
-    return Number((result as { affectedRows: number }).affectedRows) || 0
-  }
-  return 0
-}
-
 function num(value: unknown): number | null {
   if (value == null || value === '') return null
   const n = Number(value)
@@ -151,38 +143,21 @@ export class GenericInvoiceRepository {
     }
   }
 
-  async dealerRelExists(idDealer: number, idDealerProvider: number): Promise<boolean> {
-    const rows = await this.srs.query(
-      `SELECT 1 AS ok
-       FROM DEALER_REL
-       WHERE id_dealer_customer = ?
-         AND id_dealer_provider = ?
-         AND estado = 1
-       LIMIT 1`,
-      [idDealer, idDealerProvider],
-    )
-    return rows.length > 0
+  dealerRelExists(idDealer: number, idDealerProvider: number): Promise<boolean> {
+    return dealerRelExistsSql(this.srs, idDealer, idDealerProvider)
   }
 
-  async restrictionDealerAllows(idUsuario: number, idDealer: number): Promise<boolean> {
-    const rows = await this.srs.query(
-      `SELECT RESTRICTION_DEALER_V2(?, ?) AS ok`,
-      [idUsuario, idDealer],
-    )
-    return Number(rows[0]?.ok) === 1
+  restrictionDealerAllows(idUsuario: number, idDealer: number): Promise<boolean> {
+    return restrictionDealerAllowsSql(this.srs, idUsuario, idDealer)
   }
 
-  async checkDateFreeze(
+  checkDateFreeze(
     idUsuario: number,
     idDealer: number,
     idDealerProvider: number,
     dateFrom: string,
   ): Promise<number> {
-    const rows = await this.srs.query(
-      `SELECT CHECK_DATE_FREEZE(?, ?, ?, ?) AS res`,
-      [idUsuario, idDealer, idDealerProvider, dateFrom],
-    )
-    return Number(rows[0]?.res)
+    return checkDateFreezeSql(this.srs, idUsuario, idDealer, idDealerProvider, dateFrom)
   }
 
   async upsertCatalogItem(
@@ -369,32 +344,11 @@ export class GenericInvoiceRepository {
       items: PersistLine[]
     },
   ): Promise<CreatedStatement> {
-    const maxRows = await mgr.query(
-      `SELECT COALESCE(MAX(invoice_nro), 0) AS nro
-       FROM INVOICE_STATEMENT
-       WHERE id_dealer = ?
-         AND id_dealer_provider = ?
-       FOR UPDATE`,
-      [params.idDealer, params.idDealerProvider],
+    const { prefix, invoiceNro, fullNro } = await nextInvoiceNumber(
+      mgr,
+      params.idDealer,
+      params.idDealerProvider,
     )
-    const maxNro = Number(maxRows[0]?.nro ?? 0)
-
-    const relRows = await mgr.query(
-      `SELECT ini_nro_inv, prefix_invoice
-       FROM DEALER_REL
-       WHERE id_dealer_customer = ?
-         AND id_dealer_provider = ?
-         AND estado = 1
-       ORDER BY fecha_ini ASC, id ASC
-       LIMIT 1`,
-      [params.idDealer, params.idDealerProvider],
-    )
-    const prefixRaw = relRows[0]?.prefix_invoice
-    const prefix = String(prefixRaw ?? '').toUpperCase()
-    const iniNro = relRows[0]?.ini_nro_inv
-    const invoiceNro =
-      maxNro > 0 ? maxNro + 1 : iniNro == null || iniNro === '' ? 1 : Number(iniNro) || 1
-    const fullNro = `${prefix}${invoiceNro}`
 
     const headerResult = await mgr.query(
       `INSERT INTO INVOICE_STATEMENT (

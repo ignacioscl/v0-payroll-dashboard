@@ -108,6 +108,7 @@ test.describe('sobre el build', () => {
     ['/reports/business-kpis', '/reports/production-vs-goal'],
     ['/expenses', '/expenses/analytics'],
     ['/roles', '/roles/templates'],
+    ['/billing/invoices', '/billing/wo-to-be-billed'],
   ]
 
   for (const [from, to] of PAIRS) {

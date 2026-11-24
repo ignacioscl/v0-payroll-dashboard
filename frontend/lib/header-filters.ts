@@ -17,6 +17,11 @@ export interface HeaderFilters {
   date: HeaderDateFilter
   /** Tope del rango de fechas, en años (Punch Report: 1). */
   maxRangeYears?: number
+  /**
+   * La pantalla siempre tiene un rango (WO to be Billed, §2 fila 2 de plans/plan-wo-to-be-billed-v0): «Clear» del
+   * calendario vuelve al rango por defecto en vez de dejarlo vacío (R11 de su CODE-review.md).
+   */
+  dateRequired?: boolean
 }
 
 const DEFAULT_FILTERS: HeaderFilters = { search: true, district: false, date: 'range' }
@@ -26,6 +31,8 @@ const exactly = (href: string) => (pathname: string) => pathname === href
 
 const ROWS: { matches: (pathname: string) => boolean; filters: HeaderFilters }[] = [
   { matches: under('/billing/invoices'), filters: { search: true, district: true, date: 'invoice' } },
+  // WO to be Billed: el rango general (plans/plan-wo-to-be-billed-v0, T8); sin buscador de empleado ni distritos.
+  { matches: under('/billing/wo-to-be-billed'), filters: { search: false, district: false, date: 'range', dateRequired: true } },
   { matches: under('/roles'), filters: { search: true, district: false, date: null } },
   { matches: under('/expenses'), filters: { search: false, district: false, date: 'range' } },
   { matches: under('/issues'), filters: { search: true, district: false, date: 'range', maxRangeYears: 1 } },

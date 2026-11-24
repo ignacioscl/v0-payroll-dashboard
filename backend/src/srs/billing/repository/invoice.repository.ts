@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../../srs.datasource'
+import { dealerRelExistsSql } from '../billing-dealer-scope'
 import {
   buildDealerRestrictionClause,
   removedDealerOfProviderSql,
@@ -193,6 +194,11 @@ function detailScreenFiltersSql(slice: InvoiceDetailSlice, opts: { wo: boolean }
 @Injectable()
 export class InvoiceRepository {
   constructor(@InjectDataSource(SRS_CONNECTION) private readonly srs: DataSource) {}
+
+  /** `DEALER_REL` activa del par dealer + empresa (la misma consulta que el alcance de Billing). */
+  dealerRelExists(idDealer: number, idDealerProvider: number): Promise<boolean> {
+    return dealerRelExistsSql(this.srs, idDealer, idDealerProvider)
+  }
 
   async listPage(
     f: InvoiceListFilter,
@@ -896,6 +902,8 @@ export class InvoiceRepository {
     dealerIds: number[]
     departmentIds: number[]
     skipDealerRestriction: boolean
+    /** WO to be Billed, «Show deleted services»: also `estado = 0`, marked `inactive`. Invoices never sends it. */
+    includeInactive?: boolean
     search?: string
     limit: number
   }): Promise<InvoiceLookupOptionDto[]> {
@@ -915,12 +923,12 @@ export class InvoiceRepository {
       params.push(f.search)
     }
     const rows = await this.srs.query(
-      `SELECT ins.id, ins.nombre AS label,
+      `SELECT ins.id, ins.nombre AS label, ins.estado AS estado,
               CONCAT(c.razon_social, ' · ', d.nombre) AS sublabel
        FROM INVOICE_SERVICE ins
        INNER JOIN DEPARTMENT d ON d.id = ins.id_department
        INNER JOIN CONTRATISTA c ON c.id = d.id_dealer
-       WHERE ins.estado = 1
+       WHERE ${f.includeInactive ? '1 = 1' : 'ins.estado = 1'}
          AND d.id_dealer_provider = ?
          ${restrict.and}
          ${extra}
@@ -932,6 +940,7 @@ export class InvoiceRepository {
       id: Number(r.id),
       label: String(r.label ?? ''),
       sublabel: r.sublabel ? String(r.sublabel) : undefined,
+      ...(f.includeInactive && Number(r.estado) !== 1 ? { inactive: true } : {}),
     }))
   }
 

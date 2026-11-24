@@ -1,5 +1,6 @@
 import type { SrsMeUser } from './types'
 import {
+  ROL_ACCION_INVOICE_CREATE,
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   ROL_ACCION_REPORT_BUSINESS_KPIS,
   ROL_ACCION_REPORT_INCOME_BY_DEALER,
@@ -99,6 +100,25 @@ export function canAccessBillingInvoices(
   hasPermission: (id: number) => boolean,
 ): boolean {
   return adminOr(user, hasPermission, ROL_ACCION_INVOICES_MODULE_ACCESS)
+}
+
+/**
+ * Billing → WO to be Billed (`/billing/wo-to-be-billed`, plans/plan-wo-to-be-billed-v0 T8): solo usuarios internos
+ * (§3, pregunta 5), y admin o «Invoices > Modulde Access» (15) **y** «Invoices > Create Invoice» (16). El Nest decide
+ * «externo» con la regla completa (`isExternalSession`); acá alcanza con lo que trae `/me`.
+ */
+export function canAccessWoToBeBilled(
+  user: SrsMeUser | null | undefined,
+  hasPermission: (id: number) => boolean,
+): boolean {
+  // D7: la decisión de `/me` (`isExternalSession`); `isCompanyTypeCompany` sale de otra cuenta y, para un Admin
+  // Company, puede decir lo contrario (R2 de plans/plan-wo-to-be-billed-v0/CODE-review.md). Sin el dato (un PHP
+  // anterior), la de siempre.
+  if (!user || (user.isExternalSession ?? user.isCompanyTypeCompany)) return false
+  return (
+    adminOr(user, hasPermission, ROL_ACCION_INVOICES_MODULE_ACCESS) &&
+    adminOr(user, hasPermission, ROL_ACCION_INVOICE_CREATE)
+  )
 }
 
 /** @deprecated Prefer {@link canAccessBusinessKpis}. True only for Admin General (not Admin Company). */

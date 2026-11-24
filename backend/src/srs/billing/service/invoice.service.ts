@@ -1,8 +1,9 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
 import {
   ROL_ACCION_BILLING_DISTRICT,
+  ROL_ACCION_INVOICE_CREATE,
   ROL_ACCION_INVOICES_MODULE_ACCESS,
   SrsPermissionRepository,
 } from '../../auth/srs-permission.repository'
@@ -115,9 +116,21 @@ export class InvoiceService {
     query: InvoiceLookupQueryDto,
   ): Promise<InvoiceLookupResponseDto> {
     await this.assertInvoicesModuleAccess(ctx)
-    const { dealerIds, departmentIds, search, limit } = buildServiceLookupFilter(query)
+    const { dealerIds, departmentIds, includeInactive, search, limit } = buildServiceLookupFilter(query)
     if (dealerIds.length === 0) {
       throw new BadRequestException('Select at least one dealer')
+    }
+    if (includeInactive) {
+      // «Show deleted services» es de WO to be Billed: pide lo mismo que esa pantalla — Create Invoice, sesión interna
+      // y relación activa empresa–dealer, también para los Admin (R4 de plans/plan-wo-to-be-billed-v0/CODE-review.md).
+      // El lookup de Invoices, sin inactivos, sigue como estaba.
+      await this.permissions.assertRolAccion(ctx, ROL_ACCION_INVOICE_CREATE)
+      await this.permissions.assertInternalSession(ctx)
+      for (const idDealer of dealerIds) {
+        if (!(await this.repository.dealerRelExists(idDealer, ctx.idDealerProvider))) {
+          throw new ForbiddenException('Forbidden')
+        }
+      }
     }
     const rows = await this.repository.lookupServices({
       idDealerProvider: ctx.idDealerProvider,
@@ -125,6 +138,7 @@ export class InvoiceService {
       dealerIds,
       departmentIds,
       skipDealerRestriction: skipDealerRestrictionForRol(ctx.idRol),
+      includeInactive,
       search,
       limit: limit + 1,
     })

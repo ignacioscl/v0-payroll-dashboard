@@ -26,6 +26,31 @@ export class LogChangeService extends GlobalBaseService<LogChange, LogChangeQuer
     })
   }
 
+  /**
+   * Una línea en el Log de una invoice (WO to be Billed, plans/plan-wo-to-be-billed-v0 T3). `desc_json` va nulo: el Log
+   * de la invoice en Pro lo lee como la foto de una generic (`invoice-statement-log-dialog.tsx`).
+   */
+  logInvoiceStatement(idInvoiceStatement: number, idAutor: number, descCambio: string) {
+    return this.create({
+      idInvoiceStatement,
+      idAutor,
+      descCambio,
+      descJson: null,
+      origen: LOG_CHANGE_ORIGEN_PRO,
+    })
+  }
+
+  /** Una línea en el Log de una WO (eliminar, RO# / PO#; WO to be Billed T5 y T6), con los textos de legacy. */
+  logWorkOrder(idInvoice: number, idAutor: number, descCambio: string) {
+    return this.create({
+      idInvoice,
+      idAutor,
+      descCambio,
+      descJson: null,
+      origen: LOG_CHANGE_ORIGEN_PRO,
+    })
+  }
+
   listForRule(idExpRepetitive: number, take = 200) {
     return this.repository.listForRule(idExpRepetitive, take)
   }

@@ -145,3 +145,22 @@ test.describe('un permiso por reporte', () => {
     }
   })
 })
+
+/**
+ * Billing › WO to be Billed (plans/plan-wo-to-be-billed-v0, T11): un usuario sin «Invoices > Create Invoice» ve «Access
+ * denied» dentro del marco y no tiene el ítem en el menú. Las rutas de la API (403) están en wo-to-be-billed.spec.ts.
+ */
+test.describe('WO to be Billed sin «Create Invoice»', () => {
+  test.skip(E2E_MISSING_USER_REPORTS, E2E_MISSING_USER_REPORTS_REASON)
+  test.skip(!BUILD, 'Access denied only shows on a build (E2E_BUILD=1): next dev opens every screen')
+
+  test('«Access denied» dentro del marco y sin el ítem del menú', async ({ page }) => {
+    await login(page, E2E_USER_REPORTS, E2E_PASSWORD_REPORTS)
+    await page.goto('/billing/wo-to-be-billed')
+    await expect(page.locator('main').getByText('Access denied')).toBeVisible()
+    expect(new URL(page.url()).pathname).toBe('/billing/wo-to-be-billed')
+    await openMobileMenuIfNeeded(page)
+    await expect(page.getByRole('link', { name: 'WO to be Billed', exact: true })).toHaveCount(0)
+    await noHorizontalScroll(page)
+  })
+})

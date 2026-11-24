@@ -11,7 +11,7 @@
  * - «Invoice #» en Invoices (`SearchInput`): el tipo elegido antes sigue elegido y habilitado.
  */
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickAllDealersAndDatePreset } from './helpers'
+import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickAllDealersAndDatePreset, pickDealerAndRange } from './helpers'
 
 /** La X está dentro de la caja del campo (o de su envoltorio) y contra su borde derecho. */
 async function expectClearInside(field: Locator, clear: Locator) {
@@ -129,6 +129,30 @@ test.describe('La X en todo buscador', () => {
     await expect(ttk).toBeEnabled()
     const pressedAfter = await types.evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-pressed')))
     expect(pressedAfter, 'el tipo elegido antes sigue elegido').toEqual(pressedBefore)
+  })
+
+  test('«WO #» en WO to be Billed: borra ese filtro y deja los demás como estaban', async ({ page }) => {
+    await page.goto('/billing/wo-to-be-billed')
+    // Sin un dealer los filtros están deshabilitados (plans/plan-wo-to-be-billed-v0, T11).
+    await pickDealerAndRange(page, 'Tesla Orange Park Mall Pop-Up', '11/10/2026')
+    const input = page.locator('#wo-filter-wo')
+    if (!(await input.isVisible().catch(() => false))) {
+      await page.locator('main').getByRole('button', { name: /^Filters/ }).click()
+    }
+    await expect(input).toBeEnabled()
+    const approved = page.getByTestId('wo-approved-filter')
+    await approved.getByText('Yes', { exact: true }).click()
+    const zero = page.locator('#wo-filter-include-zero')
+    await zero.click()
+    const before = { approved: await approved.innerHTML(), zero: await zero.getAttribute('aria-checked') }
+
+    await input.fill('352')
+    const clear = input.locator('xpath=..').getByRole('button', { name: 'Clear search' })
+    await expectClearInside(input, clear)
+    await clear.click()
+    await expect(input).toHaveValue('')
+    await expectFocused(input)
+    expect({ approved: await approved.innerHTML(), zero: await zero.getAttribute('aria-checked') }, 'los demás filtros siguen igual').toEqual(before)
   })
 })
 

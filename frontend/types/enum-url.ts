@@ -24,6 +24,8 @@ export const SrsPhpPath = {
   PAYMENT_TYPES_CATALOG: 'php/api/payroll/payment-types-catalog.php',
   INVOICE_NOTE_STATUS: 'php/api/payroll/invoice-note-status.php',
   INVOICE_STATEMENT_PDF: 'php/api/payroll/invoice-statement-pdf.php',
+  /** WO to be Billed: Print WO y el PDF de la invoice individual (plans/plan-wo-to-be-billed-v0, T7). */
+  WO_PDF: 'php/api/payroll/wo-pdf.php',
   INVOICE_GENERAL_STATEMENT_PDF: 'php/api/payroll/invoice-general-statement-pdf.php',
   INVOICE_STATEMENT_LOG: 'php/api/payroll/invoice-statement-log.php',
   INVOICE_STATEMENT_SEND_EMAIL: 'php/api/payroll/invoice-statement-send-email.php',

@@ -51,6 +51,7 @@ import {
   canAccessIncomeByDealer,
   canAccessMonthlyClosing,
   canAccessOpenInvoices,
+  canAccessWoToBeBilled,
   canAccessProductionVsGoal,
   canAccessWindowTintClosing,
   companyHasClosingReports,
@@ -128,6 +129,7 @@ function SidebarInner({
     canAccessMonthlyClosing: canAccessMonthlyClosing(user, hasPermission),
     canAccessWindowTintClosing: canAccessWindowTintClosing(user, hasPermission),
     canAccessOpenInvoices: canAccessOpenInvoices(user, hasPermission),
+    canAccessWoToBeBilled: canAccessWoToBeBilled(user, hasPermission),
     companyModules: {
       companyHasExpenses: Boolean(user?.hasExpenses),
       companyHasClosingReports: companyHasClosingReports(user),

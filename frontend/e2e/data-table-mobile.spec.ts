@@ -9,7 +9,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickAllDealersAndDatePreset } from './helpers'
 
-const PAGES = ['/billing/invoices', '/', '/reports/production-vs-goal', '/roles/templates']
+const PAGES = ['/billing/invoices', '/billing/wo-to-be-billed', '/', '/reports/production-vs-goal', '/roles/templates']
 
 async function tableProblems(page: Page) {
   return page.evaluate(() => {

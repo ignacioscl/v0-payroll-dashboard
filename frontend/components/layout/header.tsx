@@ -40,6 +40,7 @@ export function Header() {
     dealerIdAllowList,
     dateRange,
     setDateRange,
+    resetDateRange,
     invoiceDateFrom,
     invoiceDateTo,
     setInvoiceDateFrom,
@@ -100,6 +101,9 @@ export function Header() {
 
   // Qué filtros van en cada pantalla: una tabla por ruta (lib/header-filters.ts; plans/plan-buenas-practicas-v0, 4.7).
   const filters = getHeaderFilters(pathname)
+  // Rango obligatorio (`dateRequired`, WO to be Billed): «Clear» vuelve al rango por defecto en vez de dejarlo vacío.
+  const onDateRangeChange = (value: DateRange | undefined) =>
+    filters.dateRequired && !value?.from ? resetDateRange() : setDateRange(value)
   // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
   // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
   // derecha. Vive en cada pantalla, junto a lo que gobierna (ErrorStatusToggle).
@@ -179,7 +183,7 @@ export function Header() {
             ) : (
               <DateRangePicker
                 value={dateRange}
-                onChange={setDateRange}
+                onChange={onDateRangeChange}
                 maxRangeYears={filters.maxRangeYears}
               />
             )
@@ -258,7 +262,7 @@ export function Header() {
                 ) : (
                   <DateRangePicker
                     value={dateRange}
-                    onChange={setDateRange}
+                    onChange={onDateRangeChange}
                     maxRangeYears={filters.maxRangeYears}
                   />
                 )}

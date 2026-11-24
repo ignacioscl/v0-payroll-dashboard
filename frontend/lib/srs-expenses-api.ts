@@ -1,3 +1,12 @@
+import {
+  nestErrorMessage,
+  nestFieldErrors,
+  readNestErrorBody,
+  requestNestJson,
+  SrsNestApiError,
+  type NestFieldError,
+} from '@/lib/srs-nest-client'
+
 // Tipos espejo del contrato del Nest (plans/plan-expenses-pro/AVANCE.md): todo bajo
 // /api/srs/expenses, consumido por el proxy /api/srs-kpis/expenses/... Montos como string con dos
 // decimales, fechas YYYY-MM-DD, ids numéricos, paginación `page` base 1.
@@ -315,20 +324,13 @@ export interface AssignPayload {
 
 export const EXPENSES_BASE_URL = '/api/srs-kpis/expenses'
 
-export interface ValidationError {
-  field: string
-  message: string
-}
+export type ValidationError = NestFieldError
 
 /** Error del Nest con el estado HTTP y, en un 400 de validación, el error de cada campo. */
-export class ExpensesApiError extends Error {
-  readonly status: number
-  readonly validationErrors: ValidationError[]
+export class ExpensesApiError extends SrsNestApiError {
   constructor(message: string, status: number, validationErrors: ValidationError[] = []) {
-    super(message)
+    super(message, status, { validationErrors })
     this.name = 'ExpensesApiError'
-    this.status = status
-    this.validationErrors = validationErrors
   }
 }
 
@@ -338,31 +340,13 @@ export function isExpensesApiError(err: unknown): err is ExpensesApiError {
 
 /** Nest `HttpException`: `{ statusCode, message, error }` o `DataError` con `validationErrors`. */
 async function parseNestError(res: Response, fallback: string): Promise<ExpensesApiError> {
-  try {
-    const body = (await res.json()) as {
-      message?: string | string[]
-      validationErrors?: ValidationError[]
-    }
-    const validationErrors = Array.isArray(body.validationErrors) ? body.validationErrors : []
-    let message = fallback
-    if (Array.isArray(body.message)) message = body.message.join(', ') || fallback
-    else if (typeof body.message === 'string' && body.message.trim()) message = body.message
-    else if (validationErrors.length > 0) message = validationErrors[0].message
-    return new ExpensesApiError(message, res.status, validationErrors)
-  } catch {
-    return new ExpensesApiError(fallback, res.status)
-  }
+  const body = await readNestErrorBody(res)
+  return new ExpensesApiError(nestErrorMessage(body, fallback), res.status, nestFieldErrors(body))
 }
 
-async function requestJson<T>(url: string, init: RequestInit, fallback: string): Promise<T> {
-  const res = await fetch(url, {
-    cache: 'no-store',
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-  })
-  if (!res.ok) throw await parseNestError(res, fallback)
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+/** El cliente común del Nest (`lib/srs-nest-client.ts`) con el error de Expenses. */
+function requestJson<T>(url: string, init: RequestInit, fallback: string): Promise<T> {
+  return requestNestJson<T>(url, init, fallback, parseNestError)
 }
 
 function qs(params: Record<string, string | number | boolean | null | undefined>): string {

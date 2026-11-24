@@ -38,6 +38,11 @@ export interface SrsMeUser {
   /** contratista.logo_img — tenant logo shown in the sidebar rail. */
   providerLogoImg?: string | null
   isCompanyTypeCompany: boolean
+  /**
+   * D7 de plans/plan-wo-to-be-billed-v0: «¿la sesión es externa?» con la regla de `/me` (la misma del Nest y de
+   * wo-pdf.php, con el rol firmado del token). Decide el menú y la ruta de WO to be Billed.
+   */
+  isExternalSession?: boolean
   isSystemAdmin: boolean
   /** Check «Expenses» of the company (legacy dealer_edit > Modules & function access). */
   hasExpenses?: boolean
