@@ -12,7 +12,11 @@ import {
   RemovedDealersAvailableQueryDto,
 } from '../dto/billing-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_PRODUCTION_REPORT, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import {
+  ROL_ACCION_REPORT_BUSINESS_KPIS,
+  ROL_ACCION_REPORT_INCOME_BY_DEALER,
+  SrsPermissionRepository,
+} from '../../auth/srs-permission.repository'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { parseFilterDateDone, skipDealerRestrictionForRol } from '../../shared/kpi/srs-kpi-dealer-filter'
@@ -45,32 +49,42 @@ export class BillingKpiService {
     @Inject(SrsPermissionRepository) private readonly permissions: SrsPermissionRepository,
   ) {}
 
+  /**
+   * The Billing tab of Business KPIs (and the cards the Payroll Spend tab borrows): «Report Pro > Business KPIs» (148,
+   * tema 10 of plans/plan-reunion-juan-18-11). Before, these endpoints asked nothing and the screen was the only gate.
+   */
+  private assertBusinessKpis(ctx: SrsContext): Promise<void> {
+    return this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_BUSINESS_KPIS)
+  }
+
   async getBillingKpis(ctx: SrsContext, query: SrsKpiQueryDto): Promise<BillingKpiDto> {
+    await this.assertBusinessKpis(ctx)
     return this.repository.getBillingKpis(buildSrsKpiFilter(ctx, query))
   }
 
   async getUnbilledAging(ctx: SrsContext, query: SrsKpiQueryDto) {
+    await this.assertBusinessKpis(ctx)
     return this.repository.getUnbilledAging(buildSrsKpiFilter(ctx, query))
   }
 
   async getBillingByWeek(ctx: SrsContext, query: SrsKpiQueryDto) {
+    await this.assertBusinessKpis(ctx)
     return this.repository.getBillingByWeek(buildSrsKpiFilter(ctx, query))
   }
 
   async getUnbilledByDealer(ctx: SrsContext, query: SrsKpiQueryDto) {
+    await this.assertBusinessKpis(ctx)
     return this.repository.getUnbilledByDealer(buildSrsKpiFilter(ctx, query))
   }
 
   async getPeriodCollectionKpis(ctx: SrsContext, query: SrsKpiQueryDto) {
+    await this.assertBusinessKpis(ctx)
     return this.repository.getPeriodCollectionKpis(buildSrsKpiFilter(ctx, query))
   }
 
-  /**
-   * Reports > Income by Dealer: Admin General / Admin Company, or «Reports > Production Report»
-   * (the same people that see the Billing tab of Business KPIs).
-   */
+  /** Reports > Income by Dealer: Admin General / Admin Company, or «Report Pro > Income by Dealer» (150). */
   async getIncomeByDealer(ctx: SrsContext, query: SrsKpiQueryDto): Promise<IncomeByDealerDto> {
-    await this.permissions.assertRolAccion(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_INCOME_BY_DEALER)
     const filter = buildSrsKpiFilter(ctx, query)
     const years = await this.repository.getIncomeByDealer(filter, splitRangeByYear(filter.fechaDesde, filter.fechaHasta))
     const grandCents = years.reduce((acc, y) => acc + Math.round(y.total * 100), 0)
@@ -101,7 +115,7 @@ export class BillingKpiService {
 
   /** Permission, session filter and one dealer and one calendar year per request, or 400. */
   private async oneDealerOneYear(ctx: SrsContext, query: SrsKpiQueryDto) {
-    await this.permissions.assertRolAccion(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    await this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_INCOME_BY_DEALER)
     const filter = buildSrsKpiFilter(ctx, query)
     const range = splitRangeByYear(filter.fechaDesde, filter.fechaHasta)
     // Every dealer of a big company in one request takes minutes and holds the shared pool (§8): one and one.

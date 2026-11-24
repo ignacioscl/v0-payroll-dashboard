@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -56,7 +56,7 @@ import { useFilters } from '@/lib/filter-context'
 import { formatDateParam } from '@/lib/ttk/map-header-filters'
 import { useTranslation, type TranslateFn } from '@/lib/i18n/locale-context'
 import { useSrsMe } from '@/lib/auth/use-srs-me'
-import { canAccessProductionReport, canViewPayrollSpend } from '@/lib/auth/payroll-access'
+import { canAccessBusinessKpis } from '@/lib/auth/payroll-access'
 import { formatUsCalendarDate } from '@/lib/format-us-datetime'
 import { cn } from '@/lib/utils'
 import {
@@ -178,11 +178,10 @@ const KPI_CARD_GRID = 'grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,20r
 export default function BusinessKpisPage() {
   const { t } = useTranslation()
   const { dateRange, selectedDealers, filtersHydrated } = useFilters()
-  const { user, loading: meLoading, hasPermission } = useSrsMe()
-  // Cada tab pide lo suyo (decisión C): Production Report (47) las de producción y facturación,
-  // Time Tracking > Payroll (93) la de payroll.
-  const canSeeProductionTabs = canAccessProductionReport(user, hasPermission)
-  const canSeePayroll = canViewPayrollSpend(user, hasPermission)
+  const { user, hasPermission } = useSrsMe()
+  // Todas las tabs piden «Report Pro > Business KPIs» (148), el mismo permiso que abre la pantalla (tema 10 de
+  // plans/plan-reunion-juan-18-11; antes Production Report 47 y Time Tracking > Payroll 93).
+  const canSeeTabs = canAccessBusinessKpis(user, hasPermission)
   const [filterDateDone, setFilterDateDone] = useState(false)
   const [includeZero, setIncludeZero] = useState(false)
   // Las tres tarjetas del resumen muestran solo título y total; un click en cualquiera abre el detalle de las tres.
@@ -193,10 +192,6 @@ export default function BusinessKpisPage() {
   // WO Production está oculta (sin botón): la pestaña y sus consultas siguen en el
   // código para volver a mostrarla, pero no se pide nada mientras no se elija.
   const [activeTab, setActiveTab] = useState('billing')
-  // Quien solo tiene «Time Tracking > Payroll» entra directo en Payroll Spend.
-  useEffect(() => {
-    if (!meLoading && !canSeeProductionTabs && canSeePayroll) setActiveTab('payroll')
-  }, [meLoading, canSeeProductionTabs, canSeePayroll])
 
   const idDealer = useMemo(() => selectedDealers.join(','), [selectedDealers])
 
@@ -318,12 +313,12 @@ export default function BusinessKpisPage() {
   const pay = useQuery({
     queryKey: ['srs-kpi', 'payroll', payrollKpiParams],
     queryFn: () => fetchPayrollKpi(payrollKpiParams!),
-    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeePayroll,
+    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeeTabs,
   })
   const spend = useQuery({
     queryKey: ['srs-kpi', 'payroll-spend', payrollKpiParams],
     queryFn: () => fetchPayrollSpend(payrollKpiParams!),
-    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeePayroll,
+    enabled: Boolean(payrollKpiParams) && activeTab === 'payroll' && canSeeTabs,
   })
 
   const p = prod.data
@@ -437,7 +432,7 @@ export default function BusinessKpisPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-5">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border/60 bg-muted/25 p-1.5 shadow-sm sm:grid-cols-4">
-          {canSeeProductionTabs ? (
+          {canSeeTabs ? (
             <>
               <KpiTabTrigger
                 value="billing"
@@ -457,15 +452,13 @@ export default function BusinessKpisPage() {
                 label={t('mockKpis.tabPunch')}
                 accent="violet"
               />
+              <KpiTabTrigger
+                value="payroll"
+                icon={HandCoins}
+                label={t('mockKpis.tabPayroll')}
+                accent="rose"
+              />
             </>
-          ) : null}
-          {canSeePayroll ? (
-            <KpiTabTrigger
-              value="payroll"
-              icon={HandCoins}
-              label={t('mockKpis.tabPayroll')}
-              accent="rose"
-            />
           ) : null}
         </TabsList>
 

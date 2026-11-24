@@ -4,7 +4,7 @@ import { PayrollKpiRepository } from '../repository/payroll-kpi.repository'
 import { PayrollSnapshotKpiRepository, SnapshotTypeAgg } from '../repository/payroll-snapshot-kpi.repository'
 import { PayrollKpiDto, PayrollPieceworkDiffRowDto, PayrollSpendDto, PayrollSpendTypeRowDto } from '../dto/payroll-kpi.dto'
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_TTK_PAYROLL, SrsPermissionRepository } from '../../auth/srs-permission.repository'
+import { ROL_ACCION_REPORT_BUSINESS_KPIS, SrsPermissionRepository } from '../../auth/srs-permission.repository'
 import { SrsKpiQueryDto } from '../../shared/kpi/srs-kpi-query.dto'
 import { buildSrsKpiFilter } from '../../shared/kpi/srs-kpi-filter'
 import { PAYMENT_TYPE_IDS, PIECEWORK_TYPE_IDS, proratedDayId } from '../snapshot/payment-type-ids'
@@ -105,9 +105,14 @@ export class PayrollKpiService {
     @Inject(SrsPermissionRepository) private readonly permissions: SrsPermissionRepository,
   ) {}
 
-  /** Montos de payroll: solo con «Time Tracking > Payroll» (o Admin General / Company). Decisión C. */
+  /**
+   * Montos de payroll de la tab Payroll Spend: «Report Pro > Business KPIs» (148; o Admin General / Company). Antes era
+   * «Time Tracking > Payroll» (93, decisión C de plans/plan-payroll-spend); desde el tema 10 de
+   * plans/plan-reunion-juan-18-11 todas las tabs de Business KPIs piden su permiso. Estos endpoints los llama solo
+   * Business KPIs (`/srs/kpis/payroll`).
+   */
   private assertPayrollAccess(ctx: SrsContext): Promise<void> {
-    return this.permissions.assertRolAccion(ctx, ROL_ACCION_TTK_PAYROLL)
+    return this.permissions.assertRolAccion(ctx, ROL_ACCION_REPORT_BUSINESS_KPIS)
   }
 
   async getPayrollKpis(ctx: SrsContext, query: SrsKpiQueryDto): Promise<PayrollKpiDto> {

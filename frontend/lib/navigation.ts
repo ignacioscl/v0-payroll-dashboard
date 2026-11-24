@@ -26,9 +26,11 @@ import {
   canAccessBusinessKpis,
   canAccessMonthlyClosing,
   canAccessOpenInvoices,
+  canAccessIncomeByDealer,
   canAccessPayrollDashboard,
-  canAccessProductionReport,
+  canAccessProductionVsGoal,
   canAccessWindowTintClosing,
+  companyHasClosingReports,
 } from '@/lib/auth/payroll-access'
 import { canAccessDailyPunch, canAccessSystemConfig } from '@/lib/auth/ttk-permissions'
 import { canManageRoleTemplates, canViewRoles } from '@/lib/auth/roles-permissions'
@@ -97,23 +99,39 @@ export const PROD_NAV_HREFS = ['/', '/issues'] as const
 /** Externals (isCompanyTypeCompany): Punch Report only — no Dashboard home. */
 export const PROD_NAV_HREFS_EXTERNAL = ['/issues'] as const
 
-/** Business KPIs: Admin General/Company, Production Report (47) or Time Tracking > Payroll (93). */
+/*
+ * Reports: one permission per report (migration 033, tema 10 of plans/plan-reunion-juan-18-11); Admin General/Company
+ * always pass the permission. Monthly Closing, Window Tint Closing and Open Invoices also need the company's «Closing
+ * reports» module (D17), admins included.
+ */
+
+/** Business KPIs: «Report Pro > Business KPIs» (148). */
 export const PROD_KPI_HREFS = ['/reports/business-kpis'] as const
 
-/** Production vs Goal and Income by Dealer: Admin General/Company or Production Report (47) only. */
-export const PROD_GOAL_HREFS = ['/reports/production-vs-goal', '/reports/income-by-dealer'] as const
+/** Production vs Goal: «Report Pro > Production vs Goal by Dealer» (149). */
+export const PROD_GOAL_HREFS = ['/reports/production-vs-goal'] as const
 
-/** Monthly Closing: Admin General/Company or «Reports > Closing» (140). */
+/** Income by Dealer: «Report Pro > Income by Dealer» (150). */
+export const INCOME_BY_DEALER_HREFS = ['/reports/income-by-dealer'] as const
+
+/** Monthly Closing: «Report Pro > Monthly Closing» (151) + «Closing reports». */
 export const MONTHLY_CLOSING_NAV_HREFS = ['/reports/monthly-closing'] as const
 
-/** Window Tint Closing: same permission as Monthly Closing plus the company's «Window Tint Closing» check. */
+/** Window Tint Closing: «Report Pro > Window Tint Closing» (152) + «Closing reports». */
 export const TINT_CLOSING_NAV_HREFS = ['/reports/window-tint-closing'] as const
 
 /**
- * Open Invoices and its snapshots (`/reports/open-invoices/snapshots/[id]`, by prefix): Admin General/Company or
- * «Reports > Due On Billing» (123).
+ * Open Invoices and its snapshots (`/reports/open-invoices/snapshots/[id]`, by prefix): «Report Pro > Open Invoices»
+ * (153) + «Closing reports».
  */
 export const PROD_OPEN_INVOICES_HREFS = ['/reports/open-invoices'] as const
+
+/** The three reports of the company module «Closing reports» (column `has_window_tint_closing`, D17). */
+export const CLOSING_REPORTS_HREFS = [
+  ...MONTHLY_CLOSING_NAV_HREFS,
+  ...TINT_CLOSING_NAV_HREFS,
+  ...PROD_OPEN_INVOICES_HREFS,
+] as const
 
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
@@ -157,7 +175,8 @@ function matchesHrefs(pathname: string, hrefs: readonly string[]) {
 /** Company module checks (legacy dealer_edit > Modules & function access), from `/me`. */
 export interface CompanyModules {
   companyHasExpenses: boolean
-  companyHasWindowTintClosing: boolean
+  /** «Closing reports»: Monthly Closing, Window Tint Closing and Open Invoices (me.hasWindowTintClosing). */
+  companyHasClosingReports: boolean
 }
 
 /**
@@ -166,7 +185,7 @@ export interface CompanyModules {
  */
 export function isCompanyModuleBlockedPath(pathname: string, modules: CompanyModules) {
   if (!modules.companyHasExpenses && matchesHrefs(pathname, EXPENSES_NAV_HREFS)) return true
-  if (!modules.companyHasWindowTintClosing && matchesHrefs(pathname, TINT_CLOSING_NAV_HREFS)) return true
+  if (!modules.companyHasClosingReports && matchesHrefs(pathname, CLOSING_REPORTS_HREFS)) return true
   return false
 }
 
@@ -183,6 +202,7 @@ export function isProdAllowedPath(
   canAccessMonthlyClosing = false,
   canAccessWindowTintClosing = false,
   canAccessOpenInvoices = false,
+  canAccessIncomeByDealer = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
@@ -190,6 +210,7 @@ export function isProdAllowedPath(
   if (canAccessExpenses && matches(EXPENSES_NAV_HREFS)) return true
   if (canAccessProdKpis && matches(PROD_KPI_HREFS)) return true
   if (canAccessProductionGoal && matches(PROD_GOAL_HREFS)) return true
+  if (canAccessIncomeByDealer && matches(INCOME_BY_DEALER_HREFS)) return true
   if (canAccessMonthlyClosing && matches(MONTHLY_CLOSING_NAV_HREFS)) return true
   if (canAccessWindowTintClosing && matches(TINT_CLOSING_NAV_HREFS)) return true
   if (canAccessOpenInvoices && matches(PROD_OPEN_INVOICES_HREFS)) return true
@@ -218,8 +239,10 @@ export function getVisibleNavigation(options: {
   isDev: boolean
   canAccessTtk: boolean
   canAccessProdKpis?: boolean
-  /** Production vs Goal (Production Report, 47). */
+  /** Production vs Goal (149 or admin). */
   canAccessProductionGoal?: boolean
+  /** Income by Dealer (150 or admin). */
+  canAccessIncomeByDealer?: boolean
   canAccessBillingInvoices?: boolean
   canViewRoles?: boolean
   /** Shows the Role Templates child item, independent of `canViewRoles`. */
@@ -228,11 +251,11 @@ export function getVisibleNavigation(options: {
   isCompanyTypeCompany?: boolean
   /** Expenses group (company check, then 111 or admin). */
   canAccessExpenses?: boolean
-  /** Monthly Closing (140 or admin). */
+  /** Monthly Closing (151 or admin, + «Closing reports»). */
   canAccessMonthlyClosing?: boolean
-  /** Window Tint Closing (Monthly Closing + company check). */
+  /** Window Tint Closing (152 or admin, + «Closing reports»). */
   canAccessWindowTintClosing?: boolean
-  /** Open Invoices (123 or admin): a role with only this permission sees the menu too. */
+  /** Open Invoices (153 or admin, + «Closing reports»): a role with only this permission sees the menu too. */
   canAccessOpenInvoices?: boolean
   /** Company checks: in dev the menu shows everything except the modules the company doesn't have. */
   companyModules: CompanyModules
@@ -243,6 +266,7 @@ export function getVisibleNavigation(options: {
     canAccessTtk,
     canAccessProdKpis = false,
     canAccessProductionGoal = false,
+    canAccessIncomeByDealer = false,
     canAccessBillingInvoices = false,
     canViewRoles = false,
     canManageRoleTemplates = false,
@@ -274,6 +298,8 @@ export function getVisibleNavigation(options: {
   if (
     !canAccessTtk &&
     !canAccessProdKpis &&
+    !canAccessProductionGoal &&
+    !canAccessIncomeByDealer &&
     !canAccessBillingInvoices &&
     !canViewRoles &&
     !canManageRoleTemplates &&
@@ -290,6 +316,7 @@ export function getVisibleNavigation(options: {
     ...(canAccessTtk ? ttkHrefs : []),
     ...(canAccessProdKpis ? PROD_KPI_HREFS : []),
     ...(canAccessProductionGoal ? PROD_GOAL_HREFS : []),
+    ...(canAccessIncomeByDealer ? INCOME_BY_DEALER_HREFS : []),
     ...(canAccessMonthlyClosing ? MONTHLY_CLOSING_NAV_HREFS : []),
     ...(canAccessWindowTintClosing ? TINT_CLOSING_NAV_HREFS : []),
     ...(canAccessOpenInvoices ? PROD_OPEN_INVOICES_HREFS : []),
@@ -340,7 +367,8 @@ export function getScreenAccess(
   const access = {
     ttk: canAccessDailyPunch(hasPermission, user?.isSystemAdmin),
     prodKpis: canAccessBusinessKpis(user, hasPermission),
-    productionGoal: canAccessProductionReport(user, hasPermission),
+    productionGoal: canAccessProductionVsGoal(user, hasPermission),
+    incomeByDealer: canAccessIncomeByDealer(user, hasPermission),
     billing: canAccessBillingInvoices(user, hasPermission),
     roles: canViewRoles(hasPermission, user?.isSystemAdmin),
     roleTemplates: canManageRoleTemplates(hasPermission, user?.isSystemAdmin),
@@ -348,7 +376,7 @@ export function getScreenAccess(
     expenses: canAccessExpenses(hasPermission, user?.isSystemAdmin, user?.hasExpenses),
     closing: canAccessMonthlyClosing(user, hasPermission),
     tintClosing: canAccessWindowTintClosing(user, hasPermission),
-    // Entra en hasAnyModule: un rol con solo 123 no ve «sin módulos» (review 1 de plans/plan-reporte-javier).
+    // Entra en hasAnyModule: un rol con solo Open Invoices no ve «sin módulos» (review 1 de plans/plan-reporte-javier).
     openInvoices: canAccessOpenInvoices(user, hasPermission),
   }
   const hasAnyModule = Object.values(access).some(Boolean)
@@ -359,7 +387,7 @@ export function getScreenAccess(
 
   const modules = {
     companyHasExpenses: Boolean(user?.hasExpenses),
-    companyHasWindowTintClosing: Boolean(user?.hasWindowTintClosing),
+    companyHasClosingReports: companyHasClosingReports(user),
   }
   if (isCompanyModuleBlockedPath(pathname, modules)) return 'no-module'
   if (options.isDev) return 'allowed'
@@ -377,6 +405,7 @@ export function getScreenAccess(
     access.closing,
     access.tintClosing,
     access.openInvoices,
+    access.incomeByDealer,
   )
     ? 'allowed'
     : 'denied'

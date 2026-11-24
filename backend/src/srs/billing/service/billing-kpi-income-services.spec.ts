@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common'
 
 import { SrsContext } from '../../auth/srs-auth-context.service'
-import { ROL_ACCION_PRODUCTION_REPORT } from '../../auth/srs-permission.repository'
+import { ROL_ACCION_REPORT_INCOME_BY_DEALER } from '../../auth/srs-permission.repository'
 import { BillingKpiService } from './billing-kpi.service'
 
 /** GET /srs/kpis/billing/income-by-dealer/services (plans/plan-income-by-dealer-por-servicio T2 y T6). */
@@ -17,10 +17,10 @@ describe('BillingKpiService.getIncomeServicesByDealer', () => {
     return { service: new BillingKpiService(repository as any, permissions as any), repository, permissions }
   }
 
-  it('sin el permiso de Production Report no consulta la base', async () => {
+  it('sin el permiso de Income by Dealer (150) no consulta la base', async () => {
     const { service, repository, permissions } = build(false)
     await expect(service.getIncomeServicesByDealer(ctx, query)).rejects.toBeInstanceOf(ForbiddenException)
-    expect(permissions.assertRolAccion).toHaveBeenCalledWith(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    expect(permissions.assertRolAccion).toHaveBeenCalledWith(ctx, ROL_ACCION_REPORT_INCOME_BY_DEALER)
     expect(repository.getIncomeServicesByDealer).not.toHaveBeenCalled()
   })
 
@@ -63,10 +63,10 @@ describe('BillingKpiService.getIncomeServiceVehicles', () => {
     return { service: new BillingKpiService(repository as any, permissions as any), repository, permissions }
   }
 
-  it('sin el permiso de Production Report no consulta la base', async () => {
+  it('sin el permiso de Income by Dealer (150) no consulta la base', async () => {
     const { service, repository, permissions } = build(false)
     await expect(service.getIncomeServiceVehicles(ctx, query)).rejects.toBeInstanceOf(ForbiddenException)
-    expect(permissions.assertRolAccion).toHaveBeenCalledWith(ctx, ROL_ACCION_PRODUCTION_REPORT)
+    expect(permissions.assertRolAccion).toHaveBeenCalledWith(ctx, ROL_ACCION_REPORT_INCOME_BY_DEALER)
     expect(repository.getIncomeServiceVehicles).not.toHaveBeenCalled()
   })
 

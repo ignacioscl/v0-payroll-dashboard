@@ -33,12 +33,37 @@ export const E2E_MISSING_USER_NO_MODULES = !E2E_USER_NO_MODULES || !E2E_PASSWORD
 export const E2E_MISSING_USER_NO_MODULES_REASON =
   'Set E2E_USER_NO_MODULES and E2E_PASSWORD_NO_MODULES in frontend/.env.e2e.local'
 
+/**
+ * Un usuario de Auto Wax que NO es admin, con un rol propio (sin template) que solo tiene Punch Report, para
+ * report-permissions.spec.ts (tema 10 de plans/plan-reunion-juan-18-11). En la base local se crea y se borra con
+ * `plans/plan-reunion-juan-18-11/usuario-e2e-reportes.php`.
+ */
+export const E2E_USER_REPORTS = env.E2E_USER_REPORTS ?? ''
+export const E2E_PASSWORD_REPORTS = env.E2E_PASSWORD_REPORTS ?? ''
+export const E2E_MISSING_USER_REPORTS = !E2E_USER_REPORTS || !E2E_PASSWORD_REPORTS
+export const E2E_MISSING_USER_REPORTS_REASON =
+  'Set E2E_USER_REPORTS and E2E_PASSWORD_REPORTS in frontend/.env.e2e.local (plans/plan-reunion-juan-18-11/usuario-e2e-reportes.php)'
+
 export async function login(page: Page, user = E2E_USER, password = E2E_PASSWORD) {
   await page.goto('/login')
   await page.locator('#email').fill(user)
   await page.locator('#password').fill(password)
   await page.getByRole('button', { name: /sign in|log in|ingresar|entrar/i }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+}
+
+/** El legacy (PHP) de la copia local, para los e2e que recorren una pantalla de `public/modulos`. */
+export const LEGACY = env.E2E_LEGACY_URL ?? 'http://srs.com'
+
+/** Login del legacy con el mismo usuario de `.env.e2e.local`. Si ya hay sesión, `login.php` no muestra el formulario. */
+export async function legacyLogin(page: Page, user = E2E_USER, password = E2E_PASSWORD) {
+  await page.goto(`${LEGACY}/login.php`)
+  if (await page.locator('#username').isVisible().catch(() => false)) {
+    await page.locator('#username').fill(user)
+    await page.locator('#password').fill(password)
+    await page.getByRole('button', { name: 'Secure Sign In' }).click()
+    await expect(page).not.toHaveURL(/login\.php/, { timeout: 30_000 })
+  }
 }
 
 export async function noHorizontalScroll(page: Page) {

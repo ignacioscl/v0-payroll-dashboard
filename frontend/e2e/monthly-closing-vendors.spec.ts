@@ -16,6 +16,8 @@ import {
   E2E_PASSWORD,
   E2E_USER,
   filterExpensesByCompany,
+  LEGACY,
+  legacyLogin,
   money,
   monthlyClosingDealer,
   noHorizontalScroll,
@@ -23,21 +25,10 @@ import {
 
 test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
 
-const LEGACY = process.env.E2E_LEGACY_URL ?? 'http://srs.com'
 const VENDOR_ID = '6985' // Francol Services LLC (empresa 79), solo Piecework
 const VENDOR_NAME = 'Francol Services LLC'
 const DEALER = 'AutoNation Land Rover Ft Lauderdale'
 const MONTH = 'October 2026'
-
-async function legacyLogin(page: Page) {
-  await page.goto(`${LEGACY}/login.php`)
-  if (await page.locator('#username').isVisible().catch(() => false)) {
-    await page.locator('#username').fill(E2E_USER)
-    await page.locator('#password').fill(E2E_PASSWORD)
-    await page.getByRole('button', { name: 'Secure Sign In' }).click()
-    await expect(page).not.toHaveURL(/login\.php/, { timeout: 30_000 })
-  }
-}
 
 /** La ficha se abre con un POST de `id_usuario`, como lo hace la lista de Users. */
 async function openUserForm(page: Page, id: string) {
@@ -65,8 +56,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** «10/01/2026 – 10/15/2026, 10/16/2026 – 10/30/2026» (línea del cierre) → «Work orders from Oct 1 to Oct 30, 2026». */
 function rangeText(periods: string): string {
   const dates = periods.match(/\d{2}\/\d{2}\/\d{4}/g) ?? []
-  const [m1, d1] = dates[0].split('/').map(Number)
-  const [m2, d2, y2] = dates[dates.length - 1].split('/').map(Number)
+  const first = dates[0]
+  const last = dates[dates.length - 1]
+  if (!first || !last) throw new Error(`«Pay periods» sin fechas: ${periods}`)
+  const [m1, d1] = first.split('/').map(Number)
+  const [m2, d2, y2] = last.split('/').map(Number)
   return `Work orders from ${MONTHS[m1 - 1]} ${d1} to ${MONTHS[m2 - 1]} ${d2}, ${y2}`
 }
 
