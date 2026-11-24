@@ -1,6 +1,6 @@
 /**
- * Dealer List del legacy (plans/plan-dealers-lista-goal-due-geofence, T5): las columnas «Goal Production report» y
- * «Payment Due On» y el filtro «Geofense TTK» (switch de tres opciones), el camino entero, en 1280×800 y 375×812 (los dos proyectos de
+ * Dealer List del legacy (plans/plan-dealers-lista-goal-due-geofence, T5): las columnas «Goal Production report»,
+ * «Payment Due On» y «Geofense radio» y el filtro «Geofense TTK» (switch de tres opciones), el camino entero, en 1280×800 y 375×812 (los dos proyectos de
  * playwright.config.ts, Chromium de Playwright). Contra la copia local de PROD: legacy en http://srs.com, con el
  * usuario de `.env.e2e.local` (Admin Company de Auto Wax, que es un detailer).
  *
@@ -103,6 +103,7 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
     const child = rowOf(page, firstId).locator('xpath=following-sibling::tr[1]')
     await expect(child).toContainText('GOAL PRODUCTION REPORT')
     await expect(child).toContainText('PAYMENT DUE ON')
+    await expect(child).toContainText('GEOFENSE RADIO')
     // Esta pantalla del legacy ya es más ancha que un celular (el panel entero se corre de costado): el switch no la
     // ensancha, entra en el mismo panel que el buscador y la tabla.
     const combo = (await page.locator('#geofence_switch').boundingBox())!
@@ -111,6 +112,7 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
   } else {
     await expect(page.locator('#dt-basic-example thead th', { hasText: 'GOAL PRODUCTION REPORT' })).toBeVisible()
     await expect(page.locator('#dt-basic-example thead th', { hasText: 'PAYMENT DUE ON' })).toBeVisible()
+    await expect(page.locator('#dt-basic-example thead th', { hasText: 'GEOFENSE RADIO' })).toBeVisible()
   }
 
   // En celular el menú de la fila queda dentro de la fila desplegable y sus ítems no responden (ya pasa sin este
@@ -155,11 +157,13 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
   expect(withGeo + withoutGeo).toBe(all)
   expect(withoutGeo).toBeGreaterThan(0)
 
+  let dealerWithoutGeofence = ''
   if (!mobile) {
-    // 5. Con «Without geofense»: el primer dealer no tiene ninguno; se le carga uno y, al cerrar el modal, la lista se
+  // 5. Con «Without geofense»: el primer dealer no tiene ninguno; se le carga uno y, al cerrar el modal, la lista se
     //    recarga con el mismo filtro y ese dealer ya no está.
     const geoRelId = await page.locator('#dt-basic-example tbody input[name="check_dealer"]').first().inputValue()
     const dealerName = (await page.locator(`#txt_name_${geoRelId}`).first().innerText()).trim()
+    dealerWithoutGeofence = dealerName
     const geoModal = page.locator('#modal-geofense')
     await openRowMenuItem(page, geoRelId, 'Geofense TTK')
     await expect(geoModal).toBeVisible()
@@ -182,6 +186,8 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
       await setGeofenceFilter(page, '1')
       await searchFor(page, dealerName)
       await expect(page.locator(`#check_dealer_${geoRelId}`)).toHaveCount(1)
+      // Geofense radio muestra el radio del geofence recién cargado.
+      await expect(rowOf(page, geoRelId).locator('[id^="txt_geo_radio_"]')).toHaveText(TEST_GEOFENCE.radio)
       await openRowMenuItem(page, geoRelId, 'Geofense TTK')
       await expect(geoModal).toBeVisible()
       await expect(geoModal.locator('#geofence_container input[disabled]')).toHaveCount(3)
@@ -196,10 +202,51 @@ test('Dealer List: goal, due on y filtro de geofence, el camino entero', async (
 
   // 6. El CSV: el encabezado es la primera línea y trae las dos columnas; el archivo termina con el bloque de contexto.
   await setGeofenceFilter(page, '')
+
+  // 5b. Con «All», cargar o borrar un geofence no recarga la página: cambia la celda Geofense radio de ese dealer.
+  if (!mobile) {
+    const geoModal = page.locator('#modal-geofense')
+    // El mismo dealer del paso 5, que no tiene geofence.
+    await searchFor(page, dealerWithoutGeofence)
+    await expect(info(page)).toContainText('filtered from')
+    const relId = await page.locator('#dt-basic-example tbody input[name="check_dealer"]').first().inputValue()
+    const radioCell = rowOf(page, relId).locator('[id^="txt_geo_radio_"]')
+    const before = (await radioCell.innerText()).trim()
+    await page.evaluate(() => ((window as unknown as { __noReload: boolean }).__noReload = true))
+    await openRowMenuItem(page, relId, 'Geofense TTK')
+    await expect(geoModal).toBeVisible()
+    await expect(geoModal.locator('#geofence_container #lat')).toBeVisible()
+    const existing = await geoModal.locator('#geofence_container input[disabled]').count()
+    await geoModal.locator('#lat').fill(TEST_GEOFENCE.lat)
+    await geoModal.locator('#lng').fill(TEST_GEOFENCE.lng)
+    await geoModal.locator('#radio').fill(before === TEST_GEOFENCE.radio ? '275' : TEST_GEOFENCE.radio)
+    await geoModal.getByRole('button', { name: 'Add' }).click()
+    await expect(geoModal.locator('#geofence_container input[disabled]')).toHaveCount(existing + 3)
+    try {
+      await geoModal.getByRole('button', { name: 'Close' }).last().click()
+      await expect(geoModal).toBeHidden()
+      // El dealer ya tenía geofence principal: el primero sigue siendo ese, y la celda no cambia. Si no tenía, pasa a
+      // mostrar el que se cargó.
+      await expect(radioCell).toHaveText(existing > 0 ? before : TEST_GEOFENCE.radio)
+      expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true)
+    } finally {
+      // Se deja como estaba: se borra el que se agregó (el último de la lista del modal).
+      await openRowMenuItem(page, relId, 'Geofense TTK')
+      await expect(geoModal).toBeVisible()
+      await expect(geoModal.locator('#geofence_container input[disabled]')).toHaveCount(existing + 3)
+      await geoModal.locator('[attach-type="deleteGeofense"]').last().click()
+      await expect(geoModal.locator('#geofence_container input[disabled]')).toHaveCount(existing)
+      await geoModal.getByRole('button', { name: 'Close' }).last().click()
+      await expect(geoModal).toBeHidden()
+    }
+    await expect(radioCell).toHaveText(before)
+    await searchFor(page, '')
+  }
+
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.buttons-csv').first().click()])
   const csv = readFileSync((await download.path())!, 'utf8')
   const header = csv.split('\n')[0]
-  expect(header).toContain('"GOAL PRODUCTION REPORT","PAYMENT DUE ON"')
+  expect(header).toContain('"GOAL PRODUCTION REPORT","PAYMENT DUE ON","GEOFENSE RADIO"')
   expect(csv).toContain('\n\n"Field","Value"\n')
   const block = csv.slice(csv.lastIndexOf('"Field","Value"'))
   expect(block).toMatch(/"Screen","Dealer List/)
