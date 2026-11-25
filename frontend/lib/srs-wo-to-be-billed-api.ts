@@ -26,6 +26,7 @@ export type WoApprovedFilter = '' | '0' | '1'
 /** Lo que la pantalla filtra. `null` / vacío = sin ese filtro. */
 export interface WoToBeBilledFilterInput {
   idDealer: number
+  /** `''` las dos: sin rango, toda la historia del dealer (como legacy al entrar). */
   dateFrom: string
   dateTo: string
   status: number[]
@@ -50,10 +51,12 @@ export interface WoToBeBilledFilterInput {
 export function buildWoFilterRequest(input: WoToBeBilledFilterInput): Record<string, string | number | boolean | number[]> {
   const out: Record<string, string | number | boolean | number[]> = {
     idDealer: input.idDealer,
-    dateFrom: input.dateFrom,
-    dateTo: input.dateTo,
-    includeZero: input.includeZero,
   }
+  if (input.dateFrom && input.dateTo) {
+    out.dateFrom = input.dateFrom
+    out.dateTo = input.dateTo
+  }
+  out.includeZero = input.includeZero
   if (input.status.length) out.status = [...input.status]
   if (input.departments.length) out.departments = [...input.departments]
   if (input.services.length) out.services = [...input.services]

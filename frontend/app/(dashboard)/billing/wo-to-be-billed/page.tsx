@@ -72,16 +72,27 @@ const NO_IDS: number[] = []
 export default function WoToBeBilledPage() {
   const { t } = useTranslation()
   const {
-    dateRange,
-    selectedDealers,
+    woDateRange,
+    woDealers,
+    woHeaderReady,
+    enterWoToBeBilled,
+    leaveWoToBeBilled,
+    requestWoDate,
     filtersHydrated,
+    setSelectedDealers,
     setInvoiceDateMode,
     setInvoiceDateFrom,
     setInvoiceDateTo,
     setInvoiceShowZeroOnce,
   } = useFilters()
-  // La pantalla trabaja con un dealer: con ninguno o con varios, «Select one dealer…» (fila 1 de §2).
-  const idDealer = selectedDealers.length === 1 ? Number(selectedDealers[0]) : null
+  // El dealer y el rango son de esta pantalla (combo de a uno, vacíos al entrar como legacy, memoria de 30 minutos:
+  // `lib/filters/wo-header-memory.ts`). Se arman al entrar, con el dealer de la otra pantalla ya leído de la cookie.
+  React.useEffect(() => {
+    if (!filtersHydrated) return
+    enterWoToBeBilled()
+    return () => leaveWoToBeBilled()
+  }, [filtersHydrated, enterWoToBeBilled, leaveWoToBeBilled])
+  const idDealer = woDealers.length === 1 ? Number(woDealers[0]) : null
   const oneDealer = idDealer != null && Number.isFinite(idDealer) && idDealer > 0 ? idDealer : null
 
   // Los filtros recuerdan para qué dealer se eligieron: departments y servicios son de ese dealer, y con otro dealer en
@@ -118,9 +129,11 @@ export default function WoToBeBilledPage() {
   )
   const texts = useDebouncedValue(typed, SEARCH_DEBOUNCE_MS)
 
-  const dateFrom = formatDateParam(dateRange?.from)
-  const dateTo = formatDateParam(dateRange?.to ?? dateRange?.from)
-  const gateReady = filtersHydrated && oneDealer != null && Boolean(dateFrom && dateTo)
+  // Sin rango, la lista trae toda la historia del dealer; para generar hay que elegir uno.
+  const dateFrom = formatDateParam(woDateRange?.from)
+  const dateTo = formatDateParam(woDateRange?.to ?? woDateRange?.from)
+  const hasRange = Boolean(dateFrom && dateTo)
+  const gateReady = woHeaderReady && oneDealer != null
 
   const request = React.useMemo(
     () =>
@@ -175,8 +188,9 @@ export default function WoToBeBilledPage() {
   const woIds = React.useMemo(() => selectedRows.map((r) => r.id), [selectedRows])
 
   /**
-   * «View in Invoices» (§5): antes de navegar deja Invoices con el período de las invoices creadas (no el rango del
-   * filtro: una individual lleva la fecha de alta de la WO) y el aviso para que muestre también las de $0.
+   * «View in Invoices» (§5): antes de navegar deja Invoices con el dealer de esta pantalla, el período de las invoices
+   * creadas (no el rango del filtro: una individual lleva la fecha de alta de la WO) y el aviso para que muestre también
+   * las de $0.
    */
   const viewInInvoices = React.useCallback(
     (invoices: CreatedWoInvoice[]) => {
@@ -187,6 +201,8 @@ export default function WoToBeBilledPage() {
           href="/billing/invoices"
           className="font-semibold text-primary underline-offset-2 hover:underline"
           onNavigate={() => {
+            // Invoices filtra por el dealer de las otras pantallas: se lleva el de esta, si no la invoice no se ve.
+            if (oneDealer != null) setSelectedDealers([String(oneDealer)])
             if (froms.length) {
               setInvoiceDateMode('range')
               setInvoiceDateFrom(ymdToDate(froms[0]))
@@ -199,13 +215,19 @@ export default function WoToBeBilledPage() {
         </AppLink>
       )
     },
-    [setInvoiceDateMode, setInvoiceDateFrom, setInvoiceDateTo, setInvoiceShowZeroOnce, t],
+    [oneDealer, setSelectedDealers, setInvoiceDateMode, setInvoiceDateFrom, setInvoiceDateTo, setInvoiceShowZeroOnce, t],
   )
 
   const rowActions = useWoRowActions({ config: config.data, includeZero: filters.includeZero, viewInInvoices })
 
   /** Generate Invoice: si falta el Invoice Type (o un servicio con «Selected Services»), abre el panel y lleva el foco. */
   const onGenerateClick = () => {
+    // Sin rango no se factura (legacy pide las fechas): se avisa y se abre el calendario del encabezado.
+    if (!hasRange) {
+      toast.error(t('woToBeBilled.generate.missingDate'))
+      requestWoDate()
+      return
+    }
     if (filters.invoiceType == null) {
       setFieldErrors({ invoiceType: t('woToBeBilled.generate.missingType') })
       setFilterOpen(true)
@@ -338,7 +360,7 @@ export default function WoToBeBilledPage() {
       <WoToBeBilledTable
         query={list}
         gateReady={gateReady}
-        hasOneDealer={!filtersHydrated || oneDealer != null}
+        hasOneDealer={!woHeaderReady || oneDealer != null}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         summary={gateReady ? summary.data : undefined}

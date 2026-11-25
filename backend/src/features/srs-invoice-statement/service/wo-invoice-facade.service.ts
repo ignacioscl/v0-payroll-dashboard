@@ -17,6 +17,7 @@ import { nextInvoiceNumber } from 'src/srs/billing/invoice-number'
 import { WoToBeBilledRepository } from 'src/srs/billing/repository/wo-to-be-billed.repository'
 import {
   MSG_NOTHING_TO_INVOICE,
+  MSG_SELECT_DATE_RANGE,
   ResolvedWoFilter,
   WoToBeBilledService,
 } from 'src/srs/billing/service/wo-to-be-billed.service'
@@ -79,12 +80,15 @@ export class WoInvoiceFacadeService {
   @Transactional()
   async generateTx(ctx: SrsContext, resolved: ResolvedWoFilter): Promise<GenerateWoInvoicesResponseDto> {
     const f = resolved.filter
+    // `resolveFilter` con `forGenerate` ya exige el rango; acá se vuelve a mirar para no facturar sin fechas.
+    if (f.dateFrom == null || f.dateTo == null) throw new BadRequestException(MSG_SELECT_DATE_RANGE)
+    const range = { dateFrom: f.dateFrom, dateTo: f.dateTo }
     // 5. El candado, primera sentencia.
     if (!(await lockDealerForBilling(this.db, f.idDealer, f.idDealerProvider))) {
       throw new ForbiddenException('Forbidden')
     }
     // 5 bis. Lock Date con el candado tomado: 0 corta; 1 y 2 pasan (`api.billing.php:74`).
-    if ((await checkDateFreezeSql(this.db, ctx.idUsuario, f.idDealer, f.idDealerProvider, f.dateFrom)) === 0) {
+    if ((await checkDateFreezeSql(this.db, ctx.idUsuario, f.idDealer, f.idDealerProvider, range.dateFrom)) === 0) {
       throw new BadRequestException(MSG_BILLING_BLOCKED)
     }
     // 6 y 7. Las líneas pendientes, por la misma conexión, y el plan.
@@ -98,7 +102,7 @@ export class WoInvoiceFacadeService {
     // 8. Cada invoice: número, cabecera, servicios elegidos, líneas y log.
     const invoices: CreatedWoInvoiceDto[] = []
     for (const planned of plan.invoices) {
-      invoices.push(await this.insertBatchInvoice(ctx, resolved, planned))
+      invoices.push(await this.insertBatchInvoice(ctx, resolved, planned, range))
     }
     return { invoices, workOrders: plan.workOrders }
   }
@@ -107,6 +111,7 @@ export class WoInvoiceFacadeService {
     ctx: SrsContext,
     resolved: ResolvedWoFilter,
     planned: PlannedInvoice,
+    range: { dateFrom: string; dateTo: string },
   ): Promise<CreatedWoInvoiceDto> {
     const f = resolved.filter
     const isSelected = planned.statementType === INVOICE_TYPE_SELECTED_SERVICES
@@ -121,8 +126,8 @@ export class WoInvoiceFacadeService {
       invoiceNro: number.invoiceNro,
       fullNro: number.fullNro,
       statementType: planned.statementType,
-      fechaDesde: f.dateFrom,
-      fechaHasta: f.dateTo,
+      fechaDesde: range.dateFrom,
+      fechaHasta: range.dateTo,
       invoiceServiceSelRel: isSelected ? resolved.serviceNames.join(', ') : null,
       po: null,
     })
@@ -130,7 +135,7 @@ export class WoInvoiceFacadeService {
     await this.invRels.insertWoLines(id, planned.lines)
     const workOrders = new Set(planned.lines.map((l) => l.idInvoice)).size
     await this.logs.logInvoiceStatement(id, ctx.idUsuario, msgLogBatch(workOrders))
-    return { id, fullNro: number.fullNro, dateFrom: f.dateFrom, dateTo: f.dateTo }
+    return { id, fullNro: number.fullNro, dateFrom: range.dateFrom, dateTo: range.dateTo }
   }
 
   // ------------------------------------------------------------------ individual

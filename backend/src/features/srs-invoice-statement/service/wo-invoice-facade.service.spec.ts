@@ -146,6 +146,15 @@ describe('WoInvoiceFacadeService.generateTx', () => {
     expect(t.statements.insertWoStatement).not.toHaveBeenCalled()
   })
 
+  it('sin rango: «Select a date range to generate invoices», antes del candado y sin escribir', async () => {
+    const t = build()
+    await expect(t.facade.generateTx(ctx, resolved({ dateFrom: null, dateTo: null }))).rejects.toThrow(
+      'Select a date range to generate invoices',
+    )
+    expect(t.calls).toEqual([])
+    expect(t.statements.insertWoStatement).not.toHaveBeenCalled()
+  })
+
   it('plan vacío: «There is nothing to invoice with these filters» y no escribe (D10)', async () => {
     const t = build({ lines: [] })
     await expect(t.facade.generateTx(ctx, resolved())).rejects.toThrow('There is nothing to invoice with these filters')

@@ -24,9 +24,12 @@ import {
   E2E_USER_REPORTS,
   login,
   noHorizontalScroll,
+  dealersCombo,
   filtersScope,
   openMobileMenuIfNeeded,
+  pickDateRange,
   pickDealerAndRange,
+  pickOneDealer,
 } from './helpers'
 import { exec, ids, localDbMissing, query, scalar, sqlText } from './local-db'
 
@@ -499,7 +502,7 @@ test('celular y compu: sin scroll horizontal, la tabla sin columnas fijas en cel
   expect(mutations).toBe(0)
 })
 
-test('filtros: «Clear all» limpia todo de una vez, otro dealer arranca sin departments y «Clear» del calendario vuelve al rango por defecto (R8, R9, R11)', async ({
+test('filtros: «Clear all» limpia todo de una vez, otro dealer arranca sin departments y «Clear» del calendario deja toda la historia (R8, R9)', async ({
   page,
 }) => {
   await login(page)
@@ -534,16 +537,116 @@ test('filtros: «Clear all» limpia todo de una vez, otro dealer arranca sin dep
   await expect(page.locator('main').getByText(/^work orders$|No work orders to be billed/).first()).toBeVisible({ timeout: 60_000 })
   await expect(page.locator('main').getByText('Select one dealer to see its work orders')).toHaveCount(0)
 
-  // R11: «Clear» del calendario vuelve al rango por defecto: la lista sigue consultando.
+  // «Clear» del calendario deja la pantalla sin rango: toda la historia del dealer (como legacy al entrar).
   const { scope, apply } = await filtersScope(page)
+  requests.length = 0
   await scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4}/ }).first().click()
   await page.locator('[data-slot="popover-content"]').last().getByRole('button', { name: 'Clear', exact: true }).click()
   await apply()
-  // En celular la hoja se cerró con Apply: se vuelve a abrir para leer el rango.
-  const after = await filtersScope(page)
-  await expect(after.scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}/ }).first()).toBeVisible()
-  await after.apply()
+  await expect.poll(() => requests.length, { timeout: 30_000 }).toBeGreaterThan(0)
+  expect(requests.every((u) => !new URL(u).searchParams.has('dateFrom')), requests.join('\n')).toBe(true)
   await expect(page.locator('main').getByText(/^work orders$|No work orders to be billed|records/).first()).toBeVisible()
+})
+
+/** Lo que recuerda la pantalla (`lib/filters/wo-header-memory.ts`) y el dealer de las otras pantallas, borrados. */
+async function freshHeader(page: Page) {
+  await page.context().clearCookies({ name: 'payroll_selected_dealers' })
+  await page.evaluate(() => window.localStorage.removeItem('srs.woToBeBilled.header'))
+}
+
+test('encabezado: al entrar sin dealer ni fecha; el combo es de a uno; sin fecha trae toda la historia y «Generate Invoice» pide la fecha; vuelve con lo elegido y a los 30 minutos limpio', async ({
+  page,
+}) => {
+  await login(page)
+  await freshHeader(page)
+  await page.goto(ROUTE)
+  await expect(page.locator('main').getByText('Select one dealer to see its work orders')).toBeVisible({ timeout: 60_000 })
+  let header = await filtersScope(page)
+  await expect(dealersCombo(header.scope)).toHaveText('Dealers')
+  await expect(header.scope.getByRole('button', { name: 'Select dates' }).first()).toBeVisible()
+
+  // De a uno: sin «All Dealers» ni casillas; elegir cierra y deja solo ese.
+  await dealersCombo(header.scope).click()
+  const popover = page.locator('[data-slot="popover-content"]')
+  await expect(popover.locator('[cmdk-input]')).toBeVisible()
+  await expect(popover.getByText('All Dealers', { exact: true })).toHaveCount(0)
+  await expect(popover.locator('[role="checkbox"]')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await header.apply()
+
+  // Solo el dealer: la lista sale sin fechas y con las WO de antes del rango de las otras pruebas.
+  const requests: string[] = []
+  page.on('request', (r) => {
+    if (r.url().includes(`${API}/wo-to-be-billed?`)) requests.push(r.url())
+  })
+  await pickOneDealer(page, TESLA)
+  await expect.poll(() => requests.length, { timeout: 30_000 }).toBeGreaterThan(0)
+  expect(new URL(requests[requests.length - 1]).searchParams.has('dateFrom')).toBe(false)
+  await expect(page.locator('main tbody tr').first()).toBeVisible({ timeout: 60_000 })
+
+  // «Generate Invoice» sin fecha: el aviso y el calendario abierto; no sale ningún pedido de generar.
+  const generates: string[] = []
+  page.on('request', (r) => {
+    if (r.url().includes('/wo-to-be-billed/generate') || r.url().includes('/wo-to-be-billed/preview')) generates.push(r.url())
+  })
+  await page.getByRole('button', { name: 'Generate Invoice', exact: true }).click()
+  await expect(page.getByText('Select a date range to generate invoices')).toBeVisible()
+  const calendarApply = page.locator('[data-slot="popover-content"]').last().getByRole('button', { name: 'Apply', exact: true })
+  await expect(calendarApply).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(calendarApply).toHaveCount(0)
+  expect(generates).toEqual([])
+
+  // Con dealer y rango, se va a otra pantalla y se vuelve: siguen los dos. En celular la hoja de filtros quedó abierta
+  // (el aviso lleva al calendario): la fecha se elige ahí.
+  const sheet = page.getByRole('dialog', { name: 'Filters' })
+  header = (await sheet.isVisible())
+    ? {
+        scope: sheet,
+        apply: async () => {
+          await sheet.getByRole('button', { name: 'Apply', exact: true }).click()
+          await expect(sheet).toBeHidden()
+        },
+      }
+    : await filtersScope(page)
+  await pickDateRange(page, header.scope, DAY)
+  await header.apply()
+  await page.goto('/billing/invoices')
+  await expect(page.locator('main h1')).toBeVisible({ timeout: 60_000 })
+  await page.goto(ROUTE)
+  header = await filtersScope(page)
+  await expect(dealersCombo(header.scope)).toContainText(TESLA)
+  await expect(header.scope.getByRole('button', { name: `${DAY} – ${DAY}` }).first()).toBeVisible()
+  await header.apply()
+
+  // 30 minutos o más desde la última vez: limpio.
+  await page.goto('/billing/invoices')
+  await expect(page.locator('main h1')).toBeVisible({ timeout: 60_000 })
+  await page.evaluate(() => {
+    const key = 'srs.woToBeBilled.header'
+    const m = JSON.parse(window.localStorage.getItem(key) ?? '{}')
+    window.localStorage.setItem(key, JSON.stringify({ ...m, at: Date.now() - 31 * 60 * 1000 }))
+  })
+  await page.goto(ROUTE)
+  header = await filtersScope(page)
+  await expect(dealersCombo(header.scope)).toHaveText('Dealers')
+  await expect(header.scope.getByRole('button', { name: 'Select dates' }).first()).toBeVisible()
+  await header.apply()
+})
+
+test('encabezado: si la otra pantalla tiene un solo dealer, entra con ese (le gana a lo recordado)', async ({ page }) => {
+  await login(page)
+  await freshHeader(page)
+  await page.goto(ROUTE)
+  await pickDealerAndRange(page, TESLA, DAY)
+  await page.goto('/billing/invoices')
+  await pickOneDealer(page, KIA)
+  await page.goto(ROUTE)
+  const header = await filtersScope(page)
+  await expect(dealersCombo(header.scope)).toContainText(KIA)
+  // El rango recordado sigue (hace menos de 30 minutos).
+  await expect(header.scope.getByRole('button', { name: `${DAY} – ${DAY}` }).first()).toBeVisible()
+  await header.apply()
 })
 
 test('doble clic en «Generate Invoices» con la respuesta demorada manda un solo pedido', async ({ page }) => {

@@ -85,13 +85,21 @@ export class WoToBeBilledFilterDto {
   @Min(1)
   idDealer!: number
 
-  @ApiProperty({ example: '2026-10-01' })
+  /**
+   * Las dos fechas o ninguna. Sin fechas la lista trae toda la historia del dealer, como legacy al entrar; para generar
+   * (y para la cuenta previa) son obligatorias (service, `resolveFilter`).
+   */
+  @ApiPropertyOptional({ example: '2026-10-01' })
+  @IsOptional()
+  @Transform(trimmedOrUndefined)
   @IsCalendarDate()
-  dateFrom!: string
+  dateFrom?: string
 
-  @ApiProperty({ example: '2026-11-12' })
+  @ApiPropertyOptional({ example: '2026-11-12' })
+  @IsOptional()
+  @Transform(trimmedOrUndefined)
   @IsCalendarDate()
-  dateTo!: string
+  dateTo?: string
 
   @ApiPropertyOptional({ description: 'Status (workflow): 15, 5, 6, 7, 16', example: '15,5' })
   @IsOptional()

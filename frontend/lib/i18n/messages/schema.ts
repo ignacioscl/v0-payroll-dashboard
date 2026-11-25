@@ -355,6 +355,7 @@ export interface Messages {
     generate: {
       button: string
       missingType: string
+      missingDate: string
       missingService: string
       title: string
       text: string

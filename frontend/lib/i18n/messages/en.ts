@@ -368,6 +368,7 @@ export const en: Messages = {
     generate: {
       button: 'Generate Invoice',
       missingType: 'Select an Invoice Type',
+      missingDate: 'Select a date range to generate invoices',
       missingService: 'Select at least one service',
       title: 'Generate Invoice',
       text: '{n} work orders will be included in {m} invoices',

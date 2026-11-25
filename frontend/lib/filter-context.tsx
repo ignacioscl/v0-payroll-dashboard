@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker'
 import {
   readSelectedDealersCookie,
@@ -16,6 +16,7 @@ import { useSrsMe } from '@/lib/auth/use-srs-me'
 import { canViewFakeGps } from '@/lib/auth/ttk-permissions'
 import { getDefaultDateRange, isTodayOnlyDateRange } from '@/lib/filters/date-range-presets'
 import type { InvoiceDateMode } from '@/lib/filters/date-range-open-ends'
+import { fromYmd, readWoHeaderMemory, toYmd, woHeaderOnEntry, writeWoHeaderMemory } from '@/lib/filters/wo-header-memory'
 import {
   TODAY_LIVE_STATUS_ALL,
   type TodayLiveStatusFilter,
@@ -112,6 +113,24 @@ interface FilterContextType {
    */
   invoiceShowZeroOnce: boolean
   setInvoiceShowZeroOnce: (value: boolean) => void
+  /**
+   * WO to be Billed: su propio dealer (de a uno) y su rango, aparte de los del resto de las pantallas, con la memoria de
+   * 30 minutos (`lib/filters/wo-header-memory.ts`). `woHeaderReady` es falso hasta que la pantalla entra
+   * (`enterWoToBeBilled`), así no sale un pedido con lo de una visita vieja.
+   */
+  woDealers: string[]
+  setWoDealers: (value: string[]) => void
+  woDateRange: DateRange | undefined
+  setWoDateRange: (value: DateRange | undefined) => void
+  woHeaderReady: boolean
+  enterWoToBeBilled: () => void
+  leaveWoToBeBilled: () => void
+  /**
+   * «Generate Invoice» sin rango: sube el número y el encabezado abre el calendario (en celular, la hoja de filtros con el
+   * calendario), para llevar a quien factura al campo que falta.
+   */
+  woDateRequest: number
+  requestWoDate: () => void
   /** La pantalla lo publica cuando la búsqueda lo fuerza (invoice # o empleado). */
   invoiceIgnorePeriodLocked: boolean
   setInvoiceIgnorePeriodLocked: (value: boolean) => void
@@ -179,6 +198,54 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [invoiceDateTo, setInvoiceDateTo] = useState<Date | undefined>(undefined)
   const [invoiceDateMode, setInvoiceDateMode] = useState<InvoiceDateMode>('range')
   const [invoiceShowZeroOnce, setInvoiceShowZeroOnce] = useState(false)
+  // El dealer de las otras pantallas, para WO to be Billed al entrar (sin rehacer `enterWoToBeBilled`).
+  const selectedDealersRef = useRef<string[]>([])
+  useEffect(() => {
+    selectedDealersRef.current = selectedDealers
+  }, [selectedDealers])
+
+  const [woDealers, setWoDealersState] = useState<string[]>([])
+  const [woDateRange, setWoDateRangeState] = useState<DateRange | undefined>(undefined)
+  const [woHeaderReady, setWoHeaderReady] = useState(false)
+  const [woDateRequest, setWoDateRequest] = useState(0)
+  const requestWoDate = useCallback(() => setWoDateRequest((n) => n + 1), [])
+  // Lo último elegido, para guardarlo con la hora sin depender del render.
+  const woHeaderRef = useRef<{ dealer: string | null; from: string | null; to: string | null }>({ dealer: null, from: null, to: null })
+  const saveWoHeader = useCallback((next: { dealer: string | null; from: string | null; to: string | null }) => {
+    woHeaderRef.current = next
+    writeWoHeaderMemory(typeof window !== 'undefined' ? window.localStorage : undefined, next, Date.now())
+  }, [])
+  const setWoDealers = useCallback(
+    (value: string[]) => {
+      const one = value.length ? [value[value.length - 1]] : []
+      setWoDealersState(one)
+      saveWoHeader({ ...woHeaderRef.current, dealer: one[0] ?? null })
+    },
+    [saveWoHeader],
+  )
+  const setWoDateRange = useCallback(
+    (value: DateRange | undefined) => {
+      // Un solo día elegido = desde y hasta ese día.
+      const range = value?.from ? { from: value.from, to: value.to ?? value.from } : undefined
+      setWoDateRangeState(range)
+      saveWoHeader({ ...woHeaderRef.current, from: toYmd(range?.from), to: toYmd(range?.to) })
+    },
+    [saveWoHeader],
+  )
+  const enterWoToBeBilled = useCallback(() => {
+    const storage = typeof window !== 'undefined' ? window.localStorage : undefined
+    const next = woHeaderOnEntry(selectedDealersRef.current, readWoHeaderMemory(storage), Date.now())
+    setWoDealersState(next.dealer ? [next.dealer] : [])
+    const from = fromYmd(next.from)
+    setWoDateRangeState(from ? { from, to: fromYmd(next.to) ?? from } : undefined)
+    saveWoHeader(next)
+    setWoHeaderReady(true)
+  }, [saveWoHeader])
+  const leaveWoToBeBilled = useCallback(() => {
+    // La «última vez» es cuando se deja la pantalla.
+    saveWoHeader(woHeaderRef.current)
+    setWoHeaderReady(false)
+  }, [saveWoHeader])
   const [invoiceIgnorePeriod, setInvoiceIgnorePeriod] = useState(false)
   const [invoiceIgnorePeriodLocked, setInvoiceIgnorePeriodLocked] = useState(false)
   const [incomeYearMode, setIncomeYearMode] = useState(false)
@@ -338,6 +405,15 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setInvoiceIgnorePeriod,
       invoiceShowZeroOnce,
       setInvoiceShowZeroOnce,
+      woDealers,
+      setWoDealers,
+      woDateRange,
+      setWoDateRange,
+      woHeaderReady,
+      enterWoToBeBilled,
+      leaveWoToBeBilled,
+      woDateRequest,
+      requestWoDate,
       invoiceIgnorePeriodLocked,
       setInvoiceIgnorePeriodLocked,
       incomeYearMode,

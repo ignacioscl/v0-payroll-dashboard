@@ -19,8 +19,9 @@ import {
 export type WoToBeBilledFilter = {
   idDealerProvider: number
   idDealer: number
-  dateFrom: string
-  dateTo: string
+  /** `null` las dos: sin rango, toda la historia (solo en la lista y el total). */
+  dateFrom: string | null
+  dateTo: string | null
   status: number[]
   departments: number[]
   services: number[]
@@ -104,13 +105,15 @@ export function buildWoToBeBilledWhere(f: WoToBeBilledFilter): SqlPart {
 
   if (isCompletedOnly(f)) {
     add(' AND i.id_workflow = ?', WORKFLOW_COMPLETED)
-    add(' AND i.date_last_chg_workflow BETWEEN ? AND ?', f.dateFrom, f.dateTo)
+    if (f.dateFrom && f.dateTo) add(' AND i.date_last_chg_workflow BETWEEN ? AND ?', f.dateFrom, f.dateTo)
   } else {
     if (f.status.length) add(` AND i.id_workflow IN (${sqlMarks(f.status)})`, ...f.status)
-    add(' AND i.fecha_alta >= ?', f.dateFrom)
-    // `fecha_alta` es DATETIME: intervalo semiabierto (regla mysql-date-ranges). Legacy usa `<=` y se lleva una WO de
-    // las 00:00 del día siguiente (R1 de CODE-review.md); acá no.
-    add(' AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)', f.dateTo)
+    if (f.dateFrom && f.dateTo) {
+      add(' AND i.fecha_alta >= ?', f.dateFrom)
+      // `fecha_alta` es DATETIME: intervalo semiabierto (regla mysql-date-ranges). Legacy usa `<=` y se lleva una WO
+      // de las 00:00 del día siguiente (R1 de CODE-review.md); acá no.
+      add(' AND i.fecha_alta < DATE_ADD(?, INTERVAL 1 DAY)', f.dateTo)
+    }
   }
 
   if (f.includeZero) {

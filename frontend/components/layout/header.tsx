@@ -19,7 +19,7 @@ import { useSidebar } from '@/lib/sidebar-context'
 import { cn } from '@/lib/utils'
 import { NotificationsPopover } from './notifications-popover'
 import { HeaderActionsSlot } from './header-actions'
-import { getHeaderFilters } from '@/lib/header-filters'
+import { getHeaderFilters, WO_DATE_TRIGGER } from '@/lib/header-filters'
 import {
   Sheet,
   SheetContent,
@@ -40,7 +40,11 @@ export function Header() {
     dealerIdAllowList,
     dateRange,
     setDateRange,
-    resetDateRange,
+    woDealers,
+    setWoDealers,
+    woDateRange,
+    setWoDateRange,
+    woDateRequest,
     invoiceDateFrom,
     invoiceDateTo,
     setInvoiceDateFrom,
@@ -101,18 +105,56 @@ export function Header() {
 
   // Qué filtros van en cada pantalla: una tabla por ruta (lib/header-filters.ts; plans/plan-buenas-practicas-v0, 4.7).
   const filters = getHeaderFilters(pathname)
-  // Rango obligatorio (`dateRequired`, WO to be Billed): «Clear» vuelve al rango por defecto en vez de dejarlo vacío.
-  const onDateRangeChange = (value: DateRange | undefined) =>
-    filters.dateRequired && !value?.from ? resetDateRange() : setDateRange(value)
+  // WO to be Billed: su propio dealer (de a uno) y su rango (lib/header-filters.ts, `woToBeBilled`).
+  const woHeader = filters.dealer === 'woToBeBilled'
+  const dealerValue = woHeader ? woDealers : selectedDealers
+  const onDealerChange = woHeader ? setWoDealers : setSelectedDealers
+  // «Generate Invoice» sin rango (WO to be Billed): se abre el calendario. En celular está en la hoja de filtros: se
+  // abre la hoja y, cuando el calendario ya se dibujó, se abre él.
+  const handledWoDateRequest = useRef(woDateRequest)
+  useEffect(() => {
+    if (woDateRequest === handledWoDateRequest.current) return
+    handledWoDateRequest.current = woDateRequest
+    if (!woHeader) return
+    const visibleTrigger = () =>
+      [...document.querySelectorAll<HTMLButtonElement>(`[data-date-trigger="${WO_DATE_TRIGGER}"]`)].find(
+        (el) => el.offsetParent !== null,
+      )
+    const open = (el: HTMLButtonElement) => {
+      el.scrollIntoView({ block: 'nearest' })
+      el.focus()
+      el.click()
+    }
+    const now = visibleTrigger()
+    if (now) {
+      open(now)
+      return
+    }
+    setFiltersOpen(true)
+    let tries = 0
+    const timer = window.setInterval(() => {
+      const el = visibleTrigger()
+      if (el || ++tries > 40) {
+        window.clearInterval(timer)
+        if (el) open(el)
+      }
+    }, 50)
+    return () => window.clearInterval(timer)
+  }, [woDateRequest, woHeader])
+
   // El eje pendiente/corregido NO vive acá: a ~1000px esta fila ya tiene cinco
   // controles de ancho fijo y el quinto se desbordaba sobre el botón de la
   // derecha. Vive en cada pantalla, junto a lo que gobierna (ErrorStatusToggle).
 
   // Count active filters for mobile badge
   const activeFilterCount =
-    (selectedDealers.length > 0 ? 1 : 0) +
+    (dealerValue.length > 0 ? 1 : 0) +
     (filters.date
-      ? filters.date === 'invoice'
+      ? filters.date === 'woToBeBilled'
+        ? woDateRange?.from
+          ? 1
+          : 0
+        : filters.date === 'invoice'
         ? invoiceIgnorePeriod || invoiceIgnorePeriodLocked || invoiceRange?.from
           ? 1
           : 0
@@ -165,8 +207,9 @@ export function Header() {
 
           <DealerMultiSelect
             dealers={dealerOptions}
-            value={selectedDealers}
-            onChange={setSelectedDealers}
+            value={dealerValue}
+            onChange={onDealerChange}
+            single={woHeader}
             loading={dealersLoading}
             className="w-[200px] shrink-0"
           />
@@ -180,10 +223,12 @@ export function Header() {
               <MonthFilter className="shrink-0" />
             ) : filters.date === 'sunday' ? (
               <SundayFilter className="shrink-0" withLabel />
+            ) : filters.date === 'woToBeBilled' ? (
+              <DateRangePicker value={woDateRange} onChange={setWoDateRange} triggerMarker={WO_DATE_TRIGGER} />
             ) : (
               <DateRangePicker
                 value={dateRange}
-                onChange={onDateRangeChange}
+                onChange={setDateRange}
                 maxRangeYears={filters.maxRangeYears}
               />
             )
@@ -234,8 +279,9 @@ export function Header() {
               <span className="text-sm font-medium text-muted-foreground">{t('dealer.labelPlural')}</span>
               <DealerMultiSelect
                 dealers={dealerOptions}
-                value={selectedDealers}
-                onChange={setSelectedDealers}
+                value={dealerValue}
+                onChange={onDealerChange}
+                single={woHeader}
                 loading={dealersLoading}
                 className="w-full"
               />
@@ -259,10 +305,12 @@ export function Header() {
                   <MonthFilter className="w-full" />
                 ) : filters.date === 'sunday' ? (
                   <SundayFilter className="w-full" />
+                ) : filters.date === 'woToBeBilled' ? (
+                  <DateRangePicker value={woDateRange} onChange={setWoDateRange} triggerMarker={WO_DATE_TRIGGER} />
                 ) : (
                   <DateRangePicker
                     value={dateRange}
-                    onChange={onDateRangeChange}
+                    onChange={setDateRange}
                     maxRangeYears={filters.maxRangeYears}
                   />
                 )}

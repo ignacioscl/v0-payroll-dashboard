@@ -145,10 +145,24 @@ export async function setAllDealers(page: Page, scope: Locator, checked: boolean
   if ((await isChecked()) !== checked) await all.click()
 }
 
-/** Elige un solo dealer en el combo ya abierto en `scope` (por nombre, o el primero de la lista). */
+/**
+ * Elige un solo dealer en el combo de `scope` (por nombre, o el primero de la lista). Sirve para los dos combos: el de
+ * varios (con «All Dealers» y casillas) y el de a uno (WO to be Billed: elegir cierra el combo).
+ */
 async function chooseOneDealer(page: Page, scope: Locator, name?: string) {
-  await setAllDealers(page, scope, false)
   const popover = page.locator('[data-slot="popover-content"]')
+  await (await dealersComboReady(scope)).click()
+  await expect(popover.locator('[cmdk-input]')).toBeVisible()
+  const single = (await popover.locator('button').filter({ hasText: /All Dealers/i }).count()) === 0
+  if (single) {
+    if (name) await popover.locator('[cmdk-input]').fill(name)
+    await (name ? popover.locator('[cmdk-item]').filter({ hasText: name }) : popover.locator('[cmdk-item]')).first().click()
+    await expect(popover.locator('[cmdk-input]')).toHaveCount(0)
+    if (name) await expect(dealersCombo(scope)).toContainText(name)
+    return
+  }
+  await page.keyboard.press('Escape')
+  await setAllDealers(page, scope, false)
   // Con uno elegido, «All Dealers» primero tilda todos y después destilda: se espera a que no quede ninguno tildado
   // (leer el ícono justo después del clic, antes de que se redibuje, dejaba el dealer anterior: «2 dealers»).
   const all = popover.locator('button').filter({ hasText: /All Dealers/i }).first()
@@ -167,7 +181,6 @@ async function chooseOneDealer(page: Page, scope: Locator, name?: string) {
   if (name) await expect(dealersCombo(scope)).toContainText(name)
 }
 
-/** Un solo dealer en el encabezado (compu) o en la hoja de filtros (celular): `name` o el primero de la lista. */
 export async function pickOneDealer(page: Page, name?: string) {
   const { scope, apply } = await filtersScope(page)
   await chooseOneDealer(page, scope, name)
@@ -177,12 +190,15 @@ export async function pickOneDealer(page: Page, name?: string) {
 /**
  * Un rango de días a mano en el calendario del encabezado (`from`/`to` como `MM/DD/YYYY`, en el mes que abre el
  * calendario o el siguiente). Dos clics en el primer día dejan el rango en ese día, sea cual sea el rango anterior
- * (`addToRange` de react-day-picker 9); un clic en el último lo extiende. Los días se ubican por `data-day`
+ * (`addToRange` de react-day-picker 9; sin rango, uno solo); un clic en el último lo extiende. Los días se ubican por `data-day`
  * (`components/ui/calendar.tsx`, la fecha en el formato del navegador, `en-US`).
  */
 export async function pickDateRange(page: Page, scope: Locator, from: string, to: string = from) {
   const trigger = scope.getByRole('button', { name: /\d{2}\/\d{2}\/\d{4}|Select dates/ }).first()
-  if ((await trigger.innerText()).trim() === `${from} – ${to}`) return
+  const shown = (await trigger.innerText()).trim()
+  if (shown === `${from} – ${to}`) return
+  // Sin rango (WO to be Billed al entrar) basta un clic: el segundo en el mismo día lo destilda.
+  const empty = !/\d{2}\/\d{2}\/\d{4}/.test(shown)
   await trigger.click()
   const picker = page.locator('[data-slot="popover-content"]').last()
   // Solo los días del mes (los de afuera, `rdp-outside`, repiten fechas del mes de al lado).
@@ -201,7 +217,7 @@ export async function pickDateRange(page: Page, scope: Locator, from: string, to
   }
   await reveal(from)
   await day(from).click()
-  await day(from).click()
+  if (!empty) await day(from).click()
   if (to !== from) {
     await reveal(to)
     await day(to).click()

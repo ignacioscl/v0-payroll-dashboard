@@ -3,7 +3,7 @@
  * agregar una pantalla con otra barra es sumar una fila, no tocar `header.tsx`. Se aparta de «desde la pantalla» de la
  * regla global (D13): la barra se dibuja en el servidor antes que la pantalla, y con un contexto saltaría al hidratar.
  */
-export type HeaderDateFilter = 'range' | 'invoice' | 'year' | 'month' | 'sunday' | null
+export type HeaderDateFilter = 'range' | 'invoice' | 'year' | 'month' | 'sunday' | 'woToBeBilled' | null
 
 export interface HeaderFilters {
   /** Buscador de empleado (Expenses tiene sus propios combos: no lo usa). */
@@ -12,16 +12,17 @@ export interface HeaderFilters {
   district: boolean
   /**
    * `invoice`: período de la factura con Range/From/Until; `year`: combo de años; `month`: combo de mes; `sunday`: un
-   * domingo («As of» de Open Invoices); `null`: nada.
+   * domingo («As of» de Open Invoices); `woToBeBilled`: el rango propio de WO to be Billed, que puede quedar vacío;
+   * `null`: nada.
    */
   date: HeaderDateFilter
   /** Tope del rango de fechas, en años (Punch Report: 1). */
   maxRangeYears?: number
   /**
-   * La pantalla siempre tiene un rango (WO to be Billed, §2 fila 2 de plans/plan-wo-to-be-billed-v0): «Clear» del
-   * calendario vuelve al rango por defecto en vez de dejarlo vacío (R11 de su CODE-review.md).
+   * `woToBeBilled`: el combo de dealers de a uno y el calendario con el dealer y el rango propios de WO to be Billed
+   * (`woDealers` / `woDateRange` del contexto), que arrancan vacíos y se recuerdan 30 minutos.
    */
-  dateRequired?: boolean
+  dealer?: 'woToBeBilled'
 }
 
 const DEFAULT_FILTERS: HeaderFilters = { search: true, district: false, date: 'range' }
@@ -31,8 +32,8 @@ const exactly = (href: string) => (pathname: string) => pathname === href
 
 const ROWS: { matches: (pathname: string) => boolean; filters: HeaderFilters }[] = [
   { matches: under('/billing/invoices'), filters: { search: true, district: true, date: 'invoice' } },
-  // WO to be Billed: el rango general (plans/plan-wo-to-be-billed-v0, T8); sin buscador de empleado ni distritos.
-  { matches: under('/billing/wo-to-be-billed'), filters: { search: false, district: false, date: 'range', dateRequired: true } },
+  // WO to be Billed: su dealer (de a uno) y su rango, vacíos al entrar como legacy; sin buscador ni distritos.
+  { matches: under('/billing/wo-to-be-billed'), filters: { search: false, district: false, date: 'woToBeBilled', dealer: 'woToBeBilled' } },
   { matches: under('/roles'), filters: { search: true, district: false, date: null } },
   { matches: under('/expenses'), filters: { search: false, district: false, date: 'range' } },
   { matches: under('/issues'), filters: { search: true, district: false, date: 'range', maxRangeYears: 1 } },
@@ -48,3 +49,6 @@ const ROWS: { matches: (pathname: string) => boolean; filters: HeaderFilters }[]
 export function getHeaderFilters(pathname: string): HeaderFilters {
   return ROWS.find((row) => row.matches(pathname))?.filters ?? DEFAULT_FILTERS
 }
+
+/** El botón del calendario de WO to be Billed: «Generate Invoice» sin rango lo abre (lleva al campo que falta). */
+export const WO_DATE_TRIGGER = 'wo-to-be-billed-date-range'

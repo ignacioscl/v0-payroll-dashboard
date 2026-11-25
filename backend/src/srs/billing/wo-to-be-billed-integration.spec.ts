@@ -59,7 +59,7 @@ const cents = (n: unknown) => Math.round(Number(n) * 100)
  * La consulta de legacy, aparte de la de Nest: el WHERE de `InvoiceDao::getWhere` con lo que arma la solapa (sin el
  * `EXISTS` de «línea facturable»). `services` = el csv de `id_inv_service` (uno o varios).
  */
-function legacySql(opts: { includeZero: boolean; completedOnly: boolean; services: number[] }): string {
+function legacySql(opts: { includeZero: boolean; completedOnly: boolean; services: number[]; noRange?: boolean }): string {
   const svc = opts.services.join(',')
   const total = opts.services.length ? `GET_TOTAL_BY_INVOICE_IN(i.id,'${svc}')` : 'GET_TOTAL_BY_INVOICE(i.id,0)'
   return `
@@ -82,7 +82,12 @@ function legacySql(opts: { includeZero: boolean; completedOnly: boolean; service
            : ''
        }
        ${
-         opts.completedOnly
+         opts.noRange
+           ? // Sin fechas, legacy no pone ninguna condición de fecha (`InvoiceDao.php:112-120`).
+             opts.completedOnly
+             ? 'AND i.id_workflow=7'
+             : ''
+           : opts.completedOnly
            ? 'AND i.id_workflow=7 AND i.date_last_chg_workflow BETWEEN ? AND ?'
            : // Legacy dice `<=`: una WO de las 00:00 del día siguiente entra. PRO no (regla mysql-date-ranges, R1 de
              // CODE-review.md): la comparación usa el intervalo semiabierto, la única diferencia declarada.
@@ -142,14 +147,12 @@ describeIf('WO to be Billed — la lectura contra la copia local (solo lee)', ()
   const legacyAll = async (
     c: (typeof CASES)[number],
     range: { dateFrom: string; dateTo: string },
-    opts: { includeZero: boolean; completedOnly: boolean; services: number[] },
+    opts: { includeZero: boolean; completedOnly: boolean; services: number[]; noRange?: boolean },
   ) => {
-    const rows: { id: unknown; total: unknown }[] = await db.query(legacySql(opts), [
-      range.dateFrom,
-      range.dateTo,
-      c.prov,
-      c.dealer,
-    ])
+    const rows: { id: unknown; total: unknown }[] = await db.query(
+      legacySql(opts),
+      opts.noRange ? [c.prov, c.dealer] : [range.dateFrom, range.dateTo, c.prov, c.dealer],
+    )
     return { ids: rows.map((r) => Number(r.id)), total: rows.reduce((a, r) => a + cents(r.total), 0) }
   }
 
@@ -171,6 +174,29 @@ describeIf('WO to be Billed — la lectura contra la copia local (solo lee)', ()
       }
     }
   }
+
+  for (const c of CASES) {
+    it(`dealer ${c.dealer} sin rango (como se entra): toda la historia, mismas WO y mismo total que legacy`, async () => {
+      const dto = { idDealer: c.dealer } as WoToBeBilledFilterDto
+      const nest = await nestAll(ctxOf(c), dto)
+      const legacy = await legacyAll(c, RANGES[0], { includeZero: false, completedOnly: false, services: [], noRange: true })
+      expect(sorted(nest.ids)).toEqual(sorted(legacy.ids))
+      expect(nest.summary.count).toBe(legacy.ids.length)
+      expect(cents(nest.summary.total)).toBe(legacy.total)
+      const withRange = await service.summary(ctxOf(c), { ...dto, ...RANGES[0] } as WoToBeBilledFilterDto)
+      expect(nest.summary.count).toBeGreaterThanOrEqual(withRange.count)
+    })
+  }
+
+  it('sin rango: generar y la cuenta previa piden fechas (400); una sola fecha, 400', async () => {
+    const c = CASES[1]
+    await expect(
+      service.resolveFilter(ctxOf(c), { idDealer: c.dealer, invoiceType: 3 } as WoToBeBilledFilterDto, { forGenerate: true }),
+    ).rejects.toThrow('Select a date range to generate invoices')
+    await expect(
+      service.summary(ctxOf(c), { idDealer: c.dealer, dateFrom: '2026-10-01' } as WoToBeBilledFilterDto),
+    ).rejects.toThrow('Select both dates or none.')
+  })
 
   it('Completed como único Status: contra el día en que la WO pasó a Completed, igual que legacy', async () => {
     const c = CASES[1]

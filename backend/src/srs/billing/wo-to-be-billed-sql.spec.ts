@@ -45,6 +45,15 @@ describe('buildWoToBeBilledWhere', () => {
     expect(w.params).toEqual(expect.arrayContaining([232, 594, '2026-10-01', '2026-11-12']))
   })
 
+  it('sin rango: toda la historia del dealer, sin fecha de alta ni de Completed (como legacy al entrar)', () => {
+    const w = where({ dateFrom: null, dateTo: null })
+    expect(w.sql).not.toContain('fecha_alta')
+    expect(w.sql).toContain('AND dpto.id_dealer = ?')
+    const completed = where({ dateFrom: null, dateTo: null, status: [7] })
+    expect(completed.sql).toContain('AND i.id_workflow = ?')
+    expect(completed.sql).not.toContain('date_last_chg_workflow')
+  })
+
   it('sin «Include Zero Value»: NO_CEROS + total > 0 + líneas con precio; con él, WO_IS_FULL_INVOICED', () => {
     const off = where({ includeZero: false })
     expect(off.sql).toContain('WO_IS_FULL_INVOICED_NO_CEROS(i.id) = 0')

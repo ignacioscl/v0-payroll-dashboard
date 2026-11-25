@@ -32,6 +32,8 @@ export const SEL_REL_MAX = 9000
 
 export const MSG_SELECT_INVOICE_TYPE = 'Select an Invoice Type'
 export const MSG_SELECT_ONE_SERVICE = 'Select at least one service'
+/** Generar sin rango: legacy no deja (el formulario pide las fechas). */
+export const MSG_SELECT_DATE_RANGE = 'Select a date range to generate invoices'
 export const MSG_NOTHING_TO_INVOICE = 'There is nothing to invoice with these filters'
 
 /** El filtro validado y, para «Selected Services», los nombres de los servicios elegidos en el orden en que llegaron. */
@@ -117,7 +119,15 @@ export class WoToBeBilledService {
     dto: WoToBeBilledFilterDto,
     opts: { forGenerate: boolean },
   ): Promise<ResolvedWoFilter> {
-    if (dto.dateTo < dto.dateFrom) {
+    const dateFrom = dto.dateFrom ?? null
+    const dateTo = dto.dateTo ?? null
+    if ((dateFrom == null) !== (dateTo == null)) {
+      throw new BadRequestException('Select both dates or none.')
+    }
+    if (opts.forGenerate && dateFrom == null) {
+      throw new BadRequestException(MSG_SELECT_DATE_RANGE)
+    }
+    if (dateFrom != null && dateTo != null && dateTo < dateFrom) {
       throw new BadRequestException('End date cannot be earlier than start date.')
     }
     await this.assertDealerInScope(ctx, dto.idDealer)
@@ -162,8 +172,8 @@ export class WoToBeBilledService {
       filter: {
         idDealerProvider: ctx.idDealerProvider,
         idDealer: dto.idDealer,
-        dateFrom: dto.dateFrom,
-        dateTo: dto.dateTo,
+        dateFrom,
+        dateTo,
         status: [...new Set(dto.status ?? [])],
         departments,
         services,

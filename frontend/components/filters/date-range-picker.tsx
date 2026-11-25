@@ -93,6 +93,8 @@ interface DateRangePickerProps {
   ignoreLocked?: boolean
   /** Why it is ignored / what ignoring does. Shown next to the switch. */
   ignoreHint?: string
+  /** Marca del botón (`data-date-trigger`) para que la pantalla lo abra cuando falta la fecha. */
+  triggerMarker?: string
 }
 
 export function DateRangePicker({
@@ -110,6 +112,7 @@ export function DateRangePicker({
   ignoreHint,
   openEnds,
   mode,
+  triggerMarker,
 }: DateRangePickerProps) {
   const { t, locale } = useTranslation()
   const dayPickerLocale = locale === 'es' ? esDayPicker : enUSDayPicker
@@ -196,6 +199,7 @@ export function DateRangePicker({
   const trigger = (
     <Button
       variant="outline"
+      data-date-trigger={triggerMarker}
       aria-disabled={frozen || undefined}
       className={cn(
         'gap-2 border-border bg-background/50 hover:bg-background min-w-[180px] transition-colors',

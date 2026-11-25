@@ -57,9 +57,10 @@ describe('GenerateIndividualInvoiceDto', () => {
 })
 
 describe('WoToBeBilledFilterDto / ListQuery', () => {
-  it('dealer y rango obligatorios', async () => {
+  it('dealer obligatorio; el rango es opcional (las dos o ninguna lo decide el servicio) y, si viene, es una fecha real', async () => {
     expect(await run(WoToBeBilledFilterDto, filter({ idDealer: undefined }))).toBe(400)
-    expect(await run(WoToBeBilledFilterDto, filter({ dateFrom: undefined }))).toBe(400)
+    expect(await run(WoToBeBilledFilterDto, filter({ dateFrom: undefined, dateTo: undefined }))).toMatchObject({ idDealer: 594 })
+    expect(await run(WoToBeBilledFilterDto, filter({ dateFrom: '', dateTo: '' }))).toMatchObject({ dateFrom: undefined, dateTo: undefined })
     expect(await run(WoToBeBilledFilterDto, filter({ dateTo: '2026-02-30' }))).toBe(400)
   })
 
