@@ -193,9 +193,10 @@ export class WorkOrderFacadeService {
       stockSemi: rules.stockSemi,
     })
     if (affected !== 1) throw new ConflictException('The work order changed. Reload and try again.')
-    // 7. Log con el texto literal de legacy (`api.datatable.edit.php:66-72`).
+    // 7. Log con el texto literal de legacy (`api.datatable.edit.php:66-72`): el valor nuevo **como se escribió**, no
+    //    el de mayúsculas que se guarda (legacy anota `$value` del pedido; la paridad del 25/11/2026 lo encontró).
     const label = dto.field === 'ro' ? 'RO#' : 'PO#'
-    await this.logs.logWorkOrder(wo.id, ctx.idUsuario, `${label} edited from ${before ?? ''} to:${value ?? ''}`)
+    await this.logs.logWorkOrder(wo.id, ctx.idUsuario, `${label} edited from ${before ?? ''} to:${dto.value.trim()}`)
     return dto.field === 'ro' ? { ro: value, po: wo.po } : { ro: wo.ro, po: value }
   }
 }

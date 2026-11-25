@@ -545,7 +545,7 @@ describeIf('WO to be Billed — las escrituras contra la copia local', () => {
       expect(changed).toContain('ro')
       for (const k of changed) expect(['ro', 'ro_semi_req', 'po_semi_req', 'stock_semi_req']).toContain(k)
       const log: { desc_cambio: string }[] = await db.query('SELECT desc_cambio FROM LOG_CHANGE WHERE id_invoice = ? ORDER BY id DESC LIMIT 1', [A])
-      expect(log[0].desc_cambio).toBe(`RO# edited from ${before.ro ?? ''} to:IT-RO1`)
+      expect(log[0].desc_cambio).toBe(`RO# edited from ${before.ro ?? ''} to:it-ro1`) // como se escribió, igual que legacy
       // Guardar lo mismo otra vez no escribe ni suma Log.
       const [count]: { c: unknown }[] = await db.query('SELECT COUNT(*) AS c FROM LOG_CHANGE WHERE id_invoice = ?', [A])
       await workOrders.updateRoPo(admin, A, { field: 'ro', value: 'IT-RO1' })
@@ -604,7 +604,7 @@ describeIf('WO to be Billed — las escrituras contra la copia local', () => {
         expect(after.po).toBe('ITPO')
         expect(Number(after.po_semi_req)).toBe(0) // con PO# cargado, la marca no se prende
         const [log]: { desc_cambio: string }[] = await db.query('SELECT desc_cambio FROM LOG_CHANGE WHERE id_invoice = ? ORDER BY id DESC LIMIT 1', [B])
-        expect(log.desc_cambio).toBe(`RO# edited from ${original.ro ?? ''} to:IT-RO2`)
+        expect(log.desc_cambio).toBe(`RO# edited from ${original.ro ?? ''} to:it-ro2`)
       })
       // Al soltar el candado (la transacción de afuera se deshace), la otra conexión sigue.
       await otherUpdate

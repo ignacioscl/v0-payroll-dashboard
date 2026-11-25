@@ -227,12 +227,12 @@ describe('WorkOrderFacadeService.delete', () => {
 })
 
 describe('WorkOrderFacadeService.updateRoPo', () => {
-  it('mayúsculas, sin espacios; un solo UPDATE con las tres marcas; log con el texto de legacy', async () => {
+  it('mayúsculas, sin espacios; un solo UPDATE con las tres marcas; log con el texto de legacy (el valor como se escribió)', async () => {
     const t = build({ rules: { roSemi: true, stockSemi: true } })
     const res = await t.facade.updateRoPo(ctx(), 55, { field: 'ro', value: ' ab12 ' })
     expect(res).toEqual({ ro: 'AB12', po: 'P9' })
     expect(t.workOrders.updateRoPo).toHaveBeenCalledWith(55, 232, 'ro', 'AB12', { roSemi: true, poSemi: false, stockSemi: true })
-    expect(t.logs.logWorkOrder).toHaveBeenCalledWith(55, 46, 'RO# edited from  to:AB12')
+    expect(t.logs.logWorkOrder).toHaveBeenCalledWith(55, 46, 'RO# edited from  to:ab12')
   })
 
   it('el candado de la fila es lo primero (R15)', async () => {
