@@ -182,14 +182,15 @@ export function WoToBeBilledTable({
         accessorFn: (r) => r.vin,
         header: t('woToBeBilled.columns.vin'),
         enableSorting: false,
-        size: 190,
+        // Como la columna fija de Invoices: nada se corta con «…»; el auto, si no entra, sigue en otra línea.
+        size: 250,
         cell: ({ row }) => {
           const r = row.original
           const car = [r.year, r.make, r.model, r.color].filter(Boolean).join(' / ')
           return (
             <div className="min-w-0">
-              <span className="block truncate">{r.vin}</span>
-              {car ? <span className="block truncate text-[11px] text-muted-foreground">{car}</span> : null}
+              <span className="block whitespace-nowrap">{r.vin}</span>
+              {car ? <span className="block whitespace-normal break-words text-[11px] text-muted-foreground">{car}</span> : null}
             </div>
           )
         },
@@ -237,7 +238,7 @@ export function WoToBeBilledTable({
         header: t('woToBeBilled.columns.department'),
         enableSorting: false,
         size: 130,
-        cell: ({ row }) => <span className="block truncate">{row.original.department}</span>,
+        cell: ({ row }) => <span className="block whitespace-normal break-words">{row.original.department}</span>,
         meta: { label: t('woToBeBilled.columns.department') } satisfies DataTableColumnMeta<WoToBeBilledRow>,
       },
       {

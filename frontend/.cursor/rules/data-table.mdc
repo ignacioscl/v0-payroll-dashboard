@@ -203,6 +203,12 @@ En compu, `truncate` va en un elemento `block` (o en un hijo de `flex` con `min-
 pone «…» y el nombre se corta en seco contra la columna siguiente. Se copia la celda de `production-dealer-table.tsx`
 tal cual. *(04/11/2026, Monthly Closing: «AutoNation Mercedes-Benz of Coconut Cree».)*
 
+**Una columna fija no corta con «…» si la tabla tiene lugar**: se le da el ancho de su contenido habitual y el texto
+largo sigue en otra línea (`whitespace-normal break-words`), como la primera columna de Invoices. `truncate` queda para
+lo que de verdad no entra. Control: `e2e/wo-to-be-billed.spec.ts` («celular y compu») busca en compu y en celular
+celdas cortadas con datos de autos largos. *(24/11/2026, WO to be Billed: la columna VIN cortaba «2021 / Lincoln /
+Aviator Black L…» con media pantalla libre.)*
+
 - Múltiples columnas pueden estar pinned al mismo lado — se apilan en el orden
   de declaración.
 - Se aplica `position: sticky` y un shadow sutil en el borde interno para

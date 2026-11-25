@@ -45,6 +45,7 @@ const TESLA = 'Tesla Orange Park Mall Pop-Up'
 const KIA = 'Napleton Northlake Kia'
 const SUBARU = 'North Fort Lauderdale Subaru'
 const MERCEDES = 'Mercedes-Benz of Cutler Bay'
+const ACURA = 'Acura of Melbourne'
 const DAY = '11/10/2026'
 
 const WO = {
@@ -486,6 +487,21 @@ test('celular y compu: sin scroll horizontal, la tabla sin columnas fijas en cel
     )
     expect(pinned, 'no pinned column on a phone').toBe(0)
   }
+  // Nada cortado con «…», tampoco en compu (24/11/2026: la columna VIN cortaba «2021 / Lincoln / Aviator Black L…»
+  // con media pantalla libre). Acura of Melbourne tiene los autos de nombre más largo de la copia.
+  await pickDealerAndRange(page, ACURA, '11/09/2026', '11/12/2026')
+  await expect(page.locator('main tbody tr').filter({ hasText: 'Aviator' }).first()).toBeVisible({ timeout: 60_000 })
+  const cut = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('main table td, main table td *')]
+      .filter((el) => {
+        if (el.clientWidth === 0) return false
+        const st = getComputedStyle(el)
+        return (st.textOverflow === 'ellipsis' || st.overflow === 'hidden') && el.scrollWidth > el.clientWidth + 1
+      })
+      .map((el) => (el.textContent ?? '').trim().slice(0, 40)),
+  )
+  expect(cut, 'nothing cut with «…»').toEqual([])
+  await noHorizontalScroll(page)
   // Quieta: sin mutaciones del DOM durante 2 s (el bucle de renders de T10 hacía miles).
   const mutations = await page.evaluate(
     () =>
