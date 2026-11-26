@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   CarFront,
   Hourglass,
+  FilePlus2,
 } from 'lucide-react'
 import type { MessageKey } from '@/lib/i18n/messages'
 import {
@@ -26,6 +27,7 @@ import {
   canAccessBusinessKpis,
   canAccessMonthlyClosing,
   canAccessOpenInvoices,
+  canAccessWoToBeBilled,
   canAccessIncomeByDealer,
   canAccessPayrollDashboard,
   canAccessProductionVsGoal,
@@ -69,7 +71,10 @@ export const ALL_NAVIGATION: NavItemDef[] = [
     nameKey: 'nav.billing',
     href: '/billing/invoices',
     icon: Wallet,
-    children: [{ nameKey: 'nav.invoices', href: '/billing/invoices', icon: ReceiptText }],
+    children: [
+      { nameKey: 'nav.invoices', href: '/billing/invoices', icon: ReceiptText },
+      { nameKey: 'nav.woToBeBilled', href: '/billing/wo-to-be-billed', icon: FilePlus2 },
+    ],
   },
   {
     nameKey: 'nav.expenses',
@@ -135,6 +140,9 @@ export const CLOSING_REPORTS_HREFS = [
 
 /** Billing routes gated by ROL_ACCION Invoices module access (15) or system admin. */
 export const BILLING_NAV_HREFS = ['/billing/invoices'] as const
+
+/** WO to be Billed: internos con 15 y 16, o admin (`canAccessWoToBeBilled`, plans/plan-wo-to-be-billed-v0). */
+export const WO_TO_BE_BILLED_NAV_HREFS = ['/billing/wo-to-be-billed'] as const
 
 /** Roles Admin — gated by ROL_ACCION 42 (list/view). Includes the Role Templates sub-route. */
 export const ROLES_NAV_HREFS = ['/roles', '/roles/templates'] as const
@@ -203,6 +211,7 @@ export function isProdAllowedPath(
   canAccessWindowTintClosing = false,
   canAccessOpenInvoices = false,
   canAccessIncomeByDealer = false,
+  canAccessWoToBeBilled = false,
 ) {
   if (pathname === '/') return !isCompanyTypeCompany
   if (pathname === '/issues') return true
@@ -215,6 +224,7 @@ export function isProdAllowedPath(
   if (canAccessWindowTintClosing && matches(TINT_CLOSING_NAV_HREFS)) return true
   if (canAccessOpenInvoices && matches(PROD_OPEN_INVOICES_HREFS)) return true
   if (canAccessBillingInvoices && matches(BILLING_NAV_HREFS)) return true
+  if (canAccessWoToBeBilled && matches(WO_TO_BE_BILLED_NAV_HREFS)) return true
   if (canManageRoleTemplates && matches(ROLE_TEMPLATES_NAV_HREFS)) return true
   if (canAccessSystemConfig && matches(SETTINGS_NAV_HREFS)) return true
   if (canViewRoles && (pathname === '/roles' || pathname.startsWith('/roles/'))) {
@@ -257,6 +267,8 @@ export function getVisibleNavigation(options: {
   canAccessWindowTintClosing?: boolean
   /** Open Invoices (153 or admin, + «Closing reports»): a role with only this permission sees the menu too. */
   canAccessOpenInvoices?: boolean
+  /** WO to be Billed (internal, 15 and 16 or admin). */
+  canAccessWoToBeBilled?: boolean
   /** Company checks: in dev the menu shows everything except the modules the company doesn't have. */
   companyModules: CompanyModules
   t: (key: MessageKey) => string
@@ -275,6 +287,7 @@ export function getVisibleNavigation(options: {
     canAccessMonthlyClosing = false,
     canAccessWindowTintClosing = false,
     canAccessOpenInvoices = false,
+    canAccessWoToBeBilled = false,
     companyModules,
     t,
   } = options
@@ -306,7 +319,8 @@ export function getVisibleNavigation(options: {
     !canAccessExpenses &&
     !canAccessMonthlyClosing &&
     !canAccessWindowTintClosing &&
-    !canAccessOpenInvoices
+    !canAccessOpenInvoices &&
+    !canAccessWoToBeBilled
   ) {
     return []
   }
@@ -321,6 +335,7 @@ export function getVisibleNavigation(options: {
     ...(canAccessWindowTintClosing ? TINT_CLOSING_NAV_HREFS : []),
     ...(canAccessOpenInvoices ? PROD_OPEN_INVOICES_HREFS : []),
     ...(canAccessBillingInvoices ? BILLING_NAV_HREFS : []),
+    ...(canAccessWoToBeBilled ? WO_TO_BE_BILLED_NAV_HREFS : []),
     ...(canViewRoles ? ['/roles'] : []),
     ...(canManageRoleTemplates ? ROLE_TEMPLATES_NAV_HREFS : []),
     ...(canAccessExpenses ? EXPENSES_NAV_HREFS : []),
@@ -378,6 +393,7 @@ export function getScreenAccess(
     tintClosing: canAccessWindowTintClosing(user, hasPermission),
     // Entra en hasAnyModule: un rol con solo Open Invoices no ve «sin módulos» (review 1 de plans/plan-reporte-javier).
     openInvoices: canAccessOpenInvoices(user, hasPermission),
+    woToBeBilled: canAccessWoToBeBilled(user, hasPermission),
   }
   const hasAnyModule = Object.values(access).some(Boolean)
   if (!hasAnyModule) return options.isDev ? 'allowed' : 'no-modules'
@@ -406,6 +422,7 @@ export function getScreenAccess(
     access.tintClosing,
     access.openInvoices,
     access.incomeByDealer,
+    access.woToBeBilled,
   )
     ? 'allowed'
     : 'denied'

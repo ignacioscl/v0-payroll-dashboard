@@ -152,6 +152,49 @@ export function openPdfBlobInNewTab(blob: Blob, downloadName = 'invoice.pdf'): '
   return 'downloaded'
 }
 
+/** Una pestaña abierta en el clic, que espera el PDF (`openPdfTabNow`). */
+export interface PendingPdfTab {
+  /** Carga el PDF en la pestaña; si el navegador la bloqueó, lo descarga. */
+  load: (blob: Blob, downloadName?: string) => 'opened' | 'downloaded'
+  /** Cierra la pestaña (el pedido falló). */
+  close: () => void
+}
+
+/**
+ * «Abrir ahora, cargar después» (plans/plan-wo-to-be-billed-v0, T10): la pestaña se abre **en el mismo clic**, vacía,
+ * y el PDF se carga cuando llega. Una pestaña que se abre después de esperar al servidor la bloquea el navegador
+ * (`openPdfBlobInNewTab` termina descargando); legacy abre la pestaña en el clic (`app.invoice_global.js:1-12`).
+ * Llamar sincrónicamente dentro del manejador del clic.
+ */
+export function openPdfTabNow(): PendingPdfTab {
+  const tab = typeof window !== 'undefined' ? window.open('', '_blank') : null
+  return {
+    load(blob, downloadName = 'invoice.pdf') {
+      if (!tab || tab.closed) {
+        downloadBlob(blob, downloadName)
+        return 'downloaded'
+      }
+      const url = URL.createObjectURL(blob)
+      // Se carga el PDF en la pestaña que se abrió en el clic (no es navegar la app: la app sigue donde estaba).
+      ;(tab as unknown as { location: string }).location = url
+      try {
+        tab.opener = null
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+      return 'opened'
+    },
+    close() {
+      try {
+        tab?.close()
+      } catch {
+        /* ignore */
+      }
+    },
+  }
+}
+
 /** Triggers a file download for a blob (ZIP or PDF). */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)

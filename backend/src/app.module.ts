@@ -33,6 +33,8 @@ import { SrsExpenseRepetitiveModule } from './features/srs-expense-repetitive/sr
 import { SrsExpenseDealerAssignModule } from './features/srs-expense-dealer-assign/srs-expense-dealer-assign.module'
 import { SrsLogGenericModule } from './features/srs-log-generic/srs-log-generic.module'
 import { SrsLogChangeModule } from './features/srs-log-change/srs-log-change.module'
+import { SrsInvoiceModule } from './features/srs-invoice/srs-invoice.module'
+import { SrsInvoiceStatementModule } from './features/srs-invoice-statement/srs-invoice-statement.module'
 // --- Monthly Closing y Window Tint Closing (plans/plan-monthly-closing, plans/plan-reporte-tint) ---
 import { SrsMonthlyClosingModule } from './srs/monthly-closing/monthly-closing.module'
 // --- Jobs (worker) ---
@@ -90,6 +92,9 @@ import { validateEnv } from './config/env.validation'
     SrsExpenseDealerAssignModule,
     SrsLogGenericModule,
     SrsLogChangeModule,
+    // WO to be Billed (plans/plan-wo-to-be-billed-v0): eliminar WO / RO# PO# y generar invoices.
+    SrsInvoiceModule,
+    SrsInvoiceStatementModule,
     JobsModule,
     //TemplateModule
     //NO BORRAR LA LINEA DE ARRIBA

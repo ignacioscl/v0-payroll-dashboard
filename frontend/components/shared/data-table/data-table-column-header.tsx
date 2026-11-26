@@ -48,7 +48,8 @@ export function DataTableColumnHeader<TData, TValue>({
   const numeric = meta?.numeric === true
 
   if (!column.getCanSort() && !column.getCanHide() && !filterConfig) {
-    return <div className={cn('font-semibold', className)}>{title}</div>
+    // Mismo título que con menú (abajo): sin esto, una columna sin orden ni ocultar salía en otra letra.
+    return <div className={cn('text-xs font-semibold uppercase tracking-wide', className)}>{title}</div>
   }
 
   const sorted = column.getIsSorted()

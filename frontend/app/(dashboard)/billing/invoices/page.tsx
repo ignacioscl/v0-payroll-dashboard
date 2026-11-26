@@ -68,12 +68,20 @@ export default function InvoicesPage() {
     invoiceIgnorePeriod: ignorePeriod,
     setInvoiceIgnorePeriod: setIgnorePeriod,
     setInvoiceIgnorePeriodLocked,
+    invoiceShowZeroOnce,
+    setInvoiceShowZeroOnce,
   } = useFilters()
 
   const [types, setTypes] = useState<InvoiceTypeState>(ALL_TYPES)
   const [payed, setPayed] = useState<TriState>('0')
   const [sended, setSended] = useState<TriState>('all')
-  const [hideZero, setHideZero] = useState(true)
+  // Viniendo de «View in Invoices» (WO to be Billed) arranca mostrando también las de $0: se pudo crear una así.
+  const [hideZero, setHideZero] = useState(() => !invoiceShowZeroOnce)
+  useEffect(() => {
+    if (invoiceShowZeroOnce) setInvoiceShowZeroOnce(false)
+    // Solo al abrir la pantalla: el aviso es de un solo uso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Arranca apagado: apagado, el listado es exactamente el de hoy.
   const [includePartial, setIncludePartial] = useState(false)
   const [filterDateDone, setFilterDateDone] = useState(false)

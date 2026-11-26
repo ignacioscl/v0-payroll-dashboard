@@ -1,6 +1,9 @@
 /** Legacy ROL_ACCION ids (ttk_main / rolMaganer.userHavePermission). */
 /** Invoices module access (legacy billing "Invoice" tab). */
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
+
+/** Legacy ROL_ACCION: Invoices > Create Invoice (WO to be Billed: generar, y entrar a la pantalla). */
+export const ROL_ACCION_INVOICE_CREATE = 16
 /*
  * Un permiso por reporte de Pro (migration 033, tema 10 de plans/plan-reunion-juan-18-11). Sin roles al salir: los admins
  * pasan siempre. Los del legacy que abrían estos reportes (47, 93, 123 y 140) gobiernan solo el legacy. Mismos números

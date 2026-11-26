@@ -22,7 +22,8 @@ function fmtDiscount(n: number): string {
   return n > 0 ? `−${fmtMoney(n)}` : `+${fmtMoney(-n)}`
 }
 
-function StatCell({
+/** Una tarjeta de total con su ayuda («?»). La usan Invoices y WO to be Billed: mismas tarjetas en las dos. */
+export function StatCell({
   label,
   value,
   help,
@@ -81,6 +82,9 @@ function StatCell({
   )
 }
 
+/** La grilla de las tarjetas: dos columnas en el celular; desde sm, las que entren (mobile-first-responsive). */
+export const SUMMARY_GRID_CLASS = 'grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]'
+
 /**
  * At-a-glance totals for the active filter (from API summary, full filter scope).
  * With the partial switch on there is one card more (Partial invoiced); with Payment = Unpaid
@@ -115,7 +119,7 @@ export function InvoiceSummaryStrip({
 
   // Two columns on a phone; from sm the cards flow by the width there is, so a card drops to the
   // next row instead of squeezing its number (mobile-first-responsive).
-  const gridCols = 'grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]'
+  const gridCols = SUMMARY_GRID_CLASS
 
   if (isLoading && !summary) {
     return (

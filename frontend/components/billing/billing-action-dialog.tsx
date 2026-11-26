@@ -86,11 +86,23 @@ export function BillingActionDialog({
 }) {
   const toneCfg = TONE[tone]
   const busy = pending || secondaryPending
+  // Mientras procesa no se cierra (ni con Esc, ni con clic afuera, ni con la X): un corte a mitad de camino deja al
+  // usuario sin saber si se hizo (plans/plan-wo-to-be-billed-v0, T10). Lo heredan todos los que usan este diálogo.
+  const handleOpenChange = (next: boolean) => {
+    if (!next && busy) return
+    onOpenChange(next)
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton
+        onEscapeKeyDown={(e) => {
+          if (busy) e.preventDefault()
+        }}
+        onInteractOutside={(e) => {
+          if (busy) e.preventDefault()
+        }}
         className={cn(
           'gap-0 overflow-hidden p-0 sm:max-w-lg',
           className,
@@ -130,7 +142,7 @@ export function BillingActionDialog({
             variant="outline"
             className="w-full sm:w-auto"
             disabled={busy}
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             <X className="size-4" />
             {cancelLabel}

@@ -15,8 +15,18 @@
  * Lo que depende de la base local: Edit punch necesita un ponche en /issues, las acciones de Invoices una fila en
  * «Last Month» y PO el permiso «Edit PO/RO»; si falta, ese caso se saltea con el motivo.
  */
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickDatePreset } from './helpers'
+import { expect, test, type Page } from '@playwright/test'
+import {
+  dealersComboReady,
+  E2E_MISSING_USER,
+  E2E_MISSING_USER_REASON,
+  filtersScope,
+  login,
+  pickDatePreset,
+  pickDealerAndRange,
+  pickOneDealer,
+  setAllDealers,
+} from './helpers'
 
 test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
 
@@ -39,48 +49,15 @@ async function expectFocusOn(page: Page, field: string) {
   await expect(focused).toBeInViewport({ ratio: 1 })
 }
 
-/** Encabezado (compu) u hoja de filtros (celular). */
-async function filtersScope(page: Page): Promise<{ scope: Locator; apply: () => Promise<void> }> {
-  const openFilters = page.getByRole('button', { name: 'Open filters' })
-  const mobile = await openFilters.isVisible()
-  if (mobile) await openFilters.click()
-  // La hoja se llama «Filters»; el combo de dealers abre otro `dialog` (su popover) adentro.
-  const sheet = page.getByRole('dialog', { name: 'Filters' })
-  return {
-    scope: mobile ? sheet : page.locator('header'),
-    apply: async () => {
-      if (!mobile) return
-      await sheet.getByRole('button', { name: 'Apply', exact: true }).click()
-      await expect(sheet).toBeHidden()
-    },
-  }
+/** El foco está en el elemento de `selector`, entero a la vista. */
+async function expectFocusOnSelector(page: Page, selector: string) {
+  const el = page.locator(selector).first()
+  await expect.poll(() => el.evaluate((node) => node === document.activeElement), { message: `focus on ${selector}` }).toBe(true)
+  await expect(el).toBeInViewport({ ratio: 1 })
 }
 
-/** El combo de dealers del encabezado (`DealerMultiSelect`): dice «All Dealers», «N dealers» o el nombre de uno. */
-function dealersCombo(scope: Locator): Locator {
-  return scope.locator('button[role="combobox"][class*="min-w-[200px]"]').first()
-}
-
-/** El combo ya cargó la lista (mientras carga está deshabilitado y dice «Loading…»). */
-async function dealersComboReady(scope: Locator): Promise<Locator> {
-  const combo = dealersCombo(scope)
-  await expect(combo).toBeEnabled({ timeout: 30_000 })
-  await expect(combo).not.toContainText(/loading/i, { timeout: 30_000 })
-  return combo
-}
-
-/**
- * Abre el combo de dealers y deja todos destildados o todos tildados. «All Dealers» (la primera fila) alterna:
- * con todos tildados los destilda; si no, los tilda.
- */
-async function setAllDealers(page: Page, scope: Locator, checked: boolean) {
-  await (await dealersComboReady(scope)).click()
-  const all = page.locator('[data-slot="popover-content"] button').filter({ hasText: /All Dealers/i }).first()
-  await expect(all).toBeVisible()
-  const isChecked = async () => (await all.locator('svg.lucide-check').count()) > 0
-  if ((await isChecked()) !== checked) await all.click()
-  if ((await isChecked()) !== checked) await all.click()
-}
+const WO_DEALER = 'Tesla Orange Park Mall Pop-Up'
+const WO_DAY = '11/10/2026'
 
 /** All Dealers y «Last Month» en el encabezado, así la lista de Invoices trae filas y nada viene preelegido. */
 async function allDealersLastMonth(page: Page) {
@@ -90,23 +67,6 @@ async function allDealersLastMonth(page: Page) {
     await page.keyboard.press('Escape')
   }
   await pickDatePreset(page, scope, 'Last Month')
-  await apply()
-}
-
-/** Un solo dealer en el encabezado (Add punch lo necesita): E2E_PUNCH_DEALER o el primero de la lista. */
-async function pickOneDealer(page: Page) {
-  const { scope, apply } = await filtersScope(page)
-  await setAllDealers(page, scope, false)
-  const popover = page.locator('[data-slot="popover-content"]')
-  const name = process.env.E2E_PUNCH_DEALER
-  if (name) {
-    await popover.locator('[cmdk-input]').fill(name)
-    await popover.locator('[cmdk-item]').filter({ hasText: name }).first().click()
-  } else {
-    await popover.locator('[cmdk-item]').first().click()
-  }
-  await page.keyboard.press('Escape')
-  await expect(dealersCombo(scope)).not.toContainText(/All Dealers|\d+ dealers/i)
   await apply()
 }
 
@@ -276,7 +236,7 @@ test.describe('Forms: the screen goes to the missing field (3.17)', () => {
   test('Add punch: no employee gets the focus', async ({ page }) => {
     await login(page)
     await page.goto('/issues')
-    await pickOneDealer(page)
+    await pickOneDealer(page, process.env.E2E_PUNCH_DEALER)
     await page.locator('header button:has(svg[class*="plus"])').first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByText('Add Punch').first()).toBeVisible()
@@ -289,7 +249,7 @@ test.describe('Forms: the screen goes to the missing field (3.17)', () => {
   test('Edit punch: a Clock Out that is not after Clock In gets the focus', async ({ page }) => {
     await login(page)
     await page.goto('/issues')
-    await pickOneDealer(page)
+    await pickOneDealer(page, process.env.E2E_PUNCH_DEALER)
     const edit = page.getByRole('button', { name: /^Edit punch for / }).first()
     test.skip(!(await edit.isVisible({ timeout: 20_000 }).catch(() => false)), 'No punch to edit in /issues')
     await edit.click()
@@ -301,6 +261,52 @@ test.describe('Forms: the screen goes to the missing field (3.17)', () => {
     await dialog.getByRole('button', { name: 'Update' }).click()
     await expect(dialog.getByText('Must be after Clock In')).toBeVisible()
     await expectFocusOn(page, 'punchOut')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  // WO to be Billed (plans/plan-wo-to-be-billed-v0, T11): el botón «Generate Invoice» está fuera del panel de filtros.
+  test('WO to be Billed: Generate without Invoice Type opens the filters and focuses the type', async ({ page }) => {
+    await login(page)
+    await page.goto('/billing/wo-to-be-billed')
+    await pickDealerAndRange(page, WO_DEALER, WO_DAY)
+    await expect(page.locator('main tbody tr').first()).toBeVisible({ timeout: 60_000 })
+    await page.getByRole('button', { name: 'Generate Invoice', exact: true }).click()
+    await expect(page.getByText('Select an Invoice Type')).toBeVisible()
+    await expectFocusOnSelector(page, '#wo-filter-invoice-type')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('WO to be Billed: «Selected Services» without a service focuses Services', async ({ page }) => {
+    await login(page)
+    await page.goto('/billing/wo-to-be-billed')
+    await pickDealerAndRange(page, WO_DEALER, WO_DAY)
+    const type = page.locator('#wo-filter-invoice-type')
+    if (!(await type.isVisible().catch(() => false))) await page.locator('main').getByRole('button', { name: /^Filters/ }).click()
+    await type.click()
+    await page.getByRole('option', { name: 'Invoice by Selected Services' }).click()
+    // El panel se cierra (en celular tapa la tabla) y el botón lo vuelve a abrir con el foco en Services.
+    if (await page.locator('#wo-filter-services').isVisible()) await page.locator('main').getByRole('button', { name: /^Filters/ }).click()
+    await page.getByRole('button', { name: 'Generate Invoice', exact: true }).click()
+    await expect(page.getByText('Select at least one service')).toBeVisible()
+    await expectFocusOnSelector(page, '#wo-filter-services button')
+  })
+
+  test('WO to be Billed: RO# required and empty stays in the field with its error', async ({ page }) => {
+    await login(page)
+    await page.goto('/billing/wo-to-be-billed')
+    // MBCW4685: en $0, con un servicio que pide RO# (el RO# no se borra: el backend corta antes de escribir).
+    await pickDealerAndRange(page, 'Mercedes-Benz of Cutler Bay', '08/26/2026')
+    const zero = page.locator('#wo-filter-include-zero')
+    if (!(await zero.isVisible().catch(() => false))) await page.locator('main').getByRole('button', { name: /^Filters/ }).click()
+    if ((await zero.getAttribute('aria-checked')) !== 'true') await zero.click()
+    const row = page.locator('main tbody tr').filter({ hasText: 'MBCW4685' })
+    await expect(row).toBeVisible({ timeout: 60_000 })
+    await row.getByRole('button', { name: 'Edit RO#' }).click()
+    const dialog = page.getByRole('dialog')
+    await page.locator('#wo-ro-po-value').fill('')
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog.getByText('RO# is required for this work order')).toBeVisible()
+    await expectFocusOnSelector(page, '#wo-ro-po-value')
     await dialog.getByRole('button', { name: 'Cancel' }).click()
   })
 })

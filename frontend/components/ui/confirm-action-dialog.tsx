@@ -92,14 +92,25 @@ export function ConfirmActionDialog({
   const resolvedConfirmVariant =
     confirmVariant ?? (tone === 'danger' || tone === 'warning' ? 'destructive' : 'default')
 
+  // Mientras procesa no se cierra (ni con Esc ni con Cancel): plans/plan-wo-to-be-billed-v0, T10. Lo heredan todos.
+  const handleOpenChange = (next: boolean) => {
+    if (!next && pending) return
+    onOpenChange(next)
+  }
+
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault()
     void onConfirm()
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent
+        className="gap-0 overflow-hidden p-0 sm:max-w-md"
+        onEscapeKeyDown={(e) => {
+          if (pending) e.preventDefault()
+        }}
+      >
         <div className="flex flex-col items-center px-6 pt-8 pb-2 text-center">
           <div
             className={cn(

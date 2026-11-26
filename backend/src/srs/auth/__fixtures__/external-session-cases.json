@@ -1,0 +1,109 @@
+{
+  "_doc": "D7 de plans/plan-wo-to-be-billed-v0: una sola tabla de casos para las dos copias de la regla «¿la sesión es externa?». La corren backend/src/srs/auth/srs-external-session.spec.ts (Nest, isExternalSession) y public/php/tests/external-session-cases.php (PHP, PayrollPermissionService::isExternalSession). rels = relaciones activas del usuario (ROL.estado = 1), con su id de USUARIO_ROL_REL; companyTypes = tipo efectivo de cada CONTRATISTA (COALESCE del de su id_empresa y el propio); 1 = company (externa).",
+  "cases": [
+    {
+      "name": "(a) usuario de empresa interna que entra con un rol externo",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 501,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }, { "id": 501, "idRol": 901, "tipo": 2, "idDealer": 20 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2, "20": 1 },
+      "external": true
+    },
+    {
+      "name": "(b) token sin rol: la primera relación es interna y tiene además una externa",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 0,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }, { "id": 501, "idRol": 901, "tipo": 2, "idDealer": 20 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2, "20": 1 },
+      "external": true
+    },
+    {
+      "name": "(b2) token sin rol con solo una relación externa",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 0,
+      "rels": [{ "id": 501, "idRol": 901, "tipo": 2, "idDealer": 20 }],
+      "owner": { "idOwner": 20, "ownerEmpresaType": 1 },
+      "companyTypes": { "20": 1 },
+      "external": true
+    },
+    {
+      "name": "(c) Admin Company cuya empresa es de tipo company",
+      "userRol": null, "hasAdminCompanyRel": true, "signedRel": 0,
+      "rels": [{ "id": 502, "idRol": 2, "tipo": 1, "idDealer": null }],
+      "owner": { "idOwner": 20, "ownerEmpresaType": 1 },
+      "companyTypes": { "20": 1 },
+      "external": true
+    },
+    {
+      "name": "(d) token con un rol que no es del usuario",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 999,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": true
+    },
+    {
+      "name": "(e) rol firmado que después se dio de baja (ya no es relación activa)",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 503,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": true
+    },
+    {
+      "name": "(e2) sin ninguna relación activa",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 0,
+      "rels": [],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": true
+    },
+    {
+      "name": "(e3) la empresa efectiva no se resuelve (rol externo sin dealer)",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 504,
+      "rels": [{ "id": 504, "idRol": 905, "tipo": 2, "idDealer": null }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": true
+    },
+    {
+      "name": "(f) el usuario interno de siempre",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 500,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": false
+    },
+    {
+      "name": "(f2) Admin Dealer: la empresa efectiva es la dueña",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 505,
+      "rels": [{ "id": 505, "idRol": 3, "tipo": 2, "idDealer": 20 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2, "20": 1 },
+      "external": false
+    },
+    {
+      "name": "(g) token sin rol con todas sus relaciones internas",
+      "userRol": null, "hasAdminCompanyRel": false, "signedRel": 0,
+      "rels": [{ "id": 500, "idRol": 900, "tipo": 1, "idDealer": 10 }, { "id": 506, "idRol": 906, "tipo": 1, "idDealer": 11 }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2, "11": 2 },
+      "external": false
+    },
+    {
+      "name": "(g2) Admin Company de una empresa interna",
+      "userRol": null, "hasAdminCompanyRel": true, "signedRel": 0,
+      "rels": [{ "id": 502, "idRol": 2, "tipo": 1, "idDealer": null }],
+      "owner": { "idOwner": 10, "ownerEmpresaType": 2 },
+      "companyTypes": { "10": 2 },
+      "external": false
+    },
+    {
+      "name": "(h) Admin General, también con un número de empresa que coincide con una relación de rol ajena",
+      "userRol": 1, "hasAdminCompanyRel": false, "signedRel": 777,
+      "rels": [],
+      "owner": { "idOwner": null, "ownerEmpresaType": null },
+      "companyTypes": {},
+      "external": false
+    }
+  ]
+}

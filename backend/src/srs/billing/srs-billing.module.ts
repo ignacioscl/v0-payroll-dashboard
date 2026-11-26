@@ -27,6 +27,9 @@ import { OpenInvoicesRepository } from './repository/open-invoices.repository'
 import { OpenInvoicesCompareRepository } from './repository/open-invoices-compare.repository'
 import { OpenInvoicesService } from './service/open-invoices.service'
 import { OpenInvoicesCompareService } from './service/open-invoices-compare.service'
+import { WoToBeBilledController } from './controller/wo-to-be-billed.controller'
+import { WoToBeBilledRepository } from './repository/wo-to-be-billed.repository'
+import { WoToBeBilledService } from './service/wo-to-be-billed.service'
 
 @Module({
   imports: [
@@ -52,6 +55,9 @@ import { OpenInvoicesCompareService } from './service/open-invoices-compare.serv
     OpenInvoicesCompareRepository,
     OpenInvoicesService,
     OpenInvoicesCompareService,
+    // WO to be Billed (plans/plan-wo-to-be-billed-v0, T4): la lectura; las escrituras van en features/srs-invoice*.
+    WoToBeBilledRepository,
+    WoToBeBilledService,
   ],
   // The export controllers go before InvoiceController so `/invoices/export` and
   // `/invoices/list-export` are never read as `/invoices/:id/...`.
@@ -61,8 +67,11 @@ import { OpenInvoicesCompareService } from './service/open-invoices-compare.serv
     InvoiceListExportController,
     InvoiceController,
     GenericInvoiceController,
+    WoToBeBilledController,
   ],
   // BillingKpiRepository: Income por dealer y por línea para Monthly Closing (T1 de plans/plan-monthly-closing).
-  exports: [BillingKpiService, InvoiceService, BillingKpiRepository],
+  // WoToBeBilledService / Repository: la generación (features/srs-invoice-statement) valida el filtro y lee las líneas
+  // pendientes dentro de su transacción. Ninguno de los dos importa al feature: no hay ciclo.
+  exports: [BillingKpiService, InvoiceService, BillingKpiRepository, WoToBeBilledService, WoToBeBilledRepository],
 })
 export class SrsBillingModule {}

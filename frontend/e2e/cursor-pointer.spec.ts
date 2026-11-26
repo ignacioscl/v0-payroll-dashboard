@@ -38,10 +38,10 @@ test.describe('Manito en todo botón', () => {
     expect(await buttonsWithoutPointer(page)).toEqual([])
   })
 
-  test('Dashboard, Invoices, Roles y Expenses', async ({ page }) => {
+  test('Dashboard, Invoices, WO to be Billed, Roles y Expenses', async ({ page }) => {
     test.skip(E2E_MISSING_USER, E2E_MISSING_USER_REASON)
     await login(page)
-    for (const path of ['/', '/billing/invoices', '/roles', '/expenses']) {
+    for (const path of ['/', '/billing/invoices', '/billing/wo-to-be-billed', '/roles', '/expenses']) {
       await page.goto(path)
       await expect(page.locator('main')).toBeVisible()
       await page.waitForLoadState('networkidle').catch(() => {})

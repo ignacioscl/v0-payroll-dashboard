@@ -23,6 +23,8 @@ const ITEM_COUNT: Record<ReportRulesScreen, number> = {
   openInvoices: 8,
   // The comparison of a snapshot with today (P5).
   openInvoicesCompare: 4,
+  // WO to be Billed (plans/plan-wo-to-be-billed-v0, T9): qué WO entran, Price, Include Zero Value y Completed.
+  woToBeBilled: 4,
 }
 
 /**

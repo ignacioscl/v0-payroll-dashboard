@@ -7,9 +7,9 @@
  * - Compu: Invoices sigue con su columna Invoice # fija, así no se rompe la compu.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickAllDealersAndDatePreset } from './helpers'
+import { E2E_MISSING_USER, E2E_MISSING_USER_REASON, login, pickAllDealersAndDatePreset, pickDealerAndRange } from './helpers'
 
-const PAGES = ['/billing/invoices', '/', '/reports/production-vs-goal', '/roles/templates']
+const PAGES = ['/billing/invoices', '/billing/wo-to-be-billed', '/', '/reports/production-vs-goal', '/roles/templates']
 
 async function tableProblems(page: Page) {
   return page.evaluate(() => {
@@ -50,7 +50,9 @@ test.describe('Tablas en celular', () => {
     for (const path of PAGES) {
       await page.goto(path)
       // Con todos los dealers y un mes, para que las tablas tengan filas (los filtros no se guardan entre pantallas).
-      if (path !== '/roles/templates') await pickAllDealersAndDatePreset(page, 'Last 30 days')
+      // WO to be Billed es de a un dealer.
+      if (path === '/billing/wo-to-be-billed') await pickDealerAndRange(page, 'Tesla Orange Park Mall Pop-Up', '11/10/2026')
+      else if (path !== '/roles/templates') await pickAllDealersAndDatePreset(page, 'Last 30 days')
       await waitForTables(page)
       const rows = page.locator('main table tbody tr')
       // Invoices con un mes de todos los dealers tiene filas: si no, el control no probaría nada.

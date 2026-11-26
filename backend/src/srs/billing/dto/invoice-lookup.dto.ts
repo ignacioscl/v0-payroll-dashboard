@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator'
 
-import { parseCsvPositiveInts, parseOptionalTrimmed } from './invoice-filter-parsers'
+import { parseCsvPositiveInts, parseFlag01, parseOptionalTrimmed } from './invoice-filter-parsers'
 
 /**
  * Safety ceiling for the filter lookups. The pickers must list every match (a silent cap made
@@ -33,6 +33,14 @@ export class InvoiceLookupQueryDto {
   @IsString()
   idDepartment?: string
 
+  @ApiPropertyOptional({
+    description:
+      'Service lookup only: 1 = also the deleted services (WO to be Billed, «Show deleted services»). Default 0.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseFlag01(value))
+  includeInactive?: boolean
+
   @ApiPropertyOptional({ default: LOOKUP_MAX_ROWS })
   @IsOptional()
   @Transform(toOptionalInt)
@@ -48,6 +56,8 @@ export interface InvoiceLookupOptionDto {
   sublabel?: string
   thumbnailUuid?: string | null
   logoImg?: string | null
+  /** Service lookup with `includeInactive`: the service was deleted (`INVOICE_SERVICE.estado = 0`). */
+  inactive?: boolean
 }
 
 export class InvoiceLookupResponseDto {
@@ -77,6 +87,7 @@ export function buildServiceLookupFilter(query: InvoiceLookupQueryDto) {
   return {
     dealerIds: parseCsvPositiveInts(query.idDealer ?? ''),
     departmentIds: parseCsvPositiveInts(query.idDepartment),
+    includeInactive: query.includeInactive === true,
     search: parseOptionalTrimmed(query.search),
     limit: query.limit && query.limit > 0 ? Math.min(query.limit, LOOKUP_MAX_ROWS) : LOOKUP_MAX_ROWS,
   }

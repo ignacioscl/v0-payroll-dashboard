@@ -81,6 +81,11 @@ interface DealerMultiSelectProps {
   searchPlaceholder?: string
   /** Trigger label with several items checked (default: «{count} dealers selected»). */
   manySelectedLabel?: (count: number) => string
+  /**
+   * De a uno (WO to be Billed): sin «All Dealers» ni casillas; elegir un dealer lo deja solo y cierra, con la marca del
+   * combo de selección única (`SearchableCombobox`).
+   */
+  single?: boolean
 }
 
 export function DealerMultiSelect({
@@ -98,6 +103,7 @@ export function DealerMultiSelect({
   keepOrder = false,
   searchPlaceholder,
   manySelectedLabel,
+  single = false,
 }: DealerMultiSelectProps) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('dealer.labelPlural')
@@ -126,7 +132,7 @@ export function DealerMultiSelect({
 
   const label = useMemo(() => {
     if (dealers.length === 0) return resolvedPlaceholder
-    if (allSelected) return resolvedAllLabel
+    if (allSelected && !single) return resolvedAllLabel
     if (noneSelected) return resolvedPlaceholder
     if (value.length === 1) {
       return dealers.find((d) => d.id === value[0])?.label ?? t('dealer.oneSelected')
@@ -134,7 +140,7 @@ export function DealerMultiSelect({
     return manySelectedLabel
       ? manySelectedLabel(value.length)
       : t('dealer.manySelected', { count: value.length })
-  }, [allSelected, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value, manySelectedLabel])
+  }, [allSelected, single, dealers, noneSelected, resolvedAllLabel, resolvedPlaceholder, t, value, manySelectedLabel])
 
   const orderedDealers = dealersOnOpen ?? dealers
 
@@ -165,6 +171,14 @@ export function DealerMultiSelect({
         onChange(draftValue)
       }
     }
+  }
+
+  /** De a uno: queda solo ese dealer y se cierra. */
+  const pickOne = (id: string) => {
+    setDealersOnOpen(null)
+    setSearch('')
+    setOpen(false)
+    if (!dealerSelectionEqual([id], value)) onChange([id])
   }
 
   const toggleDealer = (id: string) => {
@@ -240,6 +254,7 @@ export function DealerMultiSelect({
             onValueChange={setSearch}
           />
           {/* Sticky outside cmdk filter so it never disappears while searching. */}
+          {single ? null : (
           <button
             type="button"
             disabled={filteredIds.length === 0}
@@ -254,6 +269,7 @@ export function DealerMultiSelect({
             <RowCheckbox checked={allVisibleSelected} />
             <span className="font-medium">{checkAllLabel}</span>
           </button>
+          )}
           <CommandList className={maxHeight}>
             <CommandEmpty>{resolvedEmptyLabel}</CommandEmpty>
             <CommandGroup>
@@ -263,12 +279,20 @@ export function DealerMultiSelect({
                   <CommandItem
                     key={dealer.id}
                     value={dealer.label}
-                    onSelect={() => {}}
-                    onMouseDown={handleRowMouseDown(() => toggleDealer(dealer.id))}
+                    onSelect={single ? () => pickOne(dealer.id) : () => {}}
+                    onMouseDown={handleRowMouseDown(() => (single ? pickOne(dealer.id) : toggleDealer(dealer.id)))}
                     className="cursor-pointer data-[selected=true]:text-foreground"
                   >
-                    <RowCheckbox checked={checked} />
+                    {single ? null : <RowCheckbox checked={checked} />}
                     <span className="truncate">{dealer.label}</span>
+                    {single && value.includes(dealer.id) ? (
+                      <span
+                        className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+                        aria-hidden
+                      >
+                        <Check className="size-3 stroke-[3]" />
+                      </span>
+                    ) : null}
                   </CommandItem>
                 )
               })}

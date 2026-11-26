@@ -7,7 +7,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { canAccessExpenses, ROL_ACCION_EXPENSES_APPROVE } from './auth/expenses-permissions'
-import { canAccessMonthlyClosing, canAccessOpenInvoices, canAccessWindowTintClosing } from './auth/payroll-access'
+import {
+  canAccessMonthlyClosing,
+  canAccessOpenInvoices,
+  canAccessWindowTintClosing,
+  canAccessWoToBeBilled,
+} from './auth/payroll-access'
 import {
   ROL_ACCION_REPORT_BUSINESS_KPIS,
   ROL_ACCION_REPORT_INCOME_BY_DEALER,
@@ -263,6 +268,43 @@ describe('getScreenAccess', () => {
     const external = { user: user({ isCompanyTypeCompany: true }), permissionIds: [ROL_ACCION_TTK_ADMIN_HOURS] }
     expect(getScreenAccess('/', external, { isDev: false })).toBe('denied')
     expect(getScreenAccess('/issues', external, { isDev: false })).toBe('allowed')
+  })
+})
+
+/**
+ * Billing › WO to be Billed (plans/plan-wo-to-be-billed-v0, T8 y T11): internos con «Invoices > Modulde Access» (15) y
+ * «Invoices > Create Invoice» (16), o un admin; un externo nunca, aunque tenga los dos.
+ */
+describe('WO to be Billed (15 y 16)', () => {
+  const ROUTE = '/billing/wo-to-be-billed'
+  const ROL_ACCION_INVOICE_CREATE = 16
+
+  it('solo con «Modulde Access» → denied; con los dos → allowed; externo con los dos → denied', () => {
+    expect(getScreenAccess(ROUTE, { user: user(), permissionIds: [ROL_ACCION_INVOICES_MODULE_ACCESS] }, { isDev: false })).toBe('denied')
+    const both = [ROL_ACCION_INVOICES_MODULE_ACCESS, ROL_ACCION_INVOICE_CREATE]
+    expect(getScreenAccess(ROUTE, { user: user(), permissionIds: both }, { isDev: false })).toBe('allowed')
+    expect(getScreenAccess(ROUTE, { user: user({ isCompanyTypeCompany: true }), permissionIds: both }, { isDev: false })).toBe('denied')
+  })
+
+  it('canAccessWoToBeBilled: admin sí (sin permisos sueltos), externo admin no', () => {
+    expect(canAccessWoToBeBilled(user({ isSystemAdmin: true }), none)).toBe(true)
+    expect(canAccessWoToBeBilled(user({ isSystemAdmin: true, isCompanyTypeCompany: true }), none)).toBe(false)
+    expect(canAccessWoToBeBilled(user(), granted(ROL_ACCION_INVOICE_CREATE))).toBe(false)
+    expect(canAccessWoToBeBilled(null, granted(ROL_ACCION_INVOICES_MODULE_ACCESS, ROL_ACCION_INVOICE_CREATE))).toBe(false)
+  })
+
+  it('decide con `isExternalSession` de /me (D7) cuando viene, aunque `isCompanyTypeCompany` diga lo contrario (R2)', () => {
+    const admin = (over: Partial<SrsMeUser>) => user({ isSystemAdmin: true, ...over })
+    expect(canAccessWoToBeBilled(admin({ isCompanyTypeCompany: true, isExternalSession: false }), none)).toBe(true)
+    expect(canAccessWoToBeBilled(admin({ isCompanyTypeCompany: false, isExternalSession: true }), none)).toBe(false)
+    const both = [ROL_ACCION_INVOICES_MODULE_ACCESS, ROL_ACCION_INVOICE_CREATE]
+    expect(getScreenAccess(ROUTE, { user: user({ isExternalSession: true }), permissionIds: both }, { isDev: false })).toBe('denied')
+  })
+
+  it('el menú trae Billing › WO to be Billed solo con el acceso', () => {
+    const base = { isDev: false, canAccessTtk: true, companyModules: { companyHasExpenses: true, companyHasClosingReports: true }, t }
+    expect(hrefs(getVisibleNavigation({ ...base, canAccessWoToBeBilled: true }))).toContain(ROUTE)
+    expect(hrefs(getVisibleNavigation({ ...base, canAccessWoToBeBilled: false }))).not.toContain(ROUTE)
   })
 })
 

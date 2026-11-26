@@ -12,6 +12,7 @@ export interface Messages {
     reports: string
     billing: string
     invoices: string
+    woToBeBilled: string
     rolesAdmin: string
     rolesList: string
     roleTemplates: string
@@ -270,6 +271,137 @@ export interface Messages {
     roleDeleteSuccess: string
     roleDeleteError: string
     roleEstadoError: string
+  }
+  woToBeBilled: {
+    title: string
+    selectOneDealer: string
+    empty: string
+    loadError: string
+    counter: string
+    counterOne: string
+    selectRow: string
+    selectAll: string
+    recordsLabel: string
+    summaryCount: string
+    summaryCountHelp: string
+    summaryTotal: string
+    summaryTotalHelp: string
+    filters: {
+      department: string
+      services: string
+      invoiceType: string
+      invoiceTypePlaceholder: string
+      status: string
+      includeZero: string
+      approved: string
+      stock: string
+      wo: string
+      price: string
+      ro: string
+      po: string
+      showDeletedServices: string
+      selectDepartmentFirst: string
+    }
+    invoiceTypes: {
+      byServices: string
+      multiServices: string
+      selectedServices: string
+    }
+    status: {
+      inTransit: string
+      arrived: string
+      inProcess: string
+      completed: string
+      pause: string
+    }
+    approvedOptions: {
+      all: string
+      yes: string
+      no: string
+    }
+    columns: {
+      vin: string
+      stock: string
+      wo: string
+      invoice: string
+      date: string
+      department: string
+      services: string
+      price: string
+      ro: string
+      po: string
+      age: string
+      approved: string
+      actions: string
+    }
+    tooltips: {
+      printWo: string
+      generateIndividual: string
+      deleteWo: string
+      withoutInvoice: string
+      approvedBy: string
+      notApproved: string
+      inspectedBy: string
+      internalInspectedBy: string
+      obs: string
+      editRo: string
+      editPo: string
+    }
+    age: {
+      minutes: string
+      minute: string
+      now: string
+    }
+    generate: {
+      button: string
+      missingType: string
+      missingDate: string
+      missingService: string
+      title: string
+      text: string
+      textOneOne: string
+      textManyOne: string
+      help: string
+      confirm: string
+      cancel: string
+      processing: string
+      counting: string
+      nothing: string
+      created: string
+      createdOne: string
+      viewInInvoices: string
+    }
+    individual: {
+      title: string
+      text: string
+      confirm: string
+      alreadyInvoiced: string
+      pdfFailed: string
+    }
+    delete: {
+      title: string
+      text: string
+      confirm: string
+      done: string
+      selectedButton: string
+      selectedText: string
+      selectedTextOne: string
+      selectedDone: string
+      selectedDoneOne: string
+      partial: string
+      none: string
+      tooMany: string
+    }
+    roPo: {
+      titleRo: string
+      titlePo: string
+      labelRo: string
+      labelPo: string
+      save: string
+      cancel: string
+      saved: string
+    }
+    pdfFailed: string
   }
   invoices: {
     title: string
@@ -1606,6 +1738,13 @@ export interface Messages {
     col90: string
   }
   reportRules: {
+    woToBeBilled: {
+      title: string
+      item1: string
+      item2: string
+      item3: string
+      item4: string
+    }
     billing: {
       title: string
       item1: string

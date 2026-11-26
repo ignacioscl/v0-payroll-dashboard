@@ -183,6 +183,8 @@ export type InvoiceLookupOption = {
   sublabel?: string
   thumbnailUuid?: string | null
   logoImg?: string | null
+  /** Service lookup with `includeInactive`: a deleted service (shown in red). */
+  inactive?: boolean
 }
 
 export interface InvoiceLookupResponse {
@@ -461,10 +463,13 @@ function buildLookupQuery(params: {
   search?: string
   idDepartment?: string
   limit?: number
+  /** Services only (WO to be Billed, «Show deleted services»): also the deleted ones, marked `inactive`. */
+  includeInactive?: boolean
 }): string {
   const qs = new URLSearchParams({ idDealer: params.idDealer })
   if (params.search) qs.set('search', params.search)
   if (params.idDepartment) qs.set('idDepartment', params.idDepartment)
+  if (params.includeInactive) qs.set('includeInactive', '1')
   if (params.limit) qs.set('limit', String(params.limit))
   return `?${qs.toString()}`
 }
@@ -489,6 +494,7 @@ export async function fetchInvoiceServices(params: {
   idDepartment?: string
   search?: string
   limit?: number
+  includeInactive?: boolean
 }): Promise<InvoiceLookupResult> {
   const res = await fetch(
     `/api/srs-kpis/billing/invoices/lookups/services${buildLookupQuery(params)}`,

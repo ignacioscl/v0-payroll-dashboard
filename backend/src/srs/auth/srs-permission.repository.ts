@@ -4,12 +4,31 @@ import { DataSource } from 'typeorm'
 
 import { SRS_CONNECTION } from '../srs.datasource'
 import { SrsContext } from './srs-auth-context.service'
+import { isExternalSession } from './srs-external-session'
 
 /** Legacy ROL_ACCION: Invoices module access (`show-rol-action-15`). */
 export const ROL_ACCION_INVOICES_MODULE_ACCESS = 15
 
 /** Legacy ROL_ACCION: Invoices > Create Invoice (`show-rol-action-16`). */
 export const ROL_ACCION_INVOICE_CREATE = 16
+
+/** Legacy ROL_ACCION: Work Orders > Delete WO (`api.invoice.php:880-905`; WO to be Billed, T5). */
+export const ROL_ACCION_WO_DELETE = 14
+
+/** Legacy ROL_ACCION: Work Orders > Delete WO only in transit status (WO to be Billed, T5). */
+export const ROL_ACCION_WO_DELETE_IN_TRANSIT = 79
+
+/**
+ * Legacy ROL_ACCION: Work Orders > Lock WO after Completed. Restringe: se consulta con `CHECK_USER_PERMISSION` y bloquea
+ * si devuelve exactamente 1 (D16), no con `userHasRolAccion` (que a los Admin les da siempre «sí»).
+ */
+export const ROL_ACCION_WO_LOCK_AFTER_COMPLETED = 86
+
+/**
+ * Legacy ROL_ACCION: Work Orders > Modify PO & RO from WO when a Lock Date is set. Lo resuelve `CHECK_DATE_FREEZE`
+ * (devuelve 2), que ya lo mira en la base (WO to be Billed, T6).
+ */
+export const ROL_ACCION_WO_MODIFY_PO_RO_LOCKED = 138
 
 /** Legacy ROL_ACCION: Invoices > Print Invoice — also gates the export (D23). */
 export const ROL_ACCION_INVOICE_PRINT = 19
@@ -127,6 +146,18 @@ export class SrsPermissionRepository {
 
   async assertRolAccion(ctx: SrsContext, accionId: number): Promise<void> {
     if (!(await this.userHasRolAccion(ctx, accionId))) {
+      throw new ForbiddenException('Forbidden')
+    }
+  }
+
+  /** La sesión es de un usuario externo (regla y pareja en PHP: `srs-external-session.ts`). */
+  isExternalSession(ctx: SrsContext): Promise<boolean> {
+    return isExternalSession(ctx, this.srs)
+  }
+
+  /** 403 si la sesión no se puede comprobar interna (D7 de plans/plan-wo-to-be-billed-v0). */
+  async assertInternalSession(ctx: SrsContext): Promise<void> {
+    if (await this.isExternalSession(ctx)) {
       throw new ForbiddenException('Forbidden')
     }
   }

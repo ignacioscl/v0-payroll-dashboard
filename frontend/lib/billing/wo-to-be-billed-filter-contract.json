@@ -1,0 +1,35 @@
+{
+  "_doc": "WO to be Billed (plans/plan-wo-to-be-billed-v0, T11): el pedido que arma la pantalla para cada filtro. Lo usan lib/srs-wo-to-be-billed-api.test.ts (el front arma exactamente esto) y backend/src/srs/billing/wo-to-be-billed-filter-contract.spec.ts (el ValidationPipe real no descarta ninguna clave).",
+  "cases": [
+    {
+      "name": "solo dealer y fechas",
+      "input": { "idDealer": 594, "dateFrom": "2026-10-01", "dateTo": "2026-11-12", "status": [], "departments": [], "services": [], "invoiceType": null, "includeZero": false, "approved": "", "wo": "", "stock": "", "price": "", "ro": "", "po": "" },
+      "request": { "idDealer": 594, "dateFrom": "2026-10-01", "dateTo": "2026-11-12", "includeZero": false },
+      "query": "idDealer=594&dateFrom=2026-10-01&dateTo=2026-11-12&includeZero=0"
+    },
+    {
+      "name": "sin fechas: toda la historia del dealer (como se entra)",
+      "input": { "idDealer": 594, "dateFrom": "", "dateTo": "", "status": [], "departments": [], "services": [], "invoiceType": null, "includeZero": false, "approved": "", "wo": "", "stock": "", "price": "", "ro": "", "po": "" },
+      "request": { "idDealer": 594, "includeZero": false },
+      "query": "idDealer=594&includeZero=0"
+    },
+    {
+      "name": "todos los filtros, by Services",
+      "input": { "idDealer": 594, "dateFrom": "2026-10-01", "dateTo": "2026-11-12", "status": [15, 7], "departments": [492], "services": [13913], "invoiceType": 2, "includeZero": true, "approved": "1", "wo": " 8722 ", "stock": "8579", "price": "85.50", "ro": "R1", "po": "P1" },
+      "request": { "idDealer": 594, "dateFrom": "2026-10-01", "dateTo": "2026-11-12", "includeZero": true, "status": [15, 7], "departments": [492], "services": [13913], "invoiceType": 2, "approved": "1", "wo": "8722", "stock": "8579", "ro": "R1", "po": "P1", "price": 85.5 },
+      "query": "idDealer=594&dateFrom=2026-10-01&dateTo=2026-11-12&includeZero=1&status=15%2C7&departments=492&services=13913&invoiceType=2&approved=1&wo=8722&stock=8579&ro=R1&po=P1&price=85.5"
+    },
+    {
+      "name": "Selected Services con varios, Approved = No",
+      "input": { "idDealer": 921, "dateFrom": "2026-09-01", "dateTo": "2026-09-30", "status": [], "departments": [492, 493], "services": [147946, 147951], "invoiceType": 4, "includeZero": false, "approved": "0", "wo": "", "stock": "", "price": "", "ro": "", "po": "" },
+      "request": { "idDealer": 921, "dateFrom": "2026-09-01", "dateTo": "2026-09-30", "includeZero": false, "departments": [492, 493], "services": [147946, 147951], "invoiceType": 4, "approved": "0" },
+      "query": "idDealer=921&dateFrom=2026-09-01&dateTo=2026-09-30&includeZero=0&departments=492%2C493&services=147946%2C147951&invoiceType=4&approved=0"
+    },
+    {
+      "name": "Multi-Services, Completed solo, Price 0",
+      "input": { "idDealer": 874, "dateFrom": "2026-10-01", "dateTo": "2026-10-31", "status": [7], "departments": [], "services": [], "invoiceType": 3, "includeZero": false, "approved": "", "wo": "", "stock": "", "price": "0", "ro": "", "po": "" },
+      "request": { "idDealer": 874, "dateFrom": "2026-10-01", "dateTo": "2026-10-31", "includeZero": false, "status": [7], "invoiceType": 3, "price": 0 },
+      "query": "idDealer=874&dateFrom=2026-10-01&dateTo=2026-10-31&includeZero=0&status=7&invoiceType=3&price=0"
+    }
+  ]
+}
